@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,12 +17,15 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+
 from itertools import cycle
 from mock import Mock
 import time
 import threading
 from six.moves.queue import PriorityQueue
+import sys
 
+from cassandra.cluster import Cluster, Session
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 
 
@@ -34,6 +37,7 @@ class MockResponseResponseFuture():
 
     _query_trace = None
     _col_names = None
+    _col_types = None
 
     # a list pending callbacks, these will be prioritized in reverse or normal orderd
     pending_callbacks = PriorityQueue()
@@ -211,10 +215,11 @@ class ConcurrencyTest((unittest.TestCase)):
 
         t = TimedCallableInvoker(our_handler, slowdown=slowdown)
         t.start()
-        results = execute_concurrent(mock_session, statements_and_params, results_generator=True)
-
-        self.validate_result_ordering(results)
-        t.stop()
+        try:
+            results = execute_concurrent(mock_session, statements_and_params, results_generator=True)
+            self.validate_result_ordering(results)
+        finally:
+            t.stop()
 
     def validate_result_ordering(self, results):
         """
@@ -228,3 +233,19 @@ class ConcurrencyTest((unittest.TestCase)):
             current_time_added = list(result)[0]
             self.assertLess(last_time_added, current_time_added)
             last_time_added = current_time_added
+
+    def test_recursion_limited(self):
+        """
+        Verify that recursion is controlled when raise_on_first_error=False and something is wrong with the query.
+
+        PYTHON-585
+        """
+        max_recursion = sys.getrecursionlimit()
+        s = Session(Cluster(), [])
+        self.assertRaises(TypeError, execute_concurrent_with_args, s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=True)
+
+        results = execute_concurrent_with_args(s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=False)  # previously
+        self.assertEqual(len(results), max_recursion)
+        for r in results:
+            self.assertFalse(r[0])
+            self.assertIsInstance(r[1], TypeError)

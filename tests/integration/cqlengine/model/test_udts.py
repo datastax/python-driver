@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,13 @@ except ImportError:
 
 from datetime import datetime, date, time
 from decimal import Decimal
+from mock import Mock
 from uuid import UUID, uuid4
 
 from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.usertype import UserType
-from cassandra.cqlengine import columns
-from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace
+from cassandra.cqlengine.usertype import UserType, UserTypeDefinitionException
+from cassandra.cqlengine import columns, connection
+from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace, drop_table
 from cassandra.util import Date, Time
 
 from tests.integration import PROTOCOL_VERSION
@@ -109,11 +110,35 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual("John", john_info.name)
 
         created_user.info = User(age=22, name="Mary")
-        created_user.save()
+        created_user.update()
 
         mary_info = UserModel.objects().first().info
         self.assertEqual(22, mary_info.age)
         self.assertEqual("Mary", mary_info.name)
+
+    def test_can_update_udts_with_nones(self):
+        class User(UserType):
+            age = columns.Integer()
+            name = columns.Text()
+
+        class UserModel(Model):
+            id = columns.Integer(primary_key=True)
+            info = columns.UserDefinedType(User)
+
+        sync_table(UserModel)
+
+        user = User(age=42, name="John")
+        created_user = UserModel.create(id=0, info=user)
+
+        john_info = UserModel.objects().first().info
+        self.assertEqual(42, john_info.age)
+        self.assertEqual("John", john_info.name)
+
+        created_user.info = None
+        created_user.update()
+
+        john_info = UserModel.objects().first().info
+        self.assertIsNone(john_info)
 
     def test_can_create_same_udt_different_keyspaces(self):
         class User(UserType):
@@ -402,4 +427,138 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         UserModelText.create(id=unicode_name, info=user_template_ascii)
         UserModelText.create(id=unicode_name, info=user_template_unicode)
 
+    def test_register_default_keyspace(self):
+        class User(UserType):
+            age = columns.Integer()
+            name = columns.Text()
 
+        from cassandra.cqlengine import models
+        from cassandra.cqlengine import connection
+
+        # None emulating no model and no default keyspace before connecting
+        connection.udt_by_keyspace.clear()
+        User.register_for_keyspace(None)
+        self.assertEqual(len(connection.udt_by_keyspace), 1)
+        self.assertIn(None, connection.udt_by_keyspace)
+
+        # register should be with default keyspace, not None
+        cluster = Mock()
+        connection._register_known_types(cluster)
+        cluster.register_user_type.assert_called_with(models.DEFAULT_KEYSPACE, User.type_name(), User)
+
+    def test_db_field_override(self):
+        """
+        Tests for db_field override
+
+        Tests to ensure that udt's in models can specify db_field for a particular field and that it will be honored.
+
+        @since 3.1.0
+        @jira_ticket PYTHON-346
+        @expected_result The actual cassandra column will use the db_field specified.
+
+        @test_category data_types:udt
+        """
+        class db_field_different(UserType):
+            age = columns.Integer(db_field='a')
+            name = columns.Text(db_field='n')
+
+        class TheModel(Model):
+            id = columns.Integer(primary_key=True)
+            info = columns.UserDefinedType(db_field_different)
+
+        sync_table(TheModel)
+
+        cluster = connection.get_cluster()
+        type_meta = cluster.metadata.keyspaces[TheModel._get_keyspace()].user_types[db_field_different.type_name()]
+
+        type_fields = (db_field_different.age.column, db_field_different.name.column)
+
+        self.assertEqual(len(type_meta.field_names), len(type_fields))
+        for f in type_fields:
+            self.assertIn(f.db_field_name, type_meta.field_names)
+
+        id = 0
+        age = 42
+        name = 'John'
+        info = db_field_different(age=age, name=name)
+        TheModel.create(id=id, info=info)
+
+        self.assertEqual(1, TheModel.objects.count())
+
+        john = TheModel.objects().first()
+        self.assertEqual(john.id, id)
+        info = john.info
+        self.assertIsInstance(info, db_field_different)
+        self.assertEqual(info.age, age)
+        self.assertEqual(info.name, name)
+        # also excercise the db_Field mapping
+        self.assertEqual(info.a, age)
+        self.assertEqual(info.n, name)
+
+    def test_db_field_overload(self):
+        """
+        Tests for db_field UserTypeDefinitionException
+
+        Test so that when we override a model's default field witha  db_field that it errors appropriately
+
+        @since 3.1.0
+        @jira_ticket PYTHON-346
+        @expected_result Setting a db_field to an existing field causes an exception to occur.
+
+        @test_category data_types:udt
+        """
+
+        with self.assertRaises(UserTypeDefinitionException):
+            class something_silly(UserType):
+                first_col = columns.Integer()
+                second_col = columns.Text(db_field='first_col')
+
+        with self.assertRaises(UserTypeDefinitionException):
+            class something_silly_2(UserType):
+                first_col = columns.Integer(db_field="second_col")
+                second_col = columns.Text()
+
+    def test_set_udt_fields(self):
+        # PYTHON-502
+        class User(UserType):
+            age = columns.Integer()
+            name = columns.Text()
+
+        u = User()
+        u.age = 20
+        self.assertEqual(20, u.age)
+
+    def test_default_values(self):
+        """
+        Test that default types are set on object creation for UDTs
+
+        @since 3.7.0
+        @jira_ticket PYTHON-606
+        @expected_result Default values should be set.
+
+        @test_category data_types:udt
+        """
+
+        class NestedUdt(UserType):
+
+            test_id = columns.UUID(default=uuid4)
+            something = columns.Text()
+            default_text = columns.Text(default="default text")
+
+        class OuterModel(Model):
+
+            name = columns.Text(primary_key=True)
+            first_name = columns.Text()
+            nested = columns.List(columns.UserDefinedType(NestedUdt))
+            simple = columns.UserDefinedType(NestedUdt)
+
+        sync_table(OuterModel)
+
+        t = OuterModel.create(name='test1')
+        t.nested = [NestedUdt(something='test')]
+        t.simple = NestedUdt(something="")
+        t.save()
+        self.assertIsNotNone(t.nested[0].test_id)
+        self.assertEqual(t.nested[0].default_text, "default text")
+        self.assertIsNotNone(t.simple.test_id)
+        self.assertEqual(t.simple.default_text, "default text")

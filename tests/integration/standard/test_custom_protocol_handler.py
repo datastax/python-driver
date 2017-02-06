@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -126,12 +126,13 @@ class CustomResultMessageRaw(ResultMessage):
     type_codes = my_type_codes
 
     @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map):
+    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
             paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
             rowcount = read_int(f)
             rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
+            colnames = [c[2] for c in column_metadata]
             coltypes = [c[3] for c in column_metadata]
-            return (paging_state, (coltypes, rows))
+            return paging_state, coltypes, (colnames, rows)
 
 
 class CustomTestRawRowType(ProtocolHandler):
@@ -155,7 +156,7 @@ class CustomResultMessageTracked(ResultMessage):
     checked_rev_row_set = set()
 
     @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map):
+    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
         paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
@@ -166,7 +167,7 @@ class CustomResultMessageTracked(ResultMessage):
             tuple(ctype.from_binary(val, protocol_version)
                   for ctype, val in zip(coltypes, row))
             for row in rows]
-        return (paging_state, (colnames, parsed_rows))
+        return paging_state, coltypes, (colnames, parsed_rows)
 
 
 class CustomProtocolHandlerResultMessageTracked(ProtocolHandler):

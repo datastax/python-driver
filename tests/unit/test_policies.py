@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ except ImportError:
     import unittest  # noqa
 
 from itertools import islice, cycle
-from mock import Mock
+from mock import Mock, patch
 from random import randint
 import six
 import sys
@@ -28,12 +28,13 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.metadata import Metadata
-from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
+from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
-                                LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy)
+                                LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
+                                IdentityTranslator, EC2MultiRegionTranslator)
 from cassandra.pool import Host
 from cassandra.query import Statement
 
@@ -483,7 +484,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         host_none = Host(1, SimpleConvictionPolicy)
 
         # contact point is '1'
-        cluster = Mock(contact_points=[1])
+        cluster = Mock(contact_points_resolved=[1])
 
         # contact DC first
         policy = DCAwareRoundRobinPolicy()
@@ -816,25 +817,30 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 9000, 1)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2,-1)
 
-    def test_schedule(self):
-        policy = ExponentialReconnectionPolicy(base_delay=2, max_delay=100, max_attempts=None)
-        i=0;
-        for delay in policy.new_schedule():
-            i += 1
-            if i > 10000:
-                break;
-        self.assertEqual(i, 10001)
+    def test_schedule_no_max(self):
+        base_delay = 2
+        max_delay = 100
+        test_iter = 10000
+        policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=None)
+        sched_slice = list(islice(policy.new_schedule(), 0, test_iter))
+        self.assertEqual(sched_slice[0], base_delay)
+        self.assertEqual(sched_slice[-1], max_delay)
+        self.assertEqual(len(sched_slice), test_iter)
 
-        policy = ExponentialReconnectionPolicy(base_delay=2, max_delay=100, max_attempts=64)
+    def test_schedule_with_max(self):
+        base_delay = 2
+        max_delay = 100
+        max_attempts = 64
+        policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts)
         schedule = list(policy.new_schedule())
-        self.assertEqual(len(schedule), 64)
+        self.assertEqual(len(schedule), max_attempts)
         for i, delay in enumerate(schedule):
             if i == 0:
-                self.assertEqual(delay, 2)
+                self.assertEqual(delay, base_delay)
             elif i < 6:
                 self.assertEqual(delay, schedule[i - 1] * 2)
             else:
-                self.assertEqual(delay, 100)
+                self.assertEqual(delay, max_delay)
 
 ONE = ConsistencyLevel.ONE
 
@@ -911,14 +917,14 @@ class RetryPolicyTest(unittest.TestCase):
         retry, consistency = policy.on_unavailable(
             query=None, consistency=ONE,
             required_replicas=1, alive_replicas=2, retry_num=0)
-        self.assertEqual(retry, RetryPolicy.RETHROW)
-        self.assertEqual(consistency, None)
+        self.assertEqual(retry, RetryPolicy.RETRY_NEXT_HOST)
+        self.assertEqual(consistency, ONE)
 
         retry, consistency = policy.on_unavailable(
             query=None, consistency=ONE,
             required_replicas=10000, alive_replicas=1, retry_num=0)
-        self.assertEqual(retry, RetryPolicy.RETHROW)
-        self.assertEqual(consistency, None)
+        self.assertEqual(retry, RetryPolicy.RETRY_NEXT_HOST)
+        self.assertEqual(consistency, ONE)
 
 
 class FallthroughRetryPolicyTest(unittest.TestCase):
@@ -1108,3 +1114,31 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
             query=None, consistency=ONE, required_replicas=3, alive_replicas=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.ONE)
+
+
+class WhiteListRoundRobinPolicyTest(unittest.TestCase):
+
+    def test_hosts_with_hostname(self):
+        hosts = ['localhost']
+        policy = WhiteListRoundRobinPolicy(hosts)
+        host = Host("127.0.0.1", SimpleConvictionPolicy)
+        policy.populate(None, [host])
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(sorted(qplan), [host])
+
+        self.assertEqual(policy.distance(host), HostDistance.LOCAL)
+
+class AddressTranslatorTest(unittest.TestCase):
+
+    def test_identity_translator(self):
+        it = IdentityTranslator()
+        addr = '127.0.0.1'
+
+    @patch('socket.getfqdn', return_value='localhost')
+    def test_ec2_multi_region_translator(self, *_):
+        ec2t = EC2MultiRegionTranslator()
+        addr = '127.0.0.1'
+        translated = ec2t.translate(addr)
+        self.assertIsNot(translated, addr)  # verifies that the resolver path is followed
+        self.assertEqual(translated, addr)  # and that it resolves to the same address

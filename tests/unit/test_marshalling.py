@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from cassandra.marshal import bitlength
+import sys
+
+from cassandra import ProtocolVersion
 
 try:
     import unittest2 as unittest
@@ -24,7 +26,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from cassandra.cqltypes import lookup_casstype, DecimalType, UTF8Type, DateType
-from cassandra.util import OrderedMap, OrderedMapSerializedKey, sortedset, Time, Date
+from cassandra.util import OrderedMapSerializedKey, sortedset, Time, Date
 
 marshalled_value_pairs = (
     # binary form, type, python native type
@@ -131,11 +133,24 @@ class UnmarshalTest(unittest.TestCase):
                              msg='Marshaller for %s (%s) gave wrong type (%s instead of %s)'
                                  % (valtype, marshaller, type(whatwegot), type(serializedval)))
 
-    def test_bitlength(self):
-        self.assertEqual(bitlength(9), 4)
-        self.assertEqual(bitlength(-10), 0)
-        self.assertEqual(bitlength(0), 0)
-
     def test_date(self):
         # separate test because it will deserialize as datetime
         self.assertEqual(DateType.from_binary(DateType.to_binary(date(2015, 11, 2), 1), 1), datetime(2015, 11, 2))
+
+    def test_decimal(self):
+        # testing implicit numeric conversion
+        # int, tuple(sign, digits, exp), float
+        converted_types = (10001, (0, (1, 0, 0, 0, 0, 1), -3), 100.1)
+
+        if sys.version_info < (2, 7):
+            # Decimal in Python 2.6 does not accept floats for lossless initialization
+            # Just verifying expected exception here
+            f = converted_types[-1]
+            self.assertIsInstance(f, float)
+            self.assertRaises(TypeError, DecimalType.to_binary, f, ProtocolVersion.MAX_SUPPORTED)
+            converted_types = converted_types[:-1]
+
+        for proto_ver in range(1, ProtocolVersion.MAX_SUPPORTED + 1):
+            for n in converted_types:
+                expected = Decimal(n)
+                self.assertEqual(DecimalType.from_binary(DecimalType.to_binary(n, proto_ver), proto_ver), expected)

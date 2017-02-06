@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -171,7 +171,6 @@ Some optional C extensions are not supported in PyPy. Only murmur3 will be built
 =================================================================================
 """
 
-
 is_windows = os.name == 'nt'
 
 is_pypy = "PyPy" in sys.version
@@ -213,7 +212,7 @@ class NoPatchExtension(Extension):
             base.__init__(self, *args, **kwargs)
         else:
             Extension.__init__(self, *args, **kwargs)
-        
+
 
 class build_extensions(build_ext):
 
@@ -323,6 +322,54 @@ On OSX, via homebrew:
                 sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
 
 
+def pre_build_check():
+    """
+    Try to verify build tools
+    """
+    if os.environ.get('CASS_DRIVER_NO_PRE_BUILD_CHECK'):
+        return True
+
+    try:
+        from distutils.ccompiler import new_compiler
+        from distutils.sysconfig import customize_compiler
+        from distutils.dist import Distribution
+
+        # base build_ext just to emulate compiler option setup
+        be = build_ext(Distribution())
+        be.initialize_options()
+        be.finalize_options()
+
+        # First, make sure we have a Python include directory
+        have_python_include = any(os.path.isfile(os.path.join(p, 'Python.h')) for p in be.include_dirs)
+        if not have_python_include:
+            sys.stderr.write("Did not find 'Python.h' in %s.\n" % (be.include_dirs,))
+            return False
+
+        compiler = new_compiler(compiler=be.compiler)
+        customize_compiler(compiler)
+
+        executables = []
+        if compiler.compiler_type in ('unix', 'cygwin'):
+            executables = [compiler.executables[exe][0] for exe in ('compiler_so', 'linker_so')]
+        elif compiler.compiler_type == 'nt':
+            executables = [getattr(compiler, exe) for exe in ('cc', 'linker')]
+
+        if executables:
+            from distutils.spawn import find_executable
+            for exe in executables:
+                if not find_executable(exe):
+                    sys.stderr.write("Failed to find %s for compiler type %s.\n" % (exe, compiler.compiler_type))
+                    return False
+
+    except Exception as exc:
+        sys.stderr.write('%s\n' % str(exc))
+        sys.stderr.write("Failed pre-build check. Attempting anyway.\n")
+
+    # if we are unable to positively id the compiler type, or one of these assumptions fails,
+    # just proceed as we would have without the check
+    return True
+
+
 def run_setup(extensions):
 
     kw = {'cmdclass': {'doc': DocCommand}}
@@ -336,7 +383,14 @@ def run_setup(extensions):
     kw['ext_modules'] = [Extension('DUMMY', [])]  # dummy extension makes sure build_ext is called for install
 
     if try_cython:
-        kw['setup_requires'] = ['Cython>=0.20']
+        # precheck compiler before adding to setup_requires
+        # we don't actually negate try_cython because:
+        # 1.) build_ext eats errors at compile time, letting the install complete while producing useful feedback
+        # 2.) there could be a case where the python environment has cython installed but the system doesn't have build tools
+        if pre_build_check():
+            kw['setup_requires'] = ['Cython>=0.20,<0.25']
+        else:
+            sys.stderr.write("Bypassing Cython setup requirement\n")
 
     dependencies = ['six >=1.6']
 
@@ -363,7 +417,6 @@ def run_setup(extensions):
             'Natural Language :: English',
             'Operating System :: OS Independent',
             'Programming Language :: Python',
-            'Programming Language :: Python :: 2.6',
             'Programming Language :: Python :: 2.7',
             'Programming Language :: Python :: 3.3',
             'Programming Language :: Python :: 3.4',

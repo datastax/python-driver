@@ -4,7 +4,7 @@ import six
 from cassandra.util import OrderedDict
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import columns
-from cassandra.cqlengine import connection
+from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine import models
 
 
@@ -27,9 +27,12 @@ class BaseUserType(object):
 
     def __init__(self, **values):
         self._values = {}
+        if self._db_map:
+            values = dict((self._db_map.get(k, k), v) for k, v in values.items())
 
         for name, field in self._fields.items():
-            value = values.get(name, None)
+            field_default = field.get_default() if field.has_default else None
+            value = values.get(name, field_default)
             if value is not None or isinstance(field, columns.BaseContainerColumn):
                 value = field.to_python(value)
             value_mngr = field.value_manager(self, field, value)
@@ -68,6 +71,13 @@ class BaseUserType(object):
         for field in self._fields.keys():
             yield field
 
+    def __getattr__(self, attr):
+        # provides the mapping from db_field to fields
+        try:
+            return getattr(self, self._db_map[attr])
+        except KeyError:
+            raise AttributeError(attr)
+
     def __getitem__(self, key):
         if not isinstance(key, six.string_types):
             raise TypeError
@@ -86,7 +96,7 @@ class BaseUserType(object):
         try:
             return self._len
         except:
-            self._len = len(self._columns.keys())
+            self._len = len(self._fields.keys())
             return self._len
 
     def keys(self):
@@ -102,8 +112,8 @@ class BaseUserType(object):
         return [(k, self[k]) for k in self]
 
     @classmethod
-    def register_for_keyspace(cls, keyspace):
-        connection.register_udt(keyspace, cls.type_name(), cls)
+    def register_for_keyspace(cls, keyspace, connection=None):
+        conn.register_udt(keyspace, cls.type_name(), cls, connection=connection)
 
     @classmethod
     def type_name(cls):
@@ -158,12 +168,15 @@ class UserTypeMetaClass(type):
                 raise UserTypeDefinitionException("field '{0}' conflicts with built-in attribute/method".format(k))
             _transform_column(k, v)
 
-        # create db_name -> model name map for loading
+        attrs['_fields'] = field_dict
+
         db_map = {}
         for field_name, field in field_dict.items():
-            db_map[field.db_field_name] = field_name
-
-        attrs['_fields'] = field_dict
+            db_field = field.db_field_name
+            if db_field != field_name:
+                if db_field in field_dict:
+                    raise UserTypeDefinitionException("db_field '{0}' for field '{1}' conflicts with another attribute name".format(db_field, field_name))
+                db_map[db_field] = field_name
         attrs['_db_map'] = db_map
 
         klass = super(UserTypeMetaClass, cls).__new__(cls, name, bases, attrs)

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ from mock import Mock, ANY, call
 
 from cassandra import OperationTimedOut, SchemaTargetType, SchemaChangeType
 from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
-from cassandra.cluster import ControlConnection, _Scheduler
+from cassandra.cluster import ControlConnection, _Scheduler, ProfileManager, EXEC_PROFILE_DEFAULT, ExecutionProfile
 from cassandra.pool import Host
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
-                                ConstantReconnectionPolicy)
+                                ConstantReconnectionPolicy, IdentityTranslator)
 
 PEER_IP = "foobar"
 
@@ -59,8 +59,9 @@ class MockMetadata(object):
 class MockCluster(object):
 
     max_schema_agreement_wait = 5
-    load_balancing_policy = RoundRobinPolicy()
+    profile_manager = ProfileManager()
     reconnection_policy = ConstantReconnectionPolicy(2)
+    address_translator = IdentityTranslator()
     down_host = None
     contact_points = []
     is_shutdown = False
@@ -71,6 +72,7 @@ class MockCluster(object):
         self.removed_hosts = []
         self.scheduler = Mock(spec=_Scheduler)
         self.executor = Mock(spec=ThreadPoolExecutor)
+        self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(RoundRobinPolicy())
 
     def add_host(self, address, datacenter, rack, signal=False, refresh_nodes=True):
         host = Host(address, SimpleConvictionPolicy, datacenter, rack)
@@ -130,7 +132,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection = MockConnection()
         self.time = FakeTime()
 
-        self.control_connection = ControlConnection(self.cluster, 1, 0, 0)
+        self.control_connection = ControlConnection(self.cluster, 1, 0, 0, 0)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 
@@ -346,7 +348,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
 
         event = {
             'change_type': 'REMOVED_NODE',
@@ -362,7 +364,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_node_list_and_token_map)
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
 
     def test_handle_status_change(self):
         event = {
@@ -440,7 +442,7 @@ class ControlConnectionTest(unittest.TestCase):
             'address': ('1.2.3.4', 9000)
         }
 
-        cc_no_schema_refresh = ControlConnection(cluster, 1, -1, 0)
+        cc_no_schema_refresh = ControlConnection(cluster, 1, -1, 0, 0)
         cluster.scheduler.reset_mock()
 
         # no call on schema refresh
@@ -452,9 +454,9 @@ class ControlConnectionTest(unittest.TestCase):
         cc_no_schema_refresh._handle_status_change(status_event)
         cc_no_schema_refresh._handle_topology_change(topo_event)
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map),
-                                                            call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map)])
+                                                            call(ANY, cc_no_schema_refresh._refresh_nodes_if_not_up, '1.2.3.4')])
 
-        cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1)
+        cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1, 0)
         cluster.scheduler.reset_mock()
 
         # no call on topo refresh
@@ -481,7 +483,7 @@ class EventTimingTest(unittest.TestCase):
         self.time = FakeTime()
 
         # Use 2 for the schema_event_refresh_window which is what we would normally default to.
-        self.control_connection = ControlConnection(self.cluster, 1, 2, 0)
+        self.control_connection = ControlConnection(self.cluster, 1, 2, 0, 0)
         self.control_connection._connection = self.connection
         self.control_connection._time = self.time
 

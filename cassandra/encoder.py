@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,8 +40,7 @@ def cql_quote(term):
     # The ordering of this method is important for the result of this method to
     # be a native str type (for both Python 2 and 3)
 
-    # Handle quoting of native str and bool types
-    if isinstance(term, (str, bool)):
+    if isinstance(term, str):
         return "'%s'" % str(term).replace("'", "''")
     # This branch of the if statement will only be used by Python 2 to catch
     # unicode strings, text_type is used to prevent type errors with Python 3.
@@ -84,7 +83,7 @@ class Encoder(object):
             OrderedMap: self.cql_encode_map_collection,
             OrderedMapSerializedKey: self.cql_encode_map_collection,
             list: self.cql_encode_list_collection,
-            tuple: self.cql_encode_list_collection,
+            tuple: self.cql_encode_list_collection,  # TODO: change to tuple in next major
             set: self.cql_encode_set_collection,
             sortedset: self.cql_encode_set_collection,
             frozenset: self.cql_encode_set_collection,

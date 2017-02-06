@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +15,13 @@
 from datetime import datetime, timedelta
 import time
 import six
+from six.moves import filter
 
+from cassandra.query import FETCH_SIZE_UNSET
+from cassandra.cqlengine import columns
 from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
-from cassandra.cqlengine.operators import BaseWhereOperator, InOperator
+from cassandra.cqlengine.operators import BaseWhereOperator, InOperator, EqualsOperator
 
 
 class StatementException(Exception):
@@ -32,9 +35,7 @@ class ValueQuoter(UnicodeMixin):
 
     def __unicode__(self):
         from cassandra.encoder import cql_quote
-        if isinstance(self.value, bool):
-            return 'true' if self.value else 'false'
-        elif isinstance(self.value, (list, tuple)):
+        if isinstance(self.value, (list, tuple)):
             return '[' + ', '.join([cql_quote(v) for v in self.value]) + ']'
         elif isinstance(self.value, dict):
             return '{' + ', '.join([cql_quote(k) + ':' + cql_quote(v) for k, v in self.value.items()]) + '}'
@@ -147,7 +148,7 @@ class AssignmentClause(BaseClause):
         return self.field, self.context_id
 
 
-class TransactionClause(BaseClause):
+class ConditionalClause(BaseClause):
     """ A single variable iff statement """
 
     def __unicode__(self):
@@ -157,18 +158,25 @@ class TransactionClause(BaseClause):
         return self.field, self.context_id
 
 
+class ContainerUpdateTypeMapMeta(type):
+
+    def __init__(cls, name, bases, dct):
+        if not hasattr(cls, 'type_map'):
+            cls.type_map = {}
+        else:
+            cls.type_map[cls.col_type] = cls
+        super(ContainerUpdateTypeMapMeta, cls).__init__(name, bases, dct)
+
+
+@six.add_metaclass(ContainerUpdateTypeMapMeta)
 class ContainerUpdateClause(AssignmentClause):
 
-    def __init__(self, field, value, operation=None, previous=None, column=None):
+    def __init__(self, field, value, operation=None, previous=None):
         super(ContainerUpdateClause, self).__init__(field, value)
         self.previous = previous
         self._assignments = None
         self._operation = operation
         self._analyzed = False
-        self._column = column
-
-    def _to_database(self, val):
-        return self._column.to_database(val) if self._column else val
 
     def _analyze(self):
         raise NotImplementedError
@@ -183,10 +191,10 @@ class ContainerUpdateClause(AssignmentClause):
 class SetUpdateClause(ContainerUpdateClause):
     """ updates a set collection """
 
-    def __init__(self, field, value, operation=None, previous=None, column=None):
-        super(SetUpdateClause, self).__init__(field, value, operation, previous, column=column)
-        self._additions = None
-        self._removals = None
+    col_type = columns.Set
+
+    _additions = None
+    _removals = None
 
     def __unicode__(self):
         qs = []
@@ -241,24 +249,24 @@ class SetUpdateClause(ContainerUpdateClause):
                 self._assignments is None and
                 self._additions is None and
                 self._removals is None):
-            ctx[str(ctx_id)] = self._to_database({})
+            ctx[str(ctx_id)] = set()
         if self._assignments is not None:
-            ctx[str(ctx_id)] = self._to_database(self._assignments)
+            ctx[str(ctx_id)] = self._assignments
             ctx_id += 1
         if self._additions is not None:
-            ctx[str(ctx_id)] = self._to_database(self._additions)
+            ctx[str(ctx_id)] = self._additions
             ctx_id += 1
         if self._removals is not None:
-            ctx[str(ctx_id)] = self._to_database(self._removals)
+            ctx[str(ctx_id)] = self._removals
 
 
 class ListUpdateClause(ContainerUpdateClause):
     """ updates a list collection """
 
-    def __init__(self, field, value, operation=None, previous=None, column=None):
-        super(ListUpdateClause, self).__init__(field, value, operation, previous, column=column)
-        self._append = None
-        self._prepend = None
+    col_type = columns.List
+
+    _append = None
+    _prepend = None
 
     def __unicode__(self):
         if not self._analyzed:
@@ -288,13 +296,13 @@ class ListUpdateClause(ContainerUpdateClause):
             self._analyze()
         ctx_id = self.context_id
         if self._assignments is not None:
-            ctx[str(ctx_id)] = self._to_database(self._assignments)
+            ctx[str(ctx_id)] = self._assignments
             ctx_id += 1
         if self._prepend is not None:
-            ctx[str(ctx_id)] = self._to_database(self._prepend)
+            ctx[str(ctx_id)] = self._prepend
             ctx_id += 1
         if self._append is not None:
-            ctx[str(ctx_id)] = self._to_database(self._append)
+            ctx[str(ctx_id)] = self._append
 
     def _analyze(self):
         """ works out the updates to be performed """
@@ -348,9 +356,9 @@ class ListUpdateClause(ContainerUpdateClause):
 class MapUpdateClause(ContainerUpdateClause):
     """ updates a map collection """
 
-    def __init__(self, field, value, operation=None, previous=None, column=None):
-        super(MapUpdateClause, self).__init__(field, value, operation, previous, column=column)
-        self._updates = None
+    col_type = columns.Map
+
+    _updates = None
 
     def _analyze(self):
         if self._operation == "update":
@@ -363,32 +371,32 @@ class MapUpdateClause(ContainerUpdateClause):
         self._analyzed = True
 
     def get_context_size(self):
-        if not self._analyzed:
-            self._analyze()
-        if self.previous is None and not self._updates:
+        if self.is_assignment:
             return 1
         return len(self._updates or []) * 2
 
     def update_context(self, ctx):
-        if not self._analyzed:
-            self._analyze()
         ctx_id = self.context_id
-        if self.previous is None and not self._updates:
+        if self.is_assignment:
             ctx[str(ctx_id)] = {}
         else:
             for key in self._updates or []:
                 val = self.value.get(key)
-                ctx[str(ctx_id)] = self._column.key_col.to_database(key) if self._column else key
-                ctx[str(ctx_id + 1)] = self._column.value_col.to_database(val) if self._column else val
+                ctx[str(ctx_id)] = key
+                ctx[str(ctx_id + 1)] = val
                 ctx_id += 2
 
-    def __unicode__(self):
+    @property
+    def is_assignment(self):
         if not self._analyzed:
             self._analyze()
+        return self.previous is None and not self._updates
+
+    def __unicode__(self):
         qs = []
 
         ctx_id = self.context_id
-        if self.previous is None and not self._updates:
+        if self.is_assignment:
             qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
         else:
             for _ in self._updates or []:
@@ -398,17 +406,19 @@ class MapUpdateClause(ContainerUpdateClause):
         return ', '.join(qs)
 
 
-class CounterUpdateClause(ContainerUpdateClause):
+class CounterUpdateClause(AssignmentClause):
 
-    def __init__(self, field, value, previous=None, column=None):
-        super(CounterUpdateClause, self).__init__(field, value, previous=previous, column=column)
-        self.previous = self.previous or 0
+    col_type = columns.Counter
+
+    def __init__(self, field, value, previous=None):
+        super(CounterUpdateClause, self).__init__(field, value)
+        self.previous = previous or 0
 
     def get_context_size(self):
         return 1
 
     def update_context(self, ctx):
-        ctx[str(self.context_id)] = self._to_database(abs(self.value - self.previous))
+        ctx[str(self.context_id)] = abs(self.value - self.previous)
 
     def __unicode__(self):
         delta = self.value - self.previous
@@ -470,26 +480,37 @@ class MapDeleteClause(BaseDeleteClause):
 class BaseCQLStatement(UnicodeMixin):
     """ The base cql statement class """
 
-    def __init__(self, table, consistency=None, timestamp=None, where=None):
+    def __init__(self, table, timestamp=None, where=None, fetch_size=None, conditionals=None):
         super(BaseCQLStatement, self).__init__()
         self.table = table
-        self.consistency = consistency
         self.context_id = 0
         self.context_counter = self.context_id
         self.timestamp = timestamp
+        self.fetch_size = fetch_size if fetch_size else FETCH_SIZE_UNSET
 
         self.where_clauses = []
         for clause in where or []:
-            self.add_where_clause(clause)
+            self._add_where_clause(clause)
 
-    def add_where_clause(self, clause):
-        """
-        adds a where clause to this statement
-        :param clause: the clause to add
-        :type clause: WhereClause
-        """
-        if not isinstance(clause, WhereClause):
-            raise StatementException("only instances of WhereClause can be added to statements")
+        self.conditionals = []
+        for conditional in conditionals or []:
+            self.add_conditional_clause(conditional)
+
+    def _update_part_key_values(self, field_index_map, clauses, parts):
+        for clause in filter(lambda c: c.field in field_index_map, clauses):
+            parts[field_index_map[clause.field]] = clause.value
+
+    def partition_key_values(self, field_index_map):
+        parts = [None] * len(field_index_map)
+        self._update_part_key_values(field_index_map, (w for w in self.where_clauses if w.operator.__class__ == EqualsOperator), parts)
+        return parts
+
+    def add_where(self, column, operator, value, quote_field=True):
+        value = column.to_database(value)
+        clause = WhereClause(column.db_field_name, operator, value, quote_field)
+        self._add_where_clause(clause)
+
+    def _add_where_clause(self, clause):
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.where_clauses.append(clause)
@@ -503,6 +524,20 @@ class BaseCQLStatement(UnicodeMixin):
         for clause in self.where_clauses or []:
             clause.update_context(ctx)
         return ctx
+
+    def add_conditional_clause(self, clause):
+        """
+        Adds a iff clause to this statement
+
+        :param clause: The clause that will be added to the iff statement
+        :type clause: ConditionalClause
+        """
+        clause.set_context_id(self.context_counter)
+        self.context_counter += clause.get_context_size()
+        self.conditionals.append(clause)
+
+    def _get_conditionals(self):
+        return 'IF {0}'.format(' AND '.join([six.text_type(c) for c in self.conditionals]))
 
     def get_context_size(self):
         return len(self.get_context())
@@ -551,11 +586,12 @@ class SelectStatement(BaseCQLStatement):
                  table,
                  fields=None,
                  count=False,
-                 consistency=None,
                  where=None,
                  order_by=None,
                  limit=None,
-                 allow_filtering=False):
+                 allow_filtering=False,
+                 distinct_fields=None,
+                 fetch_size=None):
 
         """
         :param where
@@ -563,11 +599,12 @@ class SelectStatement(BaseCQLStatement):
         """
         super(SelectStatement, self).__init__(
             table,
-            consistency=consistency,
-            where=where
+            where=where,
+            fetch_size=fetch_size
         )
 
         self.fields = [fields] if isinstance(fields, six.string_types) else (fields or [])
+        self.distinct_fields = distinct_fields
         self.count = count
         self.order_by = [order_by] if isinstance(order_by, six.string_types) else order_by
         self.limit = limit
@@ -575,7 +612,12 @@ class SelectStatement(BaseCQLStatement):
 
     def __unicode__(self):
         qs = ['SELECT']
-        if self.count:
+        if self.distinct_fields:
+            if self.count:
+                qs += ['DISTINCT COUNT({0})'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
+            else:
+                qs += ['DISTINCT {0}'.format(', '.join(['"{0}"'.format(f) for f in self.distinct_fields]))]
+        elif self.count:
             qs += ['COUNT(*)']
         else:
             qs += [', '.join(['"{0}"'.format(f) for f in self.fields]) if self.fields else '*']
@@ -602,14 +644,14 @@ class AssignmentStatement(BaseCQLStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
-                 timestamp=None):
+                 timestamp=None,
+                 conditionals=None):
         super(AssignmentStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
+            conditionals=conditionals
         )
         self.ttl = ttl
         self.timestamp = timestamp
@@ -617,7 +659,7 @@ class AssignmentStatement(BaseCQLStatement):
         # add assignments
         self.assignments = []
         for assignment in assignments or []:
-            self.add_assignment_clause(assignment)
+            self._add_assignment_clause(assignment)
 
     def update_context_id(self, i):
         super(AssignmentStatement, self).update_context_id(i)
@@ -625,14 +667,17 @@ class AssignmentStatement(BaseCQLStatement):
             assignment.set_context_id(self.context_counter)
             self.context_counter += assignment.get_context_size()
 
-    def add_assignment_clause(self, clause):
-        """
-        adds an assignment clause to this statement
-        :param clause: the clause to add
-        :type clause: AssignmentClause
-        """
-        if not isinstance(clause, AssignmentClause):
-            raise StatementException("only instances of AssignmentClause can be added to statements")
+    def partition_key_values(self, field_index_map):
+        parts = super(AssignmentStatement, self).partition_key_values(field_index_map)
+        self._update_part_key_values(field_index_map, self.assignments, parts)
+        return parts
+
+    def add_assignment(self, column, value):
+        value = column.to_database(value)
+        clause = AssignmentClause(column.db_field_name, value)
+        self._add_assignment_clause(clause)
+
+    def _add_assignment_clause(self, clause):
         clause.set_context_id(self.context_counter)
         self.context_counter += clause.get_context_size()
         self.assignments.append(clause)
@@ -654,22 +699,17 @@ class InsertStatement(AssignmentStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
                  if_not_exists=False):
         super(InsertStatement, self).__init__(table,
                                               assignments=assignments,
-                                              consistency=consistency,
                                               where=where,
                                               ttl=ttl,
                                               timestamp=timestamp)
 
         self.if_not_exists = if_not_exists
-
-    def add_where_clause(self, clause):
-        raise StatementException("Cannot add where clauses to insert statements")
 
     def __unicode__(self):
         qs = ['INSERT INTO {0}'.format(self.table)]
@@ -700,22 +740,19 @@ class UpdateStatement(AssignmentStatement):
     def __init__(self,
                  table,
                  assignments=None,
-                 consistency=None,
                  where=None,
                  ttl=None,
                  timestamp=None,
-                 transactions=None):
+                 conditionals=None,
+                 if_exists=False):
         super(UpdateStatement, self). __init__(table,
                                                assignments=assignments,
-                                               consistency=consistency,
                                                where=where,
                                                ttl=ttl,
-                                               timestamp=timestamp)
+                                               timestamp=timestamp,
+                                               conditionals=conditionals)
 
-        # Add iff statements
-        self.transactions = []
-        for transaction in transactions or []:
-            self.add_transaction_clause(transaction)
+        self.if_exists = if_exists
 
     def __unicode__(self):
         qs = ['UPDATE', self.table]
@@ -737,49 +774,50 @@ class UpdateStatement(AssignmentStatement):
         if self.where_clauses:
             qs += [self._where]
 
-        if len(self.transactions) > 0:
-            qs += [self._get_transactions()]
+        if len(self.conditionals) > 0:
+            qs += [self._get_conditionals()]
+
+        if self.if_exists:
+            qs += ["IF EXISTS"]
 
         return ' '.join(qs)
 
-    def add_transaction_clause(self, clause):
-        """
-        Adds a iff clause to this statement
-
-        :param clause: The clause that will be added to the iff statement
-        :type clause: TransactionClause
-        """
-        if not isinstance(clause, TransactionClause):
-            raise StatementException('only instances of AssignmentClause can be added to statements')
-        clause.set_context_id(self.context_counter)
-        self.context_counter += clause.get_context_size()
-        self.transactions.append(clause)
-
     def get_context(self):
         ctx = super(UpdateStatement, self).get_context()
-        for clause in self.transactions or []:
+        for clause in self.conditionals:
             clause.update_context(ctx)
         return ctx
 
-    def _get_transactions(self):
-        return 'IF {0}'.format(' AND '.join([six.text_type(c) for c in self.transactions]))
-
     def update_context_id(self, i):
         super(UpdateStatement, self).update_context_id(i)
-        for transaction in self.transactions:
-            transaction.set_context_id(self.context_counter)
-            self.context_counter += transaction.get_context_size()
+        for conditional in self.conditionals:
+            conditional.set_context_id(self.context_counter)
+            self.context_counter += conditional.get_context_size()
+
+    def add_update(self, column, value, operation=None, previous=None):
+        value = column.to_database(value)
+        col_type = type(column)
+        container_update_type = ContainerUpdateClause.type_map.get(col_type)
+        if container_update_type:
+            previous = column.to_database(previous)
+            clause = container_update_type(column.db_field_name, value, operation, previous)
+        elif col_type == columns.Counter:
+            clause = CounterUpdateClause(column.db_field_name, value, previous)
+        else:
+            clause = AssignmentClause(column.db_field_name, value)
+        if clause.get_context_size():  # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
+            self._add_assignment_clause(clause)
 
 
 class DeleteStatement(BaseCQLStatement):
     """ a cql delete statement """
 
-    def __init__(self, table, fields=None, consistency=None, where=None, timestamp=None):
+    def __init__(self, table, fields=None, where=None, timestamp=None, conditionals=None, if_exists=False):
         super(DeleteStatement, self).__init__(
             table,
-            consistency=consistency,
             where=where,
-            timestamp=timestamp
+            timestamp=timestamp,
+            conditionals=conditionals
         )
         self.fields = []
         if isinstance(fields, six.string_types):
@@ -787,16 +825,23 @@ class DeleteStatement(BaseCQLStatement):
         for field in fields or []:
             self.add_field(field)
 
+        self.if_exists = if_exists
+
     def update_context_id(self, i):
         super(DeleteStatement, self).update_context_id(i)
         for field in self.fields:
             field.set_context_id(self.context_counter)
             self.context_counter += field.get_context_size()
+        for t in self.conditionals:
+            t.set_context_id(self.context_counter)
+            self.context_counter += t.get_context_size()
 
     def get_context(self):
         ctx = super(DeleteStatement, self).get_context()
         for field in self.fields:
             field.update_context(ctx)
+        for clause in self.conditionals:
+            clause.update_context(ctx)
         return ctx
 
     def add_field(self, field):
@@ -824,5 +869,11 @@ class DeleteStatement(BaseCQLStatement):
 
         if self.where_clauses:
             qs += [self._where]
+
+        if self.conditionals:
+            qs += [self._get_conditionals()]
+
+        if self.if_exists:
+            qs += ["IF EXISTS"]
 
         return ' '.join(qs)

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ from cassandra.util import unix_time_from_uuid1
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.protocol import _UNSET_VALUE
-from cassandra.util import OrderedDict, _positional_rename_invalid_identifiers
+from cassandra.util import OrderedDict, _sanitize_identifiers
 
 import logging
 log = logging.getLogger(__name__)
@@ -117,13 +117,14 @@ def named_tuple_factory(colnames, rows):
     try:
         Row = namedtuple('Row', clean_column_names)
     except Exception:
+        clean_column_names = list(map(_clean_column_name, colnames))  # create list because py3 map object will be consumed by first attempt
         log.warning("Failed creating named tuple for results with column names %s (cleaned: %s) "
                     "(see Python 'namedtuple' documentation for details on name rules). "
                     "Results will be returned with positional names. "
                     "Avoid this by choosing different names, using SELECT \"<col name>\" AS aliases, "
                     "or specifying a different row_factory on your Session" %
                     (colnames, clean_column_names))
-        Row = namedtuple('Row', _positional_rename_invalid_identifiers(clean_column_names))
+        Row = namedtuple('Row', _sanitize_identifiers(clean_column_names))
 
     return [Row(*row) for row in rows]
 
@@ -214,12 +215,19 @@ class Statement(object):
     .. versionadded:: 2.6.0
     """
 
+    is_idempotent = False
+    """
+    Flag indicating whether this statement is safe to run multiple times in speculative execution.
+    """
+
     _serial_consistency_level = None
     _routing_key = None
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
-                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
-                 custom_payload=None):
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None, custom_payload=None,
+                 is_idempotent=False):
+        if retry_policy and not hasattr(retry_policy, 'on_read_timeout'):  # just checking one method to detect positional parameter errors
+            raise ValueError('retry_policy should implement cassandra.policies.RetryPolicy')
         self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
@@ -232,14 +240,22 @@ class Statement(object):
             self.keyspace = keyspace
         if custom_payload is not None:
             self.custom_payload = custom_payload
+        self.is_idempotent = is_idempotent
+
+    def _key_parts_packed(self, parts):
+        for p in parts:
+            l = len(p)
+            yield struct.pack(">H%dsB" % l, l, p, 0)
 
     def _get_routing_key(self):
         return self._routing_key
 
     def _set_routing_key(self, key):
         if isinstance(key, (list, tuple)):
-            self._routing_key = b"".join(struct.pack("HsB", len(component), component, 0)
-                                         for component in key)
+            if len(key) == 1:
+                self._routing_key = key[0]
+            else:
+                self._routing_key = b"".join(self._key_parts_packed(key))
         else:
             self._routing_key = key
 
@@ -305,6 +321,9 @@ class Statement(object):
         Serial consistency levels may only be used against Cassandra 2.0+
         and the :attr:`~.Cluster.protocol_version` must be set to 2 or higher.
 
+        See :doc:`/lwt` for a discussion on how to work with results returned from
+        conditional statements.
+
         .. versionadded:: 2.0.0
         """)
 
@@ -314,15 +333,18 @@ class SimpleStatement(Statement):
     A simple, un-prepared query.
     """
 
-    def __init__(self, query_string, *args, **kwargs):
+    def __init__(self, query_string, retry_policy=None, consistency_level=None, routing_key=None,
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None, is_idempotent=False):
         """
         `query_string` should be a literal CQL statement with the exception
         of parameter placeholders that will be filled through the
         `parameters` argument of :meth:`.Session.execute()`.
 
-        All arguments to :class:`Statement` apply to this class as well
+        See :class:`Statement` attributes for a description of the other parameters.
         """
-        Statement.__init__(self, *args, **kwargs)
+        Statement.__init__(self, retry_policy, consistency_level, routing_key,
+                           serial_consistency_level, fetch_size, keyspace, custom_payload, is_idempotent)
         self._query_string = query_string
 
     @property
@@ -346,36 +368,35 @@ class PreparedStatement(object):
     may affect performance (as the operation requires a network roundtrip).
     """
 
-    column_metadata = None
+    column_metadata = None  #TODO: make this bind_metadata in next major
+    consistency_level = None
+    custom_payload = None
+    fetch_size = FETCH_SIZE_UNSET
+    keyspace = None  # change to prepared_keyspace in major release
+    protocol_version = None
     query_id = None
     query_string = None
-    keyspace = None  # change to prepared_keyspace in major release
-
+    result_metadata = None
     routing_key_indexes = None
     _routing_key_index_set = None
-
-    consistency_level = None
     serial_consistency_level = None
 
-    protocol_version = None
-
-    fetch_size = FETCH_SIZE_UNSET
-
-    custom_payload = None
-
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
-                 keyspace, protocol_version):
+                 keyspace, protocol_version, result_metadata):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
         self.keyspace = keyspace
         self.protocol_version = protocol_version
+        self.result_metadata = result_metadata
+        self.is_idempotent = False
 
     @classmethod
-    def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata, query, prepared_keyspace, protocol_version):
+    def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata,
+                     query, prepared_keyspace, protocol_version, result_metadata):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version)
+            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version, result_metadata)
 
         if pk_indexes:
             routing_key_indexes = pk_indexes
@@ -400,7 +421,7 @@ class PreparedStatement(object):
                         pass          # statement; just leave routing_key_indexes as None
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes,
-                                 query, prepared_keyspace, protocol_version)
+                                 query, prepared_keyspace, protocol_version, result_metadata)
 
     def bind(self, values):
         """
@@ -438,11 +459,13 @@ class BoundStatement(Statement):
     The sequence of values that were bound to the prepared statement.
     """
 
-    def __init__(self, prepared_statement, *args, **kwargs):
+    def __init__(self, prepared_statement, retry_policy=None, consistency_level=None, routing_key=None,
+                 serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None,
+                 custom_payload=None):
         """
         `prepared_statement` should be an instance of :class:`PreparedStatement`.
 
-        All arguments to :class:`Statement` apply to this class as well
+        See :class:`Statement` attributes for a description of the other parameters.
         """
         self.prepared_statement = prepared_statement
 
@@ -450,13 +473,15 @@ class BoundStatement(Statement):
         self.serial_consistency_level = prepared_statement.serial_consistency_level
         self.fetch_size = prepared_statement.fetch_size
         self.custom_payload = prepared_statement.custom_payload
+        self.is_idempotent = prepared_statement.is_idempotent
         self.values = []
 
         meta = prepared_statement.column_metadata
         if meta:
             self.keyspace = meta[0].keyspace_name
 
-        Statement.__init__(self, *args, **kwargs)
+        Statement.__init__(self, retry_policy, consistency_level, routing_key,
+                           serial_consistency_level, fetch_size, keyspace, custom_payload)
 
     def bind(self, values):
         """
@@ -562,13 +587,7 @@ class BoundStatement(Statement):
         if len(routing_indexes) == 1:
             self._routing_key = self.values[routing_indexes[0]]
         else:
-            components = []
-            for statement_index in routing_indexes:
-                val = self.values[statement_index]
-                l = len(val)
-                components.append(struct.pack(">H%dsB" % l, l, val, 0))
-
-            self._routing_key = b"".join(components)
+            self._routing_key = b"".join(self._key_parts_packed(self.values[i] for i in routing_indexes))
 
         return self._routing_key
 
@@ -694,6 +713,19 @@ class BatchStatement(Statement):
         Statement.__init__(self, retry_policy=retry_policy, consistency_level=consistency_level,
                            serial_consistency_level=serial_consistency_level, custom_payload=custom_payload)
 
+    def clear(self):
+        """
+        This is a convenience method to clear a batch statement for reuse.
+
+        *Note:* it should not be used concurrently with uncompleted execution futures executing the same
+        ``BatchStatement``.
+        """
+        del self._statements_and_parameters[:]
+        self.keyspace = None
+        self.routing_key = None
+        if self.custom_payload:
+            self.custom_payload.clear()
+
     def add(self, statement, parameters=None):
         """
         Adds a :class:`.Statement` and optional sequence of parameters
@@ -706,21 +738,19 @@ class BatchStatement(Statement):
             if parameters:
                 encoder = Encoder() if self._session is None else self._session.encoder
                 statement = bind_params(statement, parameters, encoder)
-            self._statements_and_parameters.append((False, statement, ()))
+            self._add_statement_and_params(False, statement, ())
         elif isinstance(statement, PreparedStatement):
             query_id = statement.query_id
             bound_statement = statement.bind(() if parameters is None else parameters)
             self._update_state(bound_statement)
-            self._statements_and_parameters.append(
-                (True, query_id, bound_statement.values))
+            self._add_statement_and_params(True, query_id, bound_statement.values)
         elif isinstance(statement, BoundStatement):
             if parameters:
                 raise ValueError(
                     "Parameters cannot be passed with a BoundStatement "
                     "to BatchStatement.add()")
             self._update_state(statement)
-            self._statements_and_parameters.append(
-                (True, statement.prepared_statement.query_id, statement.values))
+            self._add_statement_and_params(True, statement.prepared_statement.query_id, statement.values)
         else:
             # it must be a SimpleStatement
             query_string = statement.query_string
@@ -728,17 +758,22 @@ class BatchStatement(Statement):
                 encoder = Encoder() if self._session is None else self._session.encoder
                 query_string = bind_params(query_string, parameters, encoder)
             self._update_state(statement)
-            self._statements_and_parameters.append((False, query_string, ()))
+            self._add_statement_and_params(False, query_string, ())
         return self
 
     def add_all(self, statements, parameters):
         """
         Adds a sequence of :class:`.Statement` objects and a matching sequence
-        of parameters to the batch.  :const:`None` can be used in place of
-        parameters when no parameters are needed.
+        of parameters to the batch. Statement and parameter sequences must be of equal length or
+        one will be truncated. :const:`None` can be used in the parameters position where are needed.
         """
         for statement, value in zip(statements, parameters):
-            self.add(statement, parameters)
+            self.add(statement, value)
+
+    def _add_statement_and_params(self, is_prepared, statement, parameters):
+        if len(self._statements_and_parameters) >= 0xFFFF:
+            raise ValueError("Batch statement cannot contain more than %d statements." % 0xFFFF)
+        self._statements_and_parameters.append((is_prepared, statement, parameters))
 
     def _maybe_set_routing_attributes(self, statement):
         if self.routing_key is None:
@@ -756,10 +791,13 @@ class BatchStatement(Statement):
         self._maybe_set_routing_attributes(statement)
         self._update_custom_payload(statement)
 
+    def __len__(self):
+        return len(self._statements_and_parameters)
+
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
         return (u'<BatchStatement type=%s, statements=%d, consistency=%s>' %
-                (self.batch_type, len(self._statements_and_parameters), consistency))
+                (self.batch_type, len(self), consistency))
     __repr__ = __str__
 
 
@@ -860,7 +898,7 @@ class QueryTrace(object):
         self.trace_id = trace_id
         self._session = session
 
-    def populate(self, max_wait=2.0, wait_for_complete=True):
+    def populate(self, max_wait=2.0, wait_for_complete=True, query_cl=None):
         """
         Retrieves the actual tracing details from Cassandra and populates the
         attributes of this instance.  Because tracing details are stored
@@ -871,6 +909,9 @@ class QueryTrace(object):
 
         `wait_for_complete=False` bypasses the wait for duration to be populated.
         This can be used to query events from partial sessions.
+
+        `query_cl` specifies a consistency level to use for polling the trace tables,
+        if it should be different than the session default.
         """
         attempt = 0
         start = time.time()
@@ -882,7 +923,7 @@ class QueryTrace(object):
 
             log.debug("Attempting to fetch trace info for trace ID: %s", self.trace_id)
             session_results = self._execute(
-                self._SELECT_SESSIONS_FORMAT, (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
             is_complete = session_results and session_results[0].duration is not None
             if not session_results or (wait_for_complete and not is_complete):
@@ -906,7 +947,7 @@ class QueryTrace(object):
             log.debug("Attempting to fetch trace events for trace ID: %s", self.trace_id)
             time_spent = time.time() - start
             event_results = self._execute(
-                self._SELECT_EVENTS_FORMAT, (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(self._SELECT_EVENTS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
             log.debug("Fetched trace events for trace ID: %s", self.trace_id)
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)

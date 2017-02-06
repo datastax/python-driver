@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,10 +27,15 @@ from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
+from cassandra.query import SimpleStatement
 from cassandra.util import Date, Time
+from cassandra.cqltypes import Int32Type
+from cassandra.cqlengine.statements import SelectStatement, DeleteStatement, WhereClause
+from cassandra.cqlengine.operators import EqualsOperator
 
 from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
 class TestModel(Model):
@@ -39,6 +44,16 @@ class TestModel(Model):
     count = columns.Integer()
     text = columns.Text(required=False)
     a_bool = columns.Boolean(default=False)
+
+
+class TestModelSave(Model):
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    cluster = columns.Integer(primary_key=True)
+    count = columns.Integer(required=False)
+    text = columns.Text(required=False, index=True)
+    text_set = columns.Set(columns.Text, required=False)
+    text_list = columns.List(columns.Text, required=False)
+    text_map = columns.Map(columns.Text, columns.Text, required=False)
 
 
 class TestModelIO(BaseCassEngTestCase):
@@ -55,13 +70,29 @@ class TestModelIO(BaseCassEngTestCase):
 
     def test_model_save_and_load(self):
         """
-        Tests that models can be saved and retrieved
+        Tests that models can be saved and retrieved, using the create method.
         """
         tm = TestModel.create(count=8, text='123456789')
         self.assertIsInstance(tm, TestModel)
 
         tm2 = TestModel.objects(id=tm.pk).first()
         self.assertIsInstance(tm2, TestModel)
+
+        for cname in tm._columns.keys():
+            self.assertEqual(getattr(tm, cname), getattr(tm2, cname))
+
+    def test_model_instantiation_save_and_load(self):
+        """
+        Tests that models can be saved and retrieved, this time using the
+        natural model instantiation.
+        """
+        tm = TestModel(count=8, text='123456789')
+        # Tests that values are available on instantiation.
+        self.assertIsNotNone(tm['id'])
+        self.assertEqual(tm.count, 8)
+        self.assertEqual(tm.text, '123456789')
+        tm.save()
+        tm2 = TestModel.objects(id=tm.id).first()
 
         for cname in tm._columns.keys():
             self.assertEqual(getattr(tm, cname), getattr(tm2, cname))
@@ -310,13 +341,16 @@ class TestUpdating(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(TestUpdating, cls).setUpClass()
+        drop_table(TestModelSave)
         drop_table(TestMultiKeyModel)
+        sync_table(TestModelSave)
         sync_table(TestMultiKeyModel)
 
     @classmethod
     def tearDownClass(cls):
         super(TestUpdating, cls).tearDownClass()
         drop_table(TestMultiKeyModel)
+        drop_table(TestModelSave)
 
     def setUp(self):
         super(TestUpdating, self).setUp()
@@ -448,6 +482,103 @@ class TestUpdating(BaseCassEngTestCase):
         self.assertTrue(self.instance._values['count'].previous_value is None)
         self.assertTrue(self.instance.count is None)
 
+    def test_previous_value_tracking_on_instantiation_with_default(self):
+
+        class TestDefaultValueTracking(Model):
+            id = columns.Integer(partition_key=True)
+            int1 = columns.Integer(default=123)
+            int2 = columns.Integer(default=456)
+            int3 = columns.Integer(default=lambda: random.randint(0, 1000))
+            int4 = columns.Integer(default=lambda: random.randint(0, 1000))
+            int5 = columns.Integer()
+            int6 = columns.Integer()
+
+        instance = TestDefaultValueTracking(
+            id=1,
+            int1=9999,
+            int3=7777,
+            int5=5555)
+
+        self.assertEqual(instance.id, 1)
+        self.assertEqual(instance.int1, 9999)
+        self.assertEqual(instance.int2, 456)
+        self.assertEqual(instance.int3, 7777)
+        self.assertIsNotNone(instance.int4)
+        self.assertIsInstance(instance.int4, int)
+        self.assertGreaterEqual(instance.int4, 0)
+        self.assertLessEqual(instance.int4, 1000)
+        self.assertEqual(instance.int5, 5555)
+        self.assertTrue(instance.int6 is None)
+
+        # All previous values are unset as the object hasn't been persisted
+        # yet.
+        self.assertTrue(instance._values['id'].previous_value is None)
+        self.assertTrue(instance._values['int1'].previous_value is None)
+        self.assertTrue(instance._values['int2'].previous_value is None)
+        self.assertTrue(instance._values['int3'].previous_value is None)
+        self.assertTrue(instance._values['int4'].previous_value is None)
+        self.assertTrue(instance._values['int5'].previous_value is None)
+        self.assertTrue(instance._values['int6'].previous_value is None)
+
+        # All explicitely set columns, and those with default values are
+        # flagged has changed.
+        self.assertTrue(set(instance.get_changed_columns()) == set([
+            'id', 'int1', 'int2', 'int3', 'int4', 'int5']))
+
+    def test_save_to_none(self):
+        """
+        Test update of column value of None with save() function.
+
+        Under specific scenarios calling save on a None value wouldn't update
+        previous values. This issue only manifests with a new instantiation of the model,
+        if existing model is modified and updated the issue will not occur.
+
+        @since 3.0.0
+        @jira_ticket PYTHON-475
+        @expected_result column value should be updated to None
+
+        @test_category object_mapper
+        """
+
+        partition = uuid4()
+        cluster = 1
+        text = 'set'
+        text_list = ['set']
+        text_set = set(("set",))
+        text_map = {"set": 'set'}
+        initial = TestModelSave(partition=partition, cluster=cluster, text=text, text_list=text_list,
+                                text_set=text_set, text_map=text_map)
+        initial.save()
+        current = TestModelSave.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(current.text, text)
+        self.assertEqual(current.text_list, text_list)
+        self.assertEqual(current.text_set, text_set)
+        self.assertEqual(current.text_map, text_map)
+
+        next = TestModelSave(partition=partition, cluster=cluster, text=None, text_list=None,
+                            text_set=None, text_map=None)
+
+        next.save()
+        current = TestModelSave.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(current.text, None)
+        self.assertEqual(current.text_list, [])
+        self.assertEqual(current.text_set, set())
+        self.assertEqual(current.text_map, {})
+
+
+def test_none_filter_fails():
+    class NoneFilterModel(Model):
+
+        pk = columns.Integer(primary_key=True)
+        v = columns.Integer()
+    sync_table(NoneFilterModel)
+
+    try:
+        NoneFilterModel.objects(pk=None)
+        raise Exception("fail")
+    except CQLEngineException as e:
+        pass
+
 
 class TestCanUpdate(BaseCassEngTestCase):
 
@@ -569,6 +700,160 @@ class TestQuerying(BaseCassEngTestCase):
 
         self.assertTrue(inst.test_id == uid)
         self.assertTrue(inst.date == day)
+
+
+class BasicModel(Model):
+    __table_name__ = 'basic_model_routing'
+    k = columns.Integer(primary_key=True)
+    v = columns.Integer()
+
+
+class BasicModelMulti(Model):
+    __table_name__ = 'basic_model_routing_multi'
+    k = columns.Integer(partition_key=True)
+    v = columns.Integer(partition_key=True)
+
+
+class ComplexModelRouting(Model):
+    __table_name__ = 'complex_model_routing'
+    partition = columns.UUID(partition_key=True, default=uuid4)
+    cluster = columns.Integer(partition_key=True)
+    count = columns.Integer()
+    text = columns.Text(partition_key=True)
+    float = columns.Float(partition_key=True)
+    text_2 = columns.Text()
+
+
+class TestModelRoutingKeys(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestModelRoutingKeys, cls).setUpClass()
+        sync_table(BasicModel)
+        sync_table(BasicModelMulti)
+        sync_table(ComplexModelRouting)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestModelRoutingKeys, cls).tearDownClass()
+        drop_table(BasicModel)
+        drop_table(BasicModelMulti)
+        drop_table(ComplexModelRouting)
+
+    def test_routing_key_generation_basic(self):
+        """
+        Compares the routing key generated by simple partition key using the model with the one generated by the equivalent
+        bound statement
+        @since 3.2
+        @jira_ticket PYTHON-535
+        @expected_result they should match
+
+        @test_category object_mapper
+        """
+
+        prepared = self.session.prepare(
+            """
+          INSERT INTO {0}.basic_model_routing (k, v) VALUES  (?, ?)
+          """.format(DEFAULT_KEYSPACE))
+        bound = prepared.bind((1, 2))
+
+        mrk = BasicModel._routing_key_from_values([1], self.session.cluster.protocol_version)
+        simple = SimpleStatement("")
+        simple.routing_key = mrk
+        self.assertEqual(bound.routing_key, simple.routing_key)
+
+    def test_routing_key_generation_multi(self):
+        """
+        Compares the routing key generated by composite partition key using the model with the one generated by the equivalent
+        bound statement
+        @since 3.2
+        @jira_ticket PYTHON-535
+        @expected_result they should match
+
+        @test_category object_mapper
+        """
+
+        prepared = self.session.prepare(
+            """
+          INSERT INTO {0}.basic_model_routing_multi (k, v) VALUES  (?, ?)
+          """.format(DEFAULT_KEYSPACE))
+        bound = prepared.bind((1, 2))
+        mrk = BasicModelMulti._routing_key_from_values([1, 2], self.session.cluster.protocol_version)
+        simple = SimpleStatement("")
+        simple.routing_key = mrk
+        self.assertEqual(bound.routing_key, simple.routing_key)
+
+    def test_routing_key_generation_complex(self):
+        """
+        Compares the routing key generated by complex composite partition key using the model with the one generated by the equivalent
+        bound statement
+        @since 3.2
+        @jira_ticket PYTHON-535
+        @expected_result they should match
+
+        @test_category object_mapper
+        """
+        prepared = self.session.prepare(
+            """
+          INSERT INTO {0}.complex_model_routing (partition, cluster, count, text, float, text_2) VALUES  (?, ?, ?, ?, ?, ?)
+          """.format(DEFAULT_KEYSPACE))
+        partition = uuid4()
+        cluster = 1
+        count = 2
+        text = "text"
+        float = 1.2
+        text_2 = "text_2"
+        bound = prepared.bind((partition, cluster, count, text, float, text_2))
+        mrk = ComplexModelRouting._routing_key_from_values([partition, cluster, text, float], self.session.cluster.protocol_version)
+        simple = SimpleStatement("")
+        simple.routing_key = mrk
+        self.assertEqual(bound.routing_key, simple.routing_key)
+
+    def test_partition_key_index(self):
+        """
+        Test to ensure that statement partition key generation is in the correct order
+        @since 3.2
+        @jira_ticket PYTHON-535
+        @expected_result .
+
+        @test_category object_mapper
+        """
+        self._check_partition_value_generation(BasicModel, SelectStatement(BasicModel.__table_name__))
+        self._check_partition_value_generation(BasicModel, DeleteStatement(BasicModel.__table_name__))
+        self._check_partition_value_generation(BasicModelMulti, SelectStatement(BasicModelMulti.__table_name__))
+        self._check_partition_value_generation(BasicModelMulti, DeleteStatement(BasicModelMulti.__table_name__))
+        self._check_partition_value_generation(ComplexModelRouting, SelectStatement(ComplexModelRouting.__table_name__))
+        self._check_partition_value_generation(ComplexModelRouting, DeleteStatement(ComplexModelRouting.__table_name__))
+        self._check_partition_value_generation(BasicModel, SelectStatement(BasicModel.__table_name__), reverse=True)
+        self._check_partition_value_generation(BasicModel, DeleteStatement(BasicModel.__table_name__), reverse=True)
+        self._check_partition_value_generation(BasicModelMulti, SelectStatement(BasicModelMulti.__table_name__), reverse=True)
+        self._check_partition_value_generation(BasicModelMulti, DeleteStatement(BasicModelMulti.__table_name__), reverse=True)
+        self._check_partition_value_generation(ComplexModelRouting, SelectStatement(ComplexModelRouting.__table_name__), reverse=True)
+        self._check_partition_value_generation(ComplexModelRouting, DeleteStatement(ComplexModelRouting.__table_name__), reverse=True)
+
+    def _check_partition_value_generation(self, model, state, reverse=False):
+        """
+        This generates a some statements based on the partition_key_index of the model.
+        It then validates that order of the partition key values in the statement matches the index
+        specified in the models partition_key_index
+        """
+        # Setup some unique values for statement generation
+        uuid = uuid4()
+        values = {'k': 5, 'v': 3, 'partition': uuid, 'cluster': 6, 'count': 42, 'text': 'text', 'float': 3.1415, 'text_2': 'text_2'}
+        res = dict((v, k) for k, v in values.items())
+        items = list(model._partition_key_index.items())
+        if(reverse):
+            items.reverse()
+        # Add where clauses for each partition key
+        for partition_key, position in items:
+            wc = WhereClause(partition_key, EqualsOperator(), values.get(partition_key))
+            state._add_where_clause(wc)
+
+        # Iterate over the partition key values check to see that their index matches
+        # Those specified in the models partition field
+        for indx, value in enumerate(state.partition_key_values(model._partition_key_index)):
+            name = res.get(value)
+            self.assertEqual(indx, model._partition_key_index.get(name))
 
 
 def test_none_filter_fails():

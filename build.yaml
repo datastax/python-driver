@@ -1,3 +1,9 @@
+schedules:
+  commit:
+    schedule: per_commit
+    branches:
+      include: [master, /python.*/]
+
 python:
   - 2.7
   - 3.4
@@ -8,6 +14,7 @@ cassandra:
   - 2.1
   - 2.2
   - 3.0
+  - 3.7
 env:
   EVENT_LOOP_MANAGER:
     - libev
@@ -19,14 +26,16 @@ build:
       export JAVA_HOME=$CCM_JAVA_HOME
       export PATH=$JAVA_HOME/bin:$PATH
 
+      pip install git+https://github.com/pcmanus/ccm.git
       # Install dependencies
       if [[ $EVENT_LOOP_MANAGER == 'libev' ]]; then
         sudo apt-get install -y libev4 libev-dev
       fi
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
-
+      FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
+        FORCE_CYTHON=True
         pip install cython
         pip install numpy
         # Install the driver & compile C extensions
@@ -37,12 +46,12 @@ build:
       fi
 
       echo "==========RUNNING CQLENGINE TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
+      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
 
       echo "==========RUNNING INTEGRATION TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
+      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
       echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
   - xunit:
     - "*_results.xml"

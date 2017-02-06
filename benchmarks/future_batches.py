@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,8 @@ class Runner(BenchmarkThread):
                     except queue.Empty:
                         break
 
-            future = self.session.execute_async(self.query, self.values)
+            key = "{0}-{1}".format(self.thread_num, i)
+            future = self.run_query(key)
             futures.put_nowait(future)
 
         while True:

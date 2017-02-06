@@ -16,7 +16,7 @@ a custom QueryHandler.
 
 See :meth:`.Session.execute`, ::meth:`.Session.execute_async`, :attr:`.ResponseFuture.custom_payload`.
 
-.. autoclass:: ProtocolHandler
+.. autoclass:: _ProtocolHandler
 
     .. autoattribute:: message_types_by_opcode
         :annotation: = {default mapping}

@@ -1,9 +1,12 @@
 DataStax Python Driver for Apache Cassandra
 ===========================================
 
+.. image:: https://travis-ci.org/datastax/python-driver.png?branch=master
+   :target: https://travis-ci.org/datastax/python-driver
+
 A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (1.2+) and DataStax Enterprise (3.1+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
 
-The driver supports Python 2.6, 2.7, 3.3, and 3.4.
+The driver supports Python 2.7, 3.3, and 3.4.
 
 Feedback Requested
 ------------------
@@ -47,6 +50,10 @@ cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contribu
 community) is now maintained as an integral part of this package. Refer to
 `documentation here <http://datastax.github.io/python-driver/object_mapper.html>`_.
 
+Contributing
+------------
+See `CONTRIBUTING.md <https://github.com/datastax/python-driver/blob/master/CONTRIBUTING.rst>`_.
+
 Reporting Problems
 ------------------
 Please report any bugs and make any feature requests on the
@@ -63,13 +70,9 @@ and the IRC channel.
 For IRC, use the #datastax-drivers channel on irc.freenode.net.  If you don't have an IRC client,
 you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_.
 
-Features to be Added
---------------------
-* C extension for encoding/decoding messages
-
 License
 -------
-Copyright 2013-2015 DataStax
+Copyright 2013-2016 DataStax
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

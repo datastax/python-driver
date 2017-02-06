@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,17 +20,19 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine import columns
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import execute_count
 
 
 class TestQueryUpdateModel(Model):
 
-    partition   = columns.UUID(primary_key=True, default=uuid4)
-    cluster     = columns.Integer(primary_key=True)
-    count       = columns.Integer(required=False)
-    text        = columns.Text(required=False, index=True)
-    text_set    = columns.Set(columns.Text, required=False)
-    text_list   = columns.List(columns.Text, required=False)
-    text_map    = columns.Map(columns.Text, columns.Text, required=False)
+    partition = columns.UUID(primary_key=True, default=uuid4)
+    cluster = columns.Integer(primary_key=True)
+    count = columns.Integer(required=False)
+    text = columns.Text(required=False, index=True)
+    text_set = columns.Set(columns.Text, required=False)
+    text_list = columns.List(columns.Text, required=False)
+    text_map = columns.Map(columns.Text, columns.Text, required=False)
+
 
 class QueryUpdateTests(BaseCassEngTestCase):
 
@@ -44,6 +46,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         super(QueryUpdateTests, cls).tearDownClass()
         drop_table(TestQueryUpdateModel)
 
+    @execute_count(8)
     def test_update_values(self):
         """ tests calling udpate on a queryset """
         partition = uuid4()
@@ -64,6 +67,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             self.assertEqual(row.count, 6 if i == 3 else i)
             self.assertEqual(row.text, str(i))
 
+    @execute_count(6)
     def test_update_values_validation(self):
         """ tests calling udpate on models with values passed in """
         partition = uuid4()
@@ -90,6 +94,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         with self.assertRaises(ValidationError):
             TestQueryUpdateModel.objects(partition=uuid4(), cluster=3).update(cluster=5000)
 
+    @execute_count(8)
     def test_null_update_deletes_column(self):
         """ setting a field to null in the update should issue a delete statement """
         partition = uuid4()
@@ -110,6 +115,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             self.assertEqual(row.count, i)
             self.assertEqual(row.text, None if i == 3 else str(i))
 
+    @execute_count(9)
     def test_mixed_value_and_null_update(self):
         """ tests that updating a columns value, and removing another works properly """
         partition = uuid4()
@@ -130,9 +136,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             self.assertEqual(row.count, 6 if i == 3 else i)
             self.assertEqual(row.text, None if i == 3 else str(i))
 
-    def test_counter_updates(self):
-        pass
-
+    @execute_count(3)
     def test_set_add_updates(self):
         partition = uuid4()
         cluster = 1
@@ -143,6 +147,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("foo", "bar")))
 
+    @execute_count(2)
     def test_set_add_updates_new_record(self):
         """ If the key doesn't exist yet, an update creates the record
         """
@@ -153,6 +158,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("bar",)))
 
+    @execute_count(3)
     def test_set_remove_updates(self):
         partition = uuid4()
         cluster = 1
@@ -164,6 +170,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("baz",)))
 
+    @execute_count(3)
     def test_set_remove_new_record(self):
         """ Removing something not in the set should silently do nothing
         """
@@ -177,6 +184,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_set, set(("foo",)))
 
+    @execute_count(3)
     def test_list_append_updates(self):
         partition = uuid4()
         cluster = 1
@@ -188,6 +196,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_list, ["foo", "bar"])
 
+    @execute_count(3)
     def test_list_prepend_updates(self):
         """ Prepend two things since order is reversed by default by CQL """
         partition = uuid4()
@@ -203,6 +212,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         expected = (prepended[::-1] if is_prepend_reversed() else prepended) + original
         self.assertEqual(obj.text_list, expected)
 
+    @execute_count(3)
     def test_map_update_updates(self):
         """ Merge a dictionary into existing value """
         partition = uuid4()
@@ -216,6 +226,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1', "bar": '3', "baz": '4'})
 
+    @execute_count(3)
     def test_map_update_none_deletes_key(self):
         """ The CQL behavior is if you set a key in a map to null it deletes
         that key from the map.  Test that this works with __update.
@@ -230,3 +241,39 @@ class QueryUpdateTests(BaseCassEngTestCase):
                 text_map__update={"bar": None})
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1'})
+
+
+class StaticDeleteModel(Model):
+    example_id = columns.Integer(partition_key=True, primary_key=True, default=uuid4)
+    example_static1 = columns.Integer(static=True)
+    example_static2 = columns.Integer(static=True)
+    example_clust = columns.Integer(primary_key=True)
+
+
+class StaticDeleteTests(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super(StaticDeleteTests, cls).setUpClass()
+        sync_table(StaticDeleteModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(StaticDeleteTests, cls).tearDownClass()
+        drop_table(StaticDeleteModel)
+
+    def test_static_deletion(self):
+        """
+        Test to ensure that cluster keys are not included when removing only static columns
+
+        @since 3.6
+        @jira_ticket PYTHON-608
+        @expected_result Server should not throw an exception, and the static column should be deleted
+
+        @test_category object_mapper
+        """
+        StaticDeleteModel.create(example_id=5, example_clust=5, example_static2=1)
+        sdm = StaticDeleteModel.filter(example_id=5).first()
+        self.assertEqual(1, sdm.example_static2)
+        sdm.update(example_static2=None)
+        self.assertIsNone(sdm.example_static2)

@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 import logging
 import re
 import six
-import warnings
+from warnings import warn
 
 from cassandra.cqlengine import CQLEngineException, ValidationError
 from cassandra.cqlengine import columns
@@ -27,6 +27,17 @@ from cassandra.metadata import protect_name
 from cassandra.util import OrderedDict
 
 log = logging.getLogger(__name__)
+
+
+def _clone_model_class(model, attrs):
+    new_type = type(model.__name__, (model,), attrs)
+    try:
+        new_type.__abstract__ = model.__abstract__
+        new_type.__discriminator_value__ = model.__discriminator_value__
+        new_type.__default_ttl__ = model.__default_ttl__
+    except AttributeError:
+        pass
+    return new_type
 
 
 class ModelException(CQLEngineException):
@@ -101,28 +112,28 @@ class QuerySetDescriptor(object):
         raise NotImplementedError
 
 
-class TransactionDescriptor(object):
+class ConditionalDescriptor(object):
     """
     returns a query set descriptor
     """
     def __get__(self, instance, model):
         if instance:
-            def transaction_setter(*prepared_transaction, **unprepared_transactions):
-                if len(prepared_transaction) > 0:
-                    transactions = prepared_transaction[0]
+            def conditional_setter(*prepared_conditional, **unprepared_conditionals):
+                if len(prepared_conditional) > 0:
+                    conditionals = prepared_conditional[0]
                 else:
-                    transactions = instance.objects.iff(**unprepared_transactions)._transaction
-                instance._transaction = transactions
+                    conditionals = instance.objects.iff(**unprepared_conditionals)._conditional
+                instance._conditional = conditionals
                 return instance
 
-            return transaction_setter
+            return conditional_setter
         qs = model.__queryset__(model)
 
-        def transaction_setter(**unprepared_transactions):
-            transactions = model.objects.iff(**unprepared_transactions)._transaction
-            qs._transaction = transactions
+        def conditional_setter(**unprepared_conditionals):
+            conditionals = model.objects.iff(**unprepared_conditionals)._conditional
+            qs._conditional = conditionals
             return qs
-        return transaction_setter
+        return conditional_setter
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
@@ -178,12 +189,30 @@ class IfNotExistsDescriptor(object):
     def __get__(self, instance, model):
         if instance:
             # instance method
-            def ifnotexists_setter(ife):
+            def ifnotexists_setter(ife=True):
                 instance._if_not_exists = ife
                 return instance
             return ifnotexists_setter
 
         return model.objects.if_not_exists
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+class IfExistsDescriptor(object):
+    """
+    return a query set descriptor with a if_exists flag specified
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def ifexists_setter(ife=True):
+                instance._if_exists = ife
+                return instance
+            return ifexists_setter
+
+        return model.objects.if_exists
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
@@ -213,6 +242,25 @@ class ConsistencyDescriptor(object):
         raise NotImplementedError
 
 
+class UsingDescriptor(object):
+    """
+    return a query set descriptor with a connection context specified
+    """
+    def __get__(self, instance, model):
+        if instance:
+            # instance method
+            def using_setter(connection=None):
+                if connection:
+                    instance._connection = connection
+                return instance
+            return using_setter
+
+        return model.objects.using
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+
 class ColumnQueryEvaluator(query.AbstractQueryableColumn):
     """
     Wraps a column and allows it to be used in comparator
@@ -229,7 +277,6 @@ class ColumnQueryEvaluator(query.AbstractQueryableColumn):
         return self.column.db_field_name
 
     def _get_column(self):
-        """ :rtype: ColumnQueryEvaluator """
         return self.column
 
 
@@ -297,22 +344,32 @@ class BaseModel(object):
     objects = QuerySetDescriptor()
     ttl = TTLDescriptor()
     consistency = ConsistencyDescriptor()
-    iff = TransactionDescriptor()
+    iff = ConditionalDescriptor()
 
     # custom timestamps, see USING TIMESTAMP X
     timestamp = TimestampDescriptor()
 
     if_not_exists = IfNotExistsDescriptor()
 
+    if_exists = IfExistsDescriptor()
+
+    using = UsingDescriptor()
+
     # _len is lazily created by __len__
 
     __table_name__ = None
 
+    __table_name_case_sensitive__ = False
+
     __keyspace__ = None
+
+    __connection__ = None
 
     __discriminator_value__ = None
 
     __options__ = None
+
+    __compute_routing_key__ = True
 
     # the queryset class used for this class
     __queryset__ = query.ModelQuerySet
@@ -324,19 +381,28 @@ class BaseModel(object):
 
     _if_not_exists = False  # optional if_not_exists flag to check existence before insertion
 
+    _if_exists = False  # optional if_exists flag to check existence before update
+
     _table_name = None  # used internally to cache a derived table name
 
+    _connection = None
+
     def __init__(self, **values):
-        self._ttl = self.__default_ttl__
+        self._ttl = None
         self._timestamp = None
-        self._transaction = None
+        self._conditional = None
         self._batch = None
         self._timeout = connection.NOT_SET
         self._is_persisted = False
+        self._connection = None
 
         self._values = {}
         for name, column in self._columns.items():
-            value = values.get(name)
+            # Set default values on instantiation. Thanks to this, we don't have
+            # to wait anylonger for a call to validate() to have CQLengine set
+            # default columns values.
+            column_default = column.get_default() if column.has_default else None
+            value = values.get(name, column_default)
             if value is not None or isinstance(column, columns.BaseContainerColumn):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
@@ -355,6 +421,10 @@ class BaseModel(object):
         """
         return '{0} <{1}>'.format(self.__class__.__name__,
                                 ', '.join('{0}={1}'.format(k, getattr(self, k)) for k in self._primary_keys.keys()))
+
+    @classmethod
+    def _routing_key_from_values(cls, pk_values, protocol_version):
+        return cls._key_serializer(pk_values, protocol_version)
 
     @classmethod
     def _discover_polymorphic_submodels(cls):
@@ -383,11 +453,11 @@ class BaseModel(object):
         # we're going to take the values, which is from the DB as a dict
         # and translate that into our local fields
         # the db_map is a db_field -> model field map
-        items = values.items()
-        field_dict = dict([(cls._db_map.get(k, k), v) for k, v in items])
+        if cls._db_map:
+            values = dict((cls._db_map.get(k, k), v) for k, v in values.items())
 
         if cls._is_polymorphic:
-            disc_key = field_dict.get(cls._discriminator_column_name)
+            disc_key = values.get(cls._discriminator_column_name)
 
             if disc_key is None:
                 raise PolymorphicModelException('discriminator value was not found in values')
@@ -408,12 +478,12 @@ class BaseModel(object):
                     '{0} is not a subclass of {1}'.format(klass.__name__, cls.__name__)
                 )
 
-            field_dict = dict((k, v) for k, v in field_dict.items() if k in klass._columns.keys())
+            values = dict((k, v) for k, v in values.items() if k in klass._columns.keys())
 
         else:
             klass = cls
 
-        instance = klass(**field_dict)
+        instance = klass(**values)
         instance._set_persisted()
         return instance
 
@@ -452,6 +522,13 @@ class BaseModel(object):
         """
         return cls._columns[name]
 
+    @classmethod
+    def _get_column_by_db_name(cls, name):
+        """
+        Returns the column, mapped by db_field name
+        """
+        return cls._columns.get(cls._db_map.get(name, name))
+
     def __eq__(self, other):
         if self.__class__ != other.__class__:
             return False
@@ -462,12 +539,7 @@ class BaseModel(object):
         if keys != other_keys:
             return False
 
-        # check that all of the attributes match
-        for key in other_keys:
-            if getattr(self, key, None) != getattr(other, key, None):
-                return False
-
-        return True
+        return all(getattr(self, key, None) == getattr(other, key, None) for key in other_keys)
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -480,7 +552,10 @@ class BaseModel(object):
         """
         cf_name = protect_name(cls._raw_column_family_name())
         if include_keyspace:
-            return '{0}.{1}'.format(protect_name(cls._get_keyspace()), cf_name)
+            keyspace = cls._get_keyspace()
+            if not keyspace:
+                raise CQLEngineException("Model keyspace is not set and no default is available. Set model keyspace or setup connection before attempting to generate a query.")
+            return '{0}.{1}'.format(protect_name(keyspace), cf_name)
 
         return cf_name
 
@@ -489,7 +564,14 @@ class BaseModel(object):
     def _raw_column_family_name(cls):
         if not cls._table_name:
             if cls.__table_name__:
-                cls._table_name = cls.__table_name__.lower()
+                if cls.__table_name_case_sensitive__:
+                    cls._table_name = cls.__table_name__
+                else:
+                    table_name = cls.__table_name__.lower()
+                    if cls.__table_name__ != table_name:
+                        warn(("Model __table_name__ will be case sensitive by default in 4.0. "
+                        "You should fix the __table_name__ value of the '{0}' model.").format(cls.__name__))
+                    cls._table_name = table_name
             else:
                 if cls._is_polymorphic and not cls._is_polymorphic_base:
                     cls._table_name = cls._polymorphic_base._raw_column_family_name()
@@ -644,12 +726,12 @@ class BaseModel(object):
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
                           if_not_exists=self._if_not_exists,
-                          transaction=self._transaction,
-                          timeout=self._timeout).save()
+                          conditional=self._conditional,
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).save()
 
         self._set_persisted()
 
-        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
@@ -690,12 +772,12 @@ class BaseModel(object):
                           ttl=self._ttl,
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
-                          transaction=self._transaction,
-                          timeout=self._timeout).update()
+                          conditional=self._conditional,
+                          timeout=self._timeout,
+                          if_exists=self._if_exists).update()
 
         self._set_persisted()
 
-        self._ttl = self.__default_ttl__
         self._timestamp = None
 
         return self
@@ -708,7 +790,9 @@ class BaseModel(object):
                           batch=self._batch,
                           timestamp=self._timestamp,
                           consistency=self.__consistency__,
-                          timeout=self._timeout).delete()
+                          timeout=self._timeout,
+                          conditional=self._conditional,
+                          if_exists=self._if_exists).delete()
 
     def get_changed_columns(self):
         """
@@ -722,10 +806,21 @@ class BaseModel(object):
 
     def _inst_batch(self, batch):
         assert self._timeout is connection.NOT_SET, 'Setting both timeout and batch is not supported'
+        if self._connection:
+            raise CQLEngineException("Cannot specify a connection on model in batch mode.")
         self._batch = batch
         return self
 
     batch = hybrid_classmethod(_class_batch, _inst_batch)
+
+    @classmethod
+    def _class_get_connection(cls):
+        return cls.__connection__
+
+    def _inst_get_connection(self):
+        return self._connection or self.__connection__
+
+    _get_connection = hybrid_classmethod(_class_get_connection, _inst_get_connection)
 
 
 class ModelMetaClass(type):
@@ -749,16 +844,9 @@ class ModelMetaClass(type):
         # short circuit __discriminator_value__ inheritance
         attrs['__discriminator_value__'] = attrs.get('__discriminator_value__')
 
+        # TODO __default__ttl__ should be removed in the next major release
         options = attrs.get('__options__') or {}
         attrs['__default_ttl__'] = options.get('default_time_to_live')
-
-        def _transform_column(col_name, col_obj):
-            column_dict[col_name] = col_obj
-            if col_obj.primary_key:
-                primary_keys[col_name] = col_obj
-            col_obj.set_column_name(col_name)
-            # set properties
-            attrs[col_name] = ColumnDescriptor(col_obj)
 
         column_definitions = [(k, v) for k, v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, key=lambda x: x[1].position)
@@ -804,6 +892,15 @@ class ModelMetaClass(type):
 
         has_partition_keys = any(v.partition_key for (k, v) in column_definitions)
 
+        def _transform_column(col_name, col_obj):
+            column_dict[col_name] = col_obj
+            if col_obj.primary_key:
+                primary_keys[col_name] = col_obj
+            col_obj.set_column_name(col_name)
+            # set properties
+            attrs[col_name] = ColumnDescriptor(col_obj)
+
+        partition_key_index = 0
         # transform column definitions
         for k, v in column_definitions:
             # don't allow a column with the same name as a built-in attribute or method
@@ -811,18 +908,36 @@ class ModelMetaClass(type):
                 raise ModelDefinitionException("column '{0}' conflicts with built-in attribute/method".format(k))
 
             # counter column primary keys are not allowed
-            if (v.primary_key or v.partition_key) and isinstance(v, (columns.Counter, columns.BaseContainerColumn)):
-                raise ModelDefinitionException('counter columns and container columns cannot be used as primary keys')
+            if (v.primary_key or v.partition_key) and isinstance(v, columns.Counter):
+                raise ModelDefinitionException('counter columns cannot be used as primary keys')
 
             # this will mark the first primary key column as a partition
             # key, if one hasn't been set already
             if not has_partition_keys and v.primary_key:
                 v.partition_key = True
                 has_partition_keys = True
+            if v.partition_key:
+                v._partition_key_index = partition_key_index
+                partition_key_index += 1
+
+            overriding = column_dict.get(k)
+            if overriding:
+                v.position = overriding.position
+                v.partition_key = overriding.partition_key
+                v._partition_key_index = overriding._partition_key_index
             _transform_column(k, v)
 
         partition_keys = OrderedDict(k for k in primary_keys.items() if k[1].partition_key)
         clustering_keys = OrderedDict(k for k in primary_keys.items() if not k[1].partition_key)
+
+        if attrs.get('__compute_routing_key__', True):
+            key_cols = [c for c in partition_keys.values()]
+            partition_key_index = dict((col.db_field_name, col._partition_key_index) for col in key_cols)
+            key_cql_types = [c.cql_type for c in key_cols]
+            key_serializer = staticmethod(lambda parts, proto_version: [t.to_binary(p, proto_version) for t, p in zip(key_cql_types, parts)])
+        else:
+            partition_key_index = {}
+            key_serializer = staticmethod(lambda parts, proto_version: None)
 
         # setup partition key shortcut
         if len(partition_keys) == 0:
@@ -842,17 +957,19 @@ class ModelMetaClass(type):
         for v in column_dict.values():
             # check for duplicate column names
             if v.db_field_name in col_names:
-                raise ModelException("{0} defines the column {1} more than once".format(name, v.db_field_name))
+                raise ModelException("{0} defines the column '{1}' more than once".format(name, v.db_field_name))
             if v.clustering_order and not (v.primary_key and not v.partition_key):
                 raise ModelException("clustering_order may be specified only for clustering primary keys")
             if v.clustering_order and v.clustering_order.lower() not in ('asc', 'desc'):
-                raise ModelException("invalid clustering order {0} for column {1}".format(repr(v.clustering_order), v.db_field_name))
+                raise ModelException("invalid clustering order '{0}' for column '{1}'".format(repr(v.clustering_order), v.db_field_name))
             col_names.add(v.db_field_name)
 
         # create db_name -> model name map for loading
         db_map = {}
-        for field_name, col in column_dict.items():
-            db_map[col.db_field_name] = field_name
+        for col_name, field in column_dict.items():
+            db_field = field.db_field_name
+            if db_field != col_name:
+                db_map[db_field] = col_name
 
         # add management members to the class
         attrs['_columns'] = column_dict
@@ -865,6 +982,8 @@ class ModelMetaClass(type):
         attrs['_dynamic_columns'] = {}
 
         attrs['_partition_keys'] = partition_keys
+        attrs['_partition_key_index'] = partition_key_index
+        attrs['_key_serializer'] = key_serializer
         attrs['_clustering_keys'] = clustering_keys
         attrs['_has_counter'] = len(counter_columns) > 0
 
@@ -892,7 +1011,7 @@ class ModelMetaClass(type):
             if MultipleObjectsReturnedBase is not None:
                 break
 
-        MultipleObjectsReturnedBase = DoesNotExistBase or attrs.pop('MultipleObjectsReturned', BaseModel.MultipleObjectsReturned)
+        MultipleObjectsReturnedBase = MultipleObjectsReturnedBase or attrs.pop('MultipleObjectsReturned', BaseModel.MultipleObjectsReturned)
         attrs['MultipleObjectsReturned'] = type('MultipleObjectsReturned', (MultipleObjectsReturnedBase,), {})
 
         # create the class and add a QuerySet to it
@@ -921,9 +1040,19 @@ class Model(BaseModel):
     *Optional.* Sets the name of the CQL table for this model. If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
     """
 
+    __table_name_case_sensitive__ = False
+    """
+    *Optional.* By default, __table_name__ is case insensitive. Set this to True if you want to preserve the case sensitivity.
+    """
+
     __keyspace__ = None
     """
     Sets the name of the keyspace used by this model.
+    """
+
+    __connection__ = None
+    """
+    Sets the name of the default connection used by this model.
     """
 
     __options__ = None
@@ -936,4 +1065,9 @@ class Model(BaseModel):
     __discriminator_value__ = None
     """
     *Optional* Specifies a value for the discriminator column when using model inheritance.
+    """
+
+    __compute_routing_key__ = True
+    """
+    *Optional* Setting False disables computing the routing key for TokenAwareRouting
     """

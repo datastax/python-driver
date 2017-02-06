@@ -16,7 +16,7 @@ Contents
     How to install the driver.
 
 :doc:`getting_started`
-    A guide through the first steps of connecting to Cassandra and executing queries.
+    A guide through the first steps of connecting to Cassandra and executing queries
 
 :doc:`object_mapper`
     Introduction to the integrated object mapper, cqlengine
@@ -25,19 +25,28 @@ Contents
     The API documentation.
 
 :doc:`upgrading`
-    A guide to upgrading versions of the driver.
+    A guide to upgrading versions of the driver
+
+:doc:`execution_profiles`
+    An introduction to a more flexible way of configuring request execution
 
 :doc:`performance`
     Tips for getting good performance.
 
 :doc:`query_paging`
-    Notes on paging large query results.
+    Notes on paging large query results
+
+:doc:`lwt`
+    Working with results of conditional requests
 
 :doc:`user_defined_types`
-    Working with Cassandra 2.1's user-defined types.
+    Working with Cassandra 2.1's user-defined types
 
 :doc:`security`
-    An overview of the security features of the driver.
+    An overview of the security features of the driver
+
+:doc:`dates_and_times`
+    Some discussion on the driver's approach to working with timestamp, date, time types
 
 :doc:`faq`
     A collection of Frequently Asked Questions
@@ -49,11 +58,14 @@ Contents
    installation
    getting_started
    upgrading
+   execution_profiles
    performance
    query_paging
+   lwt
    security
    user_defined_types
    object_mapper
+   dates_and_times
    faq
 
 Getting Help
@@ -71,10 +83,3 @@ Please report any bugs and make any feature requests on the
 `JIRA <https://datastax-oss.atlassian.net/browse/PYTHON>`_ issue tracker.
 
 If you would like to contribute, please feel free to open a pull request.
-
-Indices and Tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

@@ -28,10 +28,16 @@ Model
 
     .. autoattribute:: __table_name__
 
+    .. autoattribute:: __table_name_case_sensitive__
+
     .. autoattribute:: __keyspace__
 
-    .. _ttl-change:
-    .. autoattribute:: __default_ttl__
+    .. autoattribute:: __connection__
+
+    .. attribute:: __default_ttl__
+        :annotation:  = None
+
+        Will be deprecated in release 4.0. You can set the default ttl by configuring the table ``__options__``. See :ref:`ttl-change` for more details.
 
     .. autoattribute:: __discriminator_value__
 
@@ -47,7 +53,6 @@ Model
 
     See the `list of supported table properties for more information
     <http://www.datastax.com/documentation/cql/3.1/cql/cql_reference/tabProp.html>`_.
-
 
     .. attribute:: __options__
 
@@ -78,6 +83,8 @@ Model
                                               'tombstone_compaction_interval': '86400'},
                                'gc_grace_seconds': '0'}
 
+    .. autoattribute:: __compute_routing_key__
+
 
     The base methods allow creating, storing, and querying modeled objects.
 
@@ -89,7 +96,7 @@ Model
         object is determined by its primary key(s). And please note using this flag
         would incur performance cost.
 
-        if the insertion didn't applied, a LWTException exception would be raised.
+        If the insertion isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
 
         .. code-block:: python
 
@@ -97,7 +104,25 @@ Model
                 TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
             except LWTException as e:
                 # handle failure case
-                print e.existing # existing object
+                print e.existing  # dict containing LWT result fields
+
+        This method is supported on Cassandra 2.0 or later.
+
+    .. method:: if_exists()
+
+        Check the existence of an object before an update or delete. The existence of an
+        object is determined by its primary key(s). And please note using this flag
+        would incur performance cost.
+
+        If the update or delete isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
+
+        .. code-block:: python
+
+            try:
+                TestIfExistsModel.objects(id=id).if_exists().update(count=9, text='111111111111')
+            except LWTException as e:
+                # handle failure case
+                pass
 
         This method is supported on Cassandra 2.0 or later.
 
@@ -111,7 +136,7 @@ Model
         Simply specify the column(s) and the expected value(s).  As with if_not_exists,
         this incurs a performance cost.
 
-        If the insertion isn't applied, a LWTException is raised
+        If the insertion isn't applied, a :class:`~cassandra.cqlengine.query.LWTException` is raised.
 
         .. code-block:: python
 
@@ -119,7 +144,8 @@ Model
             try:
                  t.iff(count=5).update('other text')
             except LWTException as e:
-                # handle failure
+                # handle failure case
+                print e.existing # existing object
 
     .. automethod:: get
 
@@ -144,6 +170,10 @@ Model
     .. method:: ttl(ttl_in_sec)
 
        Sets the ttl values to run instance updates and inserts queries with.
+
+    .. method:: using(keyspace=None, connection=None)
+
+        Change the context on the fly of the model instance (keyspace, connection)
 
     .. automethod:: column_family_name
 

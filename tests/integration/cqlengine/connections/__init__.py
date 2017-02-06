@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,18 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
-
-from cassandra.cqlengine.statements import AssignmentStatement, StatementException
-
-
-class AssignmentStatementTest(unittest.TestCase):
-
-    def test_add_assignment_type_checking(self):
-        """ tests that only assignment clauses can be added to queries """
-        stmt = AssignmentStatement('table', [])
-        with self.assertRaises(StatementException):
-            stmt.add_assignment_clause('x=5')

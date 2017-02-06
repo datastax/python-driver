@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,14 +75,25 @@ class BaseIfNotExistsWithCounterTest(BaseCassEngTestCase):
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
-    def test_insert_if_not_exists_success(self):
+    def test_insert_if_not_exists(self):
         """ tests that insertion with if_not_exists work as expected """
 
         id = uuid4()
 
         TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-        with self.assertRaises(LWTException):
+
+        with self.assertRaises(LWTException) as assertion:
             TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
+
+        with self.assertRaises(LWTException) as assertion:
+            TestIfNotExistsModel.objects(count=9, text='111111111111').if_not_exists().create(id=id)
+
+        self.assertEqual(assertion.exception.existing, {
+            'count': 8,
+            'id': id,
+            'text': '123456789',
+            '[applied]': False,
+        })
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
@@ -91,23 +102,8 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         self.assertEqual(tm.count, 8)
         self.assertEqual(tm.text, '123456789')
 
-    def test_insert_if_not_exists_failure(self):
-        """ tests that insertion with if_not_exists failure """
-
-        id = uuid4()
-
-        TestIfNotExistsModel.create(id=id, count=8, text='123456789')
-        TestIfNotExistsModel.create(id=id, count=9, text='111111111111')
-
-        q = TestIfNotExistsModel.objects(id=id)
-        self.assertEqual(len(q), 1)
-
-        tm = q.first()
-        self.assertEqual(tm.count, 9)
-        self.assertEqual(tm.text, '111111111111')
-
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
-    def test_batch_insert_if_not_exists_success(self):
+    def test_batch_insert_if_not_exists(self):
         """ tests that batch insertion with if_not_exists work as expected """
 
         id = uuid4()
@@ -117,8 +113,15 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
         b = BatchQuery()
         TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
-        with self.assertRaises(LWTException):
+        with self.assertRaises(LWTException) as assertion:
             b.execute()
+
+        self.assertEqual(assertion.exception.existing, {
+            'count': 8,
+            'id': id,
+            'text': '123456789',
+            '[applied]': False,
+        })
 
         q = TestIfNotExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
@@ -126,22 +129,6 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         tm = q.first()
         self.assertEqual(tm.count, 8)
         self.assertEqual(tm.text, '123456789')
-
-    def test_batch_insert_if_not_exists_failure(self):
-        """ tests that batch insertion with if_not_exists failure """
-        id = uuid4()
-
-        with BatchQuery() as b:
-            TestIfNotExistsModel.batch(b).create(id=id, count=8, text='123456789')
-        with BatchQuery() as b:
-            TestIfNotExistsModel.batch(b).create(id=id, count=9, text='111111111111')
-
-        q = TestIfNotExistsModel.objects(id=id)
-        self.assertEqual(len(q), 1)
-
-        tm = q.first()
-        self.assertEqual(tm.count, 9)
-        self.assertEqual(tm.text, '111111111111')
 
 
 class IfNotExistsModelTest(BaseIfNotExistsTest):
@@ -160,7 +147,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
 
         with mock.patch.object(self.session, 'execute') as m:
             tm = TestIfNotExistsModel(count=8)
-            tm.if_not_exists(True).save()
+            tm.if_not_exists().save()
 
         query = m.call_args[0][0].query_string
         self.assertIn("IF NOT EXISTS", query)
@@ -183,12 +170,12 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
 
     def test_instance_is_returned(self):
         """
-        ensures that we properly handle the instance.if_not_exists(True).save()
+        ensures that we properly handle the instance.if_not_exists().save()
         scenario
         """
         o = TestIfNotExistsModel.create(text="whatever")
         o.text = "new stuff"
-        o = o.if_not_exists(True)
+        o = o.if_not_exists()
         self.assertEqual(True, o._if_not_exists)
 
     def test_if_not_exists_is_not_include_with_query_on_update(self):
@@ -197,7 +184,7 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
         """
         o = TestIfNotExistsModel.create(text="whatever")
         o.text = "new stuff"
-        o = o.if_not_exists(True)
+        o = o.if_not_exists()
 
         with mock.patch.object(self.session, 'execute') as m:
             o.save()

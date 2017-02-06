@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,20 +18,22 @@ except ImportError:
     import unittest  # noqa
 
 from collections import deque
-from mock import patch
+from copy import copy
+from mock import Mock, call, patch
 import time
 from uuid import uuid4
+import logging
 
 import cassandra
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
-                                WhiteListRoundRobinPolicy)
-from cassandra.protocol import MAX_SUPPORTED_VERSION
-from cassandra.query import SimpleStatement, TraceUnavailable
+                                WhiteListRoundRobinPolicy, AddressTranslator)
+from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, get_node, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node,\
+    MockLoggingHandler, get_unsupported_lower_protocol, get_unsupported_upper_protocol, protocolv5
 from tests.integration.util import assert_quiescent_pool_state
 
 
@@ -39,7 +41,71 @@ def setup_module():
     use_singledc()
 
 
+class IgnoredHostPolicy(RoundRobinPolicy):
+
+    def __init__(self, ignored_hosts):
+        self.ignored_hosts = ignored_hosts
+        RoundRobinPolicy.__init__(self)
+
+    def distance(self, host):
+        if(str(host) in self.ignored_hosts):
+            return HostDistance.IGNORED
+        else:
+            return HostDistance.LOCAL
+
+
 class ClusterTests(unittest.TestCase):
+
+    def test_ignored_host_up(self):
+        """
+        Test to ensure that is_up is not set by default on ignored hosts
+
+        @since 3.6
+        @jira_ticket PYTHON-551
+        @expected_result ignored hosts should have None set for is_up
+
+        @test_category connection
+        """
+        ingored_host_policy = IgnoredHostPolicy(["127.0.0.2", "127.0.0.3"])
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=ingored_host_policy)
+        session = cluster.connect()
+        for host in cluster.metadata.all_hosts():
+            if str(host) == "127.0.0.1":
+                self.assertTrue(host.is_up)
+            else:
+                self.assertIsNone(host.is_up)
+
+    def test_host_resolution(self):
+        """
+        Test to insure A records are resolved appropriately.
+
+        @since 3.3
+        @jira_ticket PYTHON-415
+        @expected_result hostname will be transformed into IP
+
+        @test_category connection
+        """
+        cluster = Cluster(contact_points=["localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        self.assertTrue('127.0.0.1' in cluster.contact_points_resolved)
+
+    def test_host_duplication(self):
+        """
+        Ensure that duplicate hosts in the contact points are surfaced in the cluster metadata
+
+        @since 3.3
+        @jira_ticket PYTHON-103
+        @expected_result duplicate hosts aren't surfaced in cluster.metadata
+
+        @test_category connection
+        """
+        cluster = Cluster(contact_points=["localhost", "127.0.0.1", "localhost", "localhost", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        cluster.connect(wait_for_all_pools=True)
+        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        cluster.shutdown()
+        cluster = Cluster(contact_points=["127.0.0.1", "localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
+        cluster.connect(wait_for_all_pools=True)
+        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        cluster.shutdown()
 
     def test_raise_error_on_control_connection_timeout(self):
         """
@@ -121,7 +187,7 @@ class ClusterTests(unittest.TestCase):
         """
 
         cluster = Cluster()
-        self.assertEqual(cluster.protocol_version,  MAX_SUPPORTED_VERSION)
+        self.assertLessEqual(cluster.protocol_version,  cassandra.ProtocolVersion.MAX_SUPPORTED)
         session = cluster.connect()
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
@@ -140,6 +206,42 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual(updated_cluster_version, 1)
 
         cluster.shutdown()
+
+    def test_invalid_protocol_negotation(self):
+        """
+        Test for protocol negotiation when explicit versions are set
+
+        If an explicit protocol version that is not compatible with the server version is set
+        an exception should be thrown. It should not attempt to negotiate
+
+        for reference supported protocol version to server versions is as follows/
+
+        1.2 -> 1
+        2.0 -> 2, 1
+        2.1 -> 3, 2, 1
+        2.2 -> 4, 3, 2, 1
+        3.X -> 4, 3
+
+        @since 3.6.0
+        @jira_ticket PYTHON-537
+        @expected_result downgrading should not be allowed when explicit protocol versions are set.
+
+        @test_category connection
+        """
+
+        upper_bound = get_unsupported_upper_protocol()
+        if upper_bound is not None:
+            cluster = Cluster(protocol_version=upper_bound)
+            with self.assertRaises(NoHostAvailable):
+                cluster.connect()
+            cluster.shutdown()
+
+        lower_bound = get_unsupported_lower_protocol()
+        if lower_bound is not None:
+            cluster = Cluster(protocol_version=lower_bound)
+            with self.assertRaises(NoHostAvailable):
+                cluster.connect()
+            cluster.shutdown()
 
     def test_connect_on_keyspace(self):
         """
@@ -357,7 +459,7 @@ class ClusterTests(unittest.TestCase):
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
-            
+
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
@@ -386,7 +488,7 @@ class ClusterTests(unittest.TestCase):
             self.assertLess(end_time - start_time, refresh_threshold)
             self.assertIsNot(original_meta, c.metadata.keyspaces)
             self.assertEqual(original_meta, c.metadata.keyspaces)
-            
+
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
@@ -482,14 +584,14 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
         if PROTOCOL_VERSION < 3:
             cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
 
-        # This test relies on impl details of connection req id management to see if heartbeats 
+        # This test relies on impl details of connection req id management to see if heartbeats
         # are being sent. May need update if impl is changed
         connection_request_ids = {}
         for h in cluster.get_connection_holders():
             for c in h.get_connections():
-                # make sure none are idle (should have startup messages)
+                # make sure none are idle (should have startup messages
                 self.assertFalse(c.is_idle)
                 with c.lock:
                     connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
@@ -524,7 +626,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
 
         # include additional sessions
-        session2 = cluster.connect()
+        session2 = cluster.connect(wait_for_all_pools=True)
 
         holders = cluster.get_connection_holders()
         self.assertIn(cluster.control_connection, holders)
@@ -584,4 +686,483 @@ class ClusterTests(unittest.TestCase):
 
         cluster.shutdown()
 
+    def test_profile_load_balancing(self):
+        """
+        Tests that profile load balancing policies are honored.
 
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result Execution Policy should be used when applicable.
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        with Cluster(execution_profiles={'node1': node1}) as cluster:
+            session = cluster.connect(wait_for_all_pools=True)
+
+            # default is DCA RR for all hosts
+            expected_hosts = set(cluster.metadata.all_hosts())
+            queried_hosts = set()
+            for _ in expected_hosts:
+                rs = session.execute(query)
+                queried_hosts.add(rs.response_future._current_host)
+            self.assertEqual(queried_hosts, expected_hosts)
+
+            # by name we should only hit the one
+            expected_hosts = set(h for h in cluster.metadata.all_hosts() if h.address == '127.0.0.1')
+            queried_hosts = set()
+            for _ in cluster.metadata.all_hosts():
+                rs = session.execute(query, execution_profile='node1')
+                queried_hosts.add(rs.response_future._current_host)
+            self.assertEqual(queried_hosts, expected_hosts)
+
+            # use a copied instance and override the row factory
+            # assert last returned value can be accessed as a namedtuple so we can prove something different
+            named_tuple_row = rs[0]
+            self.assertIsInstance(named_tuple_row, tuple)
+            self.assertTrue(named_tuple_row.release_version)
+
+            tmp_profile = copy(node1)
+            tmp_profile.row_factory = tuple_factory
+            queried_hosts = set()
+            for _ in cluster.metadata.all_hosts():
+                rs = session.execute(query, execution_profile=tmp_profile)
+                queried_hosts.add(rs.response_future._current_host)
+            self.assertEqual(queried_hosts, expected_hosts)
+            tuple_row = rs[0]
+            self.assertIsInstance(tuple_row, tuple)
+            with self.assertRaises(AttributeError):
+                tuple_row.release_version
+
+            # make sure original profile is not impacted
+            self.assertTrue(session.execute(query, execution_profile='node1')[0].release_version)
+
+    def test_profile_lb_swap(self):
+        """
+        Tests that profile load balancing policies are not shared
+
+        Creates two LBP, runs a few queries, and validates that each LBP is execised
+        seperately between EP's
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result LBP should not be shared.
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        rr2 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        exec_profiles = {'rr1': rr1, 'rr2': rr2}
+        with Cluster(execution_profiles=exec_profiles) as cluster:
+            session = cluster.connect(wait_for_all_pools=True)
+
+            # default is DCA RR for all hosts
+            expected_hosts = set(cluster.metadata.all_hosts())
+            rr1_queried_hosts = set()
+            rr2_queried_hosts = set()
+
+            rs = session.execute(query, execution_profile='rr1')
+            rr1_queried_hosts.add(rs.response_future._current_host)
+            rs = session.execute(query, execution_profile='rr2')
+            rr2_queried_hosts.add(rs.response_future._current_host)
+
+            self.assertEqual(rr2_queried_hosts, rr1_queried_hosts)
+
+    def test_ta_lbp(self):
+        """
+        Test that execution profiles containing token aware LBP can be added
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result Queries can run
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        ta1 = ExecutionProfile()
+        with Cluster() as cluster:
+            session = cluster.connect()
+            cluster.add_execution_profile("ta1", ta1)
+            rs = session.execute(query, execution_profile='ta1')
+
+    def test_clone_shared_lbp(self):
+        """
+        Tests that profile load balancing policies are shared on clone
+
+        Creates one LBP clones it, and ensures that the LBP is shared between
+        the two EP's
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result LBP is shared
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        exec_profiles = {'rr1': rr1}
+        with Cluster(execution_profiles=exec_profiles) as cluster:
+            session = cluster.connect()
+            rr1_clone = session.execution_profile_clone_update('rr1', row_factory=tuple_factory)
+            cluster.add_execution_profile("rr1_clone", rr1_clone)
+            rr1_queried_hosts = set()
+            rr1_clone_queried_hosts = set()
+            rs = session.execute(query, execution_profile='rr1')
+            rr1_queried_hosts.add(rs.response_future._current_host)
+            rs = session.execute(query, execution_profile='rr1_clone')
+            rr1_clone_queried_hosts.add(rs.response_future._current_host)
+            self.assertNotEqual(rr1_clone_queried_hosts, rr1_queried_hosts)
+
+    def test_missing_exec_prof(self):
+        """
+        Tests to verify that using an unknown profile raises a ValueError
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result ValueError
+
+        @test_category config_profiles
+        """
+        query = "select release_version from system.local"
+        rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        rr2 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+        exec_profiles = {'rr1': rr1, 'rr2': rr2}
+        with Cluster(execution_profiles=exec_profiles) as cluster:
+            session = cluster.connect()
+            with self.assertRaises(ValueError):
+                session.execute(query, execution_profile='rr3')
+
+    def test_profile_pool_management(self):
+        """
+        Tests that changes to execution profiles correctly impact our cluster's pooling
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result pools should be correctly updated as EP's are added and removed
+
+        @test_category config_profiles
+        """
+
+        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
+        with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1, 'node2': node2}) as cluster:
+            session = cluster.connect(wait_for_all_pools=True)
+            pools = session.get_pool_state()
+            # there are more hosts, but we connected to the ones in the lbp aggregate
+            self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2')))
+
+            # dynamically update pools on add
+            node3 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.3']))
+            cluster.add_execution_profile('node3', node3)
+            pools = session.get_pool_state()
+            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2', '127.0.0.3')))
+
+    def test_add_profile_timeout(self):
+        """
+        Tests that EP Timeouts are honored.
+
+        @since 3.5
+        @jira_ticket PYTHON-569
+        @expected_result EP timeouts should override defaults
+
+        @test_category config_profiles
+        """
+
+        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
+            session = cluster.connect(wait_for_all_pools=True)
+            pools = session.get_pool_state()
+            self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
+
+            node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
+            self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile, 'node2', node2, pool_wait_timeout=0.000000001)
+
+
+class LocalHostAdressTranslator(AddressTranslator):
+
+    def __init__(self, addr_map=None):
+        self.addr_map = addr_map
+
+    def translate(self, addr):
+        new_addr = self.addr_map.get(addr)
+        return new_addr
+
+
+class TestAddressTranslation(unittest.TestCase):
+
+    def test_address_translator_basic(self):
+        """
+        Test host address translation
+
+        Uses a custom Address Translator to map all ip back to one.
+        Validates AddressTranslator invocation by ensuring that only meta data associated with single
+        host is populated
+
+        @since 3.3
+        @jira_ticket PYTHON-69
+        @expected_result only one hosts' metadata will be populated
+
+        @test_category metadata
+        """
+        lh_ad = LocalHostAdressTranslator({'127.0.0.1': '127.0.0.1', '127.0.0.2': '127.0.0.1', '127.0.0.3': '127.0.0.1'})
+        c = Cluster(address_translator=lh_ad)
+        c.connect()
+        self.assertEqual(len(c.metadata.all_hosts()), 1)
+        c.shutdown()
+
+    def test_address_translator_with_mixed_nodes(self):
+        """
+        Test host address translation
+
+        Uses a custom Address Translator to map ip's of non control_connection nodes to each other
+        Validates AddressTranslator invocation by ensuring that metadata for mapped hosts is also mapped
+
+        @since 3.3
+        @jira_ticket PYTHON-69
+        @expected_result metadata for crossed hosts will also be crossed
+
+        @test_category metadata
+        """
+        adder_map = {'127.0.0.1': '127.0.0.1', '127.0.0.2': '127.0.0.3', '127.0.0.3': '127.0.0.2'}
+        lh_ad = LocalHostAdressTranslator(adder_map)
+        c = Cluster(address_translator=lh_ad)
+        c.connect()
+        for host in c.metadata.all_hosts():
+            self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
+
+
+class ContextManagementTest(unittest.TestCase):
+
+    load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+    cluster_kwargs = {'load_balancing_policy': load_balancing_policy,
+                      'schema_metadata_enabled': False,
+                      'token_metadata_enabled': False}
+
+    def test_no_connect(self):
+        """
+        Test cluster context without connecting.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result context should still be valid
+
+        @test_category configuration
+        """
+        with Cluster() as cluster:
+            self.assertFalse(cluster.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_simple_nested(self):
+        """
+        Test cluster and session contexts nested in one another.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result cluster/session should be crated and shutdown appropriately.
+
+        @test_category configuration
+        """
+        with Cluster(**self.cluster_kwargs) as cluster:
+            with cluster.connect() as session:
+                self.assertFalse(cluster.is_shutdown)
+                self.assertFalse(session.is_shutdown)
+                self.assertTrue(session.execute('select release_version from system.local')[0])
+            self.assertTrue(session.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_cluster_no_session(self):
+        """
+        Test cluster context without session context.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result Session should be created correctly. Cluster should shutdown outside of context
+
+        @test_category configuration
+        """
+        with Cluster(**self.cluster_kwargs) as cluster:
+            session = cluster.connect()
+            self.assertFalse(cluster.is_shutdown)
+            self.assertFalse(session.is_shutdown)
+            self.assertTrue(session.execute('select release_version from system.local')[0])
+        self.assertTrue(session.is_shutdown)
+        self.assertTrue(cluster.is_shutdown)
+
+    def test_session_no_cluster(self):
+        """
+        Test session context without cluster context.
+
+        @since 3.4
+        @jira_ticket PYTHON-521
+        @expected_result session should be created correctly. Session should shutdown correctly outside of context
+
+        @test_category configuration
+        """
+        cluster = Cluster(**self.cluster_kwargs)
+        unmanaged_session = cluster.connect()
+        with cluster.connect() as session:
+            self.assertFalse(cluster.is_shutdown)
+            self.assertFalse(session.is_shutdown)
+            self.assertFalse(unmanaged_session.is_shutdown)
+            self.assertTrue(session.execute('select release_version from system.local')[0])
+        self.assertTrue(session.is_shutdown)
+        self.assertFalse(cluster.is_shutdown)
+        self.assertFalse(unmanaged_session.is_shutdown)
+        unmanaged_session.shutdown()
+        self.assertTrue(unmanaged_session.is_shutdown)
+        self.assertFalse(cluster.is_shutdown)
+        cluster.shutdown()
+        self.assertTrue(cluster.is_shutdown)
+
+
+class HostStateTest(unittest.TestCase):
+
+    def test_down_event_with_active_connection(self):
+        """
+        Test to ensure that on down calls to clusters with connections still active don't result in
+        a host being marked down. The second part of the test kills the connection then invokes
+        on_down, and ensures the state changes for host's metadata.
+
+        @since 3.7
+        @jira_ticket PYTHON-498
+        @expected_result host should never be toggled down while a connection is active.
+
+        @test_category connection
+        """
+        with Cluster(protocol_version=PROTOCOL_VERSION) as cluster:
+            session = cluster.connect(wait_for_all_pools=True)
+            random_host = cluster.metadata.all_hosts()[0]
+            cluster.on_down(random_host, False)
+            for _ in range(10):
+                new_host = cluster.metadata.all_hosts()[0]
+                self.assertTrue(new_host.is_up, "Host was not up on iteration {0}".format(_))
+                time.sleep(.01)
+
+            pool = session._pools.get(random_host)
+            pool.shutdown()
+            cluster.on_down(random_host, False)
+            was_marked_down = False
+            for _ in range(20):
+                new_host = cluster.metadata.all_hosts()[0]
+                if not new_host.is_up:
+                    was_marked_down = True
+                    break
+                time.sleep(.01)
+            self.assertTrue(was_marked_down)
+
+
+class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
+
+    ignored_addresses = ['127.0.0.3']
+    ignore_node_3_policy = IgnoredHostPolicy(ignored_addresses)
+
+    def test_prepare_on_ignored_hosts(self):
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          load_balancing_policy=self.ignore_node_3_policy)
+        session = cluster.connect()
+        cluster.reprepare_on_up, cluster.prepare_on_all_hosts = True, False
+
+        hosts = cluster.metadata.all_hosts()
+        session.execute("CREATE KEYSPACE clustertests "
+                        "WITH replication = "
+                        "{'class': 'SimpleStrategy', 'replication_factor': '1'}")
+        session.execute("CREATE TABLE clustertests.tab (a text, PRIMARY KEY (a))")
+        # assign to an unused variable so cluster._prepared_statements retains
+        # reference
+        _ = session.prepare("INSERT INTO clustertests.tab (a) VALUES ('a')")  # noqa
+
+        cluster.connection_factory = Mock(wraps=cluster.connection_factory)
+
+        unignored_address = '127.0.0.1'
+        unignored_host = next(h for h in hosts if h.address == unignored_address)
+        ignored_host = next(h for h in hosts if h.address in self.ignored_addresses)
+        unignored_host.is_up = ignored_host.is_up = False
+
+        cluster.on_up(unignored_host)
+        cluster.on_up(ignored_host)
+
+        # the length of mock_calls will vary, but all should use the unignored
+        # address
+        for c in cluster.connection_factory.mock_calls:
+            self.assertEqual(call(unignored_address), c)
+
+
+class DuplicateRpcTest(unittest.TestCase):
+
+    load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        self.session = self.cluster.connect()
+        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.1' WHERE peer='127.0.0.2'")
+
+    def tearDown(self):
+        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.2' WHERE peer='127.0.0.2'")
+        self.cluster.shutdown()
+
+    def test_duplicate(self):
+        """
+        Test duplicate RPC addresses.
+
+        Modifies the system.peers table to make hosts have the same rpc address. Ensures such hosts are filtered out and a message is logged
+
+        @since 3.4
+        @jira_ticket PYTHON-366
+        @expected_result only one hosts' metadata will be populated
+
+        @test_category metadata
+        """
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cassandra.cluster.__name__)
+        logger.addHandler(mock_handler)
+        test_cluster = self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        test_cluster.connect()
+        warnings = mock_handler.messages.get("warning")
+        self.assertEqual(len(warnings), 1)
+        self.assertTrue('multiple' in warnings[0])
+        logger.removeHandler(mock_handler)
+
+
+@protocolv5
+class BetaProtocolTest(unittest.TestCase):
+
+    @protocolv5
+    def test_invalid_protocol_version_beta_option(self):
+        """
+        Test cluster connection with protocol v5 and beta flag not set
+
+        @since 3.7.0
+        @jira_ticket PYTHON-614
+        @expected_result client shouldn't connect with V5 and no beta flag set
+
+        @test_category connection
+        """
+
+        cluster = Cluster(protocol_version=cassandra.ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=False)
+        try:
+            with self.assertRaises(NoHostAvailable):
+                cluster.connect()
+        except Exception as e:
+            self.fail("Unexpected error encountered {0}".format(e.message))
+            cluster.shutdown()
+
+    @protocolv5
+    def test_valid_protocol_version_beta_options_connect(self):
+        """
+        Test cluster connection with protocol version 5 and beta flag set
+
+        @since 3.7.0
+        @jira_ticket PYTHON-614
+        @expected_result client should connect with protocol v5 and beta flag set.
+
+        @test_category connection
+        """
+        cluster = Cluster(protocol_version=cassandra.ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=True)
+        session = cluster.connect()
+        self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.MAX_SUPPORTED)
+        self.assertTrue(session.execute("select release_version from system.local")[0])

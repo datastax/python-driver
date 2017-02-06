@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from cassandra import InvalidRequest
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
-from cassandra.query import PreparedStatement, UNSET_VALUE
+from cassandra.query import PreparedStatement, UNSET_VALUE, tuple_factory
 from tests.integration import get_server_versions
 
 
@@ -385,3 +385,42 @@ class PreparedStatementTests(unittest.TestCase):
 
         with self.assertRaises(InvalidRequest):
             self.session.execute(prepared, [0])
+
+    # TODO revisit this test
+    @unittest.skip
+    def test_invalidated_result_metadata(self):
+        """
+        Tests to make sure cached metadata is updated when an invalidated prepared statement is reprepared.
+
+        @since 2.7.0
+        @jira_ticket PYTHON-621
+
+        Prior to this fix, the request would blow up with a protocol error when the result was decoded expecting a different
+        number of columns.
+        """
+        s = self.session
+        s.result_factory = tuple_factory
+
+        table = "test1rf.%s" % self._testMethodName.lower()
+
+        s.execute("DROP TABLE IF EXISTS %s" % table)
+        s.execute("CREATE TABLE %s (k int PRIMARY KEY, a int, b int, c int)" % table)
+        s.execute("INSERT INTO %s (k, a, b, c) VALUES (0, 0, 0, 0)" % table)
+
+        wildcard_prepared = s.prepare("SELECT * FROM %s" % table)
+        original_result_metadata = wildcard_prepared.result_metadata
+        self.assertEqual(len(original_result_metadata), 4)
+
+        r = s.execute(wildcard_prepared)
+        self.assertEqual(r[0], (0, 0, 0, 0))
+
+        s.execute("ALTER TABLE %s DROP c" % table)
+
+        # Get a bunch of requests in the pipeline with varying states of result_meta, reprepare, resolved
+        futures = set(s.execute_async(wildcard_prepared.bind(None)) for _ in range(200))
+        for f in futures:
+
+            self.assertEqual(f.result()[0], (0, 0, 0))
+        self.assertIsNot(wildcard_prepared.result_metadata, original_result_metadata)
+        s.execute("DROP TABLE %s" % table)
+

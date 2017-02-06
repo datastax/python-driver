@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -61,7 +61,6 @@ class BaseColumnIOTest(BaseCassEngTestCase):
 
         # create a table with the given column
         class IOTestModel(Model):
-            table_name = cls.column.db_type + "_io_test_model_{0}".format(uuid4().hex[:8])
             pkey = cls.column(primary_key=True)
             data = cls.column()
 

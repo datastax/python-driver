@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype_simple('CompositeType'), cassandra.cqltypes.CompositeType)
         self.assertEqual(lookup_casstype_simple('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
         self.assertEqual(lookup_casstype_simple('ReversedType'), cassandra.cqltypes.ReversedType)
+        self.assertEqual(lookup_casstype_simple('DurationType'), cassandra.cqltypes.DurationType)
 
         self.assertEqual(str(lookup_casstype_simple('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
 
@@ -100,6 +101,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype('CompositeType'), cassandra.cqltypes.CompositeType)
         self.assertEqual(lookup_casstype('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
         self.assertEqual(lookup_casstype('ReversedType'), cassandra.cqltypes.ReversedType)
+        self.assertEqual(lookup_casstype('DurationType'), cassandra.cqltypes.DurationType)
 
         self.assertEqual(str(lookup_casstype('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
 
@@ -203,6 +205,10 @@ class TypeTests(unittest.TestCase):
         # work around rounding difference among Python versions (PYTHON-230)
         expected = 1424817268.274
         self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2015, 2, 24, 22, 34, 28, 274000))
+
+        # Large date overflow (PYTHON-452)
+        expected = 2177403010.123
+        self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2038, 12, 31, 10, 10, 10, 123000))
 
     def test_write_read_string(self):
         with tempfile.TemporaryFile() as f:

@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,13 +16,19 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine.statements import BaseCQLStatement, StatementException
+from cassandra.query import FETCH_SIZE_UNSET
+from cassandra.cqlengine.statements import BaseCQLStatement
 
 
 class BaseStatementTest(unittest.TestCase):
 
-    def test_where_clause_type_checking(self):
-        """ tests that only assignment clauses can be added to queries """
-        stmt = BaseCQLStatement('table', [])
-        with self.assertRaises(StatementException):
-            stmt.add_where_clause('x=5')
+    def test_fetch_size(self):
+        """ tests that fetch_size is correctly set """
+        stmt = BaseCQLStatement('table', None, fetch_size=1000)
+        self.assertEqual(stmt.fetch_size, 1000)
+
+        stmt = BaseCQLStatement('table', None, fetch_size=None)
+        self.assertEqual(stmt.fetch_size, FETCH_SIZE_UNSET)
+
+        stmt = BaseCQLStatement('table', None)
+        self.assertEqual(stmt.fetch_size, FETCH_SIZE_UNSET)

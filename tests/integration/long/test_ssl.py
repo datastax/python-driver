@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,24 +17,24 @@ try:
 except ImportError:
     import unittest
 
-import os, sys, traceback, logging, ssl
+import os, sys, traceback, logging, ssl, time
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, remove_cluster
+from tests.integration import PROTOCOL_VERSION, get_cluster, remove_cluster, use_single_node
 
 log = logging.getLogger(__name__)
 
-DEFAULT_PASSWORD = "cassandra"
+DEFAULT_PASSWORD = "pythondriver"
 
 # Server keystore trust store locations
-SERVER_KEYSTORE_PATH = "tests/integration/long/ssl/server_keystore.jks"
-SERVER_TRUSTSTORE_PATH = "tests/integration/long/ssl/server_trust.jks"
+SERVER_KEYSTORE_PATH = "tests/integration/long/ssl/.keystore"
+SERVER_TRUSTSTORE_PATH = "tests/integration/long/ssl/.truststore"
 
 # Client specific keys/certs
-CLIENT_CA_CERTS = 'tests/integration/long/ssl/driver_ca_cert.pem'
-DRIVER_KEYFILE = "tests/integration/long/ssl/python_driver_no_pass.key"
-DRIVER_CERTFILE = "tests/integration/long/ssl/python_driver.pem"
+CLIENT_CA_CERTS = 'tests/integration/long/ssl/cassandra.pem'
+DRIVER_KEYFILE = "tests/integration/long/ssl/driver.key"
+DRIVER_CERTFILE = "tests/integration/long/ssl/driver.pem"
 DRIVER_CERTFILE_BAD = "tests/integration/long/ssl/python_driver_bad.pem"
 
 
@@ -44,7 +44,7 @@ def setup_cluster_ssl(client_auth=False):
     ssl connectivity, and client authenticiation if needed.
     """
 
-    use_singledc(start=False)
+    use_single_node(start=False)
     ccm_cluster = get_cluster()
     ccm_cluster.stop()
 
@@ -68,14 +68,36 @@ def setup_cluster_ssl(client_auth=False):
     ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
 
-def teardown_module():
-    """
-    The rest of the tests don't need ssl enabled, remove the cluster so as to not interfere with other tests.
-    """
+def validate_ssl_options(ssl_options):
+        # find absolute path to client CA_CERTS
+        tries = 0
+        while True:
+            if tries > 5:
+                raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
+            try:
+                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
+                session = cluster.connect(wait_for_all_pools=True)
+                break
+            except Exception:
+                ex_type, ex, tb = sys.exc_info()
+                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                del tb
+                tries += 1
 
-    ccm_cluster = get_cluster()
-    ccm_cluster.stop()
-    remove_cluster()
+        # attempt a few simple commands.
+        insert_keyspace = """CREATE KEYSPACE ssltest
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}
+            """
+        statement = SimpleStatement(insert_keyspace)
+        statement.consistency_level = 3
+        session.execute(statement)
+
+        drop_keyspace = "DROP KEYSPACE ssltest"
+        statement = SimpleStatement(drop_keyspace)
+        statement.consistency_level = ConsistencyLevel.ANY
+        session.execute(statement)
+
+        cluster.shutdown()
 
 
 class SSLConnectionTests(unittest.TestCase):
@@ -83,6 +105,12 @@ class SSLConnectionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         setup_cluster_ssl()
+
+    @classmethod
+    def tearDownClass(cls):
+        ccm_cluster = get_cluster()
+        ccm_cluster.stop()
+        remove_cluster()
 
     def test_can_connect_with_ssl_ca(self):
         """
@@ -102,15 +130,31 @@ class SSLConnectionTests(unittest.TestCase):
 
         # find absolute path to client CA_CERTS
         abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
+        ssl_options = {'ca_certs': abs_path_ca_cert_path,'ssl_version': ssl.PROTOCOL_TLSv1}
+        validate_ssl_options(ssl_options=ssl_options)
 
+    def test_can_connect_with_ssl_long_running(self):
+        """
+        Test to validate that long running ssl connections continue to function past thier timeout window
+
+        @since 3.6.0
+        @jira_ticket PYTHON-600
+        @expected_result The client can connect via SSL and preform some basic operations over a period of longer then a minute
+
+        @test_category connection:ssl
+        """
+
+        # find absolute path to client CA_CERTS
+        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
+        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+                       'ssl_version': ssl.PROTOCOL_TLSv1}
         tries = 0
         while True:
             if tries > 5:
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
-                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
-                                                                                  'ssl_version': ssl.PROTOCOL_TLSv1})
-                session = cluster.connect()
+                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
+                session = cluster.connect(wait_for_all_pools=True)
                 break
             except Exception:
                 ex_type, ex, tb = sys.exc_info()
@@ -119,19 +163,35 @@ class SSLConnectionTests(unittest.TestCase):
                 tries += 1
 
         # attempt a few simple commands.
-        insert_keyspace = """CREATE KEYSPACE ssltest
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}
-            """
-        statement = SimpleStatement(insert_keyspace)
-        statement.consistency_level = 3
-        session.execute(statement)
 
-        drop_keyspace = "DROP KEYSPACE ssltest"
-        statement = SimpleStatement(drop_keyspace)
-        statement.consistency_level = ConsistencyLevel.ANY
-        session.execute(statement)
+        for i in range(8):
+            rs = session.execute("SELECT * FROM system.local")
+            time.sleep(10)
 
         cluster.shutdown()
+
+    def test_can_connect_with_ssl_ca_host_match(self):
+        """
+        Test to validate that we are able to connect to a cluster using ssl, and host matching
+
+        test_can_connect_with_ssl_ca_host_match performs a simple sanity check to ensure that we can connect to a cluster with ssl
+        authentication via simple server-side shared certificate authority. It also validates that the host ip matches what is expected
+
+        @since 3.3
+        @jira_ticket PYTHON-296
+        @expected_result The client can connect via SSL and preform some basic operations, with check_hostname specified
+
+        @test_category connection:ssl
+        """
+
+        # find absolute path to client CA_CERTS
+        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
+        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+                       'ssl_version': ssl.PROTOCOL_TLSv1,
+                       'cert_reqs': ssl.CERT_REQUIRED,
+                       'check_hostname': True}
+
+        validate_ssl_options(ssl_options=ssl_options)
 
 
 class SSLConnectionAuthTests(unittest.TestCase):
@@ -139,6 +199,12 @@ class SSLConnectionAuthTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         setup_cluster_ssl(client_auth=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        ccm_cluster = get_cluster()
+        ccm_cluster.stop()
+        remove_cluster()
 
     def test_can_connect_with_ssl_client_auth(self):
         """
@@ -158,40 +224,39 @@ class SSLConnectionAuthTests(unittest.TestCase):
         abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
         abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE)
         abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE)
+        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+                       'ssl_version': ssl.PROTOCOL_TLSv1,
+                       'keyfile': abs_driver_keyfile,
+                       'certfile': abs_driver_certfile}
+        validate_ssl_options(ssl_options)
 
-        tries = 0
-        while True:
-            if tries > 5:
-                raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
-            try:
-                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
-                                                                                  'ssl_version': ssl.PROTOCOL_TLSv1,
-                                                                                  'keyfile': abs_driver_keyfile,
-                                                                                  'certfile': abs_driver_certfile})
+    def test_can_connect_with_ssl_client_auth_host_name(self):
+        """
+        Test to validate that we can connect to a C* cluster that has client_auth enabled, and hostmatching
 
-                session = cluster.connect()
-                break
-            except Exception:
-                ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                del tb
-                tries += 1
+        This test will setup and use a c* cluster that has client authentication enabled. It will then attempt
+        to connect using valid client keys, and certs (that are in the server's truststore), and attempt to preform some
+        basic operations, with check_hostname specified
+        @jira_ticket PYTHON-296
+        @since 3.3
 
-        # attempt a few simple commands.
+        @expected_result The client can connect via SSL and preform some basic operations
 
-        insert_keyspace = """CREATE KEYSPACE ssltest
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}
-            """
-        statement = SimpleStatement(insert_keyspace)
-        statement.consistency_level = 3
-        session.execute(statement)
+        @test_category connection:ssl
+        """
 
-        drop_keyspace = "DROP KEYSPACE ssltest"
-        statement = SimpleStatement(drop_keyspace)
-        statement.consistency_level = ConsistencyLevel.ANY
-        session.execute(statement)
+        # Need to get absolute paths for certs/key
+        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
+        abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE)
+        abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE)
 
-        cluster.shutdown()
+        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+                       'ssl_version': ssl.PROTOCOL_TLSv1,
+                       'keyfile': abs_driver_keyfile,
+                       'certfile': abs_driver_certfile,
+                       'cert_reqs': ssl.CERT_REQUIRED,
+                       'check_hostname': True}
+        validate_ssl_options(ssl_options)
 
     def test_cannot_connect_without_client_auth(self):
         """
@@ -213,6 +278,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
 
         with self.assertRaises(NoHostAvailable) as context:
             cluster.connect()
+        cluster.shutdown()
 
     def test_cannot_connect_with_bad_client_auth(self):
         """
@@ -239,3 +305,4 @@ class SSLConnectionAuthTests(unittest.TestCase):
                                                                           'certfile': abs_driver_certfile})
         with self.assertRaises(NoHostAvailable) as context:
             cluster.connect()
+        cluster.shutdown()

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ class RoutingTests(unittest.TestCase):
         select = s.prepare("SELECT token(%s) FROM %s WHERE %s" %
                            (primary_key, table_name, where_clause))
 
-        return (insert, select)
+        return insert, select
 
     def test_singular_key(self):
         # string

@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from cassandra.cqlengine.columns import Column
 from cassandra.cqlengine.statements import SelectStatement, WhereClause
 from cassandra.cqlengine.operators import *
 import six
@@ -46,25 +47,36 @@ class SelectStatementTests(unittest.TestCase):
 
     def test_where_clause_rendering(self):
         ss = SelectStatement('table')
-        ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
         self.assertEqual(six.text_type(ss), 'SELECT * FROM table WHERE "a" = %(0)s', six.text_type(ss))
 
     def test_count(self):
         ss = SelectStatement('table', count=True, limit=10, order_by='d')
-        ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
         self.assertEqual(six.text_type(ss), 'SELECT COUNT(*) FROM table WHERE "a" = %(0)s LIMIT 10', six.text_type(ss))
         self.assertIn('LIMIT', six.text_type(ss))
         self.assertNotIn('ORDER', six.text_type(ss))
 
+    def test_distinct(self):
+        ss = SelectStatement('table', distinct_fields=['field2'])
+        ss.add_where(Column(db_field='field1'), EqualsOperator(), 'b')
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT "field2" FROM table WHERE "field1" = %(0)s', six.text_type(ss))
+
+        ss = SelectStatement('table', distinct_fields=['field1', 'field2'])
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT "field1", "field2" FROM table')
+
+        ss = SelectStatement('table', distinct_fields=['field1'], count=True)
+        self.assertEqual(six.text_type(ss), 'SELECT DISTINCT COUNT("field1") FROM table')
+
     def test_context(self):
         ss = SelectStatement('table')
-        ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
         self.assertEqual(ss.get_context(), {'0': 'b'})
 
     def test_context_id_update(self):
         """ tests that the right things happen the the context id """
         ss = SelectStatement('table')
-        ss.add_where_clause(WhereClause('a', EqualsOperator(), 'b'))
+        ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
         self.assertEqual(ss.get_context(), {'0': 'b'})
         self.assertEqual(str(ss), 'SELECT * FROM table WHERE "a" = %(0)s')
 
@@ -85,3 +97,15 @@ class SelectStatementTests(unittest.TestCase):
         self.assertIn('ORDER BY x, y', qstr)
         self.assertIn('ALLOW FILTERING', qstr)
 
+    def test_limit_rendering(self):
+        ss = SelectStatement('table', None, limit=10)
+        qstr = six.text_type(ss)
+        self.assertIn('LIMIT 10', qstr)
+
+        ss = SelectStatement('table', None, limit=0)
+        qstr = six.text_type(ss)
+        self.assertNotIn('LIMIT', qstr)
+
+        ss = SelectStatement('table', None, limit=None)
+        qstr = six.text_type(ss)
+        self.assertNotIn('LIMIT', qstr)

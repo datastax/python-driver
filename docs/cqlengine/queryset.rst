@@ -37,6 +37,7 @@ Retrieving objects with filters
             year = columns.Integer(primary_key=True)
             model = columns.Text()
             price = columns.Decimal()
+            options = columns.Set(columns.Text)
 
     ...and assuming the Automobile table contains a record of every car model manufactured in the last 20 years or so, we can retrieve only the cars made by a single manufacturer like this:
 
@@ -78,6 +79,10 @@ Accessing objects in a QuerySet
             q[0] #returns the first result
             q[1] #returns the second result
 
+        .. note::
+
+            * CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array indexing will load every result up to the index value requested
+            * Using negative indices requires a "SELECT COUNT()" to be executed. This has a performance cost on large datasets.
 
     * list slicing
         .. code-block:: python
@@ -86,7 +91,10 @@ Accessing objects in a QuerySet
             q[1:] #returns all results except the first
             q[1:9] #returns a slice of the results
 
-        *Note: CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array indexing / slicing will load every result up to the index value requested*
+        .. note::
+
+            * CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array slicing will load every result up to the index value requested
+            * Using negative indices requires a "SELECT COUNT()" to be executed. This has a performance cost on large datasets.
 
     * calling :attr:`get() <query.QuerySet.get>` on the queryset
         .. code-block:: python
@@ -172,6 +180,16 @@ Filtering Operators
 
             q.filter(Automobile.year <= 2012)
 
+    :attr:`CONTAINS (__contains) <query.QueryOperator.ContainsOperator>`
+
+        The CONTAINS operator is available for all collection types (List, Set, Map).
+
+        .. code-block:: python
+
+            q = Automobile.objects.filter(manufacturer='Tesla')
+            q.filter(options__contains='backup camera').allow_filtering()
+
+        Note that we need to use allow_filtering() since the *options* column has no secondary index.
 
 TimeUUID Functions
 ==================
@@ -191,13 +209,14 @@ TimeUUID Functions
     .. code-block:: python
 
         class DataStream(Model):
-            time    = cqlengine.TimeUUID(primary_key=True)
-            data    = cqlengine.Bytes()
+            id      = columns.UUID(partition_key=True)
+            time    = columns.TimeUUID(primary_key=True)
+            data    = columns.Bytes()
 
         min_time = datetime(1982, 1, 1)
         max_time = datetime(1982, 3, 9)
 
-        DataStream.filter(time__gt=cqlengine.MinTimeUUID(min_time), time__lt=cqlengine.MaxTimeUUID(max_time))
+        DataStream.filter(time__gt=functions.MinTimeUUID(min_time), time__lt=functions.MaxTimeUUID(max_time))
 
 Token Function
 ==============
@@ -205,15 +224,15 @@ Token Function
     Token functon may be used only on special, virtual column pk__token, representing token of partition key (it also works for composite partition keys).
     Cassandra orders returned items by value of partition key token, so using cqlengine.Token we can easy paginate through all table rows.
 
-    See http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun
+    See http://cassandra.apache.org/doc/cql3/CQL-3.0.html#tokenFun
 
     *Example*
 
     .. code-block:: python
 
         class Items(Model):
-            id      = cqlengine.Text(primary_key=True)
-            data    = cqlengine.Bytes()
+            id      = columns.Text(primary_key=True)
+            data    = columns.Bytes()
 
         query = Items.objects.all().limit(10)
 
@@ -324,6 +343,42 @@ None means no timeout.
     Setting the timeout on the model is meaningless and will raise an AssertionError.
 
 
+.. _ttl-change:
+
+Default TTL and Per Query TTL
+=============================
+
+Model default TTL now relies on the *default_time_to_live* feature, introduced in Cassandra 2.0. It is not handled anymore in the CQLEngine Model (cassandra-driver >=3.6). You can set the default TTL of a table like this:
+
+    Example:
+
+    .. code-block:: python
+
+        class User(Model):
+            __options__ = {'default_time_to_live': 20}
+
+            user_id = columns.UUID(primary_key=True)
+            ...
+
+You can set TTL per-query if needed. Here are a some examples:
+
+    Example:
+
+    .. code-block:: python
+
+        class User(Model):
+            __options__ = {'default_time_to_live': 20}
+
+            user_id = columns.UUID(primary_key=True)
+            ...
+
+        user = User.objects.create(user_id=1)  # Default TTL 20 will be set automatically on the server
+
+        user.ttl(30).update(age=21)            # Update the TTL to 30
+        User.objects.ttl(10).create(user_id=1)  # TTL 10
+        User(user_id=1, age=21).ttl(10).save()  # TTL 10
+
+
 Named Tables
 ===================
 
@@ -332,13 +387,12 @@ Named tables are a way of querying a table without creating an class.  They're u
 
     .. code-block:: python
 
-        from cqlengine.connection import setup
+        from cassandra.cqlengine.connection import setup
         setup("127.0.0.1", "cqlengine_test")
 
-        from cqlengine.named import NamedTable
+        from cassandra.cqlengine.named import NamedTable
         user = NamedTable("cqlengine_test", "user")
         user.objects()
         user.objects()[0]
 
         # {u'pk': 1, u't': datetime.datetime(2014, 6, 26, 17, 10, 31, 774000)}
-

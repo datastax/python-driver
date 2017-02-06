@@ -5,13 +5,13 @@
 
 .. autoclass:: Cluster ([contact_points=('127.0.0.1',)][, port=9042][, executor_threads=2], **attr_kwargs)
 
-   Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
+   .. autoattribute:: contact_points
+
+   .. autoattribute:: port
 
    .. autoattribute:: cql_version
 
    .. autoattribute:: protocol_version
-
-   .. autoattribute:: port
 
    .. autoattribute:: compression
 
@@ -22,22 +22,25 @@
    .. autoattribute:: reconnection_policy
 
    .. autoattribute:: default_retry_policy
+      :annotation: = <cassandra.policies.RetryPolicy object>
 
    .. autoattribute:: conviction_policy_factory
 
-   .. autoattribute:: connection_class
+   .. autoattribute:: address_translator
 
    .. autoattribute:: metrics_enabled
 
    .. autoattribute:: metrics
-
-   .. autoattribute:: metadata
 
    .. autoattribute:: ssl_options
 
    .. autoattribute:: sockopts
 
    .. autoattribute:: max_schema_agreement_wait
+
+   .. autoattribute:: metadata
+
+   .. autoattribute:: connection_class
 
    .. autoattribute:: control_connection_timeout
 
@@ -47,7 +50,19 @@
 
    .. autoattribute:: topology_event_refresh_window
 
+   .. autoattribute:: status_event_refresh_window
+
+   .. autoattribute:: prepare_on_all_hosts
+
+   .. autoattribute:: reprepare_on_up
+
    .. autoattribute:: connect_timeout
+
+   .. autoattribute:: schema_metadata_enabled
+      :annotation: = True
+
+   .. autoattribute:: token_metadata_enabled
+      :annotation: = True
 
    .. automethod:: connect
 
@@ -58,6 +73,8 @@
    .. automethod:: register_listener
 
    .. automethod:: unregister_listener
+
+   .. automethod:: add_execution_profile
 
    .. automethod:: set_max_requests_per_connection
 
@@ -75,6 +92,8 @@
 
    .. automethod:: set_max_connections_per_host
 
+   .. automethod:: get_control_connection_host
+
    .. automethod:: refresh_schema_metadata
 
    .. automethod:: refresh_keyspace_metadata
@@ -91,15 +110,25 @@
 
    .. automethod:: set_meta_refresh_enabled
 
+.. autoclass:: ExecutionProfile
+   :members:
+
+.. autodata:: EXEC_PROFILE_DEFAULT
+   :annotation:
 
 .. autoclass:: Session ()
 
    .. autoattribute:: default_timeout
+      :annotation: = 10.0
 
    .. autoattribute:: default_consistency_level
       :annotation: = LOCAL_ONE
 
+   .. autoattribute:: default_serial_consistency_level
+      :annotation: = None
+
    .. autoattribute:: row_factory
+      :annotation: = <function named_tuple_factory>
 
    .. autoattribute:: default_fetch_size
 
@@ -119,6 +148,12 @@
 
    .. automethod:: set_keyspace(keyspace)
 
+   .. automethod:: execution_profile_clone_update
+
+   .. automethod:: add_request_init_listener
+
+   .. automethod:: remove_request_init_listener
+
 .. autoclass:: ResponseFuture ()
 
    .. autoattribute:: query
@@ -130,6 +165,8 @@
    .. automethod:: get_all_query_traces()
 
    .. autoattribute:: custom_payload()
+
+   .. autoattribute:: is_schema_agreed
 
    .. autoattribute:: has_more_pages
 

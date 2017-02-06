@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from tests.unit.cython.utils import cyimport, cythontest
+utils_testhelper = cyimport('tests.unit.cython.utils_testhelper')
+
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine.operators import BaseQueryOperator, QueryOperatorException
 
+class UtilsTest(unittest.TestCase):
+    """Test Cython Utils functions"""
 
-class BaseOperatorTest(unittest.TestCase):
-
-    def test_get_operator_cannot_be_called_from_base_class(self):
-        with self.assertRaises(QueryOperatorException):
-            BaseQueryOperator.get_operator('*')
+    @cythontest
+    def test_datetime_from_timestamp(self):
+        utils_testhelper.test_datetime_from_timestamp(self.assertEqual)

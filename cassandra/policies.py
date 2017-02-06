@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,11 +16,9 @@ from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint
 from threading import Lock
-import six
+import socket
 
-from cassandra import ConsistencyLevel
-
-from six.moves import range
+from cassandra import ConsistencyLevel, OperationTimedOut
 
 log = logging.getLogger(__name__)
 
@@ -152,12 +150,11 @@ class RoundRobinPolicy(LoadBalancingPolicy):
     This load balancing policy is used by default.
     """
     _live_hosts = frozenset(())
+    _position = 0
 
     def populate(self, cluster, hosts):
         self._live_hosts = frozenset(hosts)
-        if len(hosts) <= 1:
-            self._position = 0
-        else:
+        if len(hosts) > 1:
             self._position = randint(0, len(hosts) - 1)
 
     def distance(self, host):
@@ -235,7 +232,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             self._dc_live_hosts[dc] = tuple(set(dc_hosts))
 
         if not self.local_dc:
-            self._contact_points = cluster.contact_points
+            self._contact_points = cluster.contact_points_resolved
 
         self._position = randint(0, len(hosts) - 1) if hosts else 0
 
@@ -337,7 +334,7 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
     def check_supported(self):
         if not self._cluster_metadata.can_support_partitioner():
-            raise Exception(
+            raise RuntimeError(
                 '%s cannot be used with the cluster partitioner (%s) because '
                 'the relevant C extension for this driver was not compiled. '
                 'See the installation instructions for details on building '
@@ -405,11 +402,15 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
         The `hosts` parameter should be a sequence of hosts to permit
         connections to.
         """
+
         self._allowed_hosts = hosts
+        self._allowed_hosts_resolved = [endpoint[4][0] for a in self._allowed_hosts
+                                        for endpoint in socket.getaddrinfo(a, None, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+
         RoundRobinPolicy.__init__(self)
 
     def populate(self, cluster, hosts):
-        self._live_hosts = frozenset(h for h in hosts if h.address in self._allowed_hosts)
+        self._live_hosts = frozenset(h for h in hosts if h.address in self._allowed_hosts_resolved)
 
         if len(hosts) <= 1:
             self._position = 0
@@ -417,17 +418,17 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
             self._position = randint(0, len(hosts) - 1)
 
     def distance(self, host):
-        if host.address in self._allowed_hosts:
+        if host.address in self._allowed_hosts_resolved:
             return HostDistance.LOCAL
         else:
             return HostDistance.IGNORED
 
     def on_up(self, host):
-        if host.address in self._allowed_hosts:
+        if host.address in self._allowed_hosts_resolved:
             RoundRobinPolicy.on_up(self, host)
 
     def on_add(self, host):
-        if host.address in self._allowed_hosts:
+        if host.address in self._allowed_hosts_resolved:
             RoundRobinPolicy.on_add(self, host)
 
 
@@ -468,7 +469,7 @@ class SimpleConvictionPolicy(ConvictionPolicy):
     """
 
     def add_failure(self, connection_exc):
-        return True
+        return not isinstance(connection_exc, OperationTimedOut)
 
     def reset(self):
         pass
@@ -528,6 +529,9 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
     a set maximum delay.
     """
 
+    # TODO: max_attempts is 64 to preserve legacy default behavior
+    # consider changing to None in major release to prevent the policy
+    # giving up forever
     def __init__(self, base_delay, max_delay, max_attempts=64):
         """
         `base_delay` and `max_delay` should be in floating point units of
@@ -551,8 +555,8 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
         self.max_attempts = max_attempts
 
     def new_schedule(self):
-        i=0
-        while self.max_attempts == None or i < self.max_attempts:
+        i = 0
+        while self.max_attempts is None or i < self.max_attempts:
             yield min(self.base_delay * (2 ** i), self.max_delay)
             i += 1
 
@@ -647,6 +651,12 @@ class RetryPolicy(object):
     should be ignored but no more retries should be attempted.
     """
 
+    RETRY_NEXT_HOST = 3
+    """
+    This should be returned from the below methods if the operation
+    should be retried on another connection.
+    """
+
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
         """
@@ -674,11 +684,11 @@ class RetryPolicy(object):
         a sufficient number of replicas responded (with data digests).
         """
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         elif received_responses >= required_responses and not data_retrieved:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_write_timeout(self, query, consistency, write_type,
                          required_responses, received_responses, retry_num):
@@ -707,11 +717,11 @@ class RetryPolicy(object):
         :attr:`~.WriteType.BATCH_LOG`.
         """
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         elif write_type == WriteType.BATCH_LOG:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         """
@@ -736,7 +746,7 @@ class RetryPolicy(object):
 
         By default, no retries will be attempted and the error will be re-raised.
         """
-        return (self.RETHROW, None)
+        return (self.RETRY_NEXT_HOST, consistency) if retry_num == 0 else (self.RETHROW, None)
 
 
 class FallthroughRetryPolicy(RetryPolicy):
@@ -746,13 +756,13 @@ class FallthroughRetryPolicy(RetryPolicy):
     """
 
     def on_read_timeout(self, *args, **kwargs):
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
     def on_write_timeout(self, *args, **kwargs):
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
     def on_unavailable(self, *args, **kwargs):
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
 
 class DowngradingConsistencyRetryPolicy(RetryPolicy):
@@ -804,45 +814,150 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     """
     def _pick_consistency(self, num_responses):
         if num_responses >= 3:
-            return (self.RETRY, ConsistencyLevel.THREE)
+            return self.RETRY, ConsistencyLevel.THREE
         elif num_responses >= 2:
-            return (self.RETRY, ConsistencyLevel.TWO)
+            return self.RETRY, ConsistencyLevel.TWO
         elif num_responses >= 1:
-            return (self.RETRY, ConsistencyLevel.ONE)
+            return self.RETRY, ConsistencyLevel.ONE
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         elif received_responses < required_responses:
             return self._pick_consistency(received_responses)
         elif not data_retrieved:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
         else:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
     def on_write_timeout(self, query, consistency, write_type,
                          required_responses, received_responses, retry_num):
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
 
         if write_type in (WriteType.SIMPLE, WriteType.BATCH, WriteType.COUNTER):
             if received_responses > 0:
                 # persisted on at least one replica
-                return (self.IGNORE, None)
+                return self.IGNORE, None
             else:
-                return (self.RETHROW, None)
+                return self.RETHROW, None
         elif write_type == WriteType.UNLOGGED_BATCH:
             return self._pick_consistency(received_responses)
         elif write_type == WriteType.BATCH_LOG:
-            return (self.RETRY, consistency)
+            return self.RETRY, consistency
 
-        return (self.RETHROW, None)
+        return self.RETHROW, None
 
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         if retry_num != 0:
-            return (self.RETHROW, None)
+            return self.RETHROW, None
         else:
             return self._pick_consistency(alive_replicas)
+
+
+class AddressTranslator(object):
+    """
+    Interface for translating cluster-defined endpoints.
+
+    The driver discovers nodes using server metadata and topology change events. Normally,
+    the endpoint defined by the server is the right way to connect to a node. In some environments,
+    these addresses may not be reachable, or not preferred (public vs. private IPs in cloud environments,
+    suboptimal routing, etc). This interface allows for translating from server defined endpoints to
+    preferred addresses for driver connections.
+
+    *Note:* :attr:`~Cluster.contact_points` provided while creating the :class:`~.Cluster` instance are not
+    translated using this mechanism -- only addresses received from Cassandra nodes are.
+    """
+    def translate(self, addr):
+        """
+        Accepts the node ip address, and returns a translated address to be used connecting to this node.
+        """
+        raise NotImplementedError()
+
+
+class IdentityTranslator(AddressTranslator):
+    """
+    Returns the endpoint with no translation
+    """
+    def translate(self, addr):
+        return addr
+
+
+class EC2MultiRegionTranslator(AddressTranslator):
+    """
+    Resolves private ips of the hosts in the same datacenter as the client, and public ips of hosts in other datacenters.
+    """
+    def translate(self, addr):
+        """
+        Reverse DNS the public broadcast_address, then lookup that hostname to get the AWS-resolved IP, which
+        will point to the private IP address within the same datacenter.
+        """
+        # get family of this address so we translate to the same
+        family = socket.getaddrinfo(addr, 0, socket.AF_UNSPEC, socket.SOCK_STREAM)[0][0]
+        host = socket.getfqdn(addr)
+        for a in socket.getaddrinfo(host, 0, family, socket.SOCK_STREAM):
+            try:
+                return a[4][0]
+            except Exception:
+                pass
+        return addr
+
+
+class SpeculativeExecutionPolicy(object):
+    """
+    Interface for specifying speculative execution plans
+    """
+
+    def new_plan(self, keyspace, statement):
+        """
+        Returns
+
+        :param keyspace:
+        :param statement:
+        :return:
+        """
+        raise NotImplementedError()
+
+
+class SpeculativeExecutionPlan(object):
+    def next_execution(self, host):
+        raise NotImplementedError()
+
+
+class NoSpeculativeExecutionPlan(SpeculativeExecutionPlan):
+    def next_execution(self, host):
+        return -1
+
+
+class NoSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
+
+    def new_plan(self, keyspace, statement):
+        return NoSpeculativeExecutionPlan()
+
+
+class ConstantSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
+    """
+    A speculative execution policy that sends a new query every X seconds (**delay**) for a maximum of Y attempts (**max_attempts**).
+    """
+
+    def __init__(self, delay, max_attempts):
+        self.delay = delay
+        self.max_attempts = max_attempts
+
+    class ConstantSpeculativeExecutionPlan(SpeculativeExecutionPlan):
+        def __init__(self, delay, max_attempts):
+            self.delay = delay
+            self.remaining = max_attempts
+
+        def next_execution(self, host):
+            if self.remaining > 0:
+                self.remaining -= 1
+                return self.delay
+            else:
+                return -1
+
+    def new_plan(self, keyspace, statement):
+        return self.ConstantSpeculativeExecutionPlan(self.delay, self.max_attempts)

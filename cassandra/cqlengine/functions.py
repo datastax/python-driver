@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -86,7 +86,7 @@ class MinTimeUUID(TimeUUIDQueryFunction):
     """
     return a fake timeuuid corresponding to the smallest possible timeuuid for the given timestamp
 
-    http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
+    http://cassandra.apache.org/doc/cql3/CQL-3.0.html#timeuuidFun
     """
     format_string = 'MinTimeUUID(%({0})s)'
 
@@ -95,19 +95,17 @@ class MaxTimeUUID(TimeUUIDQueryFunction):
     """
     return a fake timeuuid corresponding to the largest possible timeuuid for the given timestamp
 
-    http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun
+    http://cassandra.apache.org/doc/cql3/CQL-3.0.html#timeuuidFun
     """
     format_string = 'MaxTimeUUID(%({0})s)'
-
 
 
 class Token(BaseQueryFunction):
     """
     compute the token for a given partition key
 
-    http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun
+    http://cassandra.apache.org/doc/cql3/CQL-3.0.html#tokenFun
     """
-
     def __init__(self, *values):
         if len(values) == 1 and isinstance(values[0], (list, tuple)):
             values = values[0]

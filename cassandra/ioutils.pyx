@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,4 +44,4 @@ cdef inline int32_t read_int(BytesIOReader reader) except ?0xDEAD:
     cdef Buffer buf
     buf.ptr = reader.read(4)
     buf.size = 4
-    return int32_unpack(&buf)
+    return unpack_num[int32_t](&buf)

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ from datetime import datetime
 import math
 import six
 
+import cassandra
 from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
@@ -30,8 +31,8 @@ from cassandra.util import sortedset
 from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
-    BasicSharedKeyspaceUnitTestCase, greaterthancass20, lessthancass30
-from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
+    BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30
+from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_collection_sample
 
 
@@ -97,6 +98,36 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         results = s.execute("SELECT * FROM blobbytes")[0]
         for expected, actual in zip(params, results):
             self.assertEqual(expected, actual)
+
+    @unittest.skipIf(not hasattr(cassandra, 'deserializers'), "Cython required for to test DesBytesTypeArray deserializer")
+    def test_des_bytes_type_array(self):
+        """
+        Simple test to ensure the DesBytesTypeByteArray deserializer functionally works
+
+        @since 3.1
+        @jira_ticket PYTHON-503
+        @expected_result byte array should be deserialized appropriately.
+
+        @test_category queries:custom_payload
+        """
+        original = None
+        try:
+
+            original = cassandra.deserializers.DesBytesType
+            cassandra.deserializers.DesBytesType = cassandra.deserializers.DesBytesTypeByteArray
+            s = self.session
+
+            s.execute("CREATE TABLE blobbytes2 (a ascii PRIMARY KEY, b blob)")
+
+            params = ['key1', bytearray(b'blob1')]
+            s.execute("INSERT INTO blobbytes2 (a, b) VALUES (%s, %s)", params)
+
+            results = s.execute("SELECT * FROM blobbytes2")[0]
+            for expected, actual in zip(params, results):
+                self.assertEqual(expected, actual)
+        finally:
+            if original is not None:
+                cassandra.deserializers.DesBytesType=original
 
     def test_can_insert_primitive_datatypes(self):
         """
@@ -171,7 +202,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         col_names = ["zz"]
         start_index = ord('a')
         for i, collection_type in enumerate(COLLECTION_TYPES):
-            for j, datatype in enumerate(PRIMITIVE_DATATYPES):
+            for j, datatype in enumerate(PRIMITIVE_DATATYPES_KEYS):
                 if collection_type == "map":
                     type_string = "{0}_{1} {2}<{3}, {3}>".format(chr(start_index + i), chr(start_index + j),
                                                                      collection_type, datatype)
@@ -190,7 +221,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # create the input for simple statement
         params = [0]
         for collection_type in COLLECTION_TYPES:
-            for datatype in PRIMITIVE_DATATYPES:
+            for datatype in PRIMITIVE_DATATYPES_KEYS:
                 params.append((get_collection_sample(collection_type, datatype)))
 
         # insert into table as a simple statement
@@ -205,7 +236,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # create the input for prepared statement
         params = [0]
         for collection_type in COLLECTION_TYPES:
-            for datatype in PRIMITIVE_DATATYPES:
+            for datatype in PRIMITIVE_DATATYPES_KEYS:
                 params.append((get_collection_sample(collection_type, datatype)))
 
         # try the same thing with a prepared statement
@@ -522,15 +553,15 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         values = []
 
         # create list values
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             values.append('v_{0} frozen<tuple<list<{1}>>>'.format(len(values), datatype))
 
         # create set values
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             values.append('v_{0} frozen<tuple<set<{1}>>>'.format(len(values), datatype))
 
         # create map values
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             datatype_1 = datatype_2 = datatype
             if datatype == 'blob':
                 # unhashable type: 'bytearray'
@@ -550,7 +581,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
         i = 0
         # test tuple<list<datatype>>
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             created_tuple = tuple([[get_sample(datatype)]])
             s.execute("INSERT INTO tuple_non_primative (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
@@ -559,7 +590,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             i += 1
 
         # test tuple<set<datatype>>
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             created_tuple = tuple([sortedset([get_sample(datatype)])])
             s.execute("INSERT INTO tuple_non_primative (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
@@ -568,7 +599,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             i += 1
 
         # test tuple<map<datatype, datatype>>
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             if datatype == 'blob':
                 # unhashable type: 'bytearray'
                 created_tuple = tuple([{get_sample('ascii'): get_sample(datatype)}])
@@ -765,7 +796,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
 class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
-    @greaterthancass20
+    @greaterthancass21
     @lessthancass30
     def test_nested_types_with_protocol_version(self):
         """

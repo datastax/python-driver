@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,12 +24,15 @@ from threading import Thread, Event
 import time
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable
+from cassandra.cluster import NoHostAvailable, Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
+from cassandra.connection import Connection
+from cassandra.policies import WhiteListRoundRobinPolicy, HostStateListener
+from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_node
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -39,6 +42,133 @@ except ImportError:
 
 def setup_module():
     use_singledc()
+
+
+class ConnectionTimeoutTest(unittest.TestCase):
+
+    def setUp(self):
+        self.defaultInFlight = Connection.max_in_flight
+        Connection.max_in_flight = 2
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        self.session = self.cluster.connect()
+
+    def tearDown(self):
+        Connection.max_in_flight = self.defaultInFlight
+        self.cluster.shutdown()
+
+    def test_in_flight_timeout(self):
+        """
+        Test to ensure that connection id fetching will block when max_id is reached/
+
+        In previous versions of the driver this test will cause a
+        NoHostAvailable exception to be thrown, when the max_id is restricted
+
+        @since 3.3
+        @jira_ticket PYTHON-514
+        @expected_result When many requests are run on a single node connection acquisition should block
+        until connection is available or the request times out.
+
+        @test_category connection timeout
+        """
+        futures = []
+        query = '''SELECT * FROM system.local'''
+        for i in range(100):
+            futures.append(self.session.execute_async(query))
+
+        for future in futures:
+            future.result()
+
+
+class TestHostListener(HostStateListener):
+    host_down = None
+
+    def on_down(self, host):
+        host_down = host
+
+
+class HeartbeatTest(unittest.TestCase):
+    """
+    Test to validate failing a heartbeat check doesn't mark a host as down
+
+    @since 3.3
+    @jira_ticket PYTHON-286
+    @expected_result host should not be marked down when heartbeat fails
+
+    @test_category connection heartbeat
+    """
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=1)
+        self.session = self.cluster.connect(wait_for_all_pools=True)
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_heart_beat_timeout(self):
+        # Setup a host listener to ensure the nodes don't go down
+        test_listener = TestHostListener()
+        host = "127.0.0.1"
+        node = get_node(1)
+        initial_connections = self.fetch_connections(host, self.cluster)
+        self.assertNotEqual(len(initial_connections), 0)
+        self.cluster.register_listener(test_listener)
+        # Pause the node
+        try:
+            node.pause()
+            # Wait for connections associated with this host go away
+            self.wait_for_no_connections(host, self.cluster)
+            # Resume paused node
+        finally:
+            node.resume()
+        # Run a query to ensure connections are re-established
+        current_host = ""
+        count = 0
+        while current_host != host and count < 100:
+            rs = self.session.execute_async("SELECT * FROM system.local", trace=False)
+            rs.result()
+            current_host = str(rs._current_host)
+            count += 1
+            time.sleep(.1)
+        self.assertLess(count, 100, "Never connected to the first node")
+        new_connections = self.wait_for_connections(host, self.cluster)
+        self.assertIsNone(test_listener.host_down)
+        # Make sure underlying new connections don't match previous ones
+        for connection in initial_connections:
+            self.assertFalse(connection in new_connections)
+
+    def fetch_connections(self, host, cluster):
+        # Given a cluster object and host grab all connection associated with that host
+        connections = []
+        holders = cluster.get_connection_holders()
+        for conn in holders:
+            if host == str(getattr(conn, 'host', '')):
+                if isinstance(conn, HostConnectionPool):
+                    if conn._connections is not None and len(conn._connections) > 0:
+                        connections.append(conn._connections)
+                else:
+                    if conn._connection is not None:
+                        connections.append(conn._connection)
+        return connections
+
+    def wait_for_connections(self, host, cluster):
+        retry = 0
+        while(retry < 300):
+            retry += 1
+            connections = self.fetch_connections(host, cluster)
+            if len(connections) is not 0:
+                return connections
+            time.sleep(.1)
+        self.fail("No new connections found")
+
+    def wait_for_no_connections(self, host, cluster):
+        retry = 0
+        while(retry < 100):
+            retry += 1
+            connections = self.fetch_connections(host, cluster)
+            if len(connections) is 0:
+                return
+            time.sleep(.5)
+        self.fail("Connections never cleared")
 
 
 class ConnectionTests(object):
@@ -227,10 +357,20 @@ class ConnectionTests(object):
             t.join()
 
     def test_connect_timeout(self):
-        start = time.time()
-        self.assertRaises(Exception, self.get_connection, timeout=sys.float_info.min)
-        end = time.time()
-        self.assertAlmostEqual(start, end, 1)
+        # Underlying socket implementations don't always throw a socket timeout even with min float
+        # This can be timing sensitive, added retry to ensure failure occurs if it can
+        max_retry_count = 10
+        exception_thrown = False
+        for i in range(max_retry_count):
+            start = time.time()
+            try:
+                self.get_connection(timeout=sys.float_info.min)
+            except Exception as e:
+                end = time.time()
+                self.assertAlmostEqual(start, end, 1)
+                exception_thrown = True
+                break
+        self.assertTrue(exception_thrown)
 
 
 class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from cassandra.query import named_tuple_factory, dict_factory, tuple_factory
 
 try:
     import unittest2 as unittest
@@ -18,7 +19,6 @@ except ImportError:
     import unittest # noqa
 
 from mock import Mock, PropertyMock
-import warnings
 
 from cassandra.cluster import ResultSet
 
@@ -161,3 +161,29 @@ class ResultSetTests(unittest.TestCase):
     def test_bool(self):
         self.assertFalse(ResultSet(Mock(has_more_pages=False), []))
         self.assertTrue(ResultSet(Mock(has_more_pages=False), [1]))
+
+    def test_was_applied(self):
+        # unknown row factory raises
+        with self.assertRaises(RuntimeError):
+            ResultSet(Mock(), []).was_applied
+
+        response_future = Mock(row_factory=named_tuple_factory)
+
+        # no row
+        with self.assertRaises(RuntimeError):
+            ResultSet(response_future, []).was_applied
+
+        # too many rows
+        with self.assertRaises(RuntimeError):
+            ResultSet(response_future, [tuple(), tuple()]).was_applied
+
+        # various internal row factories
+        for row_factory in (named_tuple_factory, tuple_factory):
+            for applied in (True, False):
+                rs = ResultSet(Mock(row_factory=row_factory), [(applied,)])
+                self.assertEqual(rs.was_applied, applied)
+
+        row_factory = dict_factory
+        for applied in (True, False):
+            rs = ResultSet(Mock(row_factory=row_factory), [{'[applied]': applied}])
+            self.assertEqual(rs.was_applied, applied)

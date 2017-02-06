@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ class BoundStatementTestV1(unittest.TestCase):
                                          routing_key_indexes=[1, 0],
                                          query=None,
                                          keyspace='keyspace',
-                                         protocol_version=cls.protocol_version)
+                                         protocol_version=cls.protocol_version, result_metadata=None)
         cls.bound = BoundStatement(prepared_statement=cls.prepared)
 
     def test_invalid_argument_type(self):
@@ -130,7 +130,8 @@ class BoundStatementTestV1(unittest.TestCase):
                                                routing_key_indexes=[],
                                                query=None,
                                                keyspace=keyspace,
-                                               protocol_version=self.protocol_version)
+                                               protocol_version=self.protocol_version,
+                                               result_metadata=None)
         prepared_statement.fetch_size = 1234
         bound_statement = BoundStatement(prepared_statement=prepared_statement)
         self.assertEqual(1234, bound_statement.fetch_size)
@@ -163,7 +164,8 @@ class BoundStatementTestV1(unittest.TestCase):
                                                routing_key_indexes=[],
                                                query=None,
                                                keyspace='whatever',
-                                               protocol_version=self.protocol_version)
+                                               protocol_version=self.protocol_version,
+                                               result_metadata=None)
         bound = prepared_statement.bind(None)
         self.assertListEqual(bound.values, [])
 

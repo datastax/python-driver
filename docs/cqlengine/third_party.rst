@@ -13,11 +13,11 @@ Here's how, in substance, CQLengine can be plugged to `Celery
 
     from celery import Celery
     from celery.signals import worker_process_init, beat_init
-    from cqlengine import connection
-    from cqlengine.connection import (
+    from cassandra.cqlengine import connection
+    from cassandra.cqlengine.connection import (
         cluster as cql_cluster, session as cql_session)
 
-    def cassandra_init():
+    def cassandra_init(**kwargs):
         """ Initialize a clean Cassandra connection. """
         if cql_cluster is not None:
             cql_cluster.shutdown()
@@ -40,8 +40,8 @@ This is the code required for proper connection handling of CQLengine for a
 
 .. code-block:: python
 
-    from cqlengine import connection
-    from cqlengine.connection import (
+    from cassandra.cqlengine import connection
+    from cassandra.cqlengine.connection import (
         cluster as cql_cluster, session as cql_session)
 
     try:
@@ -52,7 +52,7 @@ This is the code required for proper connection handling of CQLengine for a
         pass
     else:
         @postfork
-        def cassandra_init():
+        def cassandra_init(**kwargs):
             """ Initialize a new Cassandra session in the context.
 
             Ensures that a new session is returned for every new request.

@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ if 'gevent.monkey' in sys.modules:
 else:
     from six.moves.queue import Queue, Empty  # noqa
 
-from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
+from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
 from cassandra.marshal import int32_pack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
@@ -45,7 +45,7 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
                                 AuthSuccessMessage, ProtocolException,
-                                MAX_SUPPORTED_VERSION, RegisterMessage)
+                                RegisterMessage)
 from cassandra.util import OrderedDict
 
 
@@ -125,6 +125,7 @@ class _Frame(object):
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
+
 class ConnectionException(Exception):
     """
     An unrecoverable error was hit when attempting to use a connection,
@@ -148,8 +149,8 @@ class ProtocolVersionUnsupported(ConnectionException):
     Server rejected startup message due to unsupported protocol version
     """
     def __init__(self, host, startup_version):
-        super(ProtocolVersionUnsupported, self).__init__("Unsupported protocol version on %s: %d",
-                                                         (host, startup_version))
+        msg = "Unsupported protocol version on %s: %d" % (host, startup_version)
+        super(ProtocolVersionUnsupported, self).__init__(msg, host)
         self.startup_version = startup_version
 
 
@@ -196,7 +197,7 @@ class Connection(object):
     out_buffer_size = 4096
 
     cql_version = None
-    protocol_version = MAX_SUPPORTED_VERSION
+    protocol_version = ProtocolVersion.MAX_SUPPORTED
 
     keyspace = None
     compression = True
@@ -209,6 +210,12 @@ class Connection(object):
     # The current number of operations that are in flight. More precisely,
     # the number of request IDs that are currently in use.
     in_flight = 0
+
+    # Max concurrent requests allowed per connection. This is set optimistically high, allowing
+    # all request ids to be used in protocol version 3+. Normally concurrency would be controlled
+    # at a higher level by the application or concurrent.execute_concurrent. This attribute
+    # is for lower-level integrations that want some upper bound without reimplementing.
+    max_in_flight = 2 ** 15
 
     # A set of available request IDs.  When using the v3 protocol or higher,
     # this will not initially include all request IDs in order to save memory,
@@ -231,7 +238,7 @@ class Connection(object):
     is_control_connection = False
     signaled_error = False  # used for flagging at the pool level
 
-    _server_version = None
+    allow_beta_protocol_version = False
 
     _iobuf = None
     _current_frame = None
@@ -241,14 +248,16 @@ class Connection(object):
     _socket_impl = socket
     _ssl_impl = ssl
 
+    _check_hostname = False
+
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None, protocol_version=MAX_SUPPORTED_VERSION, is_control_connection=False,
-                 user_type_map=None, connect_timeout=None):
+                 cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
+                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False):
         self.host = host
         self.port = port
         self.authenticator = authenticator
-        self.ssl_options = ssl_options
+        self.ssl_options = ssl_options.copy() if ssl_options else None
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
@@ -256,18 +265,27 @@ class Connection(object):
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self.connect_timeout = connect_timeout
+        self.allow_beta_protocol_version = allow_beta_protocol_version
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
 
+        if ssl_options:
+            self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
+            if self._check_hostname:
+                if not getattr(ssl, 'match_hostname', None):
+                    raise RuntimeError("ssl_options specify 'check_hostname', but ssl.match_hostname is not provided. "
+                                       "Patch or upgrade Python to use this option.")
+
         if protocol_version >= 3:
-            self.max_request_id = (2 ** 15) - 1
-            # Don't fill the deque with 2**15 items right away. Start with 300 and add
+            self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
+            # Don't fill the deque with 2**15 items right away. Start with some and add
             # more if needed.
-            self.request_ids = deque(range(300))
-            self.highest_request_id = 299
+            initial_size = min(300, self.max_in_flight)
+            self.request_ids = deque(range(initial_size))
+            self.highest_request_id = initial_size - 1
         else:
-            self.max_request_id = (2 ** 7) - 1
+            self.max_request_id = min(self.max_in_flight, (2 ** 7) - 1)
             self.request_ids = deque(range(self.max_request_id + 1))
             self.highest_request_id = self.max_request_id
 
@@ -319,15 +337,20 @@ class Connection(object):
     def _connect_socket(self):
         sockerr = None
         addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        if not addresses:
+            raise ConnectionException("getaddrinfo returned empty list for %s" % (self.host,))
         for (af, socktype, proto, canonname, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
                 if self.ssl_options:
                     if not self._ssl_impl:
-                        raise Exception("This version of Python was not compiled with SSL support")
+                        raise RuntimeError("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
                 self._socket.connect(sockaddr)
+                self._socket.settimeout(None)
+                if self._check_hostname:
+                    ssl.match_hostname(self._socket.getpeercert(), self.host)
                 sockerr = None
                 break
             except socket.error as err:
@@ -385,7 +408,7 @@ class Connection(object):
                             id(self), self.host, exc_info=True)
 
         # run first callback from this thread to ensure pool state before leaving
-        cb, _ = requests.popitem()[1]
+        cb, _, _ = requests.popitem()[1]
         try_callback(cb)
 
         if not requests:
@@ -395,7 +418,7 @@ class Connection(object):
         # The default callback and retry logic is fairly expensive -- we don't
         # want to tie up the event thread when there are many requests
         def err_all_callbacks():
-            for cb, _ in requests.values():
+            for cb, _, _ in requests.values():
                 try_callback(cb)
         if len(requests) < Connection.CALLBACK_ERR_THREAD_THRESHOLD:
             err_all_callbacks()
@@ -426,7 +449,7 @@ class Connection(object):
             except Exception:
                 log.exception("Pushed event handler errored, ignoring:")
 
-    def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message):
+    def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=None):
         if self.is_defunct:
             raise ConnectionShutdown("Connection to %s is defunct" % self.host)
         elif self.is_closed:
@@ -434,9 +457,10 @@ class Connection(object):
 
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
-        self._requests[request_id] = (cb, decoder)
-        self.push(encoder(msg, request_id, self.protocol_version, compressor=self.compressor))
-        return request_id
+        self._requests[request_id] = (cb, decoder, result_metadata)
+        msg = encoder(msg, request_id, self.protocol_version, compressor=self.compressor, allow_beta_protocol_version=self.allow_beta_protocol_version)
+        self.push(msg)
+        return len(msg)
 
     def wait_for_response(self, msg, timeout=None):
         return self.wait_for_responses(msg, timeout=timeout)[0]
@@ -461,7 +485,7 @@ class Connection(object):
         while True:
             needed = len(msgs) - messages_sent
             with self.lock:
-                available = min(needed, self.max_request_id - self.in_flight)
+                available = min(needed, self.max_request_id - self.in_flight + 1)
                 request_ids = [self.get_request_id() for _ in range(available)]
                 self.in_flight += available
 
@@ -517,7 +541,7 @@ class Connection(object):
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
-            if version > MAX_SUPPORTED_VERSION:
+            if version > ProtocolVersion.MAX_SUPPORTED:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
             # this frame header struct is everything after the version byte
@@ -559,8 +583,9 @@ class Connection(object):
         if stream_id < 0:
             callback = None
             decoder = ProtocolHandler.decode_message
+            result_metadata = None
         else:
-            callback, decoder = self._requests.pop(stream_id, None)
+            callback, decoder, result_metadata = self._requests.pop(stream_id)
             with self.lock:
                 self.request_ids.append(stream_id)
 
@@ -568,7 +593,7 @@ class Connection(object):
 
         try:
             response = decoder(header.version, self.user_type_map, stream_id,
-                               header.flags, header.opcode, body, self.decompressor)
+                               header.flags, header.opcode, body, self.decompressor, result_metadata)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "%s; buffer: %r", header, self._iobuf.getvalue())
@@ -582,8 +607,8 @@ class Connection(object):
                 if isinstance(response, ProtocolException):
                     if 'unsupported protocol version' in response.message:
                         self.is_unsupported_proto_version = True
-
-                    log.error("Closing connection %s due to protocol error: %s", self, response.summary_msg())
+                    else:
+                        log.error("Closing connection %s due to protocol error: %s", self, response.summary_msg())
                     self.defunct(response)
                 if callback is not None:
                     callback(response)
@@ -694,8 +719,6 @@ class Connection(object):
             if self.authenticator is None:
                 raise AuthenticationFailed('Remote end requires authentication.')
 
-            self.authenticator_class = startup_response.authenticator
-
             if isinstance(self.authenticator, dict):
                 log.debug("Sending credentials-based auth response on %s", self)
                 cm = CredentialsMessage(creds=self.authenticator)
@@ -703,6 +726,7 @@ class Connection(object):
                 self.send_msg(cm, self.get_request_id(), cb=callback)
             else:
                 log.debug("Sending SASL-based auth response on %s", self)
+                self.authenticator.server_authenticator_class = startup_response.authenticator
                 initial_response = self.authenticator.initial_response()
                 initial_response = "" if initial_response is None else initial_response
                 self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
@@ -827,18 +851,6 @@ class Connection(object):
     def reset_idle(self):
         self.msg_received = False
 
-    @property
-    def server_version(self):
-        if self._server_version is None:
-            query_message = QueryMessage(query="SELECT release_version FROM system.local", consistency_level=ConsistencyLevel.ONE)
-            message = self.wait_for_response(query_message)
-            self._server_version = message.results[1][0][0]  # (col names, rows)[rows][first row][only item]
-        return self._server_version
-
-    @server_version.setter
-    def server_version(self, version):
-        self._server_version = version
-
     def __str__(self):
         status = ""
         if self.is_defunct:
@@ -909,7 +921,7 @@ class HeartbeatFuture(object):
         log.debug("Sending options message heartbeat on idle connection (%s) %s",
                   id(connection), connection.host)
         with connection.lock:
-            if connection.in_flight < connection.max_request_id:
+            if connection.in_flight <= connection.max_request_id:
                 connection.in_flight += 1
                 connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
             else:
@@ -922,18 +934,18 @@ class HeartbeatFuture(object):
             if self._exception:
                 raise self._exception
         else:
-            raise OperationTimedOut()
+            raise OperationTimedOut("Connection heartbeat timeout after %s seconds" % (timeout,), self.connection.host)
 
     def _options_callback(self, response):
-        if not isinstance(response, SupportedMessage):
+        if isinstance(response, SupportedMessage):
+            log.debug("Received options response on connection (%s) from %s",
+                      id(self.connection), self.connection.host)
+        else:
             if isinstance(response, ConnectionException):
                 self._exception = response
             else:
                 self._exception = ConnectionException("Received unexpected response to OptionsMessage: %s"
                                                       % (response,))
-
-        log.debug("Received options response on connection (%s) from %s",
-                  id(self.connection), self.connection.host)
         self._event.set()
 
 
@@ -965,13 +977,15 @@ class ConnectionHeartbeat(Thread):
                             if connection.is_idle:
                                 try:
                                     futures.append(HeartbeatFuture(connection, owner))
-                                except Exception:
+                                except Exception as e:
                                     log.warning("Failed sending heartbeat message on connection (%s) to %s",
-                                                id(connection), connection.host, exc_info=True)
-                                    failed_connections.append((connection, owner))
+                                                id(connection), connection.host)
+                                    failed_connections.append((connection, owner, e))
                             else:
                                 connection.reset_idle()
                         else:
+                            log.debug("Cannot send heartbeat message on connection (%s) to %s",
+                                      id(connection), connection.host)
                             # make sure the owner sees this defunt/closed connection
                             owner.return_connection(connection)
                     self._raise_if_stopped()
@@ -985,14 +999,14 @@ class ConnectionHeartbeat(Thread):
                         with connection.lock:
                             connection.in_flight -= 1
                         connection.reset_idle()
-                    except Exception:
+                    except Exception as e:
                         log.warning("Heartbeat failed for connection (%s) to %s",
-                                    id(connection), connection.host, exc_info=True)
-                        failed_connections.append((f.connection, f.owner))
+                                    id(connection), connection.host)
+                        failed_connections.append((f.connection, f.owner, e))
 
-                for connection, owner in failed_connections:
+                for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
-                    connection.defunct(Exception('Connection heartbeat failure'))
+                    connection.defunct(exc)
                     owner.return_connection(connection)
             except self.ShutdownException:
                 pass
@@ -1020,6 +1034,9 @@ class Timer(object):
         self.callback = callback
         if timeout < 0:
             self.callback()
+
+    def __lt__(self, other):
+        return self.end < other.end
 
     def cancel(self):
         self.canceled = True

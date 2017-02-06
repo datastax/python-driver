@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,14 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cqlengine import columns
-from cassandra.cqlengine.management import sync_table, drop_table, create_keyspace_simple, drop_keyspace
-from cassandra.cqlengine.models import Model, ModelDefinitionException
+from mock import patch
 
+from cassandra.cqlengine import columns, CQLEngineException
+from cassandra.cqlengine.management import sync_table, drop_table, create_keyspace_simple, drop_keyspace
+from cassandra.cqlengine import models
+from cassandra.cqlengine.models import Model, ModelDefinitionException
+from uuid import uuid1
+from tests.integration import pypy
 
 class TestModel(unittest.TestCase):
     """ Tests the non-io functionality of models """
@@ -105,6 +109,50 @@ class TestModel(unittest.TestCase):
 
         drop_keyspace('keyspace')
 
+    def test_column_family(self):
+        class TestModel(Model):
+            k = columns.Integer(primary_key=True)
+
+        # no model keyspace uses default
+        self.assertEqual(TestModel.column_family_name(), "%s.test_model" % (models.DEFAULT_KEYSPACE,))
+
+        # model keyspace overrides
+        TestModel.__keyspace__ = "my_test_keyspace"
+        self.assertEqual(TestModel.column_family_name(), "%s.test_model" % (TestModel.__keyspace__,))
+
+        # neither set should raise CQLEngineException before failing or formatting an invalid name
+        del TestModel.__keyspace__
+        with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
+            self.assertRaises(CQLEngineException, TestModel.column_family_name)
+            # .. but we can still get the bare CF name
+            self.assertEqual(TestModel.column_family_name(include_keyspace=False), "test_model")
+
+    def test_column_family_case_sensitive(self):
+        """
+        Test to ensure case sensitivity is honored when __table_name_case_sensitive__ flag is set
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_name case is respected
+
+        @test_category object_mapper
+        """
+        class TestModel(Model):
+            __table_name__ = 'TestModel'
+            __table_name_case_sensitive__ = True
+
+            k = columns.Integer(primary_key=True)
+
+        self.assertEqual(TestModel.column_family_name(), '%s."TestModel"' % (models.DEFAULT_KEYSPACE,))
+
+        TestModel.__keyspace__ = "my_test_keyspace"
+        self.assertEqual(TestModel.column_family_name(), '%s."TestModel"' % (TestModel.__keyspace__,))
+
+        del TestModel.__keyspace__
+        with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
+            self.assertRaises(CQLEngineException, TestModel.column_family_name)
+            self.assertEqual(TestModel.column_family_name(include_keyspace=False), '"TestModel"')
+
 
 class BuiltInAttributeConflictTest(unittest.TestCase):
     """tests Model definitions that conflict with built-in attributes/methods"""
@@ -125,4 +173,37 @@ class BuiltInAttributeConflictTest(unittest.TestCase):
                 my_primary_key = columns.Integer(primary_key=True)
                 filter = columns.Text()
 
+@pypy
+class ModelOverWriteTest(unittest.TestCase):
+
+    def test_model_over_write(self):
+        """
+        Test to ensure overwriting of primary keys in model inheritance is allowed
+
+        This is currently only an issue in PyPy. When PYTHON-504 is introduced this should
+        be updated error out and warn the user
+
+        @since 3.6.0
+        @jira_ticket PYTHON-576
+        @expected_result primary keys can be overwritten via inheritance
+
+        @test_category object_mapper
+        """
+        class TimeModelBase(Model):
+            uuid = columns.TimeUUID(primary_key=True)
+
+        class DerivedTimeModel(TimeModelBase):
+            __table_name__ = 'derived_time'
+            uuid = columns.TimeUUID(primary_key=True, partition_key=True)
+            value = columns.Text(required=False)
+
+        # In case the table already exists in keyspace
+        drop_table(DerivedTimeModel)
+
+        sync_table(DerivedTimeModel)
+        uuid_value = uuid1()
+        uuid_value2 = uuid1()
+        DerivedTimeModel.create(uuid=uuid_value, value="first")
+        DerivedTimeModel.create(uuid=uuid_value2, value="second")
+        DerivedTimeModel.objects.filter(uuid=uuid_value)
 

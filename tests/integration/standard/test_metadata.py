@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,14 +29,17 @@ from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
 from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata,
                                 Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names,
-                                get_schema_parser)
+                                get_schema_parser, RegisteredTableExtension, _RegisteredExtensionType)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
-from tests.integration import get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass, \
-    BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster
+from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
+                               BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
+                               BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
+                               BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION,
+                               get_supported_protocol_versions, greaterthanorequalcass30)
 
-from tests.unit.cython.utils import notcython
+from tests.integration import greaterthancass21
 
 def setup_module():
     use_singledc()
@@ -44,7 +47,94 @@ def setup_module():
     CASS_SERVER_VERSION = get_server_versions()[0]
 
 
+class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
+    def test_broadcast_listen_address(self):
+        """
+        Check to ensure that the broadcast and listen adresss is populated correctly
+
+        @since 3.3
+        @jira_ticket PYTHON-332
+        @expected_result They are populated for C*> 2.0.16, 2.1.6, 2.2.0
+
+        @test_category metadata
+        """
+        # All nodes should have the broadcast_address set
+        for host in self.cluster.metadata.all_hosts():
+            self.assertIsNotNone(host.broadcast_address)
+        con = self.cluster.control_connection.get_connections()[0]
+        local_host = con.host
+        # The control connection node should have the listen address set.
+        listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
+        self.assertTrue(local_host in listen_addrs)
+
+    def test_host_release_version(self):
+        """
+        Checks the hosts release version and validates that it is equal to the
+        Cassandra version we are using in our test harness.
+
+        @since 3.3
+        @jira_ticket PYTHON-301
+        @expected_result host.release version should match our specified Cassandra version.
+
+        @test_category metadata
+        """
+        for host in self.cluster.metadata.all_hosts():
+            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
+
+
+class MetaDataRemovalTest(unittest.TestCase):
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1','127.0.0.2', '127.0.0.3', '126.0.0.186'])
+        self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_bad_contact_point(self):
+        """
+        Checks to ensure that hosts that are not resolvable are excluded from the contact point list.
+
+        @since 3.6
+        @jira_ticket PYTHON-549
+        @expected_result Invalid hosts on the contact list should be excluded
+
+        @test_category metadata
+        """
+        self.assertEqual(len(self.cluster.metadata.all_hosts()), 3)
+
+
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
+
+    def test_schema_metadata_disable(self):
+        """
+        Checks to ensure that schema metadata_enabled, and token_metadata_enabled
+        flags work correctly.
+
+        @since 3.3
+        @jira_ticket PYTHON-327
+        @expected_result schema metadata will not be populated when schema_metadata_enabled is fause
+        token_metadata will be missing when token_metadata is set to false
+
+        @test_category metadata
+        """
+        # Validate metadata is missing where appropriate
+        no_schema = Cluster(schema_metadata_enabled=False)
+        no_schema_session = no_schema.connect()
+        self.assertEqual(len(no_schema.metadata.keyspaces), 0)
+        self.assertEqual(no_schema.metadata.export_schema_as_string(), '')
+        no_token = Cluster(token_metadata_enabled=False)
+        no_token_session = no_token.connect()
+        self.assertEqual(len(no_token.metadata.token_map.token_to_host_owner), 0)
+
+        # Do a simple query to ensure queries are working
+        query = "SELECT * FROM system.local"
+        no_schema_rs = no_schema_session.execute(query)
+        no_token_rs = no_token_session.execute(query)
+        self.assertIsNotNone(no_schema_rs[0])
+        self.assertIsNotNone(no_token_rs[0])
+        no_schema.shutdown()
+        no_token.shutdown()
 
     def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
         clustering_cols = clustering_cols or []
@@ -120,7 +210,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual([], tablemeta.clustering_key)
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
-        parser = get_schema_parser(self.cluster.control_connection._connection, 1)
+        cc = self.cluster.control_connection._connection
+        parser = get_schema_parser(cc, str(CASS_SERVER_VERSION[0]), 1)
 
         for option in tablemeta.options:
             self.assertIn(option, parser.recognized_table_options)
@@ -624,6 +715,40 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    def test_refresh_user_type_metadata_proto_2(self):
+        """
+        Test to insure that protocol v1/v2 surface UDT metadata changes
+
+        @since 3.7.0
+        @jira_ticket PYTHON-106
+        @expected_result UDT metadata in the keyspace should be updated regardless of protocol version
+
+        @test_category metadata
+        """
+        supported_versions = get_supported_protocol_versions()
+        if 2 not in supported_versions or CASSANDRA_VERSION < "2.1":  # 1 and 2 were dropped in the same version
+                raise unittest.SkipTest("Protocol versions 1 and 2 are not supported in Cassandra version ".format(CASSANDRA_VERSION))
+
+        for protocol_version in (1, 2):
+            cluster = Cluster(protocol_version=protocol_version)
+            session = cluster.connect()
+            self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
+
+            session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
+            self.assertIn("user", cluster.metadata.keyspaces[self.keyspace_name].user_types)
+            self.assertIn("age", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+            self.assertIn("name", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("ALTER TYPE {0}.user ADD flag boolean".format(self.keyspace_name))
+            self.assertIn("flag", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("ALTER TYPE {0}.user RENAME flag TO something".format(self.keyspace_name))
+            self.assertIn("something", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+
+            session.execute("DROP TYPE {0}.user".format(self.keyspace_name))
+            self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
+            cluster.shutdown()
+
     def test_refresh_user_function_metadata(self):
         """
         test for synchronously refreshing UDF metadata in keyspace
@@ -735,6 +860,100 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(index_2.kind, "COMPOSITES")
         self.assertEqual(index_2.index_options["target"], "keys(b)")
         self.assertEqual(index_2.keyspace_name, "schemametadatatests")
+
+    @greaterthanorequalcass30
+    def test_table_extensions(self):
+        s = self.session
+        ks = self.keyspace_name
+        ks_meta = s.cluster.metadata.keyspaces[ks]
+        t = self.function_table_name
+        v = t + 'view'
+
+        s.execute("CREATE TABLE %s.%s (k text PRIMARY KEY, v int)" % (ks, t))
+        s.execute("CREATE MATERIALIZED VIEW %s.%s AS SELECT * FROM %s.%s WHERE v IS NOT NULL PRIMARY KEY (v, k)" % (ks, v, ks, t))
+
+        table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
+
+        self.assertFalse(table_meta.extensions)
+        self.assertFalse(view_meta.extensions)
+
+        original_table_cql = table_meta.export_as_string()
+        original_view_cql = view_meta.export_as_string()
+
+        # extensions registered, not present
+        # --------------------------------------
+        class Ext0(RegisteredTableExtension):
+            name = t
+
+            @classmethod
+            def after_table_cql(cls, table_meta, ext_key, ext_blob):
+                return "%s %s %s %s" % (cls.name, table_meta.name, ext_key, ext_blob)
+
+        class Ext1(Ext0):
+            name = t + '##'
+
+        self.assertFalse(table_meta.extensions)
+        self.assertFalse(view_meta.extensions)
+        self.assertIn(Ext0.name, _RegisteredExtensionType._extension_registry)
+        self.assertIn(Ext1.name, _RegisteredExtensionType._extension_registry)
+        self.assertEqual(len(_RegisteredExtensionType._extension_registry), 2)
+
+        self.cluster.refresh_table_metadata(ks, t)
+        table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
+
+        self.assertEqual(table_meta.export_as_string(), original_table_cql)
+        self.assertEqual(view_meta.export_as_string(), original_view_cql)
+
+        update_t = s.prepare('UPDATE system_schema.tables SET extensions=? WHERE keyspace_name=? AND table_name=?')  # for blob type coercing
+        update_v = s.prepare('UPDATE system_schema.views SET extensions=? WHERE keyspace_name=? AND view_name=?')
+        # extensions registered, one present
+        # --------------------------------------
+        ext_map = {Ext0.name: six.b("THA VALUE")}
+        [(s.execute(update_t, (ext_map, ks, t)), s.execute(update_v, (ext_map, ks, v)))
+         for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
+        self.cluster.refresh_table_metadata(ks, t)
+        self.cluster.refresh_materialized_view_metadata(ks, v)
+        table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
+
+        self.assertIn(Ext0.name, table_meta.extensions)
+        new_cql = table_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_table_cql)
+        self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertNotIn(Ext1.name, new_cql)
+
+        self.assertIn(Ext0.name, view_meta.extensions)
+        new_cql = view_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_view_cql)
+        self.assertIn(Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertNotIn(Ext1.name, new_cql)
+
+        # extensions registered, one present
+        # --------------------------------------
+        ext_map = {Ext0.name: six.b("THA VALUE"),
+                   Ext1.name: six.b("OTHA VALUE")}
+        [(s.execute(update_t, (ext_map, ks, t)), s.execute(update_v, (ext_map, ks, v)))
+         for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
+        self.cluster.refresh_table_metadata(ks, t)
+        self.cluster.refresh_materialized_view_metadata(ks, v)
+        table_meta = ks_meta.tables[t]
+        view_meta = table_meta.views[v]
+
+        self.assertIn(Ext0.name, table_meta.extensions)
+        self.assertIn(Ext1.name, table_meta.extensions)
+        new_cql = table_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_table_cql)
+        self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertIn(Ext1.after_table_cql(table_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
+
+        self.assertIn(Ext0.name, view_meta.extensions)
+        self.assertIn(Ext1.name, view_meta.extensions)
+        new_cql = view_meta.export_as_string()
+        self.assertNotEqual(new_cql, original_view_cql)
+        self.assertIn(Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        self.assertIn(Ext1.after_table_cql(view_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
 
 
 class TestCodeCoverage(unittest.TestCase):
@@ -858,6 +1077,7 @@ CREATE TABLE export_udts.users (
 
         cluster.shutdown()
 
+    @greaterthancass21
     def test_case_sensitivity(self):
         """
         Test that names that need to be escaped in CREATE statements are
@@ -885,6 +1105,9 @@ CREATE TABLE export_udts.users (
         session.execute("""
             CREATE INDEX myindex ON "%s"."%s" ("MyColumn")
             """ % (ksname, cfname))
+        session.execute("""
+            CREATE INDEX "AnotherIndex" ON "%s"."%s" ("B")
+            """ % (ksname, cfname))
 
         ksmeta = cluster.metadata.keyspaces[ksname]
         schema = ksmeta.export_as_string()
@@ -896,6 +1119,7 @@ CREATE TABLE export_udts.users (
         self.assertIn('PRIMARY KEY (k, "A")', schema)
         self.assertIn('WITH CLUSTERING ORDER BY ("A" DESC)', schema)
         self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
+        self.assertIn('CREATE INDEX "AnotherIndex" ON "AnInterestingKeyspace"."AnInterestingTable" ("B")', schema)
         cluster.shutdown()
 
     def test_already_exists_exceptions(self):
@@ -1067,14 +1291,12 @@ Approximate structure, for reference:
 
 CREATE TABLE legacy.composite_comp_with_col (
     key blob,
-    t timeuuid,
-    b blob,
-    s text,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, t, b, s)
+    PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (t ASC, b ASC, s ASC)
+    AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1187,20 +1409,13 @@ CREATE TABLE legacy.simple_no_col (
     AND read_repair_chance = 0.0
     AND speculative_retry = 'NONE';
 
-/*
-Warning: Table legacy.composite_comp_no_col omitted because it has constructs not compatible with CQL (was created via legacy API).
-
-Approximate structure, for reference:
-(this should not be used to reproduce this schema)
-
 CREATE TABLE legacy.composite_comp_no_col (
     key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(org.apache.cassandra.db.marshal.TimeUUIDType, org.apache.cassandra.db.marshal.BytesType, org.apache.cassandra.db.marshal.UTF8Type)',
-    column2 text,
+    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
     value blob,
-    PRIMARY KEY (key, column1, column1, column2)
+    PRIMARY KEY (key, column1)
 ) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC, column1 ASC, column2 ASC)
+    AND CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1212,16 +1427,17 @@ CREATE TABLE legacy.composite_comp_no_col (
     AND memtable_flush_period_in_ms = 0
     AND min_index_interval = 128
     AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-*/"""
+    AND speculative_retry = 'NONE';"""
 
         ccm = get_cluster()
-        ccm.run_cli(cli_script)
+        livenodes = [node for node in list(ccm.nodelist()) if node.is_live()]
+        livenodes[0].run_cli(cli_script)
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
         legacy_meta = cluster.metadata.keyspaces['legacy']
+        print(legacy_meta.export_as_string())
         self.assert_equal_diff(legacy_meta.export_as_string(), expected_string)
 
         session.execute('DROP KEYSPACE legacy')
@@ -1245,7 +1461,7 @@ class TokenMetadataTest(unittest.TestCase):
         cluster.shutdown()
 
     def test_getting_replicas(self):
-        tokens = [MD5Token(str(i)) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
+        tokens = [MD5Token(i) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
         hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
         token_to_primary_replica = dict(zip(tokens, hosts))
         keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
@@ -1260,12 +1476,12 @@ class TokenMetadataTest(unittest.TestCase):
 
         # shift the tokens back by one
         for token, expected_host in zip(tokens, hosts):
-            replicas = token_map.get_replicas("ks", MD5Token(str(token.value - 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(token.value - 1))
             self.assertEqual(set(replicas), set([expected_host]))
 
         # shift the tokens forward by one
         for i, token in enumerate(tokens):
-            replicas = token_map.get_replicas("ks", MD5Token(str(token.value + 1)))
+            replicas = token_map.get_replicas("ks", MD5Token(token.value + 1))
             expected_host = hosts[(i + 1) % len(hosts)]
             self.assertEqual(set(replicas), set([expected_host]))
 
@@ -1897,7 +2113,7 @@ class BadMetaTest(unittest.TestCase):
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
-        cls.parser_class = get_schema_parser(connection, timeout=20).__class__
+        cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
 
     @classmethod
     def teardown_class(cls):
@@ -1969,7 +2185,31 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
 
-class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
+class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
+
+    def test_dct_alias(self):
+        """
+        Tests to make sure DCT's have correct string formatting
+
+        Constructs a DCT and check the format as generated. To insure it matches what is expected
+
+        @since 3.6.0
+        @jira_ticket PYTHON-579
+        @expected_result DCT subtypes should always have fully qualified names
+
+        @test_category metadata
+        """
+        self.session.execute("CREATE TABLE {0}.{1} ("
+                             "k int PRIMARY KEY,"
+                             "c1 'DynamicCompositeType(s => UTF8Type, i => Int32Type)',"
+                             "c2 Text)".format(self.ks_name, self.function_table_name))
+        dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
+
+        # Format can very slightly between versions, strip out whitespace for consistency sake
+        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(s=>org.apache.cassandra.db.marshal.UTF8Type,i=>org.apache.cassandra.db.marshal.Int32Type)'" in dct_table.as_cql_query().replace(" ", ""))
+
+
+class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         if CASS_SERVER_VERSION < (3, 0):
@@ -2117,37 +2357,37 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(score_table.columns['score'])
 
         # Validate basic mv information
-        self.assertEquals(mv.keyspace_name, self.keyspace_name)
-        self.assertEquals(mv.name, "monthlyhigh")
-        self.assertEquals(mv.base_table_name, "scores")
+        self.assertEqual(mv.keyspace_name, self.keyspace_name)
+        self.assertEqual(mv.name, "monthlyhigh")
+        self.assertEqual(mv.base_table_name, "scores")
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
-        self.assertEquals(len(mv_columns), 6)
+        self.assertEqual(len(mv_columns), 6)
 
         game_column = mv_columns[0]
         self.assertIsNotNone(game_column)
-        self.assertEquals(game_column.name, 'game')
-        self.assertEquals(game_column, mv.partition_key[0])
+        self.assertEqual(game_column.name, 'game')
+        self.assertEqual(game_column, mv.partition_key[0])
 
         year_column = mv_columns[1]
         self.assertIsNotNone(year_column)
-        self.assertEquals(year_column.name, 'year')
-        self.assertEquals(year_column, mv.partition_key[1])
+        self.assertEqual(year_column.name, 'year')
+        self.assertEqual(year_column, mv.partition_key[1])
 
         month_column = mv_columns[2]
         self.assertIsNotNone(month_column)
-        self.assertEquals(month_column.name, 'month')
-        self.assertEquals(month_column, mv.partition_key[2])
+        self.assertEqual(month_column.name, 'month')
+        self.assertEqual(month_column, mv.partition_key[2])
 
         def compare_columns(a, b, name):
-            self.assertEquals(a.name, name)
-            self.assertEquals(a.name, b.name)
-            self.assertEquals(a.table, b.table)
-            self.assertEquals(a.cql_type, b.cql_type)
-            self.assertEquals(a.is_static, b.is_static)
-            self.assertEquals(a.is_reversed, b.is_reversed)
+            self.assertEqual(a.name, name)
+            self.assertEqual(a.name, b.name)
+            self.assertEqual(a.table, b.table)
+            self.assertEqual(a.cql_type, b.cql_type)
+            self.assertEqual(a.is_static, b.is_static)
+            self.assertEqual(a.is_reversed, b.is_reversed)
 
         score_column = mv_columns[3]
         compare_columns(score_column, mv.clustering_key[0], 'score')
@@ -2224,7 +2464,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("fouls", mv_alltime.columns)
 
         mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
-        self.assertEquals(mv_alltime_fouls_comumn.cql_type, 'int')
+        self.assertEqual(mv_alltime_fouls_comumn.cql_type, 'int')
 
     def test_base_table_type_alter_mv(self):
         """
@@ -2265,7 +2505,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].views), 1)
 
         score_column = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores'].columns['score']
-        self.assertEquals(score_column.cql_type, 'blob')
+        self.assertEqual(score_column.cql_type, 'blob')
 
         # until CASSANDRA-9920+CASSANDRA-10500 MV updates are only available later with an async event
         for i in range(10):
@@ -2274,7 +2514,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
                 break
             time.sleep(.2)
 
-        self.assertEquals(score_mv_column.cql_type, 'blob')
+        self.assertEqual(score_mv_column.cql_type, 'blob')
 
     def test_metadata_with_quoted_identifiers(self):
         """
@@ -2327,28 +2567,46 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(t1_table.columns['the Value'])
 
         # Validate basic mv information
-        self.assertEquals(mv.keyspace_name, self.keyspace_name)
-        self.assertEquals(mv.name, "mv1")
-        self.assertEquals(mv.base_table_name, "t1")
+        self.assertEqual(mv.keyspace_name, self.keyspace_name)
+        self.assertEqual(mv.name, "mv1")
+        self.assertEqual(mv.base_table_name, "t1")
         self.assertFalse(mv.include_all_columns)
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
-        self.assertEquals(len(mv_columns), 3)
+        self.assertEqual(len(mv_columns), 3)
 
         theKey_column = mv_columns[0]
         self.assertIsNotNone(theKey_column)
-        self.assertEquals(theKey_column.name, 'theKey')
-        self.assertEquals(theKey_column, mv.partition_key[0])
+        self.assertEqual(theKey_column.name, 'theKey')
+        self.assertEqual(theKey_column, mv.partition_key[0])
 
         cluster_column = mv_columns[1]
         self.assertIsNotNone(cluster_column)
-        self.assertEquals(cluster_column.name, 'the;Clustering')
-        self.assertEquals(cluster_column.name, mv.clustering_key[0].name)
-        self.assertEquals(cluster_column.table, mv.clustering_key[0].table)
-        self.assertEquals(cluster_column.is_static, mv.clustering_key[0].is_static)
-        self.assertEquals(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
+        self.assertEqual(cluster_column.name, 'the;Clustering')
+        self.assertEqual(cluster_column.name, mv.clustering_key[0].name)
+        self.assertEqual(cluster_column.table, mv.clustering_key[0].table)
+        self.assertEqual(cluster_column.is_static, mv.clustering_key[0].is_static)
+        self.assertEqual(cluster_column.is_reversed, mv.clustering_key[0].is_reversed)
 
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
-        self.assertEquals(value_column.name, 'the Value')
+        self.assertEqual(value_column.name, 'the Value')
+
+
+@dseonly
+class DSEMetadataTest(BasicExistingSegregatedKeyspaceUnitTestCase):
+
+    def test_dse_specific_meta(self):
+        """
+        Test to ensure DSE metadata is populated appropriately.
+        @since 3.4
+        @jira_ticket PYTHON-555
+        @expected_result metadata for dse_version, and dse_workload should be populated on dse clusters
+
+        @test_category metadata
+        """
+        for host in self.cluster.metadata.all_hosts():
+            self.assertIsNotNone(host.dse_version, "Dse version not populated as expected")
+            self.assertEqual(host.dse_version, DSE_VERSION)
+            self.assertTrue("Cassandra" in host.dse_workload)

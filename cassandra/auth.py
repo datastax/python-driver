@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@ try:
     from puresasl.client import SASLClient
 except ImportError:
     SASLClient = None
-
 
 class AuthProvider(object):
     """
@@ -62,6 +61,9 @@ class Authenticator(object):
 
     .. versionadded:: 2.0.0
     """
+
+    server_authenticator_class = None
+    """ Set during the connection AUTHENTICATE phase """
 
     def initial_response(self):
         """
@@ -140,7 +142,7 @@ class SaslAuthProvider(AuthProvider):
         from cassandra.cluster import Cluster
         from cassandra.auth import SaslAuthProvider
 
-        sasl_kwargs = {'service': 'dse',
+        sasl_kwargs = {'service': 'something',
                        'mechanism': 'GSSAPI',
                        'qops': 'auth'.split(',')}
         auth_provider = SaslAuthProvider(**sasl_kwargs)

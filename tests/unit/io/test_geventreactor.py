@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ except ImportError:
 
 import time
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
-from tests import is_gevent_monkey_patched
+from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
 
 try:
     from cassandra.io.geventreactor import GeventConnection
@@ -31,15 +31,20 @@ except ImportError:
 
 class GeventTimerTest(unittest.TestCase):
 
+    need_unpatch = False
+
     @classmethod
     def setUpClass(cls):
+        if is_eventlet_monkey_patched():
+            return  # no dynamic patching if we have eventlet applied
         if GeventConnection is not None:
             if not is_gevent_monkey_patched():
+                cls.need_unpatch = True
                 gevent.monkey.patch_all()
 
     @classmethod
     def tearDownClass(cls):
-        if is_gevent_monkey_patched():
+        if cls.need_unpatch:
             gevent_un_patch_all()
 
     def setUp(self):
@@ -47,7 +52,7 @@ class GeventTimerTest(unittest.TestCase):
             raise unittest.SkipTest("Can't test gevent without monkey patching")
         GeventConnection.initialize_reactor()
 
-    def test_multi_timer_validation(self, *args):
+    def test_multi_timer_validation(self):
         """
         Verify that timer timeouts are honored appropriately
         """

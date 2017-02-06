@@ -3,8 +3,8 @@
 Paging Large Queries
 ====================
 Cassandra 2.0+ offers support for automatic query paging.  Starting with
-version 2.0 of the driver, if :attr:`~.Cluster.protocol_version` is set to
-:const:`4` (it is by default), queries returning large result sets will be
+version 2.0 of the driver, if :attr:`~.Cluster.protocol_version` is greater than
+:const:`2` (it is by default), queries returning large result sets will be
 automatically paged.
 
 Controlling the Page Size
@@ -74,3 +74,22 @@ pages.  For example::
     handler.finished_event.wait()
     if handler.error:
         raise handler.error
+
+Resume Paged Results
+--------------------
+
+You can resume the pagination when executing a new query by using the :attr:`.ResultSet.paging_state`. This can be useful if you want to provide some stateless pagination capabilities to your application (ie. via http). For example::
+
+    from cassandra.query import SimpleStatement
+    query = "SELECT * FROM users"
+    statement = SimpleStatement(query, fetch_size=10)
+    results = session.execute(statement)
+
+    # save the paging_state somewhere and return current results
+    session['paging_stage'] = results.paging_state
+
+
+    # resume the pagination sometime later...
+    statement = SimpleStatement(query, fetch_size=10)
+    ps = session['paging_state']
+    results = session.execute(statement, paging_state=ps)

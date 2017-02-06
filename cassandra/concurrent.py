@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from collections import namedtuple
 from heapq import heappush, heappop
 from itertools import cycle
 import six
@@ -24,6 +25,9 @@ from cassandra.cluster import ResultSet
 
 import logging
 log = logging.getLogger(__name__)
+
+
+ExecutionResult = namedtuple('ExecutionResult', ['success', 'result_or_exc'])
 
 def execute_concurrent(session, statements_and_parameters, concurrency=100, raise_on_first_error=True, results_generator=False):
     """
@@ -53,8 +57,8 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
         footprint is marginal CPU overhead (more thread coordination and sorting out-of-order results
         on-the-fly).
 
-    A sequence of ``(success, result_or_exc)`` tuples is returned in the same
-    order that the statements were passed in.  If ``success`` is :const:`False`,
+    A sequence of ``ExecutionResult(success, result_or_exc)`` namedtuples is returned
+    in the same order that the statements were passed in.  If ``success`` is :const:`False`,
     there was an error executing the statement, and ``result_or_exc`` will be
     an :class:`Exception`.  If ``success`` is :const:`True`, ``result_or_exc``
     will be the query result.
@@ -90,6 +94,8 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
 
 class _ConcurrentExecutor(object):
 
+    max_error_recursion = 100
+
     def __init__(self, session, statements_and_params):
         self.session = session
         self._enum_statements = enumerate(iter(statements_and_params))
@@ -98,6 +104,7 @@ class _ConcurrentExecutor(object):
         self._results_queue = []
         self._current = 0
         self._exec_count = 0
+        self._exec_depth = 0
 
     def execute(self, concurrency, fail_fast):
         self._fail_fast = fail_fast
@@ -121,6 +128,7 @@ class _ConcurrentExecutor(object):
             pass
 
     def _execute(self, idx, statement, params):
+        self._exec_depth += 1
         try:
             future = self.session.execute_async(statement, params, timeout=None)
             args = (future, idx)
@@ -131,7 +139,15 @@ class _ConcurrentExecutor(object):
             # exc_info with fail_fast to preserve stack trace info when raising on the client thread
             # (matches previous behavior -- not sure why we wouldn't want stack trace in the other case)
             e = sys.exc_info() if self._fail_fast and six.PY2 else exc
-            self._put_result(e, idx, False)
+
+            # If we're not failing fast and all executions are raising, there is a chance of recursing
+            # here as subsequent requests are attempted. If we hit this threshold, schedule this result/retry
+            # and let the event loop thread return.
+            if self._exec_depth < self.max_error_recursion:
+                self._put_result(e, idx, False)
+            else:
+                self.session.submit(self._put_result, e, idx, False)
+        self._exec_depth -= 1
 
     def _on_success(self, result, future, idx):
         future.clear_callbacks()
@@ -153,7 +169,7 @@ class ConcurrentExecutorGenResults(_ConcurrentExecutor):
 
     def _put_result(self, result, idx, success):
         with self._condition:
-            heappush(self._results_queue, (idx, (success, result)))
+            heappush(self._results_queue, (idx, ExecutionResult(success, result)))
             self._execute_next()
             self._condition.notify()
 
@@ -183,7 +199,7 @@ class ConcurrentExecutorListResults(_ConcurrentExecutor):
         return super(ConcurrentExecutorListResults, self).execute(concurrency, fail_fast)
 
     def _put_result(self, result, idx, success):
-        self._results_queue.append((idx, (success, result)))
+        self._results_queue.append((idx, ExecutionResult(success, result)))
         with self._condition:
             self._current += 1
             if not success and self._fail_fast:

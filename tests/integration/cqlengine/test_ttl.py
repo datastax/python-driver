@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from cassandra import InvalidRequest
 from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.models import Model
@@ -158,6 +159,16 @@ class TTLBlindUpdateTest(BaseTTLTest):
 
 @unittest.skipIf(CASSANDRA_VERSION < '2.0', "default_time_to_Live was introduce in C* 2.0, currently running {0}".format(CASSANDRA_VERSION))
 class TTLDefaultTest(BaseDefaultTTLTest):
+    def get_default_ttl(self, table_name):
+        session = get_session()
+        try:
+            default_ttl = session.execute("SELECT default_time_to_live FROM system_schema.tables "
+                                          "WHERE keyspace_name = 'cqlengine_test' AND table_name = '{0}'".format(table_name))
+        except InvalidRequest:
+            default_ttl = session.execute("SELECT default_time_to_live FROM system.schema_columnfamilies "
+                                          "WHERE keyspace_name = 'cqlengine_test' AND columnfamily_name = '{0}'".format(table_name))
+        return default_ttl[0]['default_time_to_live']
+
     def test_default_ttl_not_set(self):
         session = get_session()
 
@@ -165,6 +176,9 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         tid = o.id
 
         self.assertIsNone(o._ttl)
+
+        default_ttl = self.get_default_ttl('test_ttlmodel')
+        self.assertEqual(default_ttl, 0)
 
         with mock.patch.object(session, 'execute') as m:
             TestTTLModel.objects(id=tid).update(text="aligators")
@@ -174,23 +188,44 @@ class TTLDefaultTest(BaseDefaultTTLTest):
 
     def test_default_ttl_set(self):
         session = get_session()
+
         o = TestDefaultTTLModel.create(text="some text on ttl")
         tid = o.id
 
-        self.assertEqual(o._ttl, TestDefaultTTLModel.__default_ttl__)
+        # Should not be set, it's handled by Cassandra
+        self.assertIsNone(o._ttl)
+
+        default_ttl = self.get_default_ttl('test_default_ttlmodel')
+        self.assertEqual(default_ttl, 20)
 
         with mock.patch.object(session, 'execute') as m:
-            TestDefaultTTLModel.objects(id=tid).update(text="aligators expired")
+            TestTTLModel.objects(id=tid).update(text="aligators expired")
 
+        # Should not be set either
         query = m.call_args[0][0].query_string
-        self.assertIn("USING TTL", query)
+        self.assertNotIn("USING TTL", query)
+
+    def test_default_ttl_modify(self):
+        session = get_session()
+
+        default_ttl = self.get_default_ttl('test_default_ttlmodel')
+        self.assertEqual(default_ttl, 20)
+
+        TestDefaultTTLModel.__options__ = {'default_time_to_live': 10}
+        sync_table(TestDefaultTTLModel)
+
+        default_ttl = self.get_default_ttl('test_default_ttlmodel')
+        self.assertEqual(default_ttl, 10)
+
+        # Restore default TTL
+        TestDefaultTTLModel.__options__ = {'default_time_to_live': 20}
+        sync_table(TestDefaultTTLModel)
 
     def test_override_default_ttl(self):
         session = get_session()
         o = TestDefaultTTLModel.create(text="some text on ttl")
         tid = o.id
 
-        self.assertEqual(o._ttl, TestDefaultTTLModel.__default_ttl__)
         o.ttl(3600)
         self.assertEqual(o._ttl, 3600)
 

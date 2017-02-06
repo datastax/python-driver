@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ from cassandra.cqlengine.query import ModelQuerySet, DMLQuery
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
+
 class TestModelClassFunction(BaseCassEngTestCase):
     """
     Tests verifying the behavior of the Model metaclass
@@ -34,20 +35,41 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         class TestModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
-        #check class attibutes
+        # check class attibutes
         self.assertHasAttr(TestModel, '_columns')
         self.assertHasAttr(TestModel, 'id')
         self.assertHasAttr(TestModel, 'text')
 
-        #check instance attributes
+        # check instance attributes
         inst = TestModel()
         self.assertHasAttr(inst, 'id')
         self.assertHasAttr(inst, 'text')
-        self.assertIsNone(inst.id)
+        self.assertIsNotNone(inst.id)
         self.assertIsNone(inst.text)
+
+    def test_values_on_instantiation(self):
+        """
+        Tests defaults and user-provided values on instantiation.
+        """
+
+        class TestPerson(Model):
+            first_name = columns.Text(primary_key=True, default='kevin')
+            last_name = columns.Text(default='deldycke')
+
+        # Check that defaults are available at instantiation.
+        inst1 = TestPerson()
+        self.assertHasAttr(inst1, 'first_name')
+        self.assertHasAttr(inst1, 'last_name')
+        self.assertEqual(inst1.first_name, 'kevin')
+        self.assertEqual(inst1.last_name, 'deldycke')
+
+        # Check that values on instantiation overrides defaults.
+        inst2 = TestPerson(first_name='bob', last_name='joe')
+        self.assertEqual(inst2.first_name, 'bob')
+        self.assertEqual(inst2.last_name, 'joe')
 
     def test_db_map(self):
         """
@@ -56,7 +78,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         class WildDBNames(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             content = columns.Text(db_field='words_and_whatnot')
             numbers = columns.Integer(db_field='integers_etc')
 
@@ -69,9 +91,9 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that trying to create conflicting db column names will fail
         """
 
-        with self.assertRaises(ModelException):
+        with self.assertRaisesRegexp(ModelException, r".*more than once$"):
             class BadNames(Model):
-                words = columns.Text()
+                words = columns.Text(primary_key=True)
                 content = columns.Text(db_field='words')
 
     def test_column_ordering_is_preserved(self):
@@ -92,9 +114,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
         with self.assertRaises(ModelDefinitionException):
             class TestModel(Model):
 
-                count   = columns.Integer()
-                text    = columns.Text(required=False)
-
+                count = columns.Integer()
+                text = columns.Text(required=False)
 
     def test_value_managers_are_keeping_model_instances_isolated(self):
         """
@@ -102,7 +123,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         class Stuff(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             num = columns.Integer()
 
         inst1 = Stuff(num=5)
@@ -118,7 +139,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """
         class TestModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
         class InheritedModel(TestModel):
@@ -131,7 +152,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """ Tests that auto column family name generation works as expected """
         class TestModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             text = columns.Text()
 
         assert TestModel.column_family_name(include_keyspace=False) == 'test_model'
@@ -164,7 +185,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         """ Tests that columns that can be deleted have the del attribute """
         class DelModel(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
             key = columns.Integer(primary_key=True)
             data = columns.Integer(required=False)
 
@@ -178,25 +199,25 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         class Model1(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         class Model2(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         try:
             raise Model1.DoesNotExist
         except Model2.DoesNotExist:
             assert False, "Model1 exception should not be caught by Model2"
         except Model1.DoesNotExist:
-            #expected
+            # expected
             pass
 
     def test_does_not_exist_inherits_from_superclass(self):
         """ Tests that a DoesNotExist exception can be caught by it's parent class DoesNotExist """
         class Model1(Model):
 
-            id  = columns.UUID(primary_key=True, default=lambda:uuid4())
+            id = columns.UUID(primary_key=True, default=lambda:uuid4())
 
         class Model2(Model1):
             pass
@@ -204,7 +225,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         try:
             raise Model2.DoesNotExist
         except Model1.DoesNotExist:
-            #expected
+            # expected
             pass
         except Exception:
             assert False, "Model2 exception should not be caught by Model1"
@@ -216,6 +237,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
                 key = columns.UUID(primary_key=True)
 
         self.assertEqual(len(warn), 0)
+
 
 class TestManualTableNaming(BaseCassEngTestCase):
 
@@ -230,6 +252,50 @@ class TestManualTableNaming(BaseCassEngTestCase):
         assert self.RenamedTest.column_family_name(include_keyspace=False) == 'manual_name'
         assert self.RenamedTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'
 
+
+class TestManualTableNamingCaseSensitive(BaseCassEngTestCase):
+
+    class RenamedCaseInsensitiveTest(Model):
+        __keyspace__ = 'whatever'
+        __table_name__ = 'Manual_Name'
+
+        id = columns.UUID(primary_key=True)
+
+    class RenamedCaseSensitiveTest(Model):
+        __keyspace__ = 'whatever'
+        __table_name__ = 'Manual_Name'
+        __table_name_case_sensitive__ = True
+
+        id = columns.UUID(primary_key=True)
+
+    def test_proper_table_naming_case_insensitive(self):
+        """
+        Test to ensure case senstivity is not honored by default honored
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_names arel lowercase
+
+        @test_category object_mapper
+        """
+        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=False), 'manual_name')
+        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=True), 'whatever.manual_name')
+
+    def test_proper_table_naming_case_sensitive(self):
+        """
+        Test to ensure case is honored when the flag is correctly set.
+
+        @since 3.1
+        @jira_ticket PYTHON-337
+        @expected_result table_name case is honored.
+
+        @test_category object_mapper
+        """
+
+        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=False), '"Manual_Name"')
+        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True), 'whatever."Manual_Name"')
+
+
 class AbstractModel(Model):
     __abstract__ = True
 
@@ -238,19 +304,23 @@ class ConcreteModel(AbstractModel):
     pkey = columns.Integer(primary_key=True)
     data = columns.Integer()
 
+
 class AbstractModelWithCol(Model):
 
     __abstract__ = True
     pkey = columns.Integer(primary_key=True)
 
+
 class ConcreteModelWithCol(AbstractModelWithCol):
     data = columns.Integer()
+
 
 class AbstractModelWithFullCols(Model):
     __abstract__ = True
 
     pkey = columns.Integer(primary_key=True)
     data = columns.Integer()
+
 
 class TestAbstractModelClasses(BaseCassEngTestCase):
 

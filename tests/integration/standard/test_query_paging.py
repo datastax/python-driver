@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ class QueryPagingTests(unittest.TestCase):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
-        self.session = self.cluster.connect()
+        self.session = self.cluster.connect(wait_for_all_pools=True)
         self.session.execute("TRUNCATE test3rf.test")
 
     def tearDown(self):
@@ -68,6 +68,34 @@ class QueryPagingTests(unittest.TestCase):
             self.assertEqual(100, len(list(self.session.execute(statement))))
 
             self.assertEqual(100, len(list(self.session.execute(prepared))))
+
+    def test_paging_state(self):
+        """
+        Test to validate paging state api
+        @since 3.7.0
+        @jira_ticket PYTHON-200
+        @expected_result paging state should returned should be accurate, and allow for queries to be resumed.
+
+        @test_category queries
+        """
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
+                                    [(i, ) for i in range(100)])
+        execute_concurrent(self.session, list(statements_and_params))
+
+        list_all_results = []
+        self.session.default_fetch_size = 3
+
+        result_set = self.session.execute("SELECT * FROM test3rf.test")
+        while(result_set.has_more_pages):
+            for row in result_set.current_rows:
+                self.assertNotIn(row, list_all_results)
+            list_all_results.extend(result_set.current_rows)
+            page_state = result_set.paging_state
+            result_set = self.session.execute("SELECT * FROM test3rf.test", paging_state=page_state)
+
+        if(len(result_set.current_rows) > 0):
+            list_all_results.append(result_set.current_rows)
+        self.assertEqual(len(list_all_results), 100)
 
     def test_paging_verify_writes(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
@@ -234,7 +262,7 @@ class QueryPagingTests(unittest.TestCase):
 
         for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
             self.session.default_fetch_size = fetch_size
-            future = self.session.execute_async("SELECT * FROM test3rf.test")
+            future = self.session.execute_async("SELECT * FROM test3rf.test", timeout=20)
 
             event = Event()
             counter = count()
@@ -257,7 +285,7 @@ class QueryPagingTests(unittest.TestCase):
             self.assertEqual(next(counter), 100)
 
             # simple statement
-            future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"))
+            future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"), timeout=20)
             event.clear()
             counter = count()
 
@@ -266,7 +294,7 @@ class QueryPagingTests(unittest.TestCase):
             self.assertEqual(next(counter), 100)
 
             # prepared statement
-            future = self.session.execute_async(prepared)
+            future = self.session.execute_async(prepared, timeout=20)
             event.clear()
             counter = count()
 

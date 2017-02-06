@@ -4,6 +4,7 @@ Helper module to populate a dummy Cassandra tables with data.
 
 from tests.integration.datatype_utils import PRIMITIVE_DATATYPES, get_sample
 
+
 def create_table_with_all_types(table_name, session, N):
     """
     Method that given a table_name and session construct a table that contains
@@ -45,7 +46,11 @@ def get_all_primitive_params(key):
     """
     params = [key]
     for datatype in PRIMITIVE_DATATYPES:
-        params.append(get_sample(datatype))
+        # Also test for empty strings
+        if key == 1 and datatype == 'ascii':
+            params.append('')
+        else:
+            params.append(get_sample(datatype))
     return params
 
 

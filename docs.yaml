@@ -1,0 +1,21 @@
+title: DataStax Python Driver for Apache Cassandra
+summary: DataStax Python Driver for Apache Cassandra Documentation
+output: docs/_build/
+checks:
+  external_links:
+    exclude:
+    - 'http://aka.ms/vcpython27'
+sections:
+  - title: N/A
+    prefix: /
+    type: sphinx
+    directory: docs
+versions:
+  - name: 3.7
+    ref: 3.7-doc
+  - name: 3.6
+    ref: 3.6-doc
+  - name: 3.5
+    ref: 3.5-doc
+-redirects:
+-  - \A\/(.*)/\Z: /\1.html

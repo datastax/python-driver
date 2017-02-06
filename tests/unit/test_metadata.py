@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,18 +17,23 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from binascii import unhexlify
 from mock import Mock
 import os
 import six
+import timeit
 
 import cassandra
+from cassandra.marshal import uint16_unpack, uint16_pack
 from cassandra.metadata import (Murmur3Token, MD5Token,
                                 BytesToken, ReplicationStrategy,
                                 NetworkTopologyStrategy, SimpleStrategy,
                                 LocalStrategy, protect_name,
                                 protect_names, protect_value, is_valid_name,
                                 UserType, KeyspaceMetadata, get_schema_parser,
-                                _UnknownStrategy)
+                                _UnknownStrategy, ColumnMetadata, TableMetadata,
+                                IndexMetadata, Function, Aggregate,
+                                Metadata)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -110,6 +115,45 @@ class StrategiesTest(unittest.TestCase):
         replica_map = nts.make_token_replica_map(token_to_host_owner, ring)
 
         self.assertItemsEqual(replica_map[MD5Token(0)], (dc1_1, dc1_2, dc2_1, dc2_2, dc3_1))
+
+    def test_nts_token_performance(self):
+        """
+        Tests to ensure that when rf exceeds the number of nodes available, that we dont'
+        needlessly iterate trying to construct tokens for nodes that don't exist.
+
+        @since 3.7
+        @jira_ticket PYTHON-379
+        @expected_result timing with 1500 rf should be same/similar to 3rf if we have 3 nodes
+
+        @test_category metadata
+        """
+
+        token_to_host_owner = {}
+        ring = []
+        dc1hostnum = 3
+        current_token = 0
+        vnodes_per_host = 500
+        for i in range(dc1hostnum):
+
+            host = Host('dc1.{0}'.format(i), SimpleConvictionPolicy)
+            host.set_location_info('dc1', "rack1")
+            for vnode_num in range(vnodes_per_host):
+                md5_token = MD5Token(current_token+vnode_num)
+                token_to_host_owner[md5_token] = host
+                ring.append(md5_token)
+            current_token += 1000
+
+        nts = NetworkTopologyStrategy({'dc1': 3})
+        start_time = timeit.default_timer()
+        nts.make_token_replica_map(token_to_host_owner, ring)
+        elapsed_base = timeit.default_timer() - start_time
+
+        nts = NetworkTopologyStrategy({'dc1': 1500})
+        start_time = timeit.default_timer()
+        nts.make_token_replica_map(token_to_host_owner, ring)
+        elapsed_bad = timeit.default_timer() - start_time
+        difference = elapsed_bad - elapsed_base
+        self.assertTrue(difference < 1 and difference > -1)
 
     def test_nts_make_token_replica_map_multi_rack(self):
         token_to_host_owner = {}
@@ -309,17 +353,32 @@ class MD5TokensTest(unittest.TestCase):
 class BytesTokensTest(unittest.TestCase):
 
     def test_bytes_tokens(self):
-        bytes_token = BytesToken(str(cassandra.metadata.MIN_LONG - 1))
+        bytes_token = BytesToken(unhexlify(six.b('01')))
+        self.assertEqual(bytes_token.value, six.b('\x01'))
+        self.assertEqual(str(bytes_token), "<BytesToken: %s>" % bytes_token.value)
         self.assertEqual(bytes_token.hash_fn('123'), '123')
         self.assertEqual(bytes_token.hash_fn(123), 123)
         self.assertEqual(bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)), str(cassandra.metadata.MAX_LONG))
-        self.assertEqual(str(bytes_token), "<BytesToken: -9223372036854775809>")
 
-        try:
-            bytes_token = BytesToken(cassandra.metadata.MIN_LONG - 1)
-            self.fail('Tokens for ByteOrderedPartitioner should be only strings')
-        except TypeError:
-            pass
+    def test_from_string(self):
+        from_unicode = BytesToken.from_string(six.text_type('0123456789abcdef'))
+        from_bin = BytesToken.from_string(six.b('0123456789abcdef'))
+        self.assertEqual(from_unicode, from_bin)
+        self.assertIsInstance(from_unicode.value, six.binary_type)
+        self.assertIsInstance(from_bin.value, six.binary_type)
+
+    def test_comparison(self):
+        tok = BytesToken.from_string(six.text_type('0123456789abcdef'))
+        token_high_order = uint16_unpack(tok.value[0:2])
+        self.assertLess(BytesToken(uint16_pack(token_high_order - 1)), tok)
+        self.assertGreater(BytesToken(uint16_pack(token_high_order + 1)), tok)
+
+    def test_comparison_unicode(self):
+        value = six.b('\'_-()"\xc2\xac')
+        t0 = BytesToken(value)
+        t1 = BytesToken.from_string('00')
+        self.assertGreater(t0, t1)
+        self.assertFalse(t0 < t1)
 
 
 class KeyspaceMetadataTest(unittest.TestCase):
@@ -380,9 +439,7 @@ class IndexTest(unittest.TestCase):
         column_meta.table.name = 'table_name_here'
         column_meta.table.keyspace_name = 'keyspace_name_here'
         column_meta.table.columns = {column_meta.name: column_meta}
-        connection = Mock()
-        connection.server_version = '2.1.0'
-        parser = get_schema_parser(connection, 0.1)
+        parser = get_schema_parser(Mock(), '2.1.0', 0.1)
 
         row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
         index_meta = parser._build_index_metadata(column_meta, row)
@@ -394,3 +451,85 @@ class IndexTest(unittest.TestCase):
         index_meta = parser._build_index_metadata(column_meta, row)
         self.assertEqual(index_meta.as_cql_query(),
                 "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'")
+
+
+class UnicodeIdentifiersTests(unittest.TestCase):
+    """
+    Exercise cql generation with unicode characters. Keyspace, Table, and Index names
+    cannot have special chars because C* names files by those identifiers, but they are
+    tested anyway.
+
+    Looking for encoding errors like PYTHON-447
+    """
+
+    name = six.text_type(b'\'_-()"\xc2\xac'.decode('utf-8'))
+
+    def test_keyspace_name(self):
+        km = KeyspaceMetadata(self.name, False, 'SimpleStrategy', {'replication_factor': 1})
+        km.export_as_string()
+
+    def test_table_name(self):
+        tm = TableMetadata(self.name, self.name)
+        tm.export_as_string()
+
+    def test_column_name_single_partition(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        tm.export_as_string()
+
+    def test_column_name_single_partition_single_clustering(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        cm = ColumnMetadata(tm, self.name + 'x', u'int')
+        tm.columns[cm.name] = cm
+        tm.clustering_key.append(cm)
+        tm.export_as_string()
+
+    def test_column_name_multiple_partition(self):
+        tm = TableMetadata('ks', 'table')
+        cm = ColumnMetadata(tm, self.name, u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        cm = ColumnMetadata(tm, self.name + 'x', u'int')
+        tm.columns[cm.name] = cm
+        tm.partition_key.append(cm)
+        tm.export_as_string()
+
+    def test_index(self):
+        im = IndexMetadata(self.name, self.name, self.name, kind='', index_options={'target': self.name})
+        im.export_as_string()
+        im = IndexMetadata(self.name, self.name, self.name, kind='CUSTOM', index_options={'target': self.name, 'class_name': 'Class'})
+        im.export_as_string()
+
+    def test_function(self):
+        fm = Function(self.name, self.name, (u'int', u'int'), (u'x', u'y'), u'int', u'language', self.name, False)
+        fm.export_as_string()
+
+    def test_aggregate(self):
+        am = Aggregate(self.name, self.name, (u'text',), self.name, u'text', self.name, self.name, u'text')
+        am.export_as_string()
+
+    def test_user_type(self):
+        um = UserType(self.name, self.name, [self.name, self.name], [u'int', u'text'])
+        um.export_as_string()
+
+
+class HostsTests(unittest.TestCase):
+    def test_iterate_all_hosts_and_modify(self):
+        """
+        PYTHON-572
+        """
+        metadata = Metadata()
+        metadata.add_or_return_host(Host('dc1.1', SimpleConvictionPolicy))
+        metadata.add_or_return_host(Host('dc1.2', SimpleConvictionPolicy))
+
+        self.assertEqual(len(metadata.all_hosts()), 2)
+
+        for host in metadata.all_hosts():  # this would previously raise in Py3
+            metadata.remove_host(host)
+
+        self.assertEqual(len(metadata.all_hosts()), 0)

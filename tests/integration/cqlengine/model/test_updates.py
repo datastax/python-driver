@@ -1,4 +1,4 @@
-# Copyright 2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,8 +79,8 @@ class ModelUpdateTests(BaseCassEngTestCase):
         self.assertEqual(m2.count, m1.count)
         self.assertEqual(m2.text, m0.text)
 
-    def test_noop_model_update(self):
-        """ tests that calling update on a model with no changes will do nothing. """
+    def test_noop_model_direct_update(self):
+        """ Tests that calling update on a model with no changes will do nothing. """
         m0 = TestUpdateModel.create(count=5, text='monkey')
 
         with patch.object(self.session, 'execute') as execute:
@@ -89,6 +89,38 @@ class ModelUpdateTests(BaseCassEngTestCase):
 
         with patch.object(self.session, 'execute') as execute:
             m0.update(count=5)
+        assert execute.call_count == 0
+
+        with self.assertRaises(ValidationError):
+            m0.update(partition=m0.partition)
+
+        with self.assertRaises(ValidationError):
+            m0.update(cluster=m0.cluster)
+
+    def test_noop_model_assignation_update(self):
+        """ Tests that assigning the same value on a model will do nothing. """
+        # Create object and fetch it back to eliminate any hidden variable
+        # cache effect.
+        m0 = TestUpdateModel.create(count=5, text='monkey')
+        m1 = TestUpdateModel.get(partition=m0.partition, cluster=m0.cluster)
+
+        with patch.object(self.session, 'execute') as execute:
+            m1.save()
+        assert execute.call_count == 0
+
+        with patch.object(self.session, 'execute') as execute:
+            m1.count = 5
+            m1.save()
+        assert execute.call_count == 0
+
+        with patch.object(self.session, 'execute') as execute:
+            m1.partition = m0.partition
+            m1.save()
+        assert execute.call_count == 0
+
+        with patch.object(self.session, 'execute') as execute:
+            m1.cluster = m0.cluster
+            m1.save()
         assert execute.call_count == 0
 
     def test_invalid_update_kwarg(self):

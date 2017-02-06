@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -746,7 +746,7 @@ class OrderedMap(Mapping):
             ...
         )
 
-    This class dervies from the (immutable) Mapping API. Objects in these maps
+    This class derives from the (immutable) Mapping API. Objects in these maps
     are not intended be modified.
 
     \* Note: Because of the way Cassandra encodes nested types, when using the
@@ -782,10 +782,21 @@ class OrderedMap(Mapping):
             self._items.append((key, value))
             self._index[flat_key] = len(self._items) - 1
 
+    __setitem__ = _insert
+
     def __getitem__(self, key):
         try:
             index = self._index[self._serialize_key(key)]
             return self._items[index][1]
+        except KeyError:
+            raise KeyError(str(key))
+
+    def __delitem__(self, key):
+        # not efficient -- for convenience only
+        try:
+            index = self._index.pop(self._serialize_key(key))
+            self._index = dict((k, i if i < index else i - 1) for k, i in self._index.items())
+            self._items.pop(index)
         except KeyError:
             raise KeyError(str(key))
 
@@ -913,6 +924,13 @@ class Time(object):
         """
         return self.nanosecond_time % Time.SECOND
 
+    def time(self):
+        """
+        Return a built-in datetime.time (nanosecond precision truncated to micros).
+        """
+        return datetime.time(hour=self.hour, minute=self.minute, second=self.second,
+                             microsecond=self.nanosecond // Time.MICRO)
+
     def _from_timestamp(self, t):
         if t >= Time.DAY:
             raise ValueError("value must be less than number of nanoseconds in a day (%d)" % Time.DAY)
@@ -955,6 +973,8 @@ class Time(object):
                           microsecond=self.nanosecond // Time.MICRO) == other
 
     def __lt__(self, other):
+        if not isinstance(other, Time):
+            return NotImplemented
         return self.nanosecond_time < other.nanosecond_time
 
     def __repr__(self):
@@ -1043,6 +1063,8 @@ class Date(object):
             return False
 
     def __lt__(self, other):
+        if not isinstance(other, Date):
+            return NotImplemented
         return self.days_from_epoch < other.days_from_epoch
 
     def __repr__(self):
@@ -1090,7 +1112,7 @@ else:
         WSAAddressToStringA = ctypes.windll.ws2_32.WSAAddressToStringA
     else:
         def not_windows(*args):
-            raise Exception("IPv6 addresses cannot be handled on Windows. "
+            raise OSError("IPv6 addresses cannot be handled on Windows. "
                             "Missing ctypes.windll")
         WSAStringToAddressA = not_windows
         WSAAddressToStringA = not_windows
@@ -1160,3 +1182,44 @@ def _positional_rename_invalid_identifiers(field_names):
             or name.startswith('_')):
             names_out[index] = 'field_%d_' % index
     return names_out
+
+
+def _sanitize_identifiers(field_names):
+    names_out = _positional_rename_invalid_identifiers(field_names)
+    if len(names_out) != len(set(names_out)):
+        observed_names = set()
+        for index, name in enumerate(names_out):
+            while names_out[index] in observed_names:
+                names_out[index] = "%s_" % (names_out[index],)
+            observed_names.add(names_out[index])
+    return names_out
+
+
+class Duration(object):
+    """
+    Cassandra Duration Type
+    """
+
+    months = 0
+    days = 0
+    nanoseconds = 0
+
+    def __init__(self, months=0, days=0, nanoseconds=0):
+        self.months = months
+        self.days = days
+        self.nanoseconds = nanoseconds
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.months == other.months and self.days == other.days and self.nanoseconds == other.nanoseconds
+
+    def __repr__(self):
+        return "Duration({0}, {1}, {2})".format(self.months, self.days, self.nanoseconds)
+
+    def __str__(self):
+        has_negative_values = self.months < 0 or self.days < 0 or self.nanoseconds < 0
+        return '%s%dmo%dd%dns' % (
+            '-' if has_negative_values else '',
+            abs(self.months),
+            abs(self.days),
+            abs(self.nanoseconds)
+        )

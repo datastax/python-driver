@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                uint16_pack, uint16_unpack, uint32_pack, uint32_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
-                               varint_pack, varint_unpack)
+                               varint_pack, varint_unpack, vints_pack, vints_unpack)
 from cassandra import util
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
@@ -77,6 +77,7 @@ def trim_if_startswith(s, prefix):
 
 
 _casstypes = {}
+_cqltypes = {}
 
 
 cql_type_scanner = re.Scanner((
@@ -106,6 +107,8 @@ class CassandraTypeType(type):
         cls = type.__new__(metacls, name, bases, dct)
         if not name.startswith('_'):
             _casstypes[name] = cls
+            if not cls.typename.startswith(apache_cassandra_type_prefix):
+                _cqltypes[cls.typename] = cls
         return cls
 
 
@@ -173,7 +176,7 @@ def lookup_casstype(casstype):
     Example:
 
         >>> lookup_casstype('org.apache.cassandra.db.marshal.MapType(org.apache.cassandra.db.marshal.UTF8Type,org.apache.cassandra.db.marshal.Int32Type)')
-        <class 'cassandra.types.MapType(UTF8Type, Int32Type)'>
+        <class 'cassandra.cqltypes.MapType(UTF8Type, Int32Type)'>
 
     """
     if isinstance(casstype, (CassandraType, CassandraTypeType)):
@@ -293,7 +296,7 @@ class _CassandraType(object):
         using them as parameters. This is how composite types are constructed.
 
             >>> MapType.apply_parameters([DateType, BooleanType])
-            <class 'cassandra.types.MapType(DateType, BooleanType)'>
+            <class 'cassandra.cqltypes.MapType(DateType, BooleanType)'>
 
         `subtypes` will be a sequence of CassandraTypes.  If provided, `names`
         will be an equally long sequence of column names or Nones.
@@ -369,7 +372,10 @@ class DecimalType(_CassandraType):
         try:
             sign, digits, exponent = dec.as_tuple()
         except AttributeError:
-            raise TypeError("Non-Decimal type received for Decimal value")
+            try:
+                sign, digits, exponent = Decimal(dec).as_tuple()
+            except Exception:
+                raise TypeError("Invalid type for Decimal value: %r", dec)
         unscaled = int(''.join([str(digit) for digit in digits]))
         if sign:
             unscaled *= -1
@@ -617,6 +623,11 @@ class SimpleDateType(_CassandraType):
         try:
             days = val.days_from_epoch
         except AttributeError:
+            if isinstance(val, six.integer_types):
+                # the DB wants offset int values, but util.Date init takes days from epoch
+                # here we assume int values are offset, as they would appear in CQL
+                # short circuit to avoid subtracting just to add offset
+                return uint32_pack(val)
             days = util.Date(val).days_from_epoch
         return uint32_pack(days + SimpleDateType.EPOCH_OFFSET_DAYS)
 
@@ -649,6 +660,23 @@ class TimeType(_CassandraType):
         return int64_pack(nano)
 
 
+class DurationType(_CassandraType):
+    typename = 'duration'
+
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        months, days, nanoseconds = vints_unpack(byts)
+        return util.Duration(months, days, nanoseconds)
+
+    @staticmethod
+    def serialize(duration, protocol_version):
+        try:
+            m, d, n = duration.months, duration.days, duration.nanoseconds
+        except AttributeError:
+            raise TypeError('DurationType arguments must be a Duration.')
+        return vints_pack([m, d, n])
+
+
 class UTF8Type(_CassandraType):
     typename = 'text'
     empty_binary_ok = True
@@ -671,6 +699,8 @@ class VarcharType(UTF8Type):
 
 
 class _ParameterizedType(_CassandraType):
+    num_subtypes = 'UNKNOWN'
+
     @classmethod
     def deserialize(cls, byts, protocol_version):
         if not cls.subtypes:
@@ -791,7 +821,6 @@ class MapType(_ParameterizedType):
 
 class TupleType(_ParameterizedType):
     typename = 'tuple'
-    num_subtypes = 'UNKNOWN'
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
@@ -842,7 +871,7 @@ class TupleType(_ParameterizedType):
 
 
 class UserType(TupleType):
-    typename = "'org.apache.cassandra.db.marshal.UserType'"
+    typename = "org.apache.cassandra.db.marshal.UserType"
 
     _cache = {}
     _module = sys.modules[__name__]
@@ -945,8 +974,7 @@ class UserType(TupleType):
 
 
 class CompositeType(_ParameterizedType):
-    typename = "'org.apache.cassandra.db.marshal.CompositeType'"
-    num_subtypes = 'UNKNOWN'
+    typename = "org.apache.cassandra.db.marshal.CompositeType"
 
     @classmethod
     def cql_parameterized_type(cls):
@@ -974,8 +1002,13 @@ class CompositeType(_ParameterizedType):
         return tuple(result)
 
 
-class DynamicCompositeType(CompositeType):
-    typename = "'org.apache.cassandra.db.marshal.DynamicCompositeType'"
+class DynamicCompositeType(_ParameterizedType):
+    typename = "org.apache.cassandra.db.marshal.DynamicCompositeType"
+
+    @classmethod
+    def cql_parameterized_type(cls):
+        sublist = ', '.join('%s=>%s' % (alias, typ.cass_parameterized_type(full=True)) for alias, typ in zip(cls.fieldnames, cls.subtypes))
+        return "'%s(%s)'" % (cls.typename, sublist)
 
 
 class ColumnToCollectionType(_ParameterizedType):
@@ -984,18 +1017,17 @@ class ColumnToCollectionType(_ParameterizedType):
     Cassandra includes this. We don't actually need or want the extra
     information.
     """
-    typename = "'org.apache.cassandra.db.marshal.ColumnToCollectionType'"
-    num_subtypes = 'UNKNOWN'
+    typename = "org.apache.cassandra.db.marshal.ColumnToCollectionType"
 
 
 class ReversedType(_ParameterizedType):
-    typename = "'org.apache.cassandra.db.marshal.ReversedType'"
+    typename = "org.apache.cassandra.db.marshal.ReversedType"
     num_subtypes = 1
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
         subtype, = cls.subtypes
-        return subtype.from_binary(byts)
+        return subtype.from_binary(byts, protocol_version)
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):
@@ -1010,7 +1042,7 @@ class FrozenType(_ParameterizedType):
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
         subtype, = cls.subtypes
-        return subtype.from_binary(byts)
+        return subtype.from_binary(byts, protocol_version)
 
     @classmethod
     def serialize_safe(cls, val, protocol_version):

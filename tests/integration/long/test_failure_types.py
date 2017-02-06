@@ -1,4 +1,4 @@
-# Copyright 2013-2015 DataStax, Inc.
+# Copyright 2013-2016 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
 
 import sys,logging, traceback, time
 
-from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,\
-    FunctionFailure
-from cassandra.cluster import Cluster
+from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
+                       FunctionFailure, ProtocolVersion)
+from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node
@@ -63,14 +63,20 @@ class ClientExceptionTests(unittest.TestCase):
         """
         Test is skipped if run with native protocol version <4
         """
-
+        self.support_v5 = True
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest(
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
+        try:
+            self.cluster = Cluster(protocol_version=ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=True)
+            self.session = self.cluster.connect()
+        except NoHostAvailable:
+            log.info("Protocol Version 5 not supported,")
+            self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+            self.session = self.cluster.connect()
+            self.support_v5 = False
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
         self.nodes_currently_failing = []
         self.node1, self.node2, self.node3 = get_cluster().nodes.values()
 
@@ -132,21 +138,28 @@ class ClientExceptionTests(unittest.TestCase):
                 node.start(wait_for_binary_proto=True, wait_other_notice=True)
                 self.nodes_currently_failing.remove(node)
 
-    def _perform_cql_statement(self, text, consistency_level, expected_exception):
+    def _perform_cql_statement(self, text, consistency_level, expected_exception, session=None):
         """
         Simple helper method to preform cql statements and check for expected exception
         @param text CQl statement to execute
         @param consistency_level Consistency level at which it is to be executed
         @param expected_exception Exception expected to be throw or none
         """
+        if session is None:
+            session = self.session
         statement = SimpleStatement(text)
         statement.consistency_level = consistency_level
 
         if expected_exception is None:
-            self.execute_helper(self.session, statement)
+            self.execute_helper(session, statement)
         else:
-            with self.assertRaises(expected_exception):
-                self.execute_helper(self.session, statement)
+            with self.assertRaises(expected_exception) as cm:
+                self.execute_helper(session, statement)
+            if self.support_v5 and (isinstance(cm.exception, WriteFailure) or isinstance(cm.exception, ReadFailure)):
+                if isinstance(cm.exception, ReadFailure):
+                    self.assertEqual(cm.exception.error_code_map.values()[0], 1)
+                else:
+                    self.assertEqual(cm.exception.error_code_map.values()[0], 0)
 
     def test_write_failures_from_coordinator(self):
         """
@@ -157,8 +170,8 @@ class ClientExceptionTests(unittest.TestCase):
         factor of the keyspace, and the consistency level, we will expect the coordinator to send WriteFailure, or not.
 
 
-        @since 2.6.0
-        @jira_ticket PYTHON-238
+        @since 2.6.0, 3.7.0
+        @jira_ticket PYTHON-238, PYTHON-619
         @expected_result Appropriate write failures from the coordinator
 
         @test_category queries:basic
@@ -217,8 +230,8 @@ class ClientExceptionTests(unittest.TestCase):
         from the coordinator.
 
 
-        @since 2.6.0
-        @jira_ticket PYTHON-238
+        @since 2.6.0, 3.7.0
+        @jira_ticket PYTHON-238, PYTHON-619
         @expected_result Appropriate write failures from the coordinator
 
         @test_category queries:basic
@@ -379,11 +392,3 @@ class TimeoutTimerTest(unittest.TestCase):
         self.assertAlmostEqual(expected_time, total_time, delta=.05)
         self.assertTrue(mock_errorback.called)
         self.assertFalse(mock_callback.called)
-
-
-
-
-
-
-
-
