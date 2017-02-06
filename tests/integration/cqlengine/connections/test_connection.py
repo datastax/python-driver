@@ -40,7 +40,7 @@ class ConnectionTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.original_cluster = connection.get_cluster()
+        connection.unregister_connection('default')
         cls.keyspace1 = 'ctest1'
         cls.keyspace2 = 'ctest2'
         super(ConnectionTest, cls).setUpClass()
@@ -56,7 +56,6 @@ class ConnectionTest(BaseCassEngTestCase):
         execute_with_long_wait_retry(cls.setup_session, "DROP KEYSPACE {0}".format(cls.keyspace1))
         execute_with_long_wait_retry(cls.setup_session, "DROP KEYSPACE {0}".format(cls.keyspace2))
         models.DEFAULT_KEYSPACE = DEFAULT_KEYSPACE
-        cls.original_cluster.shutdown()
         cls.setup_cluster.shutdown()
         setup_connection(DEFAULT_KEYSPACE)
         models.DEFAULT_KEYSPACE

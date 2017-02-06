@@ -271,6 +271,9 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
         self.assertTrue("appcluster" in scales._Stats.stats.keys())
         self.assertTrue("devops" in scales._Stats.stats.keys())
 
+        cluster2.shutdown()
+        cluster3.shutdown()
+
 
 class RequestAnalyzer(object):
     """

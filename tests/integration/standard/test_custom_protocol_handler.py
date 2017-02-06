@@ -62,7 +62,8 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
 
         # Ensure that we get normal uuid back first
-        session = Cluster(protocol_version=PROTOCOL_VERSION).connect(keyspace="custserdes")
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect(keyspace="custserdes")
         session.row_factory = tuple_factory
         result = session.execute("SELECT schema_version FROM system.local")
         uuid_type = result[0][0]
@@ -82,7 +83,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         result_set = session.execute("SELECT schema_version FROM system.local")
         uuid_type = result_set[0][0]
         self.assertEqual(type(uuid_type), uuid.UUID)
-        session.shutdown()
+        cluster.shutdown()
 
     def test_custom_raw_row_results_all_types(self):
         """
@@ -99,7 +100,8 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         @test_category data_types:serialization
         """
         # Connect using a custom protocol handler that tracks the various types the result message is used with.
-        session = Cluster(protocol_version=PROTOCOL_VERSION).connect(keyspace="custserdes")
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        session = cluster.connect(keyspace="custserdes")
         session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
         session.row_factory = tuple_factory
 
@@ -113,7 +115,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
         self.assertEqual(len(CustomResultMessageTracked.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
-        session.shutdown()
+        cluster.shutdown()
 
 
 class CustomResultMessageRaw(ResultMessage):

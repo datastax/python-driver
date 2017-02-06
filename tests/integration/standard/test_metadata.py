@@ -967,6 +967,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster.connect()
 
         self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
+        cluster.shutdown()
 
     def test_export_keyspace_schema(self):
         """
@@ -2114,6 +2115,9 @@ class BadMetaTest(unittest.TestCase):
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
         cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
+        cls.cluster.control_connection.reconnect = Mock()
+
+
 
     @classmethod
     def teardown_class(cls):

@@ -42,7 +42,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        drop_keyspace_shutdown_cluster("testspace", cls.session, cls.session)
+        drop_keyspace_shutdown_cluster("testspace", cls.session, cls.cluster)
 
     @cythontest
     def test_cython_parser(self):
@@ -188,7 +188,7 @@ def get_data(protocol_handler):
     session.row_factory = tuple_factory
 
     results = session.execute("SELECT * FROM test_table")
-    session.shutdown()
+    cluster.shutdown()
     return results
 
 

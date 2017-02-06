@@ -241,7 +241,8 @@ class ManagementConnectionTests(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        session = Cluster(['127.0.0.1']).connect()
+        cluster = Cluster(['127.0.0.1'])
+        session = cluster.connect()
         with self.assertRaises(CQLEngineException):
             conn.register_connection("bad_coonection1", session=session, consistency="not_null")
         with self.assertRaises(CQLEngineException):
@@ -252,6 +253,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
             conn.register_connection("bad_coonection4", session=session, cluster_options="not_null")
         with self.assertRaises(CQLEngineException):
             conn.register_connection("bad_coonection5", hosts="not_null", session=session)
+        cluster.shutdown()
 
 
 class BatchQueryConnectionTests(BaseCassEngTestCase):

@@ -291,7 +291,6 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
     @classmethod
     def tearDownClass(cls):
         models.DEFAULT_KEYSPACE = cls.default_keyspace
-        setup_connection(models.DEFAULT_KEYSPACE)
         super(TestNamedWithMV, cls).tearDownClass()
 
     @greaterthanorequalcass30
