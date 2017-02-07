@@ -818,7 +818,7 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2,-1)
 
     def test_schedule_no_max(self):
-        base_delay = 2
+        base_delay = 2.0
         max_delay = 100
         test_iter = 10000
         policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=None)

@@ -556,8 +556,13 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
 
     def new_schedule(self):
         i = 0
+        delay = self.base_delay
         while self.max_attempts is None or i < self.max_attempts:
-            yield min(self.base_delay * (2 ** i), self.max_delay)
+            if delay > self.max_delay:
+                yield self.max_delay
+            else: 
+                yield delay
+                delay = delay * 2
             i += 1
 
 
