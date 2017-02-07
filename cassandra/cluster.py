@@ -117,6 +117,7 @@ DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 
 _NOT_SET = object()
+_CANCELLED = object()
 
 
 class NoHostAvailable(Exception):
@@ -3285,20 +3286,25 @@ class ResponseFuture(object):
         self._errbacks = []
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
+        self._timer_lock = Lock()
 
     def _start_timer(self):
-        if self._timer is None:
-            spec_delay = self._spec_execution_plan.next_execution(self._current_host)
-            if spec_delay >= 0:
-                if self._time_remaining is None or self._time_remaining > spec_delay:
-                    self._timer = self.session.cluster.connection_class.create_timer(spec_delay, self._on_speculative_execute)
-                    return
-            if self._time_remaining is not None:
-                self._timer = self.session.cluster.connection_class.create_timer(self._time_remaining, self._on_timeout)
+        with self._timer_lock:
+            if self._timer is None and self._timer is not _CANCELLED:
+                spec_delay = self._spec_execution_plan.next_execution(self._current_host)
+                if spec_delay >= 0:
+                    if self._time_remaining is None or self._time_remaining > spec_delay:
+                        self._timer = self.session.cluster.connection_class.create_timer(spec_delay, self._on_speculative_execute)
+                        return
+                if self._time_remaining is not None:
+                    self._timer = self.session.cluster.connection_class.create_timer(self._time_remaining, self._on_timeout)
 
     def _cancel_timer(self):
-        if self._timer:
-            self._timer.cancel()
+        with self._timer_lock:
+            if self._timer is not None and self._timer is not _CANCELLED:
+                self._timer.cancel()
+            else:
+                self._timer = _CANCELLED
 
     def _on_timeout(self):
         errors = self._errors
@@ -3313,16 +3319,19 @@ class ResponseFuture(object):
         self._set_final_exception(OperationTimedOut(errors, self._current_host))
 
     def _on_speculative_execute(self):
-        self._timer = None
-        if not self._event.is_set():
-            if self._time_remaining is not None:
-                elapsed = time.time() - self._start_time
-                self._time_remaining -= elapsed
-                if self._time_remaining <= 0:
-                    self._on_timeout()
-                    return
-            if not self.send_request(error_no_hosts=False):
-                self._start_timer()
+        with self._timer_lock:
+            if self._timer is _CANCELLED:
+                return
+            self._timer = None
+            if not self._event.is_set():
+                if self._time_remaining is not None:
+                    elapsed = time.time() - self._start_time
+                    self._time_remaining -= elapsed
+                    if self._time_remaining <= 0:
+                        self._on_timeout()
+                        return
+                if not self.send_request(error_no_hosts=False):
+                    self._start_timer()
 
 
     def _make_query_plan(self):
