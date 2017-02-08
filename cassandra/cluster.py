@@ -3285,6 +3285,7 @@ class ResponseFuture(object):
         self._errbacks = []
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
+        self._start_timer()
 
     def _start_timer(self):
         if self._timer is None:
@@ -3339,11 +3340,6 @@ class ResponseFuture(object):
             req_id = self._query(host)
             if req_id is not None:
                 self._req_id = req_id
-
-                # timer is only started here, after we have at least one message queued
-                # this is done to avoid overrun of timers with unfettered client requests
-                # in the case of full disconnect, where no hosts will be available
-                self._start_timer()
                 return True
             if self.timeout is not None and time.time() - self._start_time > self.timeout:
                 self._on_timeout()
@@ -3462,7 +3458,7 @@ class ResponseFuture(object):
         self._event.clear()
         self._final_result = _NOT_SET
         self._final_exception = None
-        self._timer = None  # clear cancelled timer; new one will be set when request is queued
+        self._start_timer()
         self.send_request()
 
     def _reprepare(self, prepare_message, host, connection, pool):
@@ -3620,6 +3616,7 @@ class ResponseFuture(object):
                 # we got some other kind of response message
                 msg = "Got unexpected message: %r" % (response,)
                 exc = ConnectionException(msg, host)
+                self._cancel_timer()
                 self._connection.defunct(exc)
                 self._set_final_exception(exc)
         except Exception as exc:
