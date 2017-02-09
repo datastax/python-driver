@@ -533,25 +533,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         keyspace = 'test_token_aware_with_rf_2'
         cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=2)
 
-        LIMIT_TRIES = 20
-        previous_query_count_two, previous_query_count_three = None, None
-        for _ in range(LIMIT_TRIES):
-            self._insert(session, keyspace)
-            self._query(session, keyspace)
-
-            self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-            query_count_two = self.coordinator_stats.get_query_count(2)
-            query_count_three = self.coordinator_stats.get_query_count(3)
-            self.assertEqual(query_count_two + query_count_three, 12)
-            self.coordinator_stats.reset_counts()
-
-            if previous_query_count_two is not None:
-                if query_count_two != previous_query_count_two or query_count_three != previous_query_count_three:
-                    break
-            previous_query_count_two, previous_query_count_three = query_count_two, query_count_three
-            self.coordinator_stats.reset_counts()
-        else:
-            raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
+        self._check_different_query_order(session=session, keyspace=keyspace)
 
         #check TokenAwarePolicy still return the remaining replicas when one goes down
         self.coordinator_stats.reset_counts()
@@ -574,19 +556,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         create_schema(cluster, session, keyspace, replication_factor=replication_factor)
         return cluster, session
 
-    def test_token_aware_with_shuffle_rf3(self):
-        """
-        Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
-        @since 3.8
-        @jira_ticket PYTHON-676
-        @expected_result the request are spread across the replicas,
-        when one of them is down, the requests target the other avaiable ones
-
-        @test_category policy
-        """
-        keyspace = 'test_token_aware_with_rf_3'
-        cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=3)
-
+    def _check_different_query_order(self, session, keyspace):
         LIMIT_TRIES = 20
         previous_query_count_one, previous_query_count_two, previous_query_count_three = None, None, None
         for _ in range(LIMIT_TRIES):
@@ -608,6 +578,21 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.coordinator_stats.reset_counts()
         else:
             raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
+
+    def test_token_aware_with_shuffle_rf3(self):
+        """
+        Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
+        @since 3.8
+        @jira_ticket PYTHON-676
+        @expected_result the request are spread across the replicas,
+        when one of them is down, the requests target the other avaiable ones
+
+        @test_category policy
+        """
+        keyspace = 'test_token_aware_with_rf_3'
+        cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=3)
+
+        self._check_different_query_order(session=session, keyspace=keyspace)
 
         # check TokenAwarePolicy still return the remaining replicas when one goes down
         self.coordinator_stats.reset_counts()
