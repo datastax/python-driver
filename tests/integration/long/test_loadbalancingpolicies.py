@@ -533,7 +533,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         keyspace = 'test_token_aware_with_rf_2'
         cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=2)
 
-        self._check_different_query_order(session=session, keyspace=keyspace)
+        self._check_query_order_changes(session=session, keyspace=keyspace)
 
         #check TokenAwarePolicy still return the remaining replicas when one goes down
         self.coordinator_stats.reset_counts()
@@ -556,7 +556,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         create_schema(cluster, session, keyspace, replication_factor=replication_factor)
         return cluster, session
 
-    def _check_different_query_order(self, session, keyspace):
+    def _check_query_order_changes(self, session, keyspace):
         LIMIT_TRIES = 20
 
         query_counts = set()
@@ -591,7 +591,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         keyspace = 'test_token_aware_with_rf_3'
         cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=3)
 
-        self._check_different_query_order(session=session, keyspace=keyspace)
+        self._check_query_order_changes(session=session, keyspace=keyspace)
 
         # check TokenAwarePolicy still return the remaining replicas when one goes down
         self.coordinator_stats.reset_counts()
