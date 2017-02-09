@@ -557,10 +557,13 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         return cluster, session
 
     def _check_query_order_changes(self, session, keyspace):
-        LIMIT_TRIES = 20
+        LIMIT_TRIES, tried, query_counts = 20, 0, set()
 
-        query_counts = set()
-        for _ in range(LIMIT_TRIES):
+        while len(query_counts) <= 1:
+            tried += 1
+            if tried >= LIMIT_TRIES:
+                raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
+
             self._insert(session, keyspace)
             self._query(session, keyspace)
 
@@ -572,11 +575,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.assertEqual(sum(loop_qcs), 12)
 
             # end the loop if we get more than one query ordering
-            if len(loop_qcs) > 1:
-                break
             self.coordinator_stats.reset_counts()
-        else:
-            raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
 
     def test_token_aware_with_shuffle_rf3(self):
         """
