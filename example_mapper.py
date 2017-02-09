@@ -78,6 +78,9 @@ def main():
     except LWTException:
         print "precondition not met"
 
+    log.info("### setting individual column to NULL by updating it to None")
+    nick.update(birth_year=None)
+
     # showing validation
     try:
         FamilyMembers.create(id=simmons.id, surname='Tweed', name='Shannon', birth_year=1957, sex='f')
