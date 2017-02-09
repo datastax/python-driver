@@ -548,37 +548,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         cluster.shutdown()
 
-    def _set_up_shuffle_test(self, keyspace, replication_factor):
-        use_singledc()
-        cluster, session = self._cluster_session_with_lbp(
-            TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True)
-        )
-        self._wait_for_nodes_up(range(1, 4), cluster)
-
-        create_schema(cluster, session, keyspace, replication_factor=replication_factor)
-        return cluster, session
-
-    def _check_query_order_changes(self, session, keyspace):
-        LIMIT_TRIES, tried, query_counts = 20, 0, set()
-
-        while len(query_counts) <= 1:
-            tried += 1
-            if tried >= LIMIT_TRIES:
-                raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
-
-            self._insert(session, keyspace)
-            self._query(session, keyspace)
-
-            loop_qcs = (self.coordinator_stats.get_query_count(1),
-                        self.coordinator_stats.get_query_count(2),
-                        self.coordinator_stats.get_query_count(3))
-
-            query_counts.add(loop_qcs)
-            self.assertEqual(sum(loop_qcs), 12)
-
-            # end the loop if we get more than one query ordering
-            self.coordinator_stats.reset_counts()
-
     def test_token_aware_with_shuffle_rf3(self):
         """
         Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
@@ -617,6 +586,37 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
         cluster.shutdown()
+
+    def _set_up_shuffle_test(self, keyspace, replication_factor):
+        use_singledc()
+        cluster, session = self._cluster_session_with_lbp(
+            TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True)
+        )
+        self._wait_for_nodes_up(range(1, 4), cluster)
+
+        create_schema(cluster, session, keyspace, replication_factor=replication_factor)
+        return cluster, session
+
+    def _check_query_order_changes(self, session, keyspace):
+        LIMIT_TRIES, tried, query_counts = 20, 0, set()
+
+        while len(query_counts) <= 1:
+            tried += 1
+            if tried >= LIMIT_TRIES:
+                raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
+
+            self._insert(session, keyspace)
+            self._query(session, keyspace)
+
+            loop_qcs = (self.coordinator_stats.get_query_count(1),
+                        self.coordinator_stats.get_query_count(2),
+                        self.coordinator_stats.get_query_count(3))
+
+            query_counts.add(loop_qcs)
+            self.assertEqual(sum(loop_qcs), 12)
+
+            # end the loop if we get more than one query ordering
+            self.coordinator_stats.reset_counts()
 
     def test_white_list(self):
         use_singledc()
