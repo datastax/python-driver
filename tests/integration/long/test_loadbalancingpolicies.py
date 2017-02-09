@@ -530,12 +530,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         @test_category policy
         """
-        use_singledc()
         keyspace = 'test_token_aware_with_rf_2'
-        cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True))
-        self._wait_for_nodes_up(range(1, 4), cluster)
-
-        create_schema(cluster, session, keyspace, replication_factor=2)
+        cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=2)
 
         LIMIT_TRIES = 20
         previous_query_count_two, previous_query_count_three = None, None
@@ -570,6 +566,14 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         cluster.shutdown()
 
+    def _set_up_shuffle_test(self, keyspace, replication_factor):
+        use_singledc()
+        cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True))
+        self._wait_for_nodes_up(range(1, 4), cluster)
+
+        create_schema(cluster, session, keyspace, replication_factor=replication_factor)
+        return cluster, session
+
     def test_token_aware_with_shuffle_rf3(self):
         """
         Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
@@ -580,12 +584,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         @test_category policy
         """
-        use_singledc()
         keyspace = 'test_token_aware_with_rf_3'
-        cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True))
-        self._wait_for_nodes_up(range(1, 4), cluster)
-
-        create_schema(cluster, session, keyspace, replication_factor=3)
+        cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=3)
 
         LIMIT_TRIES = 20
         previous_query_count_one, previous_query_count_two, previous_query_count_three = None, None, None
