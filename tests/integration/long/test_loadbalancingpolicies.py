@@ -550,7 +550,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
     def _set_up_shuffle_test(self, keyspace, replication_factor):
         use_singledc()
-        cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True))
+        cluster, session = self._cluster_session_with_lbp(
+            TokenAwarePolicy(RoundRobinPolicy(), shuffle_replicas=True)
+        )
         self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=replication_factor)
