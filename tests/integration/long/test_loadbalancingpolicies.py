@@ -558,23 +558,22 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
     def _check_different_query_order(self, session, keyspace):
         LIMIT_TRIES = 20
-        previous_query_count_one, previous_query_count_two, previous_query_count_three = None, None, None
+
+        query_counts = set()
         for _ in range(LIMIT_TRIES):
             self._insert(session, keyspace)
             self._query(session, keyspace)
 
-            query_count_one = self.coordinator_stats.get_query_count(1)
-            query_count_two = self.coordinator_stats.get_query_count(2)
-            query_count_three = self.coordinator_stats.get_query_count(3)
-            self.assertEqual(query_count_one + query_count_two + query_count_three, 12)
+            loop_qcs = (self.coordinator_stats.get_query_count(1),
+                        self.coordinator_stats.get_query_count(2),
+                        self.coordinator_stats.get_query_count(3))
 
-            if previous_query_count_two is not None:
-                if query_count_one != previous_query_count_one \
-                        or query_count_two != previous_query_count_two \
-                        or query_count_three != previous_query_count_three:
-                    break
-            previous_query_count_one, previous_query_count_two, previous_query_count_three = \
-                query_count_one, query_count_two, query_count_three
+            query_counts.add(loop_qcs)
+            self.assertEqual(sum(loop_qcs), 12)
+
+            # end the loop if we get more than one query ordering
+            if len(loop_qcs) > 1:
+                break
             self.coordinator_stats.reset_counts()
         else:
             raise Exception("After {0} tries shuffle returned the same output".format(LIMIT_TRIES))
