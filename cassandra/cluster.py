@@ -3322,8 +3322,8 @@ class ResponseFuture(object):
                 if self._time_remaining <= 0:
                     self._on_timeout()
                     return
-            if not self.send_request(error_no_hosts=False):
-                self._start_timer()
+            self.send_request(error_no_hosts=False)
+            self._start_timer()
 
 
     def _make_query_plan(self):
