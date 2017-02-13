@@ -767,15 +767,6 @@ class TokenAwarePolicyTest(unittest.TestCase):
  
     @patch('cassandra.policies.shuffle')
     def _assert_shuffle(self, patched_shuffle, keyspace, routing_key):
-        """
-        Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
-        @since 3.8
-        @jira_ticket PYTHON-676
-        @expected_result shuffle should be called when the `shuffle_replicas` is truthy
-        if the keyspace and the routing key are set
-
-        @test_category policy
-        """
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
