@@ -172,7 +172,8 @@ def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
         log.warning("Registering connection '{0}' when it already exists.".format(name))
 
     if session is not None:
-        invalid_config_args = (consistency is not None or
+        invalid_config_args = (hosts is not None or
+                               consistency is not None or
                                lazy_connect is not False or
                                retry_connect is not False or
                                cluster_options is not None)
