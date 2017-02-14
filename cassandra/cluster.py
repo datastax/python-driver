@@ -69,6 +69,7 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
+from cassandra.timestamps import MonotonicTimestampGenerator
 
 
 def _is_eventlet_monkey_patched():
@@ -743,7 +744,8 @@ class Cluster(object):
                  prepare_on_all_hosts=True,
                  reprepare_on_up=True,
                  execution_profiles=None,
-                 allow_beta_protocol_version=False):
+                 allow_beta_protocol_version=False,
+                 timestamp_generator=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -801,6 +803,13 @@ class Cluster(object):
 
         if connection_class is not None:
             self.connection_class = connection_class
+
+        if timestamp_generator is not None:
+            if not callable(timestamp_generator):
+                raise ValueError("timestamp_generator must be callable")
+            self.timestamp_generator = timestamp_generator
+        else:
+            self.timestamp_generator = MonotonicTimestampGenerator()
 
         self.profile_manager = ProfileManager()
         self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
@@ -1866,6 +1875,27 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
+    timestamp_generator = None
+    """
+    When :attr:`use_client_timestamp` is set, sessions call this object and use
+    the result as the timestamp.  (Note that timestamps specified within a CQL
+    query will override this timestamp.)  By default, a new
+    :class:`~.MonotonicTimestampGenerator` is created for
+    each :class:`Cluster` instance.
+
+    Applications can set this value for custom timestamp behavior.  For
+    example, an application could share a timestamp generator across
+    :class:`Cluster` objects to guarantee that the application will use unique,
+    increasing timestamps across clusters, or set it to to ``lambda:
+    int(time.time() * 1e6)`` if losing records over clock inconsistencies is
+    acceptable for the application. Custom :attr:`timestamp_generator` s should
+    be callable, and calling them should return an integer representing seconds
+    since some point in time, typically UNIX epoch.
+
+    .. versionadded:: 3.8.0
+    """
+
+
     encoder = None
     """
     A :class:`~cassandra.encoder.Encoder` instance that will be used when
@@ -2058,7 +2088,7 @@ class Session(object):
 
         start_time = time.time()
         if self._protocol_version >= 3 and self.use_client_timestamp:
-            timestamp = int(start_time * 1e6)
+            timestamp = self.cluster.timestamp_generator()
         else:
             timestamp = None
 
