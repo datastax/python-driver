@@ -396,7 +396,7 @@ def execute_until_pass(session, query):
         try:
             return session.execute(query)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Recieved already exists from query {0}   not exiting".format(query))
+            log.warn("Received already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
@@ -414,7 +414,7 @@ def execute_with_long_wait_retry(session, query, timeout=30):
         try:
             return session.execute(query, timeout=timeout)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Recieved already exists from query {0}    not exiting".format(query))
+            log.warn("Received already exists from query {0}    not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):

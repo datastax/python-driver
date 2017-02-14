@@ -35,6 +35,7 @@ from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, execute_until_pass, execute_with_long_wait_retry, get_node,\
     MockLoggingHandler, get_unsupported_lower_protocol, get_unsupported_upper_protocol, protocolv5
 from tests.integration.util import assert_quiescent_pool_state
+import sys
 
 
 def setup_module():
@@ -74,6 +75,7 @@ class ClusterTests(unittest.TestCase):
                 self.assertTrue(host.is_up)
             else:
                 self.assertIsNone(host.is_up)
+        cluster.shutdown()
 
     def test_host_resolution(self):
         """
@@ -129,6 +131,7 @@ class ClusterTests(unittest.TestCase):
 
         with self.assertRaisesRegexp(NoHostAvailable, "OperationTimedOut\('errors=Timed out creating connection \(1 seconds\)"):
             cluster.connect()
+        cluster.shutdown()
 
         get_node(1).resume()
 
@@ -431,7 +434,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(original_test1rf_meta.export_as_string(), current_test1rf_meta.export_as_string())
         self.assertIsNot(original_type_meta, current_type_meta)
         self.assertEqual(original_type_meta.as_cql_query(), current_type_meta.as_cql_query())
-        session.shutdown()
+        cluster.shutdown()
 
     def test_refresh_schema_no_wait(self):
 
@@ -879,7 +882,17 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
 
             node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
-            self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile, 'node2', node2, pool_wait_timeout=0.000000001)
+
+            max_retry_count = 10
+            for i in range(max_retry_count):
+                start = time.time()
+                try:
+                    self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile, 'node2',
+                                      node2, pool_wait_timeout=sys.float_info.min)
+                except Exception:
+                    end = time.time()
+                    self.assertAlmostEqual(start, end, 1)
+                    break
 
 
 class LocalHostAdressTranslator(AddressTranslator):
@@ -933,6 +946,7 @@ class TestAddressTranslation(unittest.TestCase):
         c.connect()
         for host in c.metadata.all_hosts():
             self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
+        c.shutdown()
 
 
 class ContextManagementTest(unittest.TestCase):
@@ -1090,6 +1104,7 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         # address
         for c in cluster.connection_factory.mock_calls:
             self.assertEqual(call(unignored_address), c)
+        cluster.shutdown()
 
 
 class DuplicateRpcTest(unittest.TestCase):
@@ -1120,12 +1135,14 @@ class DuplicateRpcTest(unittest.TestCase):
         mock_handler = MockLoggingHandler()
         logger = logging.getLogger(cassandra.cluster.__name__)
         logger.addHandler(mock_handler)
-        test_cluster = self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        test_cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
         test_cluster.connect()
         warnings = mock_handler.messages.get("warning")
         self.assertEqual(len(warnings), 1)
         self.assertTrue('multiple' in warnings[0])
         logger.removeHandler(mock_handler)
+        test_cluster.shutdown()
+
 
 
 @protocolv5
@@ -1166,3 +1183,4 @@ class BetaProtocolTest(unittest.TestCase):
         session = cluster.connect()
         self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.MAX_SUPPORTED)
         self.assertTrue(session.execute("select release_version from system.local")[0])
+        cluster.shutdown()

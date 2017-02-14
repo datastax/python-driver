@@ -113,6 +113,7 @@ class SchemaTests(unittest.TestCase):
                 execute_until_pass(session, "INSERT INTO test.cf (key, value) VALUES ({0}, {0})".format(j))
 
             execute_until_pass(session, "DROP KEYSPACE test")
+        cluster.shutdown()
 
     def test_for_schema_disagreement_attribute(self):
         """
@@ -149,6 +150,7 @@ class SchemaTests(unittest.TestCase):
         self.check_and_wait_for_agreement(session, rs, True)
         rs = session.execute("DROP KEYSPACE test_schema_disagreement")
         self.check_and_wait_for_agreement(session, rs, True)
+        cluster.shutdown()
 
     def check_and_wait_for_agreement(self, session, rs, exepected):
         self.assertEqual(rs.response_future.is_schema_agreed, exepected)
