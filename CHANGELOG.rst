@@ -1,3 +1,39 @@
+3.8.0
+=====
+
+Features
+--------
+
+* Quote index names in metadata CQL generation (PYTHON-616)
+* On column deserialization failure, keep error message consistent between python and cython (PYTHON-631)
+* TokenAwarePolicy always sends requests to the same replica for a given key (PYTHON-643)
+* Added cql types to result set (PYTHON-648)
+* Add __len__ to BatchStatement (PYTHON-650)
+* Duration Type for Cassandra (PYTHON-655)
+* Send flags with PREPARE message in v5 (PYTHON-684)
+
+Bug Fixes
+---------
+
+* Potential Timing issue if application exits prior to session pool initialization (PYTHON-636)
+* "Host X.X.X.X has been marked down" without any exceptions (PYTHON-640)
+* NoHostAvailable or OperationTimedOut when using execute_concurrent with a generator that inserts into more than one table (PYTHON-642)
+* ResponseFuture creates Timers and don't cancel them even when result is received which leads to memory leaks (PYTHON-644)
+* Driver cannot connect to Cassandra version > 3 (PYTHON-646)
+* Unable to import model using UserType without setuping connection since 3.7 (PYTHON-649)
+* Don't prepare queries on ignored hosts on_up (PYTHON-669)
+* Sockets associated with sessions not getting cleaned up on session.shutdown() (PYTHON-673)
+* Make client timestamps strictly monotonic (PYTHON-676)
+* cassandra.cqlengine.connection.register_connection broken when hosts=None (PYTHON-692)
+
+Other
+-----
+
+* Create a cqlengine doc section explaining None semantics (PYTHON-623)
+* Resolve warnings in documentation generation (PYTHON-645)
+* Cython dependency (PYTHON-686)
+* Drop Support for Python 2.6 (PYTHON-690)
+
 3.7.1
 =====
 October 26, 2016
