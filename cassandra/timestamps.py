@@ -40,15 +40,17 @@ class MonotonicTimestampGenerator(object):
     :attr:`warning_threshold` and :attr:`warning_interval`.
     """
 
-    warning_threshold = 0
+    warning_threshold = 1
     """
     This object will only issue warnings when the returned timestamp drifts
     more than ``warning_threshold`` seconds into the future.
+    Defaults to 1 second.
     """
 
-    warning_interval = 0
+    warning_interval = 1
     """
     This object will only issue warnings every ``warning_interval`` seconds.
+    Defaults to 1 second.
     """
 
     def __init__(self, warn_on_drift=True, warning_threshold=0, warning_interval=0):
