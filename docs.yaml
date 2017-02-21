@@ -11,6 +11,8 @@ sections:
     type: sphinx
     directory: docs
 versions:
+  - name: 3.8
+    ref: 3.8-doc
   - name: 3.7
     ref: 3.7-doc
   - name: 3.6
