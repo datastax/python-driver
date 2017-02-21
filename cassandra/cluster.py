@@ -661,6 +661,17 @@ class Cluster(object):
     establishment, options passing, and authentication.
     """
 
+    timestamp_generator = None
+    """
+    An object, shared between all sessions created by this cluster instance,
+    that generates timestamps when client-side timestamp generation is enabled.
+    By default, each :class:`Cluster` uses a new
+    :class:`~.MonotonicTimestampGenerator`.
+
+    Applications can set this value for custom timestamp behavior. See the
+    documentation for :meth:`Session.timestamp_generator`.
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
