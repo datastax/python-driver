@@ -512,29 +512,13 @@ class QueryMessage(_MessageType):
             flags |= _VALUES_FLAG  # also v2+, but we're only setting params internally right now
 
         if self.serial_consistency_level:
-            if protocol_version >= 2:
-                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
-            else:
-                raise UnsupportedOperation(
-                    "Serial consistency levels require the use of protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
-                    "to support serial consistency levels.")
+            flags |= _WITH_SERIAL_CONSISTENCY_FLAG
 
         if self.fetch_size:
-            if protocol_version >= 2:
-                flags |= _PAGE_SIZE_FLAG
-            else:
-                raise UnsupportedOperation(
-                    "Automatic query paging may only be used with protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
+            flags |= _PAGE_SIZE_FLAG
 
         if self.paging_state:
-            if protocol_version >= 2:
-                flags |= _WITH_PAGING_STATE_FLAG
-            else:
-                raise UnsupportedOperation(
-                    "Automatic query paging may only be used with protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
+            flags |= _WITH_PAGING_STATE_FLAG
 
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP
@@ -696,11 +680,8 @@ class ResultMessage(_MessageType):
             coltype = cls.read_type(f, user_type_map)
             bind_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
 
-        if protocol_version >= 2:
-            _, result_metadata = cls.recv_results_metadata(f, user_type_map)
-            return bind_metadata, pk_indexes, result_metadata
-        else:
-            return bind_metadata, pk_indexes, None
+        _, result_metadata = cls.recv_results_metadata(f, user_type_map)
+        return bind_metadata, pk_indexes, result_metadata
 
     @classmethod
     def recv_results_schema_change(cls, f, protocol_version):
@@ -776,55 +757,40 @@ class ExecuteMessage(_MessageType):
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
-        if protocol_version == 1:
-            if self.serial_consistency_level:
-                raise UnsupportedOperation(
-                    "Serial consistency levels require the use of protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
-                    "to support serial consistency levels.")
-            if self.fetch_size or self.paging_state:
-                raise UnsupportedOperation(
-                    "Automatic query paging may only be used with protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
-            write_short(f, len(self.query_params))
-            for param in self.query_params:
-                write_value(f, param)
-            write_consistency_level(f, self.consistency_level)
-        else:
-            write_consistency_level(f, self.consistency_level)
-            flags = _VALUES_FLAG
-            if self.serial_consistency_level:
-                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
-            if self.fetch_size:
-                flags |= _PAGE_SIZE_FLAG
-            if self.paging_state:
-                flags |= _WITH_PAGING_STATE_FLAG
-            if self.timestamp is not None:
-                if protocol_version >= 3:
-                    flags |= _PROTOCOL_TIMESTAMP
-                else:
-                    raise UnsupportedOperation(
-                        "Protocol-level timestamps may only be used with protocol version "
-                        "3 or higher. Consider setting Cluster.protocol_version to 3.")
-            if self.skip_meta:
-                flags |= _SKIP_METADATA_FLAG
-
-            if ProtocolVersion.uses_int_query_flags(protocol_version):
-                write_uint(f, flags)
+        write_consistency_level(f, self.consistency_level)
+        flags = _VALUES_FLAG
+        if self.serial_consistency_level:
+            flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+        if self.fetch_size:
+            flags |= _PAGE_SIZE_FLAG
+        if self.paging_state:
+            flags |= _WITH_PAGING_STATE_FLAG
+        if self.timestamp is not None:
+            if protocol_version >= 3:
+                flags |= _PROTOCOL_TIMESTAMP
             else:
-                write_byte(f, flags)
+                raise UnsupportedOperation(
+                    "Protocol-level timestamps may only be used with protocol version "
+                    "3 or higher. Consider setting Cluster.protocol_version to 3.")
+        if self.skip_meta:
+            flags |= _SKIP_METADATA_FLAG
 
-            write_short(f, len(self.query_params))
-            for param in self.query_params:
-                write_value(f, param)
-            if self.fetch_size:
-                write_int(f, self.fetch_size)
-            if self.paging_state:
-                write_longstring(f, self.paging_state)
-            if self.serial_consistency_level:
-                write_consistency_level(f, self.serial_consistency_level)
-            if self.timestamp is not None:
-                write_long(f, self.timestamp)
+        if ProtocolVersion.uses_int_query_flags(protocol_version):
+            write_uint(f, flags)
+        else:
+            write_byte(f, flags)
+
+        write_short(f, len(self.query_params))
+        for param in self.query_params:
+            write_value(f, param)
+        if self.fetch_size:
+            write_int(f, self.fetch_size)
+        if self.paging_state:
+            write_longstring(f, self.paging_state)
+        if self.serial_consistency_level:
+            write_consistency_level(f, self.serial_consistency_level)
+        if self.timestamp is not None:
+            write_long(f, self.timestamp)
 
 
 
