@@ -40,7 +40,7 @@ else:
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
 from cassandra.marshal import int32_pack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
-                                StartupMessage, ErrorMessage, CredentialsMessage,
+                                StartupMessage, ErrorMessage,
                                 QueryMessage, ResultMessage, ProtocolHandler,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
@@ -719,17 +719,11 @@ class Connection(object):
             if self.authenticator is None:
                 raise AuthenticationFailed('Remote end requires authentication.')
 
-            if isinstance(self.authenticator, dict):
-                log.debug("Sending credentials-based auth response on %s", self)
-                cm = CredentialsMessage(creds=self.authenticator)
-                callback = partial(self._handle_startup_response, did_authenticate=True)
-                self.send_msg(cm, self.get_request_id(), cb=callback)
-            else:
-                log.debug("Sending SASL-based auth response on %s", self)
-                self.authenticator.server_authenticator_class = startup_response.authenticator
-                initial_response = self.authenticator.initial_response()
-                initial_response = "" if initial_response is None else initial_response
-                self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
+            log.debug("Sending SASL-based auth response on %s", self)
+            self.authenticator.server_authenticator_class = startup_response.authenticator
+            initial_response = self.authenticator.initial_response()
+            initial_response = "" if initial_response is None else initial_response
+            self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.host, startup_response.summary_msg())

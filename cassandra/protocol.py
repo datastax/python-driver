@@ -423,25 +423,6 @@ class AuthenticateMessage(_MessageType):
         return cls(authenticator=authname)
 
 
-class CredentialsMessage(_MessageType):
-    opcode = 0x04
-    name = 'CREDENTIALS'
-
-    def __init__(self, creds):
-        self.creds = creds
-
-    def send_body(self, f, protocol_version):
-        if protocol_version > 1:
-            raise UnsupportedOperation(
-                "Credentials-based authentication is not supported with "
-                "protocol version 2 or higher.  Use the SASL authentication "
-                "mechanism instead.")
-        write_short(f, len(self.creds))
-        for credkey, credval in self.creds.items():
-            write_string(f, credkey)
-            write_string(f, credval)
-
-
 class AuthChallengeMessage(_MessageType):
     opcode = 0x0E
     name = 'AUTH_CHALLENGE'
