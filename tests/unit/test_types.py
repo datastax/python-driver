@@ -33,7 +33,7 @@ from cassandra.protocol import (write_string, read_longstring, write_stringmap,
                                 read_stringmap, read_inet, write_inet,
                                 read_string, write_longstring)
 from cassandra.query import named_tuple_factory
-from cassandra.pool import Host
+from cassandra.hosts import Host
 from cassandra.policies import SimpleConvictionPolicy, ConvictionPolicy
 from cassandra.util import Date, Time
 from cassandra.metadata import Token

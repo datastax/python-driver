@@ -50,10 +50,7 @@ class Runner(BenchmarkThread):
     def run(self):
         self.start_profile()
 
-        if self.protocol_version >= 3:
-            concurrency = 1000
-        else:
-            concurrency = 100
+        concurrency = 1000
 
         for _ in range(min(concurrency, self.num_queries)):
             self.insert_next()

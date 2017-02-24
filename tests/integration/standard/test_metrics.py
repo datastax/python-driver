@@ -26,12 +26,14 @@ from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 from cassandra.protocol import SyntaxException
 
 from cassandra.cluster import Cluster, NoHostAvailable
-from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
+from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, local, \
+    execute_until_pass
 from greplin import scales
 from tests.integration import BasicSharedKeyspaceUnitTestCaseRF3WM, BasicExistingKeyspaceUnitTestCase, local
 
 def setup_module():
     use_singledc()
+
 
 @local
 class MetricsTests(unittest.TestCase):
@@ -182,6 +184,7 @@ class MetricsTests(unittest.TestCase):
 
 
 class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
+
     @local
     def test_metrics_per_cluster(self):
         """
@@ -374,7 +377,7 @@ class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
         # Make sure a poorly coded RA doesn't cause issues
         ra = RequestAnalyzer(self.session, throw_on_success=False, throw_on_fail=True)
         self.session.execute("SELECT release_version FROM system.local")
-        
+
         ra.remove_ra(self.session)
 
         RequestAnalyzer(self.session, throw_on_success=True)

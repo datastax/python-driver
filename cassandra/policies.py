@@ -101,7 +101,7 @@ class LoadBalancingPolicy(HostStateListener):
 
     def distance(self, host):
         """
-        Returns a measure of how remote a :class:`~.pool.Host` is in
+        Returns a measure of how remote a :class:`~.hosts.Host` is in
         terms of the :class:`.HostDistance` enums.
         """
         raise NotImplementedError()
