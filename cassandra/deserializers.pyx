@@ -212,15 +212,10 @@ cdef class _DesSingleParamType(_DesParameterizedType):
 
 cdef class DesListType(_DesSingleParamType):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        cdef uint16_t v2_and_below = 2
         cdef int32_t v3_and_above = 3
 
-        if protocol_version >= 3:
-            result = _deserialize_list_or_set[int32_t](
-                v3_and_above, buf, protocol_version, self.deserializer)
-        else:
-            result = _deserialize_list_or_set[uint16_t](
-                v2_and_below, buf, protocol_version, self.deserializer)
+        result = _deserialize_list_or_set[int32_t](
+            v3_and_above, buf, protocol_version, self.deserializer)
 
         return result
 
@@ -230,7 +225,6 @@ cdef class DesSetType(DesListType):
 
 
 ctypedef fused itemlen_t:
-    uint16_t # protocol <= v2
     int32_t  # protocol >= v3
 
 cdef list _deserialize_list_or_set(itemlen_t dummy_version,
@@ -299,20 +293,13 @@ cdef class DesMapType(_DesParameterizedType):
         self.val_deserializer = self.deserializers[1]
 
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        cdef uint16_t v2_and_below = 0
         cdef int32_t v3_and_above = 0
         key_type, val_type = self.cqltype.subtypes
 
-        if protocol_version >= 3:
-            result = _deserialize_map[int32_t](
-                v3_and_above, buf, protocol_version,
-                self.key_deserializer, self.val_deserializer,
-                key_type, val_type)
-        else:
-            result = _deserialize_map[uint16_t](
-                v2_and_below, buf, protocol_version,
-                self.key_deserializer, self.val_deserializer,
-                key_type, val_type)
+        result = _deserialize_map[int32_t](
+            v3_and_above, buf, protocol_version,
+            self.key_deserializer, self.val_deserializer,
+            key_type, val_type)
 
         return result
 
