@@ -95,7 +95,6 @@ HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
-frame_header_v1_v2 = struct.Struct('>BbBi')
 frame_header_v3 = struct.Struct('>BhBi')
 
 
@@ -277,17 +276,12 @@ class Connection(object):
                     raise RuntimeError("ssl_options specify 'check_hostname', but ssl.match_hostname is not provided. "
                                        "Patch or upgrade Python to use this option.")
 
-        if protocol_version >= 3:
-            self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
-            # Don't fill the deque with 2**15 items right away. Start with some and add
-            # more if needed.
-            initial_size = min(300, self.max_in_flight)
-            self.request_ids = deque(range(initial_size))
-            self.highest_request_id = initial_size - 1
-        else:
-            self.max_request_id = min(self.max_in_flight, (2 ** 7) - 1)
-            self.request_ids = deque(range(self.max_request_id + 1))
-            self.highest_request_id = self.max_request_id
+        self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
+        # Don't fill the deque with 2**15 items right away. Start with some and add
+        # more if needed.
+        initial_size = min(300, self.max_in_flight)
+        self.request_ids = deque(range(initial_size))
+        self.highest_request_id = initial_size - 1
 
         self.lock = RLock()
         self.connected_event = Event()
@@ -543,7 +537,7 @@ class Connection(object):
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
             if version > ProtocolVersion.MAX_SUPPORTED:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
-            frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
+            frame_header = frame_header_v3
             # this frame header struct is everything after the version byte
             header_size = frame_header.size + 1
             if pos >= header_size:
