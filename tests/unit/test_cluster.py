@@ -88,20 +88,6 @@ class ClusterTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             Cluster(contact_points="not a sequence", protocol_version=4, connect_timeout=1)
 
-    def test_requests_in_flight_threshold(self):
-        d = HostDistance.LOCAL
-        mn = 3
-        mx = 5
-        c = Cluster(protocol_version=2)
-        c.set_min_requests_per_connection(d, mn)
-        c.set_max_requests_per_connection(d, mx)
-        # min underflow, max, overflow
-        for n in (-1, mx, 127):
-            self.assertRaises(ValueError, c.set_min_requests_per_connection, d, n)
-        # max underflow, under min, overflow
-        for n in (0, mn, 128):
-            self.assertRaises(ValueError, c.set_max_requests_per_connection, d, n)
-
 
 class SchedulerTest(unittest.TestCase):
     # TODO: this suite could be expanded; for now just adding a test covering a ticket
