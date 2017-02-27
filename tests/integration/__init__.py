@@ -181,12 +181,8 @@ def get_unsupported_lower_protocol():
     This is used to determine the lowest protocol version that is NOT
     supported by the version of C* running
     """
-
-    if Version(CASSANDRA_VERSION) >= Version('3.0'):
-        return 3
-    else:
-        return None
-
+    #Right now all the Cassandra versions support protocol v3 which is the lowest version
+    return None
 
 def get_unsupported_upper_protocol():
     """

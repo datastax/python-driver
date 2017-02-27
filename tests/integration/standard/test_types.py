@@ -831,9 +831,9 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
         self.session.execute(ddl)
 
-        for pvi in range(1, 5):
+        for pvi in range(3, 5):
             self.run_inserts_at_version(pvi)
-            for pvr in range(1, 5):
+            for pvr in range(3, 5):
                 self.read_inserts_at_level(pvr)
 
     def read_inserts_at_level(self, proto_ver):
