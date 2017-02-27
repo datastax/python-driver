@@ -25,7 +25,7 @@ from cassandra.cqlengine.management import _get_table_metadata, sync_table, drop
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass20, MockLoggingHandler, CASSANDRA_VERSION
+from tests.integration import PROTOCOL_VERSION, MockLoggingHandler, CASSANDRA_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 from cassandra.cqlengine.usertype import UserType
@@ -420,7 +420,6 @@ class IndexTests(BaseCassEngTestCase):
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
         self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
 
-    @greaterthancass20
     def test_sync_indexed_set(self):
         """
         Tests that models that have container types with indices can be synced.
