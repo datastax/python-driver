@@ -63,8 +63,7 @@ from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, Simpl
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy, IdentityTranslator, NoSpeculativeExecutionPlan,
                                 NoSpeculativeExecutionPolicy)
-from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
-                            HostConnectionPool, HostConnection,
+from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler, HostConnection,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace,
@@ -105,17 +104,6 @@ else:
 "".encode('utf8')
 
 log = logging.getLogger(__name__)
-
-
-DEFAULT_MIN_REQUESTS = 5
-DEFAULT_MAX_REQUESTS = 100
-
-DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST = 2
-DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST = 8
-
-DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST = 1
-DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
-
 
 _NOT_SET = object()
 
@@ -857,26 +845,6 @@ class Cluster(object):
 
         self._user_types = defaultdict(dict)
 
-        self._min_requests_per_connection = {
-            HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
-            HostDistance.REMOTE: DEFAULT_MIN_REQUESTS
-        }
-
-        self._max_requests_per_connection = {
-            HostDistance.LOCAL: DEFAULT_MAX_REQUESTS,
-            HostDistance.REMOTE: DEFAULT_MAX_REQUESTS
-        }
-
-        self._core_connections_per_host = {
-            HostDistance.LOCAL: DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST,
-            HostDistance.REMOTE: DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST
-        }
-
-        self._max_connections_per_host = {
-            HostDistance.LOCAL: DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST,
-            HostDistance.REMOTE: DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST
-        }
-
         self.executor = ThreadPoolExecutor(max_workers=executor_threads)
         self.scheduler = _Scheduler(self.executor)
 
@@ -977,30 +945,6 @@ class Cluster(object):
         _, not_done = wait_futures(futures, pool_wait_timeout)
         if not_done:
             raise OperationTimedOut("Failed to create all new connection pools in the %ss timeout.")
-
-    def get_min_requests_per_connection(self, host_distance):
-        return self._min_requests_per_connection[host_distance]
-
-    def get_max_requests_per_connection(self, host_distance):
-        return self._max_requests_per_connection[host_distance]
-
-    def get_core_connections_per_host(self, host_distance):
-        """
-        Gets the minimum number of connections per Session that will be opened
-        for each host with :class:`~.HostDistance` equal to `host_distance`.
-        The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
-        :attr:`~HostDistance.REMOTE`.
-        """
-        return self._core_connections_per_host[host_distance]
-
-    def get_max_connections_per_host(self, host_distance):
-        """
-        Gets the maximum number of connections per Session that will be opened
-        for each host with :class:`~.HostDistance` equal to `host_distance`.
-        The default is 8 for :attr:`~HostDistance.LOCAL` and 2 for
-        :attr:`~HostDistance.REMOTE`.
-       """
-        return self._max_connections_per_host[host_distance]
 
     def connection_factory(self, address, *args, **kwargs):
         """
