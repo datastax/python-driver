@@ -27,7 +27,7 @@ from cassandra.query import dict_factory
 from cassandra.util import OrderedMap
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, \
-    greaterthanorequalcass30, greaterthanorequalcass36
+    lessthancass30, greaterthanorequalcass36
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, PRIMITIVE_DATATYPES_KEYS, COLLECTION_TYPES, \
     get_sample, get_collection_sample
 
@@ -691,7 +691,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(k[0], 'alphanum')
         self.assertEqual(k.field_0_, 'alphanum')  # named tuple with positional field name
 
-    @greaterthanorequalcass30
+    @lessthancass30
     def test_type_alteration(self):
         s = self.session
         type_name = "type_name"
@@ -724,7 +724,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(val['v0'], 3)
         self.assertEqual(val['v1'], six.b('\xde\xad\xbe\xef'))
 
-    @greaterthanorequalcass30
+    @lessthancass30
     def test_alter_udt(self):
         """
         Test to ensure that altered UDT's are properly surfaced without needing to restart the underlying session.

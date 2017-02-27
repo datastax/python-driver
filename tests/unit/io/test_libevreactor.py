@@ -63,12 +63,12 @@ class LibevConnectionTest(unittest.TestCase):
         c._socket.send.side_effect = lambda x: len(x)
         return c
 
-    def make_header_prefix(self, message_class, version=2, stream_id=0):
-        header = map(uint8_pack, [
+    def make_header_prefix(self, message_class, version=3, stream_id=0):
+        header = list(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             stream_id,
             message_class.opcode  # opcode
-        ])
+        ]))
         header.insert(1, uint16_pack(0))  # flags (compression)
         return six.binary_type().join(header)
 
