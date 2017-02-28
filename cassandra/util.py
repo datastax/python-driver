@@ -15,6 +15,7 @@
 from __future__ import with_statement
 import calendar
 import datetime
+from functools import total_ordering
 import random
 import six
 import uuid
@@ -861,6 +862,7 @@ if six.PY3:
     long = int
 
 
+@total_ordering
 class Time(object):
     '''
     Idealized time, independent of day.
@@ -985,6 +987,7 @@ class Time(object):
                                         self.second, self.nanosecond)
 
 
+@total_ordering
 class Date(object):
     '''
     Idealized date: year, month, day
