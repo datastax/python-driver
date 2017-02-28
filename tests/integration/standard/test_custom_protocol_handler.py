@@ -17,15 +17,19 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.protocol import ProtocolHandler, ResultMessage, UUIDType, read_int, EventMessage
-from cassandra.query import tuple_factory
-from cassandra.cluster import Cluster
-from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster
+from cassandra.protocol import ProtocolHandler, ResultMessage, QueryMessage, UUIDType, read_int
+from cassandra.query import tuple_factory, SimpleStatement
+from cassandra.cluster import Cluster, ResponseFuture
+from cassandra import ProtocolVersion, ConsistencyLevel
+
+from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, \
+    greaterthanorequalcass30, execute_with_long_wait_retry
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
 
 import uuid
+import mock
 
 
 def setup_module():
@@ -115,6 +119,51 @@ class CustomProtocolHandlerTest(unittest.TestCase):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
         self.assertEqual(len(CustomResultMessageTracked.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
+        cluster.shutdown()
+
+    @greaterthanorequalcass30
+    def test_protocol_divergence_v4_fail_by_flag_uses_int(self):
+        """
+        Test to validate that the _PAGE_SIZE_FLAG is not treated correctly in V4 if the flags are
+        written using write_uint instead of write_int
+
+        @since 3.9
+        @jira_ticket PYTHON-713
+        @expected_result the fetch_size=1 parameter will be ignored
+
+        @test_category connection
+        """
+        self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V4, uses_int_query_flag=False,
+                                                        int_flag=True)
+
+
+    def _send_query_message(self, session, timeout, **kwargs):
+        query = "SELECT * FROM test3rf.test"
+        message = QueryMessage(query=query, **kwargs)
+        future = ResponseFuture(session, message, query=None, timeout=timeout)
+        future.send_request()
+        return future
+
+    def _protocol_divergence_fail_by_flag_uses_int(self, version, uses_int_query_flag, int_flag = True, beta=False):
+        cluster = Cluster(protocol_version=version, allow_beta_protocol_version=beta)
+        session = cluster.connect()
+
+        query_one = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (1, 1)")
+        query_two = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (2, 2)")
+
+        execute_with_long_wait_retry(session, query_one)
+        execute_with_long_wait_retry(session, query_two)
+
+        with mock.patch('cassandra.protocol.ProtocolVersion.uses_int_query_flags', new=mock.Mock(return_value=int_flag)):
+            future = self._send_query_message(session, 10,
+                                              consistency_level=ConsistencyLevel.ONE, fetch_size=1)
+
+            response = future.result()
+
+            # This means the flag are not handled as they are meant by the server if uses_int=False
+            self.assertEqual(response.has_more_pages, uses_int_query_flag)
+
+        execute_with_long_wait_retry(session, SimpleStatement("TRUNCATE test3rf.test"))
         cluster.shutdown()
 
 
