@@ -24,7 +24,7 @@ from cassandra.cqlengine.management import sync_table
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 
-from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry
+from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry, local
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE, setup_connection
 from cassandra.cqlengine import models
@@ -95,10 +95,18 @@ class ConnectionTest(BaseCassEngTestCase):
         self.assertEqual(1, TestConnectModel.objects.count())
         self.assertEqual(TestConnectModel.objects.first(), TCM2)
 
+<<<<<<< HEAD
+=======
+    @local
+>>>>>>> 1d91fa8... Added support for testing remotely and on Windows
     def test_connection_setup_with_setup(self):
         connection.setup(hosts=None, default_keyspace=None)
         self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
 
+<<<<<<< HEAD
+=======
+    @local
+>>>>>>> 1d91fa8... Added support for testing remotely and on Windows
     def test_connection_setup_with_default(self):
         connection.default()
         self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))

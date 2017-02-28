@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 import logging
 import sys
 import socket
+import platform
 
 log = logging.getLogger()
 log.setLevel('DEBUG')
@@ -41,3 +46,5 @@ def is_gevent_monkey_patched():
 
 def is_monkey_patched():
     return is_gevent_monkey_patched() or is_eventlet_monkey_patched()
+
+notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adecuate for windows")
