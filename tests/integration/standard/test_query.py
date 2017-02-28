@@ -505,14 +505,8 @@ class PrintStatementTests(unittest.TestCase):
 class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
-        if PROTOCOL_VERSION < 2:
-            raise unittest.SkipTest(
-                "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
-                % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        if PROTOCOL_VERSION < 3:
-            self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
     def tearDown(self):
@@ -632,14 +626,8 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
 
 class SerialConsistencyTests(unittest.TestCase):
     def setUp(self):
-        if PROTOCOL_VERSION < 2:
-            raise unittest.SkipTest(
-                "Protocol 2.0+ is required for Serial Consistency, currently testing against %r"
-                % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        if PROTOCOL_VERSION < 3:
-            self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -719,14 +707,6 @@ class SerialConsistencyTests(unittest.TestCase):
 
 class LightweightTransactionTests(unittest.TestCase):
     def setUp(self):
-        """
-        Test is skipped if run with cql version < 2
-
-        """
-        if PROTOCOL_VERSION < 2:
-            raise unittest.SkipTest(
-                "Protocol 2.0+ is required for Lightweight transactions, currently testing against %r"
-                % (PROTOCOL_VERSION,))
 
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
@@ -792,10 +772,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
     # Test for PYTHON-126: BatchStatement.add() should set the routing key of the first added prepared statement
 
     def setUp(self):
-        if PROTOCOL_VERSION < 2:
-            raise unittest.SkipTest(
-                "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
-                % (PROTOCOL_VERSION,))
+
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         self.session = self.cluster.connect()
         query = """

@@ -33,10 +33,6 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 class UserDefinedTypeTests(BaseCassEngTestCase):
 
-    def setUp(self):
-        if PROTOCOL_VERSION < 3:
-            raise unittest.SkipTest("UDTs require native protocol 3+, currently using: {0}".format(PROTOCOL_VERSION))
-
     def test_can_create_udts(self):
         class User(UserType):
             age = columns.Integer()

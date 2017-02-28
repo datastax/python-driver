@@ -1040,8 +1040,6 @@ class TestObjectsProperty(BaseQuerySetUsage):
 class PageQueryTests(BaseCassEngTestCase):
     @execute_count(3)
     def test_paged_result_handling(self):
-        if PROTOCOL_VERSION < 2:
-            raise unittest.SkipTest("Paging requires native protocol 2+, currently using: {0}".format(PROTOCOL_VERSION))
 
         # addresses #225
         class PagingTest(Model):

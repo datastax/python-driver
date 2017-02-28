@@ -449,8 +449,6 @@ class NonModelFailureTest(BaseCassEngTestCase):
 
 class StaticColumnTests(BaseCassEngTestCase):
     def test_static_columns(self):
-        if PROTOCOL_VERSION < 2:
-            raise unittest.SkipTest("Native protocol 2+ required, currently using: {0}".format(PROTOCOL_VERSION))
 
         class StaticModel(Model):
             id = columns.Integer(primary_key=True)

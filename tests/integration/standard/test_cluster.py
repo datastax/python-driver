@@ -330,35 +330,6 @@ class ClusterTests(unittest.TestCase):
                           protocol_version=PROTOCOL_VERSION)
         self.assertRaises(NoHostAvailable, cluster.connect)
 
-    def test_cluster_settings(self):
-        """
-        Test connection setting getters and setters
-        """
-        if PROTOCOL_VERSION >= 3:
-            raise unittest.SkipTest("min/max requests and core/max conns aren't used with v3 protocol")
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-
-        min_requests_per_connection = cluster.get_min_requests_per_connection(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MIN_REQUESTS, min_requests_per_connection)
-        cluster.set_min_requests_per_connection(HostDistance.LOCAL, min_requests_per_connection + 1)
-        self.assertEqual(cluster.get_min_requests_per_connection(HostDistance.LOCAL), min_requests_per_connection + 1)
-
-        max_requests_per_connection = cluster.get_max_requests_per_connection(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MAX_REQUESTS, max_requests_per_connection)
-        cluster.set_max_requests_per_connection(HostDistance.LOCAL, max_requests_per_connection + 1)
-        self.assertEqual(cluster.get_max_requests_per_connection(HostDistance.LOCAL), max_requests_per_connection + 1)
-
-        core_connections_per_host = cluster.get_core_connections_per_host(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST, core_connections_per_host)
-        cluster.set_core_connections_per_host(HostDistance.LOCAL, core_connections_per_host + 1)
-        self.assertEqual(cluster.get_core_connections_per_host(HostDistance.LOCAL), core_connections_per_host + 1)
-
-        max_connections_per_host = cluster.get_max_connections_per_host(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST, max_connections_per_host)
-        cluster.set_max_connections_per_host(HostDistance.LOCAL, max_connections_per_host + 1)
-        self.assertEqual(cluster.get_max_connections_per_host(HostDistance.LOCAL), max_connections_per_host + 1)
-
     def test_refresh_schema(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
@@ -407,12 +378,6 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     def test_refresh_schema_type(self):
-        if get_server_versions()[0] < (2, 1, 0):
-            raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
-
-        if PROTOCOL_VERSION < 3:
-            raise unittest.SkipTest('UDTs are not specified in change events for protocol v2')
-            # We may want to refresh types on keyspace change events in that case(?)
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
@@ -585,8 +550,6 @@ class ClusterTests(unittest.TestCase):
     def test_idle_heartbeat(self):
         interval = 2
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
-        if PROTOCOL_VERSION < 3:
-            cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         session = cluster.connect(wait_for_all_pools=True)
 
         # This test relies on impl details of connection req id management to see if heartbeats
