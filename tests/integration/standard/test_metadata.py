@@ -36,7 +36,6 @@ from cassandra.pool import Host
 from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
-                               BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION,
                                greaterthanorequalcass30, lessthancass30, greaterthancass21)
 
 def setup_module():
@@ -2550,21 +2549,3 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
         self.assertEqual(value_column.name, 'the Value')
-
-
-@dseonly
-class DSEMetadataTest(BasicExistingSegregatedKeyspaceUnitTestCase):
-
-    def test_dse_specific_meta(self):
-        """
-        Test to ensure DSE metadata is populated appropriately.
-        @since 3.4
-        @jira_ticket PYTHON-555
-        @expected_result metadata for dse_version, and dse_workload should be populated on dse clusters
-
-        @test_category metadata
-        """
-        for host in self.cluster.metadata.all_hosts():
-            self.assertIsNotNone(host.dse_version, "Dse version not populated as expected")
-            self.assertEqual(host.dse_version, DSE_VERSION)
-            self.assertTrue("Cassandra" in host.dse_workload)
