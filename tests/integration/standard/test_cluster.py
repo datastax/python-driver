@@ -201,12 +201,8 @@ class ClusterTests(unittest.TestCase):
         elif CASSANDRA_VERSION >= '2.1':
             self.assertEqual(updated_protocol_version, 3)
             self.assertEqual(updated_cluster_version, 3)
-        elif CASSANDRA_VERSION >= '2.0':
-            self.assertEqual(updated_protocol_version, 2)
-            self.assertEqual(updated_cluster_version, 2)
         else:
-            self.assertEqual(updated_protocol_version, 1)
-            self.assertEqual(updated_cluster_version, 1)
+            raise ValueError('Invalid CASSANDRA_VERSION (< 2.1) %s' % (CASSANDRA_VERSION,))
 
         cluster.shutdown()
 
@@ -303,15 +299,6 @@ class ClusterTests(unittest.TestCase):
         self.assertRaises(TypeError, Cluster, auth_provider=1, protocol_version=1)
         c = Cluster(protocol_version=1)
         self.assertRaises(TypeError, setattr, c, 'auth_provider', 1)
-
-    def test_v2_auth_provider(self):
-        """
-        Check for v2 auth_provider compliance
-        """
-        bad_auth_provider = lambda x: {'username': 'foo', 'password': 'bar'}
-        self.assertRaises(TypeError, Cluster, auth_provider=bad_auth_provider, protocol_version=2)
-        c = Cluster(protocol_version=2)
-        self.assertRaises(TypeError, setattr, c, 'auth_provider', bad_auth_provider)
 
     def test_conviction_policy_factory_is_callable(self):
         """

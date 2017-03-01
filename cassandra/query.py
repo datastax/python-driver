@@ -647,8 +647,7 @@ class BatchStatement(Statement):
 
     serial_consistency_level = None
     """
-    The same as :attr:`.Statement.serial_consistency_level`, but is only
-    supported when using protocol version 3 or higher.
+    The same as :attr:`.Statement.serial_consistency_level`.
     """
 
     _statements_and_parameters = None

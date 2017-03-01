@@ -223,7 +223,6 @@ class TestTwistedConnection(unittest.TestCase):
         self.assertEqual(self.obj_ut._iobuf.getvalue(), b'')  # buf starts empty
 
         # write a complete message, plus 'NEXT' (to simulate next message)
-        # assumes protocol v3+ as default Connection.protocol_version
         body = b'this is the drum roll'
         extra = b'NEXT'
         self.obj_ut._iobuf.write(

@@ -1717,10 +1717,11 @@ class Session(object):
 
     use_client_timestamp = True
     """
-    When using protocol version 3 or higher, write timestamps may be supplied
-    client-side at the protocol level.  (Normally they are generated
-    server-side by the coordinator node.)  Note that timestamps specified
-    within a CQL query will override this timestamp.
+    Clients provide write timestamps by default.  Note that timestamps
+    specified within a CQL query will override this timestamp.
+
+    If client timestamps are disabled, the coordinator node will provide the
+    timestamp server-side.
 
     .. versionadded:: 2.1.0
     """

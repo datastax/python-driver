@@ -211,14 +211,14 @@ class Connection(object):
     in_flight = 0
 
     # Max concurrent requests allowed per connection. This is set optimistically high, allowing
-    # all request ids to be used in protocol version 3+. Normally concurrency would be controlled
+    # all request ids to be used. Normally concurrency would be controlled
     # at a higher level by the application or concurrent.execute_concurrent. This attribute
     # is for lower-level integrations that want some upper bound without reimplementing.
     max_in_flight = 2 ** 15
 
-    # A set of available request IDs.  When using the v3 protocol or higher,
-    # this will not initially include all request IDs in order to save memory,
-    # but the set will grow if it is exhausted.
+    # A set of available request IDs.  This will not initially include all
+    # request IDs in order to save memory, but the set will grow if it is
+    # exhausted.
     request_ids = None
 
     # Tracks the highest used request ID in order to help with growing the

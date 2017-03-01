@@ -409,8 +409,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
         """
         Test to validate that result metadata is appropriately populated across protocol version
 
-        In protocol version 1 result metadata is retrieved everytime the statement is issued. In all
-        other protocol versions it's set once upon the prepare, then re-used. This test ensures that it manifests
+        Result metadata is set once upon the prepare, then re-used. This test ensures that it manifests
         it's self the same across multiple protocol versions.
 
         @since 3.6.0
@@ -423,10 +422,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
             cluster = Cluster(protocol_version=proto_version)
             session = cluster.connect()
             select_statement = session.prepare("SELECT * FROM system.local")
-            if proto_version == 1:
-                self.assertEqual(select_statement.result_metadata, None)
-            else:
-                self.assertNotEqual(select_statement.result_metadata, None)
+            self.assertNotEqual(select_statement.result_metadata, None)
             future = session.execute_async(select_statement)
             results = future.result()
             if base_line is None:

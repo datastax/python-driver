@@ -213,6 +213,3 @@ explicitly.
 
 Upon declaration, types are automatically registered with the driver, so query results return instances of your ``UserType``
 class*.
-
-***Note**: UDTs were not added to the native protocol until v3. When setting up the cqlengine connection, be sure to specify
-``protocol_version=3``. If using an earlier version, UDT queries will still work, but the returned type will be a namedtuple.
