@@ -245,7 +245,6 @@ cdef list _deserialize_list_or_set(itemlen_t dummy_version,
 
     _unpack_len[itemlen_t](buf, 0, &numelements)
     offset = sizeof(itemlen_t)
-    protocol_version = max(3, protocol_version)
     for _ in range(numelements):
         subelem[itemlen_t](buf, &elem_buf, &offset, dummy_version)
         result.append(from_binary(deserializer, &elem_buf, protocol_version))
@@ -318,7 +317,6 @@ cdef _deserialize_map(itemlen_t dummy_version,
     _unpack_len[itemlen_t](buf, 0, &numelements)
     offset = sizeof(itemlen_t)
     themap = util.OrderedMapSerializedKey(key_type, protocol_version)
-    protocol_version = max(3, protocol_version)
     for _ in range(numelements):
         subelem[itemlen_t](buf, &key_buf, &offset, dummy_version)
         subelem[itemlen_t](buf, &val_buf, &offset, numelements)
@@ -341,10 +339,6 @@ cdef class DesTupleType(_DesParameterizedType):
         cdef Buffer item_buf
         cdef Buffer itemlen_buf
         cdef Deserializer deserializer
-
-        # collections inside UDTs are always encoded with at least the
-        # version 3 format
-        protocol_version = max(3, protocol_version)
 
         p = 0
         values = []
