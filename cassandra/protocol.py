@@ -30,7 +30,7 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        UnsupportedOperation, UserFunctionDescriptor,
                        UserAggregateDescriptor, SchemaTargetType)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
-                               int8_pack, int8_unpack, uint64_pack, header_pack,
+                               int8_pack, int8_unpack, uint64_pack,
                                v3_header_pack, uint32_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
