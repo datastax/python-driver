@@ -75,9 +75,9 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEqual(float(bind_params("%s", (f,), Encoder())), f)
 
 
-class BoundStatementTestV1(unittest.TestCase):
+class BoundStatementTestV3(unittest.TestCase):
 
-    protocol_version=1
+    protocol_version=3
 
     @classmethod
     def setUpClass(cls):
@@ -183,15 +183,7 @@ class BoundStatementTestV1(unittest.TestCase):
         self.assertRaises(ValueError, self.bound.bind, (0, 0, 0, UNSET_VALUE))
 
 
-class BoundStatementTestV2(BoundStatementTestV1):
-    protocol_version=2
-
-
-class BoundStatementTestV3(BoundStatementTestV1):
-    protocol_version=3
-
-
-class BoundStatementTestV4(BoundStatementTestV1):
+class BoundStatementTestV4(BoundStatementTestV3):
     protocol_version=4
 
     def test_dict_missing_routing_key(self):
