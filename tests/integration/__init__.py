@@ -450,8 +450,9 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
         ex_type, ex, tb = sys.exc_info()
         log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
         del tb
-    log.warn("Shutting down cluster")
-    cluster.shutdown()
+    finally:
+        log.warn("Shutting down cluster")
+        cluster.shutdown()
 
 
 def setup_keyspace(ipformat=None, wait=True):
