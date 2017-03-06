@@ -123,7 +123,10 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
 
         @test_category timing
         """
-        tsg = timestamps.MonotonicTimestampGenerator()
+        tsg = timestamps.MonotonicTimestampGenerator(
+            warning_threshold=1e-6,
+            warning_interval=1e-6
+        )
         #The units of _last_warn is seconds
         tsg._last_warn = 12
 
@@ -181,7 +184,8 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         @test_category timing
         """
         tsg = timestamps.MonotonicTimestampGenerator(
-            warning_threshold=1e-6
+            warning_threshold=1e-6,
+            warning_interval=1e-6
         )
         tsg.last, tsg._last_warn = 100, 97
         tsg._next_timestamp(98, tsg.last)
@@ -198,6 +202,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         @test_category timing
         """
         tsg = timestamps.MonotonicTimestampGenerator(
+            warning_threshold=1e-6,
             warning_interval=2e-6
         )
         tsg.last = 100
@@ -219,7 +224,8 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         @test_category timing
         """
         tsg = timestamps.MonotonicTimestampGenerator(
-            warning_interval=1e-6
+            warning_interval=1e-6,
+            warning_threshold=1e-6,
         )
         tsg.last = 100
         tsg._next_timestamp(70, tsg.last)
@@ -249,7 +255,7 @@ class TestTimestampGeneratorMultipleThreads(unittest.TestCase):
                 with lock:
                     generated_timestamps.append(timestamp)
 
-        tsg = timestamps.MonotonicTimestampGenerator(warning_threshold=1)
+        tsg = timestamps.MonotonicTimestampGenerator()
         fixed_time = 1
         num_threads = 5
 

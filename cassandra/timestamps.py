@@ -53,7 +53,7 @@ class MonotonicTimestampGenerator(object):
     Defaults to 1 second.
     """
 
-    def __init__(self, warn_on_drift=True, warning_threshold=0, warning_interval=0):
+    def __init__(self, warn_on_drift=True, warning_threshold=warning_threshold, warning_interval=warning_interval):
         self.lock = Lock()
         with self.lock:
             self.last = 0
@@ -97,7 +97,7 @@ class MonotonicTimestampGenerator(object):
         since_last_warn = now - self._last_warn
 
         warn = (self.warn_on_drift and
-                (diff > self.warning_threshold * 1e6) and
+                (diff >= self.warning_threshold * 1e6) and
                 (since_last_warn >= self.warning_interval * 1e6))
         if warn:
             log.warn(
