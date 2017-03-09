@@ -25,8 +25,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
-from tests.unit.cython.utils import notcython
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, notpy3
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions
 
 import time
 import re
@@ -70,8 +69,6 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         for event in trace.events:
             str(event)
 
-    @notcython
-    @notpy3
     def test_row_error_message(self):
         """
         Test to validate, new column deserialization message
@@ -86,7 +83,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(ss)
         with self.assertRaises(DriverException) as context:
             self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
-        self.assertIn("Failed decoding result column", context.exception.message)
+        self.assertIn("Failed decoding result column", str(context.exception))
 
     def test_trace_id_to_resultset(self):
 

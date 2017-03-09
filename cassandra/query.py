@@ -791,10 +791,13 @@ class BatchStatement(Statement):
         self._maybe_set_routing_attributes(statement)
         self._update_custom_payload(statement)
 
+    def __len__(self):
+        return len(self._statements_and_parameters)
+
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
         return (u'<BatchStatement type=%s, statements=%d, consistency=%s>' %
-                (self.batch_type, len(self._statements_and_parameters), consistency))
+                (self.batch_type, len(self), consistency))
     __repr__ = __str__
 
 

@@ -42,7 +42,7 @@ except ImportError:
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
-                       SchemaTargetType, DriverException)
+                       SchemaTargetType, DriverException, ProtocolVersion)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -57,8 +57,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 IsBootstrappingErrorMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
-                                RESULT_KIND_SCHEMA_CHANGE, MIN_SUPPORTED_VERSION,
-                                ProtocolHandler)
+                                RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -70,6 +69,7 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
+from cassandra.timestamps import MonotonicTimestampGenerator
 
 
 def _is_eventlet_monkey_patched():
@@ -355,9 +355,11 @@ class Cluster(object):
     server will be automatically used.
     """
 
-    protocol_version = 4
+    protocol_version = ProtocolVersion.V4
     """
     The maximum version of the native protocol to use.
+
+    See :class:`.ProtocolVersion` for more information about versions.
 
     If not set in the constructor, the driver will automatically downgrade
     version based on a negotiation with the server, but it is most efficient
@@ -365,35 +367,6 @@ class Cluster(object):
     Setting this will also prevent conflicting versions negotiated if your
     cluster is upgraded.
 
-    Version 2 of the native protocol adds support for lightweight transactions,
-    batch operations, and automatic query paging. The v2 protocol is
-    supported by Cassandra 2.0+.
-
-    Version 3 of the native protocol adds support for protocol-level
-    client-side timestamps (see :attr:`.Session.use_client_timestamp`),
-    serial consistency levels for :class:`~.BatchStatement`, and an
-    improved connection pool.
-
-    Version 4 of the native protocol adds a number of new types, server warnings,
-    new failure messages, and custom payloads. Details in the
-    `project docs <https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec>`_
-
-    The following table describes the native protocol versions that
-    are supported by each version of Cassandra:
-
-    +-------------------+-------------------+
-    | Cassandra Version | Protocol Versions |
-    +===================+===================+
-    | 1.2               | 1                 |
-    +-------------------+-------------------+
-    | 2.0               | 1, 2              |
-    +-------------------+-------------------+
-    | 2.1               | 1, 2, 3           |
-    +-------------------+-------------------+
-    | 2.2               | 1, 2, 3, 4        |
-    +-------------------+-------------------+
-    | 3.x               | 3, 4              |
-    +-------------------+-------------------+
     """
 
     allow_beta_protocol_version = False
@@ -688,6 +661,17 @@ class Cluster(object):
     establishment, options passing, and authentication.
     """
 
+    timestamp_generator = None
+    """
+    An object, shared between all sessions created by this cluster instance,
+    that generates timestamps when client-side timestamp generation is enabled.
+    By default, each :class:`Cluster` uses a new
+    :class:`~.MonotonicTimestampGenerator`.
+
+    Applications can set this value for custom timestamp behavior. See the
+    documentation for :meth:`Session.timestamp_generator`.
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -771,7 +755,8 @@ class Cluster(object):
                  prepare_on_all_hosts=True,
                  reprepare_on_up=True,
                  execution_profiles=None,
-                 allow_beta_protocol_version=False):
+                 allow_beta_protocol_version=False,
+                 timestamp_generator=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -829,6 +814,13 @@ class Cluster(object):
 
         if connection_class is not None:
             self.connection_class = connection_class
+
+        if timestamp_generator is not None:
+            if not callable(timestamp_generator):
+                raise ValueError("timestamp_generator must be callable")
+            self.timestamp_generator = timestamp_generator
+        else:
+            self.timestamp_generator = MonotonicTimestampGenerator()
 
         self.profile_manager = ProfileManager()
         self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
@@ -1141,15 +1133,15 @@ class Cluster(object):
         if self._protocol_version_explicit:
             raise DriverException("ProtocolError returned from server while using explicitly set client protocol_version %d" % (previous_version,))
 
-        new_version = previous_version - 1
-        if new_version < self.protocol_version:
-            if new_version >= MIN_SUPPORTED_VERSION:
-                log.warning("Downgrading core protocol version from %d to %d for %s. "
-                            "To avoid this, it is best practice to explicitly set Cluster(protocol_version) to the version supported by your cluster. "
-                            "http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Cluster.protocol_version", self.protocol_version, new_version, host_addr)
-                self.protocol_version = new_version
-            else:
-                raise DriverException("Cannot downgrade protocol version (%d) below minimum supported version: %d" % (new_version, MIN_SUPPORTED_VERSION))
+        new_version = ProtocolVersion.get_lower_supported(previous_version)
+        if new_version < ProtocolVersion.MIN_SUPPORTED:
+            raise DriverException(
+                "Cannot downgrade protocol version below minimum supported version: %d" % (ProtocolVersion.MIN_SUPPORTED,))
+
+        log.warning("Downgrading core protocol version from %d to %d for %s. "
+                    "To avoid this, it is best practice to explicitly set Cluster(protocol_version) to the version supported by your cluster. "
+                    "http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Cluster.protocol_version", self.protocol_version, new_version, host_addr)
+        self.protocol_version = new_version
 
     def connect(self, keyspace=None, wait_for_all_pools=False):
         """
@@ -1330,8 +1322,9 @@ class Cluster(object):
                 log.debug("Now that host %s is up, cancelling the reconnection handler", host)
                 reconnector.cancel()
 
-            self._prepare_all_queries(host)
-            log.debug("Done preparing all queries for host %s, ", host)
+            if self.profile_manager.distance(host) != HostDistance.IGNORED:
+                self._prepare_all_queries(host)
+                log.debug("Done preparing all queries for host %s, ", host)
 
             for session in self.sessions:
                 session.remove_pool(host)
@@ -1893,6 +1886,27 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
+    timestamp_generator = None
+    """
+    When :attr:`use_client_timestamp` is set, sessions call this object and use
+    the result as the timestamp.  (Note that timestamps specified within a CQL
+    query will override this timestamp.)  By default, a new
+    :class:`~.MonotonicTimestampGenerator` is created for
+    each :class:`Cluster` instance.
+
+    Applications can set this value for custom timestamp behavior.  For
+    example, an application could share a timestamp generator across
+    :class:`Cluster` objects to guarantee that the application will use unique,
+    increasing timestamps across clusters, or set it to to ``lambda:
+    int(time.time() * 1e6)`` if losing records over clock inconsistencies is
+    acceptable for the application. Custom :attr:`timestamp_generator` s should
+    be callable, and calling them should return an integer representing seconds
+    since some point in time, typically UNIX epoch.
+
+    .. versionadded:: 3.8.0
+    """
+
+
     encoder = None
     """
     A :class:`~cassandra.encoder.Encoder` instance that will be used when
@@ -2085,7 +2099,7 @@ class Session(object):
 
         start_time = time.time()
         if self._protocol_version >= 3 and self.use_client_timestamp:
-            timestamp = int(start_time * 1e6)
+            timestamp = self.cluster.timestamp_generator()
         else:
             timestamp = None
 
@@ -2276,6 +2290,13 @@ class Session(object):
                 return
             else:
                 self.is_shutdown = True
+
+        # PYTHON-673. If shutdown was called shortly after session init, avoid
+        # a race by cancelling any initial connection attempts haven't started,
+        # then blocking on any that have.
+        for future in self._initial_connect_futures:
+            future.cancel()
+        wait_futures(self._initial_connect_futures)
 
         for pool in list(self._pools.values()):
             pool.shutdown()
@@ -3305,6 +3326,7 @@ class ResponseFuture(object):
         self._errbacks = []
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
+        self._start_timer()
 
     def _start_timer(self):
         if self._timer is None:
@@ -3341,8 +3363,8 @@ class ResponseFuture(object):
                 if self._time_remaining <= 0:
                     self._on_timeout()
                     return
-            if not self.send_request(error_no_hosts=False):
-                self._start_timer()
+            self.send_request(error_no_hosts=False)
+            self._start_timer()
 
 
     def _make_query_plan(self):
@@ -3359,11 +3381,6 @@ class ResponseFuture(object):
             req_id = self._query(host)
             if req_id is not None:
                 self._req_id = req_id
-
-                # timer is only started here, after we have at least one message queued
-                # this is done to avoid overrun of timers with unfettered client requests
-                # in the case of full disconnect, where no hosts will be available
-                self._start_timer()
                 return True
             if self.timeout is not None and time.time() - self._start_time > self.timeout:
                 self._on_timeout()
@@ -3482,7 +3499,7 @@ class ResponseFuture(object):
         self._event.clear()
         self._final_result = _NOT_SET
         self._final_exception = None
-        self._timer = None  # clear cancelled timer; new one will be set when request is queued
+        self._start_timer()
         self.send_request()
 
     def _reprepare(self, prepare_message, host, connection, pool):
@@ -3640,6 +3657,7 @@ class ResponseFuture(object):
                 # we got some other kind of response message
                 msg = "Got unexpected message: %r" % (response,)
                 exc = ConnectionException(msg, host)
+                self._cancel_timer()
                 self._connection.defunct(exc)
                 self._set_final_exception(exc)
         except Exception as exc:

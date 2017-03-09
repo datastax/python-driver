@@ -17,12 +17,12 @@ good bug reports. They will not be repeated in detail here, but in general, the 
 
 Pull Requests
 -------------
-If you're able to fix a bug yourself, you can [fork the repository](https://help.github.com/articles/fork-a-repo/) and submit a [Pull Request](https://help.github.com/articles/using-pull-requests/) with the fix.
+If you're able to fix a bug yourself, you can `fork the repository <https://help.github.com/articles/fork-a-repo/>`_ and submit a `Pull Request <https://help.github.com/articles/using-pull-requests/>`_ with the fix.
 Please include tests demonstrating the issue and fix. For examples of how to run the tests, consult the `dev README <https://github.com/datastax/python-driver/blob/master/README-dev.rst#running-the-tests>`_.
 
 Contribution License Agreement
 ------------------------------
-To protect the community, all contributors are required to [sign the DataStax Contribution License Agreement](http://cla.datastax.com/). The process is completely electronic and should only take a few minutes.
+To protect the community, all contributors are required to `sign the DataStax Contribution License Agreement <http://cla.datastax.com/>`_. The process is completely electronic and should only take a few minutes.
 
 Design and Implementation Guidelines
 ------------------------------------

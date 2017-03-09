@@ -22,6 +22,7 @@ import six
 from six.moves import range
 import io
 
+from cassandra import ProtocolVersion
 from cassandra import type_codes, DriverException
 from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
@@ -30,7 +31,7 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        UserAggregateDescriptor, SchemaTargetType)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                int8_pack, int8_unpack, uint64_pack, header_pack,
-                               v3_header_pack)
+                               v3_header_pack, uint32_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
                                 DoubleType, FloatType, Int32Type,
@@ -38,7 +39,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 LongType, MapType, SetType, TimeUUIDType,
                                 UTF8Type, VarcharType, UUIDType, UserType,
                                 TupleType, lookup_casstype, SimpleDateType,
-                                TimeType, ByteType, ShortType)
+                                TimeType, ByteType, ShortType, DurationType)
 from cassandra.policies import WriteType
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 from cassandra import util
@@ -54,9 +55,6 @@ class InternalError(Exception):
     pass
 
 ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
-
-MIN_SUPPORTED_VERSION = 1
-MAX_SUPPORTED_VERSION = 5
 
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
@@ -263,7 +261,7 @@ class ReadFailureMessage(RequestExecutionException):
         received_responses = read_int(f)
         required_responses = read_int(f)
 
-        if protocol_version >= 5:
+        if ProtocolVersion.uses_error_code_map(protocol_version):
             error_code_map = read_error_code_map(f)
             failures = len(error_code_map)
         else:
@@ -311,7 +309,7 @@ class WriteFailureMessage(RequestExecutionException):
         received_responses = read_int(f)
         required_responses = read_int(f)
 
-        if protocol_version >= 5:
+        if ProtocolVersion.uses_error_code_map(protocol_version):
             error_code_map = read_error_code_map(f)
             failures = len(error_code_map)
         else:
@@ -560,8 +558,8 @@ class QueryMessage(_MessageType):
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP
 
-        if protocol_version >= 5:
-            write_int(f, flags)
+        if ProtocolVersion.uses_int_query_flags(protocol_version):
+            write_uint(f, flags)
         else:
             write_byte(f, flags)
 
@@ -775,12 +773,14 @@ class PrepareMessage(_MessageType):
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
+        if ProtocolVersion.uses_prepare_flags(protocol_version):
+            # Write the flags byte; with 0 value for now, but this should change in PYTHON-678
+            write_uint(f, 0)
 
 
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
-
     def __init__(self, query_id, query_params, consistency_level,
                  serial_consistency_level=None, fetch_size=None,
                  paging_state=None, timestamp=None, skip_meta=False):
@@ -828,8 +828,8 @@ class ExecuteMessage(_MessageType):
             if self.skip_meta:
                 flags |= _SKIP_METADATA_FLAG
 
-            if protocol_version >= 5:
-                write_int(f, flags)
+            if ProtocolVersion.uses_int_query_flags(protocol_version):
+                write_uint(f, flags)
             else:
                 write_byte(f, flags)
 
@@ -882,7 +882,7 @@ class BatchMessage(_MessageType):
             if self.timestamp is not None:
                 flags |= _PROTOCOL_TIMESTAMP
 
-            if protocol_version >= 5:
+            if ProtocolVersion.uses_int_query_flags(protocol_version):
                 write_int(f, flags)
             else:
                 write_byte(f, flags)
@@ -1162,6 +1162,10 @@ def read_int(f):
 
 def write_int(f, i):
     f.write(int32_pack(i))
+
+
+def write_uint(f, i):
+    f.write(uint32_pack(i))
 
 
 def write_long(f, i):

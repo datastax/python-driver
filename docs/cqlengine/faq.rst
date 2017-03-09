@@ -48,3 +48,20 @@ resolve to the statement with the lastest timestamp.
     assert MyModel.objects(id=1).first().count == 3
     assert MyModel.objects(id=1).first().text  == '111'
 
+How can I delete individual values from a row?
+-------------------------------------------------
+
+When inserting with CQLEngine, ``None`` is equivalent to CQL ``NULL`` or to
+issuing a ``DELETE`` on that column. For example:
+
+.. code-block:: python
+
+    class MyModel(Model):
+        id    = columns.Integer(primary_key=True)
+        text  = columns.Text()
+
+    m = MyModel.create(id=1, text='We can delete this with None')
+    assert MyModel.objects(id=1).first().text is not None
+
+    m.update(text=None)
+    assert MyModel.objects(id=1).first().text is None

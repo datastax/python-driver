@@ -271,6 +271,9 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
         self.assertTrue("appcluster" in scales._Stats.stats.keys())
         self.assertTrue("devops" in scales._Stats.stats.keys())
 
+        cluster2.shutdown()
+        cluster3.shutdown()
+
 
 class RequestAnalyzer(object):
     """
@@ -363,8 +366,12 @@ class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
         ra.remove_ra(self.session)
 
         # Make sure a poorly coded RA doesn't cause issues
-        RequestAnalyzer(self.session, throw_on_success=False, throw_on_fail=True)
+        ra = RequestAnalyzer(self.session, throw_on_success=False, throw_on_fail=True)
         self.session.execute("SELECT release_version FROM system.local")
+        
+        ra.remove_ra(self.session)
+
+        RequestAnalyzer(self.session, throw_on_success=True)
         try:
             self.session.execute("nonesense")
         except SyntaxException:

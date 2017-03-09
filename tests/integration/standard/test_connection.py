@@ -364,7 +364,8 @@ class ConnectionTests(object):
         for i in range(max_retry_count):
             start = time.time()
             try:
-                self.get_connection(timeout=sys.float_info.min)
+                conn = self.get_connection(timeout=sys.float_info.min)
+                conn.close()
             except Exception as e:
                 end = time.time()
                 self.assertAlmostEqual(start, end, 1)

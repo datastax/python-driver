@@ -655,7 +655,8 @@ class BaseModel(object):
         """
         Create an instance of this model in the database.
 
-        Takes the model column values as keyword arguments.
+        Takes the model column values as keyword arguments. Setting a value to
+        `None` is equivalent to running a CQL `DELETE` on that column.
 
         Returns the instance.
         """
@@ -741,7 +742,8 @@ class BaseModel(object):
         Performs an update on the model instance. You can pass in values to set on the model
         for updating, or you can call without values to execute an update against any modified
         fields. If no fields on the model have been modified since loading, no query will be
-        performed. Model validation is performed normally.
+        performed. Model validation is performed normally. Setting a value to `None` is
+        equivalent to running a CQL `DELETE` on that column.
 
         It is possible to do a blind update, that is, to update a field without having first selected the object out of the database.
         See :ref:`Blind Updates <blind_updates>`

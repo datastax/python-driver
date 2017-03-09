@@ -107,6 +107,8 @@ def _get_cass_version_from_dse(dse_version):
         cass_ver = "2.1"
     elif dse_version.startswith('5.0'):
         cass_ver = "3.0"
+    elif dse_version.startswith("5.1"):
+        cass_ver = "3.10"
     else:
         log.error("Uknown dse version found {0}, defaulting to 2.1".format(dse_version))
         cass_ver = "2.1"
@@ -394,7 +396,7 @@ def execute_until_pass(session, query):
         try:
             return session.execute(query)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Recieved already exists from query {0}   not exiting".format(query))
+            log.warn("Received already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
@@ -412,7 +414,7 @@ def execute_with_long_wait_retry(session, query, timeout=30):
         try:
             return session.execute(query, timeout=timeout)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Recieved already exists from query {0}    not exiting".format(query))
+            log.warn("Received already exists from query {0}    not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):

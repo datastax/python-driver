@@ -21,7 +21,7 @@ from ccmlib.node import Node
 
 from cassandra.query import named_tuple_factory
 
-from tests.integration import get_node, get_cluster
+from tests.integration import get_node, get_cluster, wait_for_node_socket
 
 IP_FORMAT = '127.0.0.%s'
 
@@ -107,6 +107,7 @@ def bootstrap(node, data_center=None, token=None):
                          auto_bootstrap=False,
                          thrift_interface=(IP_FORMAT % node, 9160),
                          storage_interface=(IP_FORMAT % node, 7000),
+                         binary_interface=(IP_FORMAT % node, 9042),
                          jmx_port=str(7000 + 100 * node),
                          remote_debug_port=0,
                          initial_token=token if token else node * 10)
@@ -132,6 +133,7 @@ def wait_for_up(cluster, node):
     while tries < 100:
         host = cluster.metadata.get_host(addr)
         if host and host.is_up:
+            wait_for_node_socket(get_node(node), 60)
             log.debug("Done waiting for node %s to be up", node)
             return
         else:

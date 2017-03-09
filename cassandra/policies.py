@@ -14,7 +14,7 @@
 
 from itertools import islice, cycle, groupby, repeat
 import logging
-from random import randint
+from random import randint, shuffle
 from threading import Lock
 import socket
 
@@ -315,8 +315,10 @@ class TokenAwarePolicy(LoadBalancingPolicy):
     This alters the child policy's behavior so that it first attempts to
     send queries to :attr:`~.HostDistance.LOCAL` replicas (as determined
     by the child policy) based on the :class:`.Statement`'s
-    :attr:`~.Statement.routing_key`.  Once those hosts are exhausted, the
-    remaining hosts in the child policy's query plan will be used.
+    :attr:`~.Statement.routing_key`. If :attr:`.shuffle_replicas` is
+    truthy, these replicas will be yielded in a random order. Once those
+    hosts are exhausted, the remaining hosts in the child policy's query
+    plan will be used in the order provided by the child policy.
 
     If no :attr:`~.Statement.routing_key` is set on the query, the child
     policy's query plan will be used as is.
@@ -324,9 +326,14 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
     _child_policy = None
     _cluster_metadata = None
+    shuffle_replicas = False
+    """
+    Yield local replicas in a random order.
+    """
 
-    def __init__(self, child_policy):
+    def __init__(self, child_policy, shuffle_replicas=False):
         self._child_policy = child_policy
+        self.shuffle_replicas = shuffle_replicas
 
     def populate(self, cluster, hosts):
         self._cluster_metadata = cluster.metadata
@@ -361,6 +368,8 @@ class TokenAwarePolicy(LoadBalancingPolicy):
                     yield host
             else:
                 replicas = self._cluster_metadata.get_replicas(keyspace, routing_key)
+                if self.shuffle_replicas:
+                    shuffle(replicas)
                 for replica in replicas:
                     if replica.is_up and \
                             child.distance(replica) == HostDistance.LOCAL:

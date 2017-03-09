@@ -32,7 +32,7 @@ from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
     BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30
-from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
+from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_collection_sample
 
 
@@ -202,7 +202,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         col_names = ["zz"]
         start_index = ord('a')
         for i, collection_type in enumerate(COLLECTION_TYPES):
-            for j, datatype in enumerate(PRIMITIVE_DATATYPES):
+            for j, datatype in enumerate(PRIMITIVE_DATATYPES_KEYS):
                 if collection_type == "map":
                     type_string = "{0}_{1} {2}<{3}, {3}>".format(chr(start_index + i), chr(start_index + j),
                                                                      collection_type, datatype)
@@ -221,7 +221,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # create the input for simple statement
         params = [0]
         for collection_type in COLLECTION_TYPES:
-            for datatype in PRIMITIVE_DATATYPES:
+            for datatype in PRIMITIVE_DATATYPES_KEYS:
                 params.append((get_collection_sample(collection_type, datatype)))
 
         # insert into table as a simple statement
@@ -236,7 +236,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # create the input for prepared statement
         params = [0]
         for collection_type in COLLECTION_TYPES:
-            for datatype in PRIMITIVE_DATATYPES:
+            for datatype in PRIMITIVE_DATATYPES_KEYS:
                 params.append((get_collection_sample(collection_type, datatype)))
 
         # try the same thing with a prepared statement
@@ -553,15 +553,15 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         values = []
 
         # create list values
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             values.append('v_{0} frozen<tuple<list<{1}>>>'.format(len(values), datatype))
 
         # create set values
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             values.append('v_{0} frozen<tuple<set<{1}>>>'.format(len(values), datatype))
 
         # create map values
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             datatype_1 = datatype_2 = datatype
             if datatype == 'blob':
                 # unhashable type: 'bytearray'
@@ -581,7 +581,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
         i = 0
         # test tuple<list<datatype>>
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             created_tuple = tuple([[get_sample(datatype)]])
             s.execute("INSERT INTO tuple_non_primative (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
@@ -590,7 +590,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             i += 1
 
         # test tuple<set<datatype>>
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             created_tuple = tuple([sortedset([get_sample(datatype)])])
             s.execute("INSERT INTO tuple_non_primative (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
@@ -599,7 +599,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             i += 1
 
         # test tuple<map<datatype, datatype>>
-        for datatype in PRIMITIVE_DATATYPES:
+        for datatype in PRIMITIVE_DATATYPES_KEYS:
             if datatype == 'blob':
                 # unhashable type: 'bytearray'
                 created_tuple = tuple([{get_sample('ascii'): get_sample(datatype)}])
