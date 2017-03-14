@@ -99,38 +99,43 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Bad credentials.*Username and/or '
-                                'password are incorrect.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
     def test_connect_wrong_username(self):
         cluster = self.cluster_as('wrong_user', 'cassandra')
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Bad credentials.*Username and/or '
-                                'password are incorrect.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.*',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
     def test_connect_empty_pwd(self):
         cluster = self.cluster_as('Cassandra', '')
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Bad credentials.*Username and/or '
-                                'password are incorrect.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.*',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
     def test_connect_no_auth_provider(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Remote end requires authentication.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.*',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
 
 class SaslAuthenticatorTests(AuthenticationTests):
