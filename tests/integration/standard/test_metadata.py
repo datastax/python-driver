@@ -37,7 +37,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
                                BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION,
-                               get_supported_protocol_versions, greaterthanorequalcass30)
+                               get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30)
 
 from tests.integration import greaterthancass21
 
@@ -2470,6 +2470,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
         self.assertEqual(mv_alltime_fouls_comumn.cql_type, 'int')
 
+    @lessthancass30
     def test_base_table_type_alter_mv(self):
         """
         test to ensure that materialized view metadata is properly updated when a type in the base table
