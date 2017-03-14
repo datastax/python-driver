@@ -12,7 +12,7 @@ Batch Query General Use Pattern
 
     .. code-block:: python
 
-        from cassandra.cqlengine import BatchQuery
+        from cassandra.cqlengine.query import BatchQuery
 
         #using a context manager
         with BatchQuery() as b:
