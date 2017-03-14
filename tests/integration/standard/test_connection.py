@@ -24,7 +24,7 @@ from threading import Thread, Event
 import time
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable, Cluster
+from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
@@ -192,7 +192,7 @@ class ConnectionTests(object):
             try:
                 conn = self.klass.factory(host='127.0.0.1', timeout=timeout, protocol_version=PROTOCOL_VERSION)
                 break
-            except (OperationTimedOut, NoHostAvailable) as e:
+            except (OperationTimedOut, NoHostAvailable, ConnectionShutdown) as e:
                 continue
 
         if conn:
