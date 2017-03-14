@@ -95,18 +95,12 @@ class ConnectionTest(BaseCassEngTestCase):
         self.assertEqual(1, TestConnectModel.objects.count())
         self.assertEqual(TestConnectModel.objects.first(), TCM2)
 
-<<<<<<< HEAD
-=======
     @local
->>>>>>> 1d91fa8... Added support for testing remotely and on Windows
     def test_connection_setup_with_setup(self):
         connection.setup(hosts=None, default_keyspace=None)
         self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
 
-<<<<<<< HEAD
-=======
     @local
->>>>>>> 1d91fa8... Added support for testing remotely and on Windows
     def test_connection_setup_with_default(self):
         connection.default()
         self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
