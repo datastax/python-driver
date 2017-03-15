@@ -37,7 +37,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
                                BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION,
-                               get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30)
+                               get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30, local)
 
 from tests.integration import greaterthancass21
 
@@ -48,13 +48,14 @@ def setup_module():
 
 
 class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
+    @local
     def test_broadcast_listen_address(self):
         """
         Check to ensure that the broadcast and listen adresss is populated correctly
 
         @since 3.3
         @jira_ticket PYTHON-332
-        @expected_result They are populated for C*> 2.0.16, 2.1.6, 2.2.0
+        @expected_result They are populated for C*> 2.1.6, 2.2.0
 
         @test_category metadata
         """
@@ -81,7 +82,7 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         for host in self.cluster.metadata.all_hosts():
             self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
 
-
+@local
 class MetaDataRemovalTest(unittest.TestCase):
 
     def setUp(self):
@@ -1090,6 +1091,7 @@ CREATE TABLE export_udts.users (
         ksname = 'AnInterestingKeyspace'
         cfname = 'AnInterestingTable'
 
+        session.execute("DROP KEYSPACE IF EXISTS {0}".format(ksname))
         session.execute("""
             CREATE KEYSPACE "%s"
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
@@ -1146,6 +1148,7 @@ CREATE TABLE export_udts.users (
         self.assertRaises(AlreadyExists, session.execute, ddl % (ksname, cfname))
         cluster.shutdown()
 
+    @local
     def test_replicas(self):
         """
         Ensure cluster.metadata.get_replicas return correctly when not attached to keyspace
@@ -1184,6 +1187,7 @@ CREATE TABLE export_udts.users (
             self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
         cluster.shutdown()
 
+    @local
     def test_legacy_tables(self):
 
         if CASS_SERVER_VERSION < (2, 1, 0):
@@ -1450,7 +1454,7 @@ class TokenMetadataTest(unittest.TestCase):
     """
     Test of TokenMap creation and other behavior.
     """
-
+    @local
     def test_token(self):
         expected_node_count = len(get_cluster().nodes)
 
@@ -2116,8 +2120,6 @@ class BadMetaTest(unittest.TestCase):
         connection = cls.cluster.control_connection._connection
         cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
         cls.cluster.control_connection.reconnect = Mock()
-
-
 
     @classmethod
     def teardown_class(cls):

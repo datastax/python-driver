@@ -115,6 +115,7 @@ def _get_cass_version_from_dse(dse_version):
 
     return cass_ver
 
+CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 DSE_VERSION = os.getenv('DSE_VERSION', None)
 DSE_CRED = os.getenv('DSE_CREDS', None)
@@ -139,6 +140,18 @@ if DSE_VERSION:
         if DSE_CRED:
             log.info("Using DSE credentials file located at {0}".format(DSE_CRED))
             CCM_KWARGS['dse_credentials_file'] = DSE_CRED
+
+
+#This changes the default contact_point parameter in Cluster
+def set_default_cass_ip():
+    if CASSANDRA_IP.startswith("127.0.0."):
+        return
+    defaults = list(Cluster.__init__.__defaults__)
+    defaults = [[CASSANDRA_IP]] + defaults[1:]
+    try:
+        Cluster.__init__.__defaults__ = tuple(defaults)
+    except:
+        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
 
 
 def get_default_protocol():
@@ -208,6 +221,7 @@ default_protocol_version = get_default_protocol()
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
+local = unittest.skipUnless(CASSANDRA_IP.startswith("127.0.0."), 'Tests only runs against local C*')
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
@@ -299,6 +313,8 @@ def is_current_cluster(cluster_name, node_counts):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
+    set_default_cass_ip()
+
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
         if CCM_CLUSTER:

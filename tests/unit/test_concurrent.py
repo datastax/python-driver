@@ -24,6 +24,7 @@ import time
 import threading
 from six.moves.queue import PriorityQueue
 import sys
+import platform
 
 from cassandra.cluster import Cluster, Session
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
@@ -114,7 +115,6 @@ class TimedCallableInvoker(threading.Thread):
                 fn([time_added], *args, **kwargs)
             self._stopper.wait(.001)
         return
-
 
 class ConcurrencyTest((unittest.TestCase)):
 
@@ -231,7 +231,12 @@ class ConcurrencyTest((unittest.TestCase)):
         for success, result in results:
             self.assertTrue(success)
             current_time_added = list(result)[0]
-            self.assertLess(last_time_added, current_time_added)
+
+            #Windows clock granularity makes this equal most of the times
+            if "Windows" in platform.system():
+                self.assertLessEqual(last_time_added, current_time_added)
+            else:
+                self.assertLess(last_time_added, current_time_added)
             last_time_added = current_time_added
 
     def test_recursion_limited(self):

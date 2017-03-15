@@ -18,11 +18,13 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+
 from cassandra import OperationTimedOut
 from cassandra.cluster import ExecutionProfile
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy
 from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21
+from tests import notwindows
 
 
 def setup_module():
@@ -52,6 +54,8 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
         self.cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
         self.cluster.add_execution_profile("spec_ep_rr_lim", spec_ep_rr_lim)
 
+    #This doesn't work well with Windows clock granularity
+    @notwindows
     @greaterthancass21
     def test_speculative_execution(self):
         """
