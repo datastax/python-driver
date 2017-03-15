@@ -19,6 +19,7 @@
 import eventlet
 from eventlet.green import socket
 from eventlet.queue import Queue
+from greenlet import GreenletExit
 import logging
 from threading import Event
 import time
@@ -80,7 +81,6 @@ class EventletConnection(Connection):
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
-
         self._write_queue = Queue()
 
         self._connect_socket()
@@ -126,6 +126,8 @@ class EventletConnection(Connection):
                 log.debug("Exception during socket send for %s: %s", self, err)
                 self.defunct(err)
                 return  # Leave the write loop
+            except GreenletExit:  # graceful greenthread exit
+                return
 
     def handle_read(self):
         while True:
@@ -137,6 +139,8 @@ class EventletConnection(Connection):
                           self, err)
                 self.defunct(err)
                 return  # leave the read loop
+            except GreenletExit:  # graceful greenthread exit
+                return
 
             if self._iobuf.tell():
                 self.process_io_buffer()
