@@ -25,7 +25,9 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
+    greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local
+from tests import notwindows
 
 import time
 import re
@@ -115,6 +117,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         for event in trace.events:
             str(event)
 
+    @local
     @greaterthanprotocolv3
     def test_client_ip_in_trace(self):
         """
@@ -179,6 +182,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
             self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ANY).trace_id)
         self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.QUORUM).trace_id)
 
+    @notwindows
     def test_incomplete_query_trace(self):
         """
         Tests to ensure that partial tracing works.
@@ -430,9 +434,9 @@ class PreparedStatementMetdataTest(unittest.TestCase):
             future = session.execute_async(select_statement)
             results = future.result()
             if base_line is None:
-                base_line = results[0].__dict__.keys()
+                base_line = results[0]._asdict().keys()
             else:
-                self.assertEqual(base_line, results[0].__dict__.keys())
+                self.assertEqual(base_line, results[0]._asdict().keys())
             cluster.shutdown()
 
 

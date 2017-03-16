@@ -68,12 +68,19 @@ else:
         return val
 
 
+def bit_length(n):
+    if six.PY3 or isinstance(n, int):
+        return int.bit_length(n)
+    else:
+        return long.bit_length(n)
+
+
 def varint_pack(big):
     pos = True
     if big == 0:
         return b'\x00'
     if big < 0:
-        bytelength = int.bit_length(abs(big) - 1) // 8 + 1
+        bytelength = bit_length(abs(big) - 1) // 8 + 1
         big = (1 << bytelength * 8) + big
         pos = False
     revbytes = bytearray()

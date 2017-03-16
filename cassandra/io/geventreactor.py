@@ -125,7 +125,7 @@ class GeventConnection(Connection):
                 self.defunct(err)
                 return  # leave the read loop
 
-            if self._iobuf.tell():
+            if buf and self._iobuf.tell():
                 self.process_io_buffer()
             else:
                 log.debug("Connection %s closed by server", self)

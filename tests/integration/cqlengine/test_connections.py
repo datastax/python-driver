@@ -23,6 +23,7 @@ from cassandra.cqlengine.query import ContextQuery, BatchQuery, ModelQuerySet
 from tests.integration.cqlengine import setup_connection, DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query import test_queryset
+from tests.integration import local, CASSANDRA_IP
 
 
 class TestModel(Model):
@@ -44,7 +45,6 @@ class AnotherTestModel(Model):
     count = columns.Integer()
     text = columns.Text()
 
-
 class ContextQueryConnectionTests(BaseCassEngTestCase):
 
     @classmethod
@@ -53,8 +53,8 @@ class ContextQueryConnectionTests(BaseCassEngTestCase):
         create_keyspace_simple('ks1', 1)
 
         conn.unregister_connection('default')
-        conn.register_connection('fake_cluster', ['127.0.0.100'], lazy_connect=True, retry_connect=True, default=True)
-        conn.register_connection('cluster', ['127.0.0.1'])
+        conn.register_connection('fake_cluster', ['1.2.3.4'], lazy_connect=True, retry_connect=True, default=True)
+        conn.register_connection('cluster', [CASSANDRA_IP])
 
         with ContextQuery(TestModel, connection='cluster') as tm:
             sync_table(tm)
@@ -141,7 +141,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         super(ManagementConnectionTests, cls).setUpClass()
         conn.unregister_connection('default')
         conn.register_connection('fake_cluster', ['127.0.0.100'], lazy_connect=True, retry_connect=True, default=True)
-        conn.register_connection('cluster', ['127.0.0.1'])
+        conn.register_connection('cluster', [CASSANDRA_IP])
 
     @classmethod
     def tearDownClass(cls):
@@ -227,11 +227,11 @@ class ManagementConnectionTests(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        cluster = Cluster(['127.0.0.1'])
+        cluster = Cluster([CASSANDRA_IP])
         session = cluster.connect()
         connection_name = 'from_session'
         conn.register_connection(connection_name, session=session)
-        self.assertIsNotNone(conn.get_connection(connection_name).cluster.metadata.get_host("127.0.0.1"))
+        self.assertIsNotNone(conn.get_connection(connection_name).cluster.metadata.get_host(CASSANDRA_IP))
         self.addCleanup(conn.unregister_connection, connection_name)
         cluster.shutdown()
 
@@ -245,8 +245,8 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         @test_category object_mapper
         """
         connection_name = 'from_hosts'
-        conn.register_connection(connection_name, hosts=['127.0.0.1'])
-        self.assertIsNotNone(conn.get_connection(connection_name).cluster.metadata.get_host("127.0.0.1"))
+        conn.register_connection(connection_name, hosts=[CASSANDRA_IP])
+        self.assertIsNotNone(conn.get_connection(connection_name).cluster.metadata.get_host(CASSANDRA_IP))
         self.addCleanup(conn.unregister_connection, connection_name)
 
     def test_connection_param_validation(self):
@@ -258,7 +258,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        cluster = Cluster(['127.0.0.1'])
+        cluster = Cluster([CASSANDRA_IP])
         session = cluster.connect()
         with self.assertRaises(CQLEngineException):
             conn.register_connection("bad_coonection1", session=session, consistency="not_null")
@@ -275,6 +275,8 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         cluster.shutdown()
 
 
+        cluster.shutdown()
+
 class BatchQueryConnectionTests(BaseCassEngTestCase):
 
     conns = ['cluster']
@@ -289,7 +291,7 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
 
         conn.unregister_connection('default')
         conn.register_connection('fake_cluster', ['127.0.0.100'], lazy_connect=True, retry_connect=True, default=True)
-        conn.register_connection('cluster', ['127.0.0.1'])
+        conn.register_connection('cluster', [CASSANDRA_IP])
 
     @classmethod
     def tearDownClass(cls):
@@ -415,7 +417,6 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
             with BatchQuery(connection='cluster') as b:
                 obj1.batch(b).using(connection='test').save()
 
-
 class UsingDescriptorTests(BaseCassEngTestCase):
 
     conns = ['cluster']
@@ -427,7 +428,7 @@ class UsingDescriptorTests(BaseCassEngTestCase):
 
         conn.unregister_connection('default')
         conn.register_connection('fake_cluster', ['127.0.0.100'], lazy_connect=True, retry_connect=True, default=True)
-        conn.register_connection('cluster', ['127.0.0.1'])
+        conn.register_connection('cluster', [CASSANDRA_IP])
 
     @classmethod
     def tearDownClass(cls):
@@ -527,13 +528,12 @@ class ModelQuerySetNew(ModelQuerySet):
         super(ModelQuerySetNew, self).__init__(*args, **kwargs)
         self._connection = "cluster"
 
-
 class BaseConnectionTestNoDefault(object):
     conns = ['cluster']
 
     @classmethod
     def setUpClass(cls):
-        conn.register_connection('cluster', ['127.0.0.1'])
+        conn.register_connection('cluster', [CASSANDRA_IP])
         test_queryset.TestModel.__queryset__ = ModelQuerySetNew
         test_queryset.IndexedTestModel.__queryset__ = ModelQuerySetNew
         test_queryset.IndexedCollectionsTestModel.__queryset__ = ModelQuerySetNew
