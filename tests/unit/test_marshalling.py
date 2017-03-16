@@ -140,7 +140,7 @@ class UnmarshalTest(unittest.TestCase):
     def test_decimal(self):
         # testing implicit numeric conversion
         # int, tuple(sign, digits, exp), float
-        converted_types = (10001, (0, (1, 0, 0, 0, 0, 1), -3), 100.1)
+        converted_types = (10001, (0, (1, 0, 0, 0, 0, 1), -3), 100.1, -87.629798)
 
         if sys.version_info < (2, 7):
             # Decimal in Python 2.6 does not accept floats for lossless initialization
