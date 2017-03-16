@@ -1,3 +1,14 @@
+3.8.1
+=====
+March 16, 2017
+
+Bug Fixes
+---------
+
+* implement __le__/__ge__/__ne__ on some custom types (PYTHON-714)
+* Fix bug in eventlet and gevent reactors that could cause hangs (PYTHON-721)
+* Fix DecimalType regression (PYTHON-724)
+
 3.8.0
 =====
 
