@@ -20,21 +20,29 @@ try:
 except ImportError:
     import unittest  # noqa
 import logging
+from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
-    greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local
+    greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace
 from tests import notwindows
 
 import time
 import re
 
-
 def setup_module():
-    use_singledc()
+    use_singledc(start=False)
+    ccm_cluster = get_cluster()
+    ccm_cluster.clear()
+    # This is necessary because test_too_many_statements may
+    # timeout otherwise
+    config_options = {'write_request_timeout_in_ms': '20000'}
+    ccm_cluster.set_configuration_options(config_options)
+    ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+    setup_keyspace()
     global CASS_SERVER_VERSION
     CASS_SERVER_VERSION = get_server_versions()[0]
 
@@ -424,7 +432,9 @@ class PreparedStatementMetdataTest(unittest.TestCase):
 
         base_line = None
         for proto_version in get_supported_protocol_versions():
-            cluster = Cluster(protocol_version=proto_version)
+            beta_flag = True if proto_version in ProtocolVersion.BETA_VERSIONS else False
+            cluster = Cluster(protocol_version=proto_version, allow_beta_protocol_version=beta_flag)
+
             session = cluster.connect()
             select_statement = session.prepare("SELECT * FROM system.local")
             if proto_version == 1:
@@ -462,10 +472,16 @@ class PreparedStatementArgTest(unittest.TestCase):
             mock_handler = MockLoggingHandler()
             logger = logging.getLogger(cluster.__name__)
             logger.addHandler(mock_handler)
+            self.assertGreaterEqual(len(clus.metadata.all_hosts()), 3)
             select_statement = session.prepare("SELECT * FROM system.local")
-            session.execute(select_statement)
-            session.execute(select_statement)
-            session.execute(select_statement)
+            reponse_first = session.execute(select_statement)
+            reponse_second = session.execute(select_statement)
+            reponse_third = session.execute(select_statement)
+
+            self.assertEqual(len({reponse_first.response_future.attempted_hosts[0],
+                                  reponse_second.response_future.attempted_hosts[0],
+                                  reponse_third.response_future.attempted_hosts[0]}), 3)
+
             self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
         finally:
             clus.shutdown()
