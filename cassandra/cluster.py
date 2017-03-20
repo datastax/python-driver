@@ -1975,6 +1975,12 @@ class Session(object):
         while futures.not_done and not any(f.result() for f in futures.done):
             futures = wait_futures(futures.not_done, return_when=FIRST_COMPLETED)
 
+        if not any(f.result() for f in self._initial_connect_futures):
+            msg = "Unable to connect to any servers"
+            if self.keyspace:
+                msg += " using keyspace '%s'" % self.keyspace
+            raise NoHostAvailable(msg, [h.address for h in hosts])
+
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
         """
         Execute the given query and synchronously wait for the response.
