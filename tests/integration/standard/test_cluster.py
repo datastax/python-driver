@@ -25,11 +25,12 @@ from uuid import uuid4
 import logging
 
 import cassandra
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 WhiteListRoundRobinPolicy, AddressTranslator)
+from cassandra.pool import Host
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
 
@@ -176,6 +177,28 @@ class ClusterTests(unittest.TestCase):
         execute_with_long_wait_retry(session, "DROP KEYSPACE clustertests")
 
         cluster.shutdown()
+
+    def test_session_host_parameter(self):
+        """
+        Test for protocol negotiation
+
+        Very that NoHostAvailable is risen in Session.__init__ when there are no valid connections and that
+        no error is arisen otherwise, despite maybe being some invalid hosts
+
+        @since 3.9
+        @jira_ticket PYTHON-665
+        @expected_result NoHostAvailable when the driver is unable to connect to a valid host,
+        no exception otherwise
+
+        @test_category connection
+        """
+        with self.assertRaises(NoHostAvailable):
+            Session(Cluster(), [])
+        with self.assertRaises(NoHostAvailable):
+            Session(Cluster(), [Host("1.2.3.4", SimpleConvictionPolicy)])
+        session = Session(Cluster(), [Host(x, SimpleConvictionPolicy) for x in
+                                      ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
+        session.shutdown()
 
     def test_protocol_negotiation(self):
         """
