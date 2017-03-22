@@ -28,6 +28,9 @@ import platform
 
 from cassandra.cluster import Cluster, Session
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
+from cassandra.pool import Host
+from cassandra.policies import SimpleConvictionPolicy
+from tests.unit.utils import mock_session_pools
 
 
 class MockResponseResponseFuture():
@@ -239,6 +242,7 @@ class ConcurrencyTest((unittest.TestCase)):
                 self.assertLess(last_time_added, current_time_added)
             last_time_added = current_time_added
 
+    @mock_session_pools
     def test_recursion_limited(self):
         """
         Verify that recursion is controlled when raise_on_first_error=False and something is wrong with the query.
@@ -246,7 +250,7 @@ class ConcurrencyTest((unittest.TestCase)):
         PYTHON-585
         """
         max_recursion = sys.getrecursionlimit()
-        s = Session(Cluster(), [])
+        s = Session(Cluster(), [Host("127.0.0.1", SimpleConvictionPolicy)])
         self.assertRaises(TypeError, execute_concurrent_with_args, s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=True)
 
         results = execute_concurrent_with_args(s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=False)  # previously
