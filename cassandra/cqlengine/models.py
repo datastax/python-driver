@@ -490,6 +490,7 @@ class BaseModel(object):
     def _set_persisted(self):
         for v in self._values.values():
             v.reset_previous_value()
+            v.explicit = False
         self._is_persisted = True
 
     def _can_update(self):
