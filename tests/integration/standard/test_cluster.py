@@ -193,10 +193,10 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
         with self.assertRaises(NoHostAvailable):
-            Session(Cluster(), [])
+            Session(Cluster(protocol_version=PROTOCOL_VERSION), [])
         with self.assertRaises(NoHostAvailable):
-            Session(Cluster(), [Host("1.2.3.4", SimpleConvictionPolicy)])
-        session = Session(Cluster(), [Host(x, SimpleConvictionPolicy) for x in
+            Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host("1.2.3.4", SimpleConvictionPolicy)])
+        session = Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host(x, SimpleConvictionPolicy) for x in
                                       ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
         session.shutdown()
 
