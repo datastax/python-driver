@@ -514,16 +514,20 @@ class TestUpdating(BaseCassEngTestCase):
         # yet.
         self.assertTrue(instance._values['id'].previous_value is None)
         self.assertTrue(instance._values['int1'].previous_value is None)
-        self.assertTrue(instance._values['int2'].previous_value is None)
         self.assertTrue(instance._values['int3'].previous_value is None)
-        self.assertTrue(instance._values['int4'].previous_value is None)
         self.assertTrue(instance._values['int5'].previous_value is None)
         self.assertTrue(instance._values['int6'].previous_value is None)
+
+        # When a column has a default value and that field has no explicit value specified at
+        # the instance creation, the previous_value should be set to the default value to
+        # avoid any undesired update
+        self.assertEqual(instance._values['int2'].previous_value, 456)
+        self.assertIsNotNone(instance._values['int4'])
 
         # All explicitely set columns, and those with default values are
         # flagged has changed.
         self.assertTrue(set(instance.get_changed_columns()) == set([
-            'id', 'int1', 'int2', 'int3', 'int4', 'int5']))
+            'id', 'int1', 'int3', 'int5']))
 
     def test_save_to_none(self):
         """
