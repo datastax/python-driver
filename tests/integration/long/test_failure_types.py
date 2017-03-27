@@ -322,8 +322,6 @@ class TimeoutTimerTest(unittest.TestCase):
         """
         Setup sessions and pause node1
         """
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
 
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
         self.node1 = get_node(1)

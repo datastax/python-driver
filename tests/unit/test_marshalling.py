@@ -142,14 +142,6 @@ class UnmarshalTest(unittest.TestCase):
         # int, tuple(sign, digits, exp), float
         converted_types = (10001, (0, (1, 0, 0, 0, 0, 1), -3), 100.1, -87.629798)
 
-        if sys.version_info < (2, 7):
-            # Decimal in Python 2.6 does not accept floats for lossless initialization
-            # Just verifying expected exception here
-            f = converted_types[-1]
-            self.assertIsInstance(f, float)
-            self.assertRaises(TypeError, DecimalType.to_binary, f, ProtocolVersion.MAX_SUPPORTED)
-            converted_types = converted_types[:-1]
-
         for proto_ver in range(1, ProtocolVersion.MAX_SUPPORTED + 1):
             for n in converted_types:
                 expected = Decimal(n)
