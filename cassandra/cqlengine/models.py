@@ -407,6 +407,8 @@ class BaseModel(object):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
             value_mngr.explicit = name in values
+            if not value_mngr.explicit and column.has_default:
+                value_mngr.previous_value = value
             self._values[name] = value_mngr
 
     def __repr__(self):

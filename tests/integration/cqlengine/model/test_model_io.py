@@ -22,6 +22,7 @@ from datetime import datetime, date, time
 from decimal import Decimal
 from operator import itemgetter
 
+import cassandra
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.management import sync_table
@@ -482,6 +483,37 @@ class TestUpdating(BaseCassEngTestCase):
         self.assertTrue(self.instance._values['count'].previous_value is None)
         self.assertTrue(self.instance.count is None)
 
+    def test_value_override_with_default(self):
+        """
+        Updating a row with a new Model instance shouldn't set columns to defaults
+
+        @since 3.9
+        @jira_ticket PYTHON-657
+        @expected_result column value should not change
+
+        @test_category object_mapper
+        """
+        class ModelWithDefault(Model):
+            id = columns.Integer(primary_key=True)
+            mf = columns.Map(columns.Integer, columns.Integer)
+            dummy = columns.Integer(default=42)
+        sync_table(ModelWithDefault)
+
+        initial = ModelWithDefault(id=1, mf={0: 0}, dummy=0)
+        initial.save()
+
+        session = cassandra.cluster.Cluster().connect()
+        session.execute('USE ' + DEFAULT_KEYSPACE)
+        self.assertEqual(
+            list(session.execute('SELECT * from model_with_default'))[0].dummy, 0
+        )
+
+        second = ModelWithDefault(id=1)
+        second.update(mf={0: 1})
+        self.assertEqual(
+            list(session.execute('SELECT * from model_with_default'))[0].dummy, 0
+        )
+
     def test_previous_value_tracking_on_instantiation_with_default(self):
 
         class TestDefaultValueTracking(Model):
@@ -514,16 +546,20 @@ class TestUpdating(BaseCassEngTestCase):
         # yet.
         self.assertTrue(instance._values['id'].previous_value is None)
         self.assertTrue(instance._values['int1'].previous_value is None)
-        self.assertTrue(instance._values['int2'].previous_value is None)
         self.assertTrue(instance._values['int3'].previous_value is None)
-        self.assertTrue(instance._values['int4'].previous_value is None)
         self.assertTrue(instance._values['int5'].previous_value is None)
         self.assertTrue(instance._values['int6'].previous_value is None)
+
+        # When a column has a default value and that field has no explicit value specified at
+        # the instance creation, the previous_value should be set to the default value to
+        # avoid any undesired update
+        self.assertEqual(instance._values['int2'].previous_value, 456)
+        self.assertIsNotNone(instance._values['int4'])
 
         # All explicitely set columns, and those with default values are
         # flagged has changed.
         self.assertTrue(set(instance.get_changed_columns()) == set([
-            'id', 'int1', 'int2', 'int3', 'int4', 'int5']))
+            'id', 'int1', 'int3', 'int5']))
 
     def test_save_to_none(self):
         """

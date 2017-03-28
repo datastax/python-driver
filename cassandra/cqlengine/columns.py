@@ -37,7 +37,7 @@ class BaseValueManager(object):
 
     @property
     def deleted(self):
-        return self.column._val_is_null(self.value) and (self.explicit or self.previous_value is not None)
+        return self.column._val_is_null(self.value) and (self.explicit or not self.column._val_is_null(self.previous_value))
 
     @property
     def changed(self):
