@@ -485,12 +485,14 @@ class Counter(Integer):
 
     def __init__(self,
                  index=False,
+                 static=False,
                  db_field=None,
                  required=False):
         super(Counter, self).__init__(
             primary_key=False,
             partition_key=False,
             index=index,
+            static=static,
             db_field=db_field,
             default=0,
             required=required,
