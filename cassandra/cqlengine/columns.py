@@ -47,7 +47,7 @@ class BaseValueManager(object):
         :rtype: boolean
 
         """
-        return self.value != self.previous_value
+        return self.explicit and self.value != self.previous_value
 
     def reset_previous_value(self):
         self.previous_value = deepcopy(self.value)
@@ -57,6 +57,7 @@ class BaseValueManager(object):
 
     def setval(self, val):
         self.value = val
+        self.explicit = True
 
     def delval(self):
         self.value = None
