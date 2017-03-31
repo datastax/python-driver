@@ -58,3 +58,4 @@ def is_monkey_patched():
     return is_gevent_monkey_patched() or is_eventlet_monkey_patched()
 
 notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adequate for windows")
+notpypy = unittest.skipUnless(not '__pypy__' in sys.builtin_module_names, "This tests is not suitable for pypy")

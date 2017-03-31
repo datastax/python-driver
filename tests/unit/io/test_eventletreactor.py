@@ -19,8 +19,8 @@ except ImportError:
     import unittest # noqa
 
 from tests.unit.io.utils import TimerConnectionTests
-from tests import is_eventlet_time_monkey_patched, is_gevent_time_monkey_patched
 from tests.unit.io.eventlet_utils import restore_saved_module
+from tests import notpypy
 import time
 from eventlet import monkey_patch
 
@@ -31,7 +31,9 @@ except ImportError:
 
 
 class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
+    @notpypy
     def setUp(self):
+        #There are some issues with some versions of pypy and eventlet
         if not EventletConnection:
             raise unittest.SkipTest("Can't test eventlet without monkey patching")
         monkey_patch(time=True)
