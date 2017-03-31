@@ -29,7 +29,7 @@ from cassandra.pool import Host
 from tests.unit.utils import mock_session_pools
 
 try:
-    from dse.io.libevreactor import LibevConnection
+    from cassandra.io.libevreactor import LibevConnection
 except ImportError:
     LibevConnection = None  # noqa
 
