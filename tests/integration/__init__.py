@@ -11,6 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
+from cassandra.io.geventreactor import GeventConnection
+from cassandra.io.libevreactor import LibevConnection
+from cassandra.io.asyncorereactor import AsyncoreConnection
+from cassandra.io.eventletreactor import EventletConnection
+from cassandra.io.twistedreactor import TwistedConnection
+
+EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "gevent")
+if EVENT_LOOP_MANAGER == "gevent":
+    import gevent.monkey
+    gevent.monkey.patch_all()
+    connection_class = GeventConnection
+elif EVENT_LOOP_MANAGER == "eventlet":
+    from eventlet import monkey_patch
+    monkey_patch()
+    connection_class = EventletConnection
+elif EVENT_LOOP_MANAGER == "async":
+    connection_class = AsyncoreConnection
+elif EVENT_LOOP_MANAGER == "twisted":
+    connection_class = TwistedConnection
+else:
+    connection_class = LibevConnection
+
+from cassandra.cluster import Cluster
+Cluster.connection_class = connection_class
 
 try:
     import unittest2 as unittest
@@ -18,7 +44,6 @@ except ImportError:
     import unittest  # noqa
 from packaging.version import Version
 import logging
-import os
 import socket
 import sys
 import time
@@ -30,9 +55,8 @@ from itertools import groupby
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
     InvalidRequest
-from cassandra.cluster import Cluster
+
 from cassandra.protocol import ConfigurationException
-from cassandra.policies import RoundRobinPolicy
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster

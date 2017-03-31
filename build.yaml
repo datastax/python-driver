@@ -3,6 +3,49 @@ schedules:
     schedule: per_commit
     branches:
       include: [master, /python.*/]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+
+  nightly_libev:
+    schedule: nightly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+    matrix:
+      exclude:
+        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+
+  nightly_gevent:
+    schedule: nightly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='gevent'
+    matrix:
+      exclude:
+        - pythoon: 3.4
+        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+
+  nightly_eventlet:
+    schedule: nightly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='eventlet'
+    matrix:
+      exclude:
+        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+
+  nightly_async:
+    schedule: nightly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='async'
+    matrix:
+      exclude:
+        - cassandra: ['2.0', '2.1', '2.2', '3.0']
 
 python:
   - 2.7
@@ -16,8 +59,6 @@ cassandra:
   - '3.0'
   - '3.11'
 env:
-  EVENT_LOOP_MANAGER:
-    - libev
   CYTHON:
     - CYTHON
     - NO_CYTHON
@@ -28,9 +69,7 @@ build:
 
       pip install git+https://github.com/pcmanus/ccm.git
       # Install dependencies
-      if [[ $EVENT_LOOP_MANAGER == 'libev' ]]; then
-        sudo apt-get install -y libev4 libev-dev
-      fi
+      sudo apt-get install -y libev4 libev-dev
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
       FORCE_CYTHON=False
@@ -46,12 +85,12 @@ build:
       fi
 
       echo "==========RUNNING CQLENGINE TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
 
       echo "==========RUNNING INTEGRATION TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
       echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
   - xunit:
     - "*_results.xml"
