@@ -22,6 +22,7 @@ from mock import patch, Mock
 import time
 
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
+from tests.unit.io.utils import TimerConnectionTests
 from tests import is_monkey_patched
 
 

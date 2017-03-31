@@ -18,8 +18,8 @@ except ImportError:
     import unittest # noqa
 
 
-from tests import is_gevent_time_monkey_patched, is_eventlet_monkey_patched
 from tests.unit.io.utils import TimerConnectionTests
+from tests import MONKEY_PATCH_LOOP
 
 try:
     from cassandra.io.geventreactor import GeventConnection
@@ -31,6 +31,9 @@ except ImportError:
 
 class GeventTimerTest(unittest.TestCase, TimerConnectionTests):
     def setUp(self):
+        if not MONKEY_PATCH_LOOP:
+            raise unittest.SkipTest("Skpping because monkey patching may affect the rest of the tests")
+
         if not GeventConnection:
             raise unittest.SkipTest("Can't test gevent without monkey patching")
         gevent.monkey.patch_time()
