@@ -19,12 +19,12 @@ except ImportError:
 
 import time
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
-from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
+from tests import is_gevent_time_monkey_patched, is_eventlet_monkey_patched
 
 try:
     from cassandra.io.geventreactor import GeventConnection
     import gevent.monkey
-    from gevent_utils import gevent_un_patch_all
+    from tests.unit.io.gevent_utils import restore_saved_module
 except ImportError:
     GeventConnection = None  # noqa
 
@@ -38,17 +38,17 @@ class GeventTimerTest(unittest.TestCase):
         if is_eventlet_monkey_patched():
             return  # no dynamic patching if we have eventlet applied
         if GeventConnection is not None:
-            if not is_gevent_monkey_patched():
+            if not is_gevent_time_monkey_patched():
                 cls.need_unpatch = True
-                gevent.monkey.patch_all()
+                gevent.monkey.patch_time()
 
     @classmethod
     def tearDownClass(cls):
         if cls.need_unpatch:
-            gevent_un_patch_all()
+            restore_saved_module("time")
 
     def setUp(self):
-        if not is_gevent_monkey_patched():
+        if not is_gevent_time_monkey_patched():
             raise unittest.SkipTest("Can't test gevent without monkey patching")
         GeventConnection.initialize_reactor()
 

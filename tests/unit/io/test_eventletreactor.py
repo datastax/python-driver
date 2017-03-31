@@ -19,8 +19,10 @@ except ImportError:
     import unittest # noqa
 
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
-from tests import is_eventlet_monkey_patched
+from tests import is_eventlet_time_monkey_patched, is_gevent_time_monkey_patched
+from tests.unit.io.eventlet_utils import restore_saved_module
 import time
+from eventlet import monkey_patch
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
@@ -29,12 +31,25 @@ except ImportError:
 
 
 class EventletTimerTest(unittest.TestCase):
+    need_unpatch = False
+
+    @classmethod
+    def setUpClass(cls):
+        if is_eventlet_time_monkey_patched():
+            return  # no dynamic patching if we have eventlet applied
+        if EventletConnection is not None:
+            if not is_gevent_time_monkey_patched():
+                cls.need_unpatch = True
+                monkey_patch(time=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.need_unpatch:
+            restore_saved_module(time)
 
     def setUp(self):
-        if EventletConnection is None:
-            raise unittest.SkipTest("Eventlet libraries not available")
-        if not is_eventlet_monkey_patched():
-            raise unittest.SkipTest("Can't test eventlet without monkey patching")
+        if not is_eventlet_time_monkey_patched():
+            raise unittest.SkipTest("Can't test gevent without monkey patching")
         EventletConnection.initialize_reactor()
 
     def test_multi_timer_validation(self, *args):

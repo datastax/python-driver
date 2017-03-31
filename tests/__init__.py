@@ -44,6 +44,16 @@ def is_gevent_monkey_patched():
     return socket.socket is gevent.socket.socket
 
 
+def is_gevent_time_monkey_patched():
+    import gevent.monkey
+    return "time" in gevent.monkey.saved
+
+
+def is_eventlet_time_monkey_patched():
+    import eventlet
+    return eventlet.patcher.is_monkey_patched('time')
+
+
 def is_monkey_patched():
     return is_gevent_monkey_patched() or is_eventlet_monkey_patched()
 
