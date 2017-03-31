@@ -47,7 +47,20 @@ class BaseValueManager(object):
         :rtype: boolean
 
         """
-        return self.explicit and self.value != self.previous_value
+        if self.explicit:
+            return self.value != self.previous_value
+
+        if isinstance(self.column, BaseContainerColumn):
+            default_value = self.column.get_default()
+            if self.column._val_is_null(default_value):
+                return not self.column._val_is_null(self.value) and self.value != self.previous_value
+            else:
+                if self.previous_value is None:
+                    return self.value != default_value
+                else:
+                    return self.value != self.previous_value
+
+        return False
 
     def reset_previous_value(self):
         self.previous_value = deepcopy(self.value)
