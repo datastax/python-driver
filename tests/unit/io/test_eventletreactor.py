@@ -18,7 +18,7 @@ try:
 except ImportError:
     import unittest # noqa
 
-from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
+from tests.unit.io.utils import TimerConnectionTests
 from tests import is_eventlet_time_monkey_patched, is_gevent_time_monkey_patched
 from tests.unit.io.eventlet_utils import restore_saved_module
 import time
@@ -30,53 +30,16 @@ except ImportError:
     EventletConnection = None  # noqa
 
 
-class EventletTimerTest(unittest.TestCase):
-    need_unpatch = False
-
-    @classmethod
-    def setUpClass(cls):
-        if is_eventlet_time_monkey_patched():
-            return  # no dynamic patching if we have eventlet applied
-        if EventletConnection is not None:
-            if not is_gevent_time_monkey_patched():
-                cls.need_unpatch = True
-                monkey_patch(time=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.need_unpatch:
-            restore_saved_module(time)
-
+class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
     def setUp(self):
-        if not is_eventlet_time_monkey_patched():
-            raise unittest.SkipTest("Can't test gevent without monkey patching")
+        if not EventletConnection:
+            raise unittest.SkipTest("Can't test eventlet without monkey patching")
+        monkey_patch(time=True)
         EventletConnection.initialize_reactor()
 
-    def test_multi_timer_validation(self, *args):
-        """
-        Verify that timer timeouts are honored appropriately
-        """
-        # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, EventletConnection, 0, 100, 1, 100)
-        # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, EventletConnection, 100, 0, -1, 100)
-        # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, EventletConnection, 0, 100, 1, 100, True)
+    def tearDown(self):
+        restore_saved_module(time)
+        EventletConnection._timers = None
 
-    def test_timer_cancellation(self):
-        """
-        Verify that timer cancellation is honored
-        """
-
-        # Various lists for tracking callback stage
-        timeout = .1
-        callback = TimerCallback(timeout)
-        timer = EventletConnection.create_timer(timeout, callback.invoke)
-        timer.cancel()
-        # Release context allow for timer thread to run.
-        time.sleep(.2)
-        timer_manager = EventletConnection._timers
-        # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())
+    def getClass(self):
+        return EventletConnection

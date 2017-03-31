@@ -17,9 +17,9 @@ try:
 except ImportError:
     import unittest # noqa
 
-import time
-from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
+
 from tests import is_gevent_time_monkey_patched, is_eventlet_monkey_patched
+from tests.unit.io.utils import TimerConnectionTests
 
 try:
     from cassandra.io.geventreactor import GeventConnection
@@ -29,55 +29,16 @@ except ImportError:
     GeventConnection = None  # noqa
 
 
-class GeventTimerTest(unittest.TestCase):
-
-    need_unpatch = False
-
-    @classmethod
-    def setUpClass(cls):
-        if is_eventlet_monkey_patched():
-            return  # no dynamic patching if we have eventlet applied
-        if GeventConnection is not None:
-            if not is_gevent_time_monkey_patched():
-                cls.need_unpatch = True
-                gevent.monkey.patch_time()
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.need_unpatch:
-            restore_saved_module("time")
-
+class GeventTimerTest(unittest.TestCase, TimerConnectionTests):
     def setUp(self):
-        if not is_gevent_time_monkey_patched():
+        if not GeventConnection:
             raise unittest.SkipTest("Can't test gevent without monkey patching")
+        gevent.monkey.patch_time()
         GeventConnection.initialize_reactor()
 
-    def test_multi_timer_validation(self):
-        """
-        Verify that timer timeouts are honored appropriately
-        """
+    def tearDown(self):
+        restore_saved_module("time")
+        GeventConnection._timers = None
 
-        # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, GeventConnection, 0, 100, 1, 100)
-        # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, GeventConnection, 100, 0, -1, 100)
-        # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, GeventConnection, 0, 100, 1, 100, True),
-
-    def test_timer_cancellation(self):
-        """
-        Verify that timer cancellation is honored
-        """
-
-        # Various lists for tracking callback stage
-        timeout = .1
-        callback = TimerCallback(timeout)
-        timer = GeventConnection.create_timer(timeout, callback.invoke)
-        timer.cancel()
-        # Release context allow for timer thread to run.
-        time.sleep(.2)
-        timer_manager = GeventConnection._timers
-        # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())
+    def getClass(self):
+        return GeventConnection
