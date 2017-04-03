@@ -30,7 +30,6 @@ from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.query import SimpleStatement
 from cassandra.util import Date, Time
-from cassandra.cqltypes import Int32Type
 from cassandra.cqlengine.statements import SelectStatement, DeleteStatement, WhereClause
 from cassandra.cqlengine.operators import EqualsOperator
 
@@ -482,37 +481,6 @@ class TestUpdating(BaseCassEngTestCase):
         self.assertTrue(self.instance.get_changed_columns() == [])
         self.assertTrue(self.instance._values['count'].previous_value is None)
         self.assertTrue(self.instance.count is None)
-
-    def test_value_override_with_default(self):
-        """
-        Updating a row with a new Model instance shouldn't set columns to defaults
-
-        @since 3.9
-        @jira_ticket PYTHON-657
-        @expected_result column value should not change
-
-        @test_category object_mapper
-        """
-        class ModelWithDefault(Model):
-            id = columns.Integer(primary_key=True)
-            mf = columns.Map(columns.Integer, columns.Integer)
-            dummy = columns.Integer(default=42)
-        sync_table(ModelWithDefault)
-
-        initial = ModelWithDefault(id=1, mf={0: 0}, dummy=0)
-        initial.save()
-
-        session = cassandra.cluster.Cluster().connect()
-        session.execute('USE ' + DEFAULT_KEYSPACE)
-        self.assertEqual(
-            list(session.execute('SELECT * from model_with_default'))[0].dummy, 0
-        )
-
-        second = ModelWithDefault(id=1)
-        second.update(mf={0: 1})
-        self.assertEqual(
-            list(session.execute('SELECT * from model_with_default'))[0].dummy, 0
-        )
 
     def test_previous_value_tracking_on_instantiation_with_default(self):
 
