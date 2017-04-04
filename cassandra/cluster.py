@@ -3728,13 +3728,20 @@ class ResponseFuture(object):
 
         with self._callback_lock:
             self._final_result = response
+            # save off current callbacks inside lock for execution outside it
+            # -- prevents case where _final_result is set, then a callback is
+            # added and executed on the spot, then executed again as a
+            # registered callback
+            to_call = tuple(
+                partial(fn, response, *args, **kwargs)
+                for (fn, args, kwargs) in self._callbacks
+            )
 
         self._event.set()
 
         # apply each callback
-        for callback in self._callbacks:
-            fn, args, kwargs = callback
-            fn(response, *args, **kwargs)
+        for callback_partial in to_call:
+            callback_partial()
 
     def _set_final_exception(self, response):
         self._cancel_timer()
