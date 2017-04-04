@@ -3881,10 +3881,9 @@ class ResponseFuture(object):
         """
         run_now = False
         with self._callback_lock:
+            self._callbacks.append((fn, args, kwargs))
             if self._final_result is not _NOT_SET:
                 run_now = True
-            else:
-                self._callbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_result, *args, **kwargs)
         return self
@@ -3897,10 +3896,9 @@ class ResponseFuture(object):
         """
         run_now = False
         with self._callback_lock:
+            self._errbacks.append((fn, args, kwargs))
             if self._final_exception:
                 run_now = True
-            else:
-                self._errbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_exception, *args, **kwargs)
         return self
