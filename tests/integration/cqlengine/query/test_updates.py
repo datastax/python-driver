@@ -242,6 +242,52 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1'})
 
+    @execute_count(5)
+    def test_map_update_remove(self):
+        """
+        Test that map item removal with update(<columnname>__remove=...) works
+
+        @jira_ticket PYTHON-688
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+            partition=partition,
+            cluster=cluster,
+            text_map={"foo": '1', "bar": '2'}
+        )
+        TestQueryUpdateModel.objects(partition=partition, cluster=cluster).update(
+            text_map__remove={"bar"}
+        )
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_map, {"foo": '1'})
+
+        TestQueryUpdateModel.objects(partition=partition, cluster=cluster).update(
+            text_map__remove={"foo"}
+        )
+        self.assertEqual(
+            TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster).text_map,
+            {}
+        )
+
+    def test_map_remove_rejects_non_sets(self):
+        """
+        Map item removal requires a set to match the CQL API
+
+        @jira_ticket PYTHON-688
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+            partition=partition,
+            cluster=cluster,
+            text_map={"foo": '1', "bar": '2'}
+        )
+        with self.assertRaises(ValidationError):
+            TestQueryUpdateModel.objects(partition=partition, cluster=cluster).update(
+                text_map__remove=["bar"]
+            )
+
 
 class StaticDeleteModel(Model):
     example_id = columns.Integer(partition_key=True, primary_key=True, default=uuid4)
