@@ -3881,6 +3881,9 @@ class ResponseFuture(object):
         """
         run_now = False
         with self._callback_lock:
+            # Always add fn to self._callbacks, even when we're about to
+            # execute it, to prevent races with functions like
+            # start_fetching_next_page that reset _final_result
             self._callbacks.append((fn, args, kwargs))
             if self._final_result is not _NOT_SET:
                 run_now = True
@@ -3896,6 +3899,9 @@ class ResponseFuture(object):
         """
         run_now = False
         with self._callback_lock:
+            # Always add fn to self._errbacks, even when we're about to execute
+            # it, to prevent races with functions like start_fetching_next_page
+            # that reset _final_exception
             self._errbacks.append((fn, args, kwargs))
             if self._final_exception:
                 run_now = True
