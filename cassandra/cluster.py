@@ -3750,11 +3750,19 @@ class ResponseFuture(object):
 
         with self._callback_lock:
             self._final_exception = response
+            # save off current errbacks inside lock for execution outside it --
+            # prevents case where _final_exception is set, then an errback is
+            # added and executed on the spot, then executed again as a
+            # registered errback
+            to_call = tuple(
+                partial(fn, response, *args, **kwargs)
+                for (fn, args, kwargs) in self._errbacks
+            )
         self._event.set()
 
-        for errback in self._errbacks:
-            fn, args, kwargs = errback
-            fn(response, *args, **kwargs)
+        # apply each callback
+        for callback_partial in to_call:
+            callback_partial()
 
     def _retry(self, reuse_connection, consistency_level, host):
         if self._final_exception:
