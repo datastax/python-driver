@@ -242,6 +242,34 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1'})
 
+    @execute_count(3)
+    def test_an_extra_delete_is_not_sent(self):
+        """
+        Test to ensure that an extra DELETE is not sent if an object is read
+        from the DB with a None value
+
+        @since 3.9
+        @jira_ticket PYTHON-719
+        @expected_result only three queries are executed, the first one for
+        inserting the object, the second one for reading it, and the third
+        one for updating it
+
+        @test_category object_mapper
+        """
+        partition = uuid4()
+        cluster = 1
+
+        TestQueryUpdateModel.objects.create(
+            partition=partition, cluster=cluster)
+
+        obj = TestQueryUpdateModel.objects(
+            partition=partition, cluster=cluster).first()
+
+        self.assertFalse(any([obj._values[column].deleted for column in obj._values]))
+
+        obj.text = 'foo'
+        obj.save()
+
 
 class StaticDeleteModel(Model):
     example_id = columns.Integer(partition_key=True, primary_key=True, default=uuid4)
