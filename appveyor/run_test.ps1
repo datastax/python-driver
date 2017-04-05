@@ -12,6 +12,11 @@ python -c "import platform; print(platform.architecture())"
 
 $wc = New-Object 'System.Net.WebClient'
 nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit
+
+$env:MONKEY_PATCH_LOOP=1
+nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit\io\test_geventreactor.py
+nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit\io\test_eventletreactor.py
+
 echo "uploading unit results"
 $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\unit_results.xml))
 
