@@ -484,12 +484,12 @@ class BaseModel(object):
             klass = cls
 
         instance = klass(**values)
-        instance._set_persisted()
+        instance._set_persisted(force=True)
         return instance
 
-    def _set_persisted(self):
+    def _set_persisted(self, force=False):
         # ensure we don't modify to any values not affected by the last save/update
-        for v in [v for v in self._values.values() if v.changed]:
+        for v in [v for v in self._values.values() if v.changed or force]:
             v.reset_previous_value()
             v.explicit = False
         self._is_persisted = True
