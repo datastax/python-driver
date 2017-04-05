@@ -407,8 +407,6 @@ class BaseModel(object):
                 value = column.to_python(value)
             value_mngr = column.value_manager(self, column, value)
             value_mngr.explicit = name in values
-            if not value_mngr.explicit and column.has_default:
-                value_mngr.previous_value = value
             self._values[name] = value_mngr
 
     def __repr__(self):
@@ -486,11 +484,12 @@ class BaseModel(object):
             klass = cls
 
         instance = klass(**values)
-        instance._set_persisted()
+        instance._set_persisted(force=True)
         return instance
 
-    def _set_persisted(self):
-        for v in self._values.values():
+    def _set_persisted(self, force=False):
+        # ensure we don't modify to any values not affected by the last save/update
+        for v in [v for v in self._values.values() if v.changed or force]:
             v.reset_previous_value()
             v.explicit = False
         self._is_persisted = True
@@ -591,6 +590,10 @@ class BaseModel(object):
 
         return cls._table_name
 
+    def _set_column_value(self, name, value):
+        """Function to change a column value without changing the value manager states"""
+        self._values[name].value = value  # internal assignement, skip the main setter
+
     def validate(self):
         """
         Cleans and validates the field values
@@ -600,7 +603,7 @@ class BaseModel(object):
             if v is None and not self._values[name].explicit and col.has_default:
                 v = col.get_default()
             val = col.validate(v)
-            setattr(self, name, val)
+            self._set_column_value(name, val)
 
     # Let an instance be used like a dict of its columns keys/values
     def __iter__(self):

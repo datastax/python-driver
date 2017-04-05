@@ -1457,6 +1457,9 @@ class DMLQuery(object):
                     if self.instance._values[name].changed:
                         nulled_fields.add(col.db_field_name)
                     continue
+                if col.has_default and not self.instance._values[name].changed:
+                    # Ensure default columns included in a save() are marked as explicit, to get them *persisted* properly
+                    self.instance._values[name].explicit = True
                 insert.add_assignment(col, getattr(self.instance, name, None))
 
         # skip query execution if it's empty
