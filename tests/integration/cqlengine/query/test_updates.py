@@ -313,11 +313,12 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects(
             partition=partition, cluster=cluster).first()
 
-        self.assertFalse(any([obj._values[column].deleted for column in obj._values]))
+        self.assertFalse({k: v for (k, v) in obj._values.items() if v.deleted})
 
         obj.text = 'foo'
         obj.save()
-        
+        #execute_count will check the execution count and
+        #assert no more calls than necessary where made
 
 class StaticDeleteModel(Model):
     example_id = columns.Integer(partition_key=True, primary_key=True, default=uuid4)
