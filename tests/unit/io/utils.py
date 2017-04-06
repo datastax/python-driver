@@ -116,11 +116,11 @@ class TimerConnectionTests(object):
         Verify that timer timeouts are honored appropriately
         """
         # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, self.getClass(), 0, 100, 1, 100)
+        submit_and_wait_for_completion(self, self.connection_class, 0, 100, 1, 100)
         # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, self.getClass(), 100, 0, -1, 100)
+        submit_and_wait_for_completion(self, self.connection_class, 100, 0, -1, 100)
         # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, self.getClass(), 0, 100, 1, 100, True),
+        submit_and_wait_for_completion(self, self.connection_class, 0, 100, 1, 100, True),
 
     def test_timer_cancellation(self):
         """
@@ -130,11 +130,11 @@ class TimerConnectionTests(object):
         # Various lists for tracking callback stage
         timeout = .1
         callback = TimerCallback(timeout)
-        timer = self.getClass().create_timer(timeout, callback.invoke)
+        timer = self.connection_class.create_timer(timeout, callback.invoke)
         timer.cancel()
         # Release context allow for timer thread to run.
         time.sleep(.2)
-        timer_manager = self.getClass()._timers
+        timer_manager = self.connection_class._timers
         # Assert that the cancellation was honored
         self.assertFalse(timer_manager._queue)
         self.assertFalse(timer_manager._new_timers)

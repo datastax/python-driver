@@ -20,10 +20,11 @@ try:
     import thread
     import Queue
     import __builtin__
-except:
+    #For python3 compatibility
+except ImportError:
     import _thread as thread
     import queue as Queue
-    import builtins
+    import builtins as __builtin__
 
 import threading
 import ssl
