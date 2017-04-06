@@ -91,10 +91,10 @@ class ModelUpdateTests(BaseCassEngTestCase):
             m0.update(count=5)
         assert execute.call_count == 0
 
-        with self.assertRaises(ValidationError):
+        with patch.object(self.session, 'execute') as execute:
             m0.update(partition=m0.partition)
 
-        with self.assertRaises(ValidationError):
+        with patch.object(self.session, 'execute') as execute:
             m0.update(cluster=m0.cluster)
 
     def test_noop_model_assignation_update(self):
