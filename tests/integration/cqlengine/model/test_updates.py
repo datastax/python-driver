@@ -61,6 +61,17 @@ class ModelUpdateTests(BaseCassEngTestCase):
         self.assertEqual(m2.count, m1.count)
         self.assertEqual(m2.text, m0.text)
 
+        #This shouldn't raise a Validation error as the PR is not changing
+        m0.update(partition=m0.partition, cluster=m0.cluster)
+
+        #Assert a ValidationError is risen if the PR changes
+        with self.assertRaises(ValidationError):
+            m0.update(partition=m0.partition, cluster=20)
+
+        # Assert a ValidationError is risen if the columns doesn't exist
+        with self.assertRaises(ValidationError):
+            m0.update(invalid_column=20)
+
     def test_update_values(self):
         """ tests calling update on models with values passed in """
         m0 = TestUpdateModel.create(count=5, text='monkey')
