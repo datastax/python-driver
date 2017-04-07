@@ -906,18 +906,17 @@ class ClusterTests(unittest.TestCase):
 
         @test_category config_profiles
         """
+        max_retry_count = 10
+        for i in range(max_retry_count):
+            node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+            with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
+                session = cluster.connect(wait_for_all_pools=True)
+                pools = session.get_pool_state()
+                self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+                self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
 
-        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
-        with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
-            session = cluster.connect(wait_for_all_pools=True)
-            pools = session.get_pool_state()
-            self.assertGreater(len(cluster.metadata.all_hosts()), 2)
-            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
+                node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2', '127.0.0.3']))
 
-            node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
-
-            max_retry_count = 10
-            for i in range(max_retry_count):
                 start = time.time()
                 try:
                     self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile,
@@ -927,8 +926,8 @@ class ClusterTests(unittest.TestCase):
                 except AssertionError:
                     end = time.time()
                     self.assertAlmostEqual(start, end, 1)
-            else:
-                raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
+        else:
+            raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
 
 
 class LocalHostAdressTranslator(AddressTranslator):
