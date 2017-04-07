@@ -1565,7 +1565,7 @@ class Cluster(object):
         open, attempt to open connections until that number is met.
         """
         for session in self.sessions:
-            for pool in session._pools.values():
+            for pool in tuple(session._pools.values()):
                 pool.ensure_core_connections()
 
     @staticmethod
@@ -2304,7 +2304,7 @@ class Session(object):
             future.cancel()
         wait_futures(self._initial_connect_futures)
 
-        for pool in list(self._pools.values()):
+        for pool in tuple(self._pools.values()):
             pool.shutdown()
 
     def __enter__(self):
@@ -2455,7 +2455,7 @@ class Session(object):
             if not remaining_callbacks:
                 callback(host_errors)
 
-        for pool in self._pools.values():
+        for pool in tuple(self._pools.values()):
             pool._set_keyspace_for_all_conns(keyspace, pool_finished_setting_keyspace)
 
     def user_type_registered(self, keyspace, user_type, klass):
@@ -2496,7 +2496,7 @@ class Session(object):
             return self.cluster.executor.submit(fn, *args, **kwargs)
 
     def get_pool_state(self):
-        return dict((host, pool.get_state()) for host, pool in self._pools.items())
+        return dict((host, pool.get_state()) for host, pool in tuple(self._pools.items()))
 
     def get_pools(self):
         return self._pools.values()
