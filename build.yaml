@@ -60,6 +60,9 @@ schedules:
 python:
   - 2.7
   - 3.4
+  - 3.5
+  - 3.6
+  
 os:
   - ubuntu/trusty64
 cassandra:
