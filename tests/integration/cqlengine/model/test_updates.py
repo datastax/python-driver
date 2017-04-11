@@ -21,7 +21,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
-
+from cassandra.cqlengine.usertype import UserType
 
 class TestUpdateModel(Model):
 
@@ -147,19 +147,40 @@ class ModelUpdateTests(BaseCassEngTestCase):
             m0.update(partition=uuid4())
 
 
+class UDT(UserType):
+    age = columns.Integer()
+    mf = columns.Map(columns.Integer, columns.Integer)
+    dummy_udt = columns.Integer(default=42)
+
+
 class ModelWithDefault(Model):
-    id          = columns.Integer(primary_key=True)
-    mf          = columns.Map(columns.Integer, columns.Integer)
-    dummy       = columns.Integer(default=42)
+    id = columns.Integer(primary_key=True)
+    mf = columns.Map(columns.Integer, columns.Integer)
+    dummy = columns.Integer(default=42)
+    udt = columns.UserDefinedType(UDT)
+    udt_default = columns.UserDefinedType(UDT, default=UDT(age=1, mf={2:2}))
+
+
+class UDTWithDefault(UserType):
+    age = columns.Integer()
+    mf = columns.Map(columns.Integer, columns.Integer, default={2:2})
+    dummy_udt = columns.Integer(default=42)
 
 
 class ModelWithDefaultCollection(Model):
-    id          = columns.Integer(primary_key=True)
-    mf          = columns.Map(columns.Integer, columns.Integer, default={2:2})
-    dummy       = columns.Integer(default=42)
+    id = columns.Integer(primary_key=True)
+    mf = columns.Map(columns.Integer, columns.Integer, default={2:2})
+    dummy = columns.Integer(default=42)
+    udt = columns.UserDefinedType(UDT)
+    udt_default = columns.UserDefinedType(UDT, default=UDT(age=1, mf={2: 2}))
 
 
 class ModelWithDefaultTests(BaseCassEngTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.default_udt = UDT(age=1, mf={2:2}, dummy_udt=42)
+
     def setUp(self):
         sync_table(ModelWithDefault)
 
@@ -176,17 +197,19 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        initial = ModelWithDefault(id=1, mf={0: 0}, dummy=0)
+        first_udt = UDT(age=1, mf={2:2}, dummy_udt=0)
+        initial = ModelWithDefault(id=1, mf={0: 0}, dummy=0, udt=first_udt, udt_default=first_udt)
         initial.save()
 
         self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': 0, 'mf': {0: 0}})
+                         {'id': 1, 'dummy': 0, 'mf': {0: 0}, "udt": first_udt, "udt_default": first_udt})
 
+        second_udt = UDT(age=1, mf={3: 3}, dummy_udt=12)
         second = ModelWithDefault(id=1)
-        second.update(mf={0: 1})
+        second.update(mf={0: 1}, udt=second_udt)
 
         self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': 0, 'mf': {0: 1}})
+                         {'id': 1, 'dummy': 0, 'mf': {0: 1}, "udt": second_udt, "udt_default": first_udt})
 
     def test_value_is_written_if_is_default(self):
         """
@@ -202,10 +225,11 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         initial = ModelWithDefault(id=1)
         initial.mf = {0: 0}
         initial.dummy = 42
+        initial.udt_default = self.default_udt
         initial.update()
 
         self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': 42, 'mf': {0: 0}})
+                         {'id': 1, 'dummy': 42, 'mf': {0: 0}, "udt": None, "udt_default": self.default_udt})
 
     def test_null_update_is_respected(self):
         """
@@ -223,10 +247,11 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         q = ModelWithDefault.objects.all().allow_filtering()
         obj = q.filter(id=1).get()
 
-        obj.update(dummy=None)
+        updated_udt = UDT(age=1, mf={2:2}, dummy_udt=None)
+        obj.update(dummy=None, udt_default=updated_udt)
 
         self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': None, 'mf': {0: 0}})
+                         {'id': 1, 'dummy': None, 'mf': {0: 0}, "udt": None, "udt_default": updated_udt})
 
     def test_only_set_values_is_updated(self):
         """
@@ -244,28 +269,32 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         item = ModelWithDefault.filter(id=1).first()
         ModelWithDefault.objects(id=1).delete()
         item.mf = {1: 2}
-
+        udt, default_udt = UDT(age=1, mf={2:3}), UDT(age=1, mf={2:3})
+        item.udt, item.default_udt = udt, default_udt
         item.save()
 
         self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': None, 'mf': {1: 2}})
+                         {'id': 1, 'dummy': None, 'mf': {1: 2}, "udt": udt, "udt_default": default_udt})
 
     def test_collections(self):
         """
-        Test the updates work as expected when an object is deleted
+        Test the updates work as expected on Map objects
         @since 3.9
         @jira_ticket PYTHON-657
-        @expected_result the non updated column is None and the
-        updated column has the set value
+        @expected_result the row is updated when the Map object is
+        reduced
 
         @test_category object_mapper
         """
-        ModelWithDefault.create(id=1, mf={1: 1, 2: 1}, dummy=1).save()
+        udt, udt_default = UDT(age=1, mf={1: 1, 2: 1}), UDT(age=1, mf={1: 1, 2: 1})
+
+        ModelWithDefault.create(id=1, mf={1: 1, 2: 1}, dummy=1, udt=udt, udt_default=udt_default).save()
         item = ModelWithDefault.filter(id=1).first()
 
+        udt, udt_default = UDT(age=1, mf={2: 1}), UDT(age=1, mf={2: 1})
         item.update(mf={2:1})
         self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {2: 1}})
+                         {'id': 1, 'dummy': 1, 'mf': {2: 1}, "udt": udt, "udt_default": udt_default})
 
     def test_collection_with_default(self):
         """
@@ -278,24 +307,32 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         @test_category object_mapper
         """
         sync_table(ModelWithDefaultCollection)
-        item = ModelWithDefaultCollection.create(id=1, mf={1: 1}, dummy=1).save()
-        self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {1: 1}})
 
-        item.update(mf={2: 2})
-        self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {2: 2}})
+        udt, udt_default = UDT(age=1, mf={6: 6}), UDT(age=1, mf={6: 6})
 
-        item.update(mf=None)
+        item = ModelWithDefaultCollection.create(id=1, mf={1: 1}, dummy=1, udt=udt, udt_default=udt_default).save()
         self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {}})
+                         {'id': 1, 'dummy': 1, 'mf': {1: 1}, "udt": udt, "udt_default": udt_default})
 
+        udt, udt_default = UDT(age=1, mf={5: 5}), UDT(age=1, mf={5: 5})
+        item.update(mf={2: 2}, udt=udt, udt_default=udt_default)
+        self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 1, 'mf': {2: 2}, "udt": udt, "udt_default": udt_default})
+
+        udt, udt_default = UDT(age=1, mf=None), UDT(age=1, mf=None)
+        expected_udt, expected_udt_default = UDT(age=1, mf={}), UDT(age=1, mf={})
+        item.update(mf=None, udt=udt, udt_default=udt_default)
+        self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 1, 'mf': {}, "udt": expected_udt, "udt_default": expected_udt_default})
+
+        udt_default = UDT(age=1, mf=None), UDT(age=1, mf={5:5})
         item = ModelWithDefaultCollection.create(id=2, dummy=2).save()
         self.assertEqual(ModelWithDefaultCollection.objects().all().get(id=2)._as_dict(),
-                         {'id': 2, 'dummy': 2, 'mf': {2: 2}})
+                         {'id': 2, 'dummy': 2, 'mf': {2: 2}, "udt": None, "udt_default": udt_default})
 
-        item.update(mf={1: 1, 4: 4})
+        udt, udt_default = UDT(age=1, mf={1: 1, 6: 6}), UDT(age=1, mf={1: 1, 6: 6})
+        item.update(mf={1: 1, 4: 4}, udt=udt, udt_default=udt_default)
         self.assertEqual(ModelWithDefaultCollection.objects().all().get(id=2)._as_dict(),
-                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}})
+                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
 
         drop_table(ModelWithDefaultCollection)

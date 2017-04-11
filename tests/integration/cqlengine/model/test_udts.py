@@ -24,11 +24,45 @@ from uuid import UUID, uuid4
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.usertype import UserType, UserTypeDefinitionException
 from cassandra.cqlengine import columns, connection
-from cassandra.cqlengine.management import sync_table, sync_type, create_keyspace_simple, drop_keyspace, drop_table
+from cassandra.cqlengine.management import sync_table, drop_table, sync_type, create_keyspace_simple, drop_keyspace
+from cassandra.cqlengine import ValidationError
 from cassandra.util import Date, Time
 
 from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import DEFAULT_KEYSPACE
+
+
+class User(UserType):
+    age = columns.Integer()
+    name = columns.Text()
+
+
+class UserModel(Model):
+    id = columns.Integer(primary_key=True)
+    info = columns.UserDefinedType(User)
+
+
+class AllDatatypes(UserType):
+    a = columns.Ascii()
+    b = columns.BigInt()
+    c = columns.Blob()
+    d = columns.Boolean()
+    e = columns.DateTime()
+    f = columns.Decimal()
+    g = columns.Double()
+    h = columns.Float()
+    i = columns.Inet()
+    j = columns.Integer()
+    k = columns.Text()
+    l = columns.TimeUUID()
+    m = columns.UUID()
+    n = columns.VarInt()
+
+
+class AllDatatypesModel(Model):
+    id = columns.Integer(primary_key=True)
+    data = columns.UserDefinedType(AllDatatypes)
 
 
 class UserDefinedTypeTests(BaseCassEngTestCase):
@@ -42,7 +76,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             age = columns.Integer()
             name = columns.Text()
 
-        sync_type("cqlengine_test", User)
+        sync_type(DEFAULT_KEYSPACE, User)
         user = User(age=42, name="John")
         self.assertEqual(42, user.age)
         self.assertEqual("John", user.name)
@@ -53,8 +87,10 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             name = columns.Text()
             gender = columns.Text()
 
-        sync_type("cqlengine_test", User)
-        user = User(age=42, name="John", gender="male")
+        sync_type(DEFAULT_KEYSPACE, User)
+        user = User(age=42)
+        user["name"] = "John"
+        user["gender"] = "male"
         self.assertEqual(42, user.age)
         self.assertEqual("John", user.name)
         self.assertEqual("male", user.gender)
@@ -64,19 +100,12 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             age = columns.Integer()
             name = columns.Text()
 
-        sync_type("cqlengine_test", User)
+        sync_type(DEFAULT_KEYSPACE, User)
         user = User(age=42, name="John", gender="male")
         with self.assertRaises(AttributeError):
             user.gender
 
     def test_can_insert_udts(self):
-        class User(UserType):
-            age = columns.Integer()
-            name = columns.Text()
-
-        class UserModel(Model):
-            id = columns.Integer(primary_key=True)
-            info = columns.UserDefinedType(User)
 
         sync_table(UserModel)
 
@@ -90,16 +119,9 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertTrue(type(john.info) is User)
         self.assertEqual(42, john.info.age)
         self.assertEqual("John", john.info.name)
+        drop_table(UserModel)
 
     def test_can_update_udts(self):
-        class User(UserType):
-            age = columns.Integer()
-            name = columns.Text()
-
-        class UserModel(Model):
-            id = columns.Integer(primary_key=True)
-            info = columns.UserDefinedType(User)
-
         sync_table(UserModel)
 
         user = User(age=42, name="John")
@@ -113,18 +135,11 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         created_user.update()
 
         mary_info = UserModel.objects().first().info
-        self.assertEqual(22, mary_info.age)
-        self.assertEqual("Mary", mary_info.name)
+        self.assertEqual(22, mary_info["age"])
+        self.assertEqual("Mary", mary_info["name"])
+        drop_table(UserModel)
 
     def test_can_update_udts_with_nones(self):
-        class User(UserType):
-            age = columns.Integer()
-            name = columns.Text()
-
-        class UserModel(Model):
-            id = columns.Integer(primary_key=True)
-            info = columns.UserDefinedType(User)
-
         sync_table(UserModel)
 
         user = User(age=42, name="John")
@@ -139,45 +154,43 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         john_info = UserModel.objects().first().info
         self.assertIsNone(john_info)
+        drop_table(UserModel)
 
     def test_can_create_same_udt_different_keyspaces(self):
-        class User(UserType):
-            age = columns.Integer()
-            name = columns.Text()
-
-        sync_type("cqlengine_test", User)
+        sync_type(DEFAULT_KEYSPACE, User)
 
         create_keyspace_simple("simplex", 1)
         sync_type("simplex", User)
         drop_keyspace("simplex")
 
     def test_can_insert_partial_udts(self):
-        class User(UserType):
+        class UserGender(UserType):
             age = columns.Integer()
             name = columns.Text()
             gender = columns.Text()
 
-        class UserModel(Model):
+        class UserModelGender(Model):
             id = columns.Integer(primary_key=True)
-            info = columns.UserDefinedType(User)
+            info = columns.UserDefinedType(UserGender)
 
-        sync_table(UserModel)
+        sync_table(UserModelGender)
 
-        user = User(age=42, name="John")
-        UserModel.create(id=0, info=user)
+        user = UserGender(age=42, name="John")
+        UserModelGender.create(id=0, info=user)
 
-        john_info = UserModel.objects().first().info
+        john_info = UserModelGender.objects().first().info
         self.assertEqual(42, john_info.age)
         self.assertEqual("John", john_info.name)
         self.assertIsNone(john_info.gender)
 
-        user = User(age=42)
-        UserModel.create(id=0, info=user)
+        user = UserGender(age=42)
+        UserModelGender.create(id=0, info=user)
 
-        john_info = UserModel.objects().first().info
+        john_info = UserModelGender.objects().first().info
         self.assertEqual(42, john_info.age)
         self.assertIsNone(john_info.name)
         self.assertIsNone(john_info.gender)
+        drop_table(UserModelGender)
 
     def test_can_insert_nested_udts(self):
         class Depth_0(UserType):
@@ -215,6 +228,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(udts[2], output.v_2)
         self.assertEqual(udts[3], output.v_3)
 
+        drop_table(DepthModel)
+
     def test_can_insert_udts_with_nones(self):
         """
         Test for inserting all column types as empty into a UserType as None's
@@ -230,27 +245,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         @test_category data_types:udt
         """
-
-        class AllDatatypes(UserType):
-            a = columns.Ascii()
-            b = columns.BigInt()
-            c = columns.Blob()
-            d = columns.Boolean()
-            e = columns.DateTime()
-            f = columns.Decimal()
-            g = columns.Double()
-            h = columns.Float()
-            i = columns.Inet()
-            j = columns.Integer()
-            k = columns.Text()
-            l = columns.TimeUUID()
-            m = columns.UUID()
-            n = columns.VarInt()
-
-        class AllDatatypesModel(Model):
-            id = columns.Integer(primary_key=True)
-            data = columns.UserDefinedType(AllDatatypes)
-
         sync_table(AllDatatypesModel)
 
         input = AllDatatypes(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=None, i=None, j=None, k=None,
@@ -261,6 +255,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         output = AllDatatypesModel.objects().first().data
         self.assertEqual(input, output)
+
+        drop_table(AllDatatypesModel)
 
     def test_can_insert_udts_with_all_datatypes(self):
         """
@@ -277,27 +273,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         @test_category data_types:udt
         """
-
-        class AllDatatypes(UserType):
-            a = columns.Ascii()
-            b = columns.BigInt()
-            c = columns.Blob()
-            d = columns.Boolean()
-            e = columns.DateTime()
-            f = columns.Decimal()
-            g = columns.Double()
-            h = columns.Float()
-            i = columns.Inet()
-            j = columns.Integer()
-            k = columns.Text()
-            l = columns.TimeUUID()
-            m = columns.UUID()
-            n = columns.VarInt()
-
-        class AllDatatypesModel(Model):
-            id = columns.Integer(primary_key=True)
-            data = columns.UserDefinedType(AllDatatypes)
-
         sync_table(AllDatatypesModel)
 
         input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True,
@@ -312,6 +287,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         for i in range(ord('a'), ord('a') + 14):
             self.assertEqual(input[chr(i)], output[chr(i)])
+
+        drop_table(AllDatatypesModel)
 
     def test_can_insert_udts_protocol_v4_datatypes(self):
         """
@@ -354,6 +331,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         for i in range(ord('a'), ord('a') + 3):
             self.assertEqual(input[chr(i)], output[chr(i)])
 
+        drop_table(Allv4DatatypesModel)
+
     def test_nested_udts_inserts(self):
         """
         Test for inserting collections of user types using cql engine.
@@ -394,6 +373,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         names_output = Container.objects().first().names
         self.assertEqual(names_output, names)
 
+        drop_table(Container)
+
     def test_udts_with_unicode(self):
         """
         Test for inserting models with unicode and udt columns.
@@ -410,10 +391,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         ascii_name = 'normal name'
         unicode_name = u'Fran\u00E7ois'
 
-        class User(UserType):
-            age = columns.Integer()
-            name = columns.Text()
-
         class UserModelText(Model):
             id = columns.Text(primary_key=True)
             info = columns.UserDefinedType(User)
@@ -427,10 +404,9 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         UserModelText.create(id=unicode_name, info=user_template_ascii)
         UserModelText.create(id=unicode_name, info=user_template_unicode)
 
+        drop_table(UserModelText)
+
     def test_register_default_keyspace(self):
-        class User(UserType):
-            age = columns.Integer()
-            name = columns.Text()
 
         from cassandra.cqlengine import models
         from cassandra.cqlengine import connection
@@ -495,6 +471,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(info.a, age)
         self.assertEqual(info.n, name)
 
+        drop_table(TheModel)
+
     def test_db_field_overload(self):
         """
         Tests for db_field UserTypeDefinitionException
@@ -520,9 +498,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
     def test_set_udt_fields(self):
         # PYTHON-502
-        class User(UserType):
-            age = columns.Integer()
-            name = columns.Text()
 
         u = User()
         u.age = 20
@@ -562,3 +537,63 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(t.nested[0].default_text, "default text")
         self.assertIsNotNone(t.simple.test_id)
         self.assertEqual(t.simple.default_text, "default text")
+
+        drop_table(OuterModel)
+
+    def test_udt_validate(self):
+        """
+        Test to verify restrictions are honored and that validate is called
+        for each member of the UDT when an updated is attempted
+
+        @since 3.10
+        @jira_ticket PYTHON-505
+        @expected_result a validation error is arisen due to the name being
+        too long
+
+        @test_category data_types:object_mapper
+        """
+        class UserValidate(UserType):
+            age = columns.Integer()
+            name = columns.Text(max_length=2)
+
+        class UserModelValidate(Model):
+            id = columns.Integer(primary_key=True)
+            info = columns.UserDefinedType(UserValidate)
+
+        sync_table(UserModelValidate)
+
+        user = UserValidate(age=1, name="Robert")
+        item = UserModelValidate(id=1, info=user)
+        with self.assertRaises(ValidationError):
+            item.save()
+
+        drop_table(UserModelValidate)
+
+    def test_udt_validate_with_default(self):
+        """
+        Test to verify restrictions are honored and that validate is called
+        on the default value
+
+        @since 3.10
+        @jira_ticket PYTHON-505
+        @expected_result a validation error is arisen due to the name being
+        too long
+
+        @test_category data_types:object_mapper
+        """
+        class UserValidateDefault(UserType):
+            age = columns.Integer()
+            name = columns.Text(max_length=2, default="Robert")
+
+        class UserModelValidateDefault(Model):
+            id = columns.Integer(primary_key=True)
+            info = columns.UserDefinedType(UserValidateDefault)
+
+        sync_table(UserModelValidateDefault)
+
+        user = UserValidateDefault(age=1)
+        item = UserModelValidateDefault(id=1, info=user)
+        with self.assertRaises(ValidationError):
+            item.save()
+
+        drop_table(UserModelValidateDefault)

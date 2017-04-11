@@ -150,7 +150,7 @@ class TestTokenFunction(BaseCassEngTestCase):
             TokenTestModel.create(key=i, val=i)
         named = NamedTable(DEFAULT_KEYSPACE, TokenTestModel.__table_name__)
 
-        query = named.objects.all().limit(1)
+        query = named.all().limit(1)
         first_page = list(query)
         last = first_page[-1]
         self.assertTrue(len(first_page) is 1)
