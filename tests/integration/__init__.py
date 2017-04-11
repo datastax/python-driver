@@ -19,7 +19,7 @@ from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.io.eventletreactor import EventletConnection
 from cassandra.io.twistedreactor import TwistedConnection
 
-EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "gevent")
+EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
 if EVENT_LOOP_MANAGER == "gevent":
     import gevent.monkey
     gevent.monkey.patch_all()

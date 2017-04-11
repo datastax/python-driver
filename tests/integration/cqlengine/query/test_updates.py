@@ -18,20 +18,11 @@ from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine import columns
+
 from tests.integration.cqlengine import is_prepend_reversed
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 from tests.integration.cqlengine import execute_count
 from tests.integration import greaterthancass20
-
-class TestQueryUpdateModel(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    cluster = columns.Integer(primary_key=True)
-    count = columns.Integer(required=False)
-    text = columns.Text(required=False, index=True)
-    text_set = columns.Set(columns.Text, required=False)
-    text_list = columns.List(columns.Text, required=False)
-    text_map = columns.Map(columns.Text, columns.Text, required=False)
 
 
 class QueryUpdateTests(BaseCassEngTestCase):

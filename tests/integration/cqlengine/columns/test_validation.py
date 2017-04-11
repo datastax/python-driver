@@ -18,30 +18,21 @@ except ImportError:
     import unittest  # noqa
 
 import sys
-from datetime import datetime, timedelta, date, tzinfo
+from datetime import datetime, timedelta, date, tzinfo, time
 from decimal import Decimal as D
 from uuid import uuid4, uuid1
 
 from cassandra import InvalidRequest
-from cassandra.cqlengine.columns import TimeUUID
-from cassandra.cqlengine.columns import Ascii
-from cassandra.cqlengine.columns import Text
-from cassandra.cqlengine.columns import Integer
-from cassandra.cqlengine.columns import BigInt
-from cassandra.cqlengine.columns import VarInt
-from cassandra.cqlengine.columns import DateTime
-from cassandra.cqlengine.columns import Date
-from cassandra.cqlengine.columns import UUID
-from cassandra.cqlengine.columns import Boolean
-from cassandra.cqlengine.columns import Decimal
-from cassandra.cqlengine.columns import Inet
+from cassandra.cqlengine.columns import TimeUUID, Ascii, Text, Integer, BigInt, VarInt, DateTime, Date, UUID, Boolean, \
+    Decimal, Inet, Time, UserDefinedType, Map, List, Set, Tuple, Double, Float
 from cassandra.cqlengine.connection import execute
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model, ValidationError
+from cassandra.cqlengine.usertype import UserType
 from cassandra import util
 
 from tests.integration import PROTOCOL_VERSION
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 
 
 class TestDatetime(BaseCassEngTestCase):
@@ -62,7 +53,7 @@ class TestDatetime(BaseCassEngTestCase):
         now = datetime.now()
         self.DatetimeTest.objects.create(test_id=0, created_at=now)
         dt2 = self.DatetimeTest.objects(test_id=0).first()
-        assert dt2.created_at.timetuple()[:6] == now.timetuple()[:6]
+        self.assertEqual(dt2.created_at.timetuple()[:6], now.timetuple()[:6])
 
     def test_datetime_tzinfo_io(self):
         class TZ(tzinfo):
@@ -74,21 +65,27 @@ class TestDatetime(BaseCassEngTestCase):
         now = datetime(1982, 1, 1, tzinfo=TZ())
         dt = self.DatetimeTest.objects.create(test_id=1, created_at=now)
         dt2 = self.DatetimeTest.objects(test_id=1).first()
-        assert dt2.created_at.timetuple()[:6] == (now + timedelta(hours=1)).timetuple()[:6]
+        self.assertEqual(dt2.created_at.timetuple()[:6], (now + timedelta(hours=1)).timetuple()[:6])
 
     def test_datetime_date_support(self):
         today = date.today()
         self.DatetimeTest.objects.create(test_id=2, created_at=today)
         dt2 = self.DatetimeTest.objects(test_id=2).first()
-        assert dt2.created_at.isoformat() == datetime(today.year, today.month, today.day).isoformat()
+        self.assertEqual(dt2.created_at.isoformat(), datetime(today.year, today.month, today.day).isoformat())
+
+        result = self.DatetimeTest.objects.all().allow_filtering().filter(test_id=2).first()
+        self.assertEqual(result.created_at, datetime.combine(today, datetime.min.time()))
+
+        result = self.DatetimeTest.objects.all().allow_filtering().filter(test_id=2, created_at=today).first()
+        self.assertEqual(result.created_at, datetime.combine(today, datetime.min.time()))
 
     def test_datetime_none(self):
         dt = self.DatetimeTest.objects.create(test_id=3, created_at=None)
         dt2 = self.DatetimeTest.objects(test_id=3).first()
-        assert dt2.created_at is None
+        self.assertIsNone(dt2.created_at)
 
         dts = self.DatetimeTest.objects.filter(test_id=3).values_list('created_at')
-        assert dts[0][0] is None
+        self.assertIsNone(dts[0][0])
 
     def test_datetime_invalid(self):
         dt_value= 'INVALID'
@@ -99,13 +96,13 @@ class TestDatetime(BaseCassEngTestCase):
         dt_value = 1454520554
         self.DatetimeTest.objects.create(test_id=5, created_at=dt_value)
         dt2 = self.DatetimeTest.objects(test_id=5).first()
-        assert dt2.created_at == datetime.utcfromtimestamp(dt_value)
+        self.assertEqual(dt2.created_at, datetime.utcfromtimestamp(dt_value))
 
     def test_datetime_large(self):
         dt_value = datetime(2038, 12, 31, 10, 10, 10, 123000)
         self.DatetimeTest.objects.create(test_id=6, created_at=dt_value)
         dt2 = self.DatetimeTest.objects(test_id=6).first()
-        assert dt2.created_at == dt_value
+        self.assertEqual(dt2.created_at, dt_value)
 
     def test_datetime_truncate_microseconds(self):
         """
@@ -187,49 +184,170 @@ class TestVarInt(BaseCassEngTestCase):
         int2 = self.VarIntTest.objects(test_id=0).first()
         self.assertEqual(int1.bignum, int2.bignum)
 
+        with self.assertRaises(ValidationError):
+            self.VarIntTest.objects.create(test_id=0, bignum="not_a_number")
 
-class TestDate(BaseCassEngTestCase):
-    class DateTest(Model):
 
-        test_id = Integer(primary_key=True)
-        created_at = Date()
-
+class DataType():
     @classmethod
     def setUpClass(cls):
         if PROTOCOL_VERSION < 4:
             return
-        sync_table(cls.DateTest)
+
+        class DataTypeTest(Model):
+            test_id = Integer(primary_key=True)
+            class_param = cls.db_klass()
+
+        cls.model_class = DataTypeTest
+        sync_table(cls.model_class)
 
     @classmethod
     def tearDownClass(cls):
         if PROTOCOL_VERSION < 4:
             return
-        drop_table(cls.DateTest)
+        drop_table(cls.model_class)
 
     def setUp(self):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
-    def test_date_io(self):
-        today = date.today()
-        self.DateTest.objects.create(test_id=0, created_at=today)
-        result = self.DateTest.objects(test_id=0).first()
-        self.assertEqual(result.created_at, util.Date(today))
+    def _check_value_is_correct_in_db(self, value):
+
+        if value is None:
+            result = self.model_class.objects.all().allow_filtering().filter(test_id=0).first()
+            self.assertIsNone(result.class_param)
+
+        else:
+            if not isinstance(value, self.python_klass):
+                value_to_compare = self.python_klass(value)
+            else:
+                value_to_compare = value
+
+            result = self.model_class.objects(test_id=0).first()
+            self.assertIsInstance(result.class_param, self.python_klass)
+            self.assertEqual(result.class_param, value_to_compare)
+
+            result = self.model_class.objects.all().allow_filtering().filter(test_id=0).first()
+            self.assertIsInstance(result.class_param, self.python_klass)
+            self.assertEqual(result.class_param, value_to_compare)
+
+            result = self.model_class.objects.all().allow_filtering().filter(test_id=0, class_param=value).first()
+            self.assertIsInstance(result.class_param, self.python_klass)
+            self.assertEqual(result.class_param, value_to_compare)
+
+        return result
 
     def test_date_io_using_datetime(self):
-        now = datetime.utcnow()
-        self.DateTest.objects.create(test_id=0, created_at=now)
-        result = self.DateTest.objects(test_id=0).first()
-        self.assertIsInstance(result.created_at, util.Date)
-        self.assertEqual(result.created_at, util.Date(now))
+        first_value = self.first_value
+        second_value = self.second_value
+        third_value = self.third_value
+
+        self.model_class.objects.create(test_id=0, class_param=first_value)
+        result = self._check_value_is_correct_in_db(first_value)
+        result.delete()
+
+        self.model_class.objects.create(test_id=0, class_param=second_value)
+        result = self._check_value_is_correct_in_db(second_value)
+
+        result.update(class_param=third_value).save()
+        result = self._check_value_is_correct_in_db(third_value)
+
+        result.update(class_param=None).save()
+        self._check_value_is_correct_in_db(None)
 
     def test_date_none(self):
-        self.DateTest.objects.create(test_id=1, created_at=None)
-        dt2 = self.DateTest.objects(test_id=1).first()
-        assert dt2.created_at is None
+        self.model_class.objects.create(test_id=1, class_param=None)
+        dt2 = self.model_class.objects(test_id=1).first()
+        self.assertIsNone(dt2.class_param)
 
-        dts = self.DateTest.objects(test_id=1).values_list('created_at')
-        assert dts[0][0] is None
+        dts = self.model_class.objects(test_id=1).values_list('class_param')
+        self.assertIsNone(dts[0][0])
+
+
+class TestDate(DataType, BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.db_klass, cls.python_klass = Date, util.Date
+        cls.first_value, cls.second_value, cls.third_value = \
+            datetime.utcnow(), util.Date(datetime(1, 1, 1)), datetime(1, 1, 2)
+        super(TestDate, cls).setUpClass()
+
+
+class TestTime(DataType, BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.db_klass, cls.python_klass = Time, util.Time
+        cls.first_value, cls.second_value, cls.third_value = \
+            time(2, 12, 7, 48),  util.Time(time(2, 12, 7, 49)), time(2, 12, 7, 50)
+        super(TestTime, cls).setUpClass()
+
+
+class TestDateTime(DataType, BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.db_klass, cls.python_klass = DateTime, datetime
+        cls.first_value, cls.second_value, cls.third_value = \
+            datetime(2017, 4, 13, 18, 34, 24, 317000), datetime(1, 1, 1), datetime(1, 1, 2)
+        super(TestDateTime, cls).setUpClass()
+
+
+class TestBoolean(DataType, BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.db_klass, cls.python_klass = Boolean, bool
+        cls.first_value, cls.second_value, cls.third_value = True, False, True
+        super(TestBoolean, cls).setUpClass()
+
+
+class User(UserType):
+    # We use Date and Time to ensure to_python
+    # is called for these columns
+    age = Integer()
+    date_param = Date()
+    map_param = Map(Integer, Time)
+    list_param = List(Date)
+    set_param = Set(Date)
+    tuple_param = Tuple(Date, Decimal, Boolean, VarInt, Double, UUID)
+
+
+class UserModel(Model):
+    test_id = Integer(primary_key=True)
+    class_param = UserDefinedType(User)
+
+
+class TestUDT(DataType, BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.db_klass, cls.python_klass = UserDefinedType, User
+        cls.first_value = User(
+            age=1,
+            date_param=datetime.utcnow(),
+            map_param={1: time(2, 12, 7, 50), 2: util.Time(time(2, 12, 7, 49))},
+            list_param=[datetime(1, 1, 2), datetime(1, 1, 3)],
+            set_param=set((datetime(1, 1, 3), util.Date(datetime(1, 1, 1)))),
+            tuple_param=(datetime(1, 1, 3), 2, False, 1, 2.324, uuid4())
+        )
+
+        cls.second_value = User(
+            age=1,
+            date_param=datetime.utcnow(),
+            map_param={1: time(2, 12, 7, 50), 2: util.Time(time(2, 12, 7, 49))},
+            list_param=[datetime(1, 1, 2), datetime(1, 2, 3)],
+            set_param=set((datetime(1, 1, 3), util.Date(datetime(1, 1, 1)))),
+            tuple_param=(datetime(1, 1, 2), 2, False, 1, 2.324, uuid4())
+        )
+
+        cls.third_value = User(
+            age=2,
+            date_param=datetime.utcnow(),
+            map_param={1: time(2, 12, 7, 51), 2: util.Time(time(2, 12, 7, 49))},
+            list_param=[datetime(1, 1, 2), datetime(1, 1, 4)],
+            set_param=set((datetime(1, 1, 3), util.Date(datetime(1, 1, 2)))),
+            tuple_param=(datetime(1, 1, 2), 3, False, 1, 2.3214, uuid4())
+        )
+
+        cls.model_class = UserModel
+        sync_table(cls.model_class)
 
 
 class TestDecimal(BaseCassEngTestCase):
@@ -319,7 +437,7 @@ class TestInteger(BaseCassEngTestCase):
     class IntegerTest(Model):
 
         test_id = UUID(primary_key=True, default=lambda:uuid4())
-        value   = Integer(default=0, required=True)
+        value = Integer(default=0, required=True)
 
     def test_default_zero_fields_validate(self):
         """ Tests that integer columns with a default value of 0 validate """
@@ -644,4 +762,3 @@ class TestInet(BaseCassEngTestCase):
         # TODO: presently this only tests that the server blows it up. Is there supposed to be local validation?
         with self.assertRaises(InvalidRequest):
             self.InetTestModel.create(address="what is going on here?")
-

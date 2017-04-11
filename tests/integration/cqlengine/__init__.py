@@ -21,7 +21,7 @@ except ImportError:
 from cassandra import ConsistencyLevel
 
 from cassandra.cqlengine import connection
-from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
+from cassandra.cqlengine.management import create_keyspace_simple, drop_keyspace, CQLENG_ALLOW_SCHEMA_MANAGEMENT
 import cassandra
 
 from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION, CASSANDRA_IP, set_default_cass_ip
@@ -44,7 +44,6 @@ def setup_package():
 
 def teardown_package():
     connection.unregister_connection("default")
-
 
 def is_prepend_reversed():
     # do we have https://issues.apache.org/jira/browse/CASSANDRA-8733 ?
