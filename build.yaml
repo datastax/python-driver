@@ -25,7 +25,7 @@ schedules:
     matrix:
       exclude:
         - pythoon: 3.4
-        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+          cassandra: ['2.0', '2.1', '2.2', '3.0']
 
   nightly_eventlet:
     schedule: nightly
@@ -43,6 +43,16 @@ schedules:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='async'
+    matrix:
+      exclude:
+        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+
+  nightly_twister:
+    schedule: nightly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='twisted'
     matrix:
       exclude:
         - cassandra: ['2.0', '2.1', '2.2', '3.0']
