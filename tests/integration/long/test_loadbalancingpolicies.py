@@ -650,5 +650,5 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.fail()
         except NoHostAvailable:
             pass
-
-        cluster.shutdown()
+        finally:
+            cluster.shutdown()

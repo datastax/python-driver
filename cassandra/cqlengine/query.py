@@ -1252,6 +1252,9 @@ class ModelQuerySet(AbstractQuerySet):
 
             # add items to a map
             Row.objects(row_id=5).update(map_column__update={1: 2, 3: 4})
+
+            # remove items from a map
+            Row.objects(row_id=5).update(map_column__remove={1, 2})
         """
         if not values:
             return
@@ -1270,8 +1273,14 @@ class ModelQuerySet(AbstractQuerySet):
             if col.is_primary_key:
                 raise ValidationError("Cannot apply update to primary key '{0}' for {1}.{2}".format(col_name, self.__module__, self.model.__name__))
 
-            # we should not provide default values in this use case.
-            val = col.validate(val)
+            if col_op == 'remove' and isinstance(col, columns.Map):
+                if not isinstance(val, set):
+                    raise ValidationError(
+                        "Cannot apply update operation '{0}' on column '{1}' with value '{2}'. A set is required.".format(col_op, col_name, val))
+                val = {v: None for v in val}
+            else:
+                # we should not provide default values in this use case.
+                val = col.validate(val)
 
             if val is None:
                 nulled_columns.add(col_name)
@@ -1448,6 +1457,9 @@ class DMLQuery(object):
                     if self.instance._values[name].changed:
                         nulled_fields.add(col.db_field_name)
                     continue
+                if col.has_default and not self.instance._values[name].changed:
+                    # Ensure default columns included in a save() are marked as explicit, to get them *persisted* properly
+                    self.instance._values[name].explicit = True
                 insert.add_assignment(col, getattr(self.instance, name, None))
 
         # skip query execution if it's empty

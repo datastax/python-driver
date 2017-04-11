@@ -1975,6 +1975,12 @@ class Session(object):
         while futures.not_done and not any(f.result() for f in futures.done):
             futures = wait_futures(futures.not_done, return_when=FIRST_COMPLETED)
 
+        if not any(f.result() for f in self._initial_connect_futures):
+            msg = "Unable to connect to any servers"
+            if self.keyspace:
+                msg += " using keyspace '%s'" % self.keyspace
+            raise NoHostAvailable(msg, [h.address for h in hosts])
+
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
         """
         Execute the given query and synchronously wait for the response.
@@ -3722,13 +3728,20 @@ class ResponseFuture(object):
 
         with self._callback_lock:
             self._final_result = response
+            # save off current callbacks inside lock for execution outside it
+            # -- prevents case where _final_result is set, then a callback is
+            # added and executed on the spot, then executed again as a
+            # registered callback
+            to_call = tuple(
+                partial(fn, response, *args, **kwargs)
+                for (fn, args, kwargs) in self._callbacks
+            )
 
         self._event.set()
 
         # apply each callback
-        for callback in self._callbacks:
-            fn, args, kwargs = callback
-            fn(response, *args, **kwargs)
+        for callback_partial in to_call:
+            callback_partial()
 
     def _set_final_exception(self, response):
         self._cancel_timer()
@@ -3737,11 +3750,19 @@ class ResponseFuture(object):
 
         with self._callback_lock:
             self._final_exception = response
+            # save off current errbacks inside lock for execution outside it --
+            # prevents case where _final_exception is set, then an errback is
+            # added and executed on the spot, then executed again as a
+            # registered errback
+            to_call = tuple(
+                partial(fn, response, *args, **kwargs)
+                for (fn, args, kwargs) in self._errbacks
+            )
         self._event.set()
 
-        for errback in self._errbacks:
-            fn, args, kwargs = errback
-            fn(response, *args, **kwargs)
+        # apply each callback
+        for callback_partial in to_call:
+            callback_partial()
 
     def _retry(self, reuse_connection, consistency_level, host):
         if self._final_exception:
@@ -3875,10 +3896,12 @@ class ResponseFuture(object):
         """
         run_now = False
         with self._callback_lock:
+            # Always add fn to self._callbacks, even when we're about to
+            # execute it, to prevent races with functions like
+            # start_fetching_next_page that reset _final_result
+            self._callbacks.append((fn, args, kwargs))
             if self._final_result is not _NOT_SET:
                 run_now = True
-            else:
-                self._callbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_result, *args, **kwargs)
         return self
@@ -3891,10 +3914,12 @@ class ResponseFuture(object):
         """
         run_now = False
         with self._callback_lock:
+            # Always add fn to self._errbacks, even when we're about to execute
+            # it, to prevent races with functions like start_fetching_next_page
+            # that reset _final_exception
+            self._errbacks.append((fn, args, kwargs))
             if self._final_exception:
                 run_now = True
-            else:
-                self._errbacks.append((fn, args, kwargs))
         if run_now:
             fn(self._final_exception, *args, **kwargs)
         return self

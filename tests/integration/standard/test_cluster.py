@@ -25,11 +25,12 @@ from uuid import uuid4
 import logging
 
 import cassandra
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 WhiteListRoundRobinPolicy, AddressTranslator)
+from cassandra.pool import Host
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
 
@@ -176,6 +177,28 @@ class ClusterTests(unittest.TestCase):
         execute_with_long_wait_retry(session, "DROP KEYSPACE clustertests")
 
         cluster.shutdown()
+
+    def test_session_host_parameter(self):
+        """
+        Test for protocol negotiation
+
+        Very that NoHostAvailable is risen in Session.__init__ when there are no valid connections and that
+        no error is arisen otherwise, despite maybe being some invalid hosts
+
+        @since 3.9
+        @jira_ticket PYTHON-665
+        @expected_result NoHostAvailable when the driver is unable to connect to a valid host,
+        no exception otherwise
+
+        @test_category connection
+        """
+        with self.assertRaises(NoHostAvailable):
+            Session(Cluster(protocol_version=PROTOCOL_VERSION), [])
+        with self.assertRaises(NoHostAvailable):
+            Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host("1.2.3.4", SimpleConvictionPolicy)])
+        session = Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host(x, SimpleConvictionPolicy) for x in
+                                      ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
+        session.shutdown()
 
     def test_protocol_negotiation(self):
         """
@@ -813,7 +836,9 @@ class ClusterTests(unittest.TestCase):
         rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
         exec_profiles = {'rr1': rr1}
         with Cluster(execution_profiles=exec_profiles) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
+            self.assertGreater(len(cluster.metadata.all_hosts()), 1, "We only have one host connected at this point")
+
             rr1_clone = session.execution_profile_clone_update('rr1', row_factory=tuple_factory)
             cluster.add_execution_profile("rr1_clone", rr1_clone)
             rr1_queried_hosts = set()
@@ -895,10 +920,11 @@ class ClusterTests(unittest.TestCase):
             for i in range(max_retry_count):
                 start = time.time()
                 try:
-                    self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile, 'node2',
+                    self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile,
+                                      'profile_{0}'.format(i),
                                       node2, pool_wait_timeout=sys.float_info.min)
                     break
-                except Exception:
+                except AssertionError:
                     end = time.time()
                     self.assertAlmostEqual(start, end, 1)
             else:
@@ -1176,7 +1202,6 @@ class BetaProtocolTest(unittest.TestCase):
                 cluster.connect()
         except Exception as e:
             self.fail("Unexpected error encountered {0}".format(e.message))
-            cluster.shutdown()
 
     @protocolv5
     def test_valid_protocol_version_beta_options_connect(self):

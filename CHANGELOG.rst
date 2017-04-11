@@ -1,3 +1,25 @@
+3.9.0
+=====
+
+Features
+--------
+* cqlengine: remove elements by key from a map (PYTHON-688)
+
+Bug Fixes
+---------
+* improve error handling when connecting to non-existent keyspace (PYTHON-665)
+* Sockets associated with sessions not getting cleaned up on session.shutdown() (PYTHON-673)
+* rare flake on integration.standard.test_cluster.ClusterTests.test_clone_shared_lbp (PYTHON-727)
+* MontonicTimestampGenerator.__init__ ignores class defaults (PYTHON-728)
+* race where callback or errback for request may not be called (PYTHON-733)
+* cqlengine: model.update() should not update columns with a default value that hasn't changed (PYTHON-657)
+* cqlengine: field value manager's explicit flag is True when queried back from cassandra (PYTHON-719)
+
+Other
+-----
+* Connection not closed in example_mapper (PYTHON-723)
+* Remove mention of pre-2.0 C* versions from OSS 3.0+ docs (PYTHON-710)
+
 3.8.1
 =====
 March 16, 2017

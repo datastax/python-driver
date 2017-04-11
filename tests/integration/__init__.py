@@ -28,7 +28,8 @@ from threading import Event
 from subprocess import call
 from itertools import groupby
 
-from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists
+from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
+    InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
 from cassandra.policies import RoundRobinPolicy
@@ -411,7 +412,7 @@ def execute_until_pass(session, query):
     while tries < 100:
         try:
             return session.execute(query)
-        except (ConfigurationException, AlreadyExists):
+        except (ConfigurationException, AlreadyExists, InvalidRequest):
             log.warn("Received already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return

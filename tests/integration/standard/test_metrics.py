@@ -143,6 +143,8 @@ class MetricsTests(unittest.TestCase):
         self.assertTrue(results)
 
         # Stop node gracefully
+        # Sometimes this commands continues with the other nodes having not noticed
+        # 1 is down, and a Timeout error is returned instead of an Unavailable
         get_node(1).stop(wait=True, wait_other_notice=True)
 
         try:

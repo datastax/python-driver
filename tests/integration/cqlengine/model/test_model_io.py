@@ -22,6 +22,7 @@ from datetime import datetime, date, time
 from decimal import Decimal
 from operator import itemgetter
 
+import cassandra
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.management import sync_table
@@ -29,7 +30,6 @@ from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.query import SimpleStatement
 from cassandra.util import Date, Time
-from cassandra.cqltypes import Int32Type
 from cassandra.cqlengine.statements import SelectStatement, DeleteStatement, WhereClause
 from cassandra.cqlengine.operators import EqualsOperator
 
@@ -523,7 +523,7 @@ class TestUpdating(BaseCassEngTestCase):
         # All explicitely set columns, and those with default values are
         # flagged has changed.
         self.assertTrue(set(instance.get_changed_columns()) == set([
-            'id', 'int1', 'int2', 'int3', 'int4', 'int5']))
+            'id', 'int1', 'int3', 'int5']))
 
     def test_save_to_none(self):
         """

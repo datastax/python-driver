@@ -134,3 +134,157 @@ class ModelUpdateTests(BaseCassEngTestCase):
         m0 = TestUpdateModel.create(count=5, text='monkey')
         with self.assertRaises(ValidationError):
             m0.update(partition=uuid4())
+
+
+class ModelWithDefault(Model):
+    id          = columns.Integer(primary_key=True)
+    mf          = columns.Map(columns.Integer, columns.Integer)
+    dummy       = columns.Integer(default=42)
+
+
+class ModelWithDefaultCollection(Model):
+    id          = columns.Integer(primary_key=True)
+    mf          = columns.Map(columns.Integer, columns.Integer, default={2:2})
+    dummy       = columns.Integer(default=42)
+
+
+class ModelWithDefaultTests(BaseCassEngTestCase):
+    def setUp(self):
+        sync_table(ModelWithDefault)
+
+    def tearDown(self):
+        drop_table(ModelWithDefault)
+
+    def test_value_override_with_default(self):
+        """
+        Updating a row with a new Model instance shouldn't set columns to defaults
+
+        @since 3.9
+        @jira_ticket PYTHON-657
+        @expected_result column value should not change
+
+        @test_category object_mapper
+        """
+        initial = ModelWithDefault(id=1, mf={0: 0}, dummy=0)
+        initial.save()
+
+        self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 0, 'mf': {0: 0}})
+
+        second = ModelWithDefault(id=1)
+        second.update(mf={0: 1})
+
+        self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 0, 'mf': {0: 1}})
+
+    def test_value_is_written_if_is_default(self):
+        """
+        Check if the we try to update with the default value, the update
+        happens correctly
+        @since 3.9
+        @jira_ticket PYTHON-657
+        @expected_result column value should be updated
+
+        @test_category object_mapper
+        :return:
+        """
+        initial = ModelWithDefault(id=1)
+        initial.mf = {0: 0}
+        initial.dummy = 42
+        initial.update()
+
+        self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 42, 'mf': {0: 0}})
+
+    def test_null_update_is_respected(self):
+        """
+        Check if the we try to update with None under particular
+        circumstances, it works correctly
+        @since 3.9
+        @jira_ticket PYTHON-657
+        @expected_result column value should be updated to None
+
+        @test_category object_mapper
+        :return:
+        """
+        ModelWithDefault.create(id=1, mf={0: 0}).save()
+
+        q = ModelWithDefault.objects.all().allow_filtering()
+        obj = q.filter(id=1).get()
+
+        obj.update(dummy=None)
+
+        self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': None, 'mf': {0: 0}})
+
+    def test_only_set_values_is_updated(self):
+        """
+        Test the updates work as expected when an object is deleted
+        @since 3.9
+        @jira_ticket PYTHON-657
+        @expected_result the non updated column is None and the
+        updated column has the set value
+
+        @test_category object_mapper
+        """
+
+        ModelWithDefault.create(id=1, mf={1: 1}, dummy=1).save()
+
+        item = ModelWithDefault.filter(id=1).first()
+        ModelWithDefault.objects(id=1).delete()
+        item.mf = {1: 2}
+
+        item.save()
+
+        self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': None, 'mf': {1: 2}})
+
+    def test_collections(self):
+        """
+        Test the updates work as expected when an object is deleted
+        @since 3.9
+        @jira_ticket PYTHON-657
+        @expected_result the non updated column is None and the
+        updated column has the set value
+
+        @test_category object_mapper
+        """
+        ModelWithDefault.create(id=1, mf={1: 1, 2: 1}, dummy=1).save()
+        item = ModelWithDefault.filter(id=1).first()
+
+        item.update(mf={2:1})
+        self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 1, 'mf': {2: 1}})
+
+    def test_collection_with_default(self):
+        """
+        Test the updates work as expected when an object is deleted
+        @since 3.9
+        @jira_ticket PYTHON-657
+        @expected_result the non updated column is None and the
+        updated column has the set value
+
+        @test_category object_mapper
+        """
+        sync_table(ModelWithDefaultCollection)
+        item = ModelWithDefaultCollection.create(id=1, mf={1: 1}, dummy=1).save()
+        self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 1, 'mf': {1: 1}})
+
+        item.update(mf={2: 2})
+        self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 1, 'mf': {2: 2}})
+
+        item.update(mf=None)
+        self.assertEqual(ModelWithDefaultCollection.objects().all().get()._as_dict(),
+                         {'id': 1, 'dummy': 1, 'mf': {}})
+
+        item = ModelWithDefaultCollection.create(id=2, dummy=2).save()
+        self.assertEqual(ModelWithDefaultCollection.objects().all().get(id=2)._as_dict(),
+                         {'id': 2, 'dummy': 2, 'mf': {2: 2}})
+
+        item.update(mf={1: 1, 4: 4})
+        self.assertEqual(ModelWithDefaultCollection.objects().all().get(id=2)._as_dict(),
+                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}})
+
+        drop_table(ModelWithDefaultCollection)

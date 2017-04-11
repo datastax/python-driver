@@ -157,9 +157,9 @@ class ClientExceptionTests(unittest.TestCase):
                 self.execute_helper(session, statement)
             if self.support_v5 and (isinstance(cm.exception, WriteFailure) or isinstance(cm.exception, ReadFailure)):
                 if isinstance(cm.exception, ReadFailure):
-                    self.assertEqual(cm.exception.error_code_map.values()[0], 1)
+                    self.assertEqual(list(cm.exception.error_code_map.values())[0], 1)
                 else:
-                    self.assertEqual(cm.exception.error_code_map.values()[0], 0)
+                    self.assertEqual(list(cm.exception.error_code_map.values())[0], 0)
 
     def test_write_failures_from_coordinator(self):
         """
@@ -322,8 +322,6 @@ class TimeoutTimerTest(unittest.TestCase):
         """
         Setup sessions and pause node1
         """
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
 
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
         self.node1 = get_node(1)
