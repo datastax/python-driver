@@ -5,6 +5,9 @@ schedules:
       include: [master, /python.*/]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
 
   nightly_libev:
     schedule: nightly
@@ -14,7 +17,7 @@ schedules:
       EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
-        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+        - cassandra: ['2.0', '2.1', '3.0']
 
   nightly_gevent:
     schedule: nightly
@@ -24,8 +27,8 @@ schedules:
       EVENT_LOOP_MANAGER='gevent'
     matrix:
       exclude:
-        - pythoon: 3.4
-          cassandra: ['2.0', '2.1', '2.2', '3.0']
+        - python: 3.4
+          cassandra: ['2.0', '2.1', '3.0']
 
   nightly_eventlet:
     schedule: nightly
@@ -35,7 +38,7 @@ schedules:
       EVENT_LOOP_MANAGER='eventlet'
     matrix:
       exclude:
-        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+        - cassandra: ['2.0', '2.1', '3.0']
 
   nightly_async:
     schedule: nightly
@@ -45,7 +48,7 @@ schedules:
       EVENT_LOOP_MANAGER='async'
     matrix:
       exclude:
-        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+        - cassandra: ['2.0', '2.1', '3.0']
 
   nightly_twister:
     schedule: nightly
@@ -55,7 +58,7 @@ schedules:
       EVENT_LOOP_MANAGER='twisted'
     matrix:
       exclude:
-        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+        - cassandra: ['2.0', '2.1', '3.0']
 
 python:
   - 2.7
