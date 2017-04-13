@@ -278,7 +278,7 @@ class TestTime(DataType, BaseCassEngTestCase):
     def setUpClass(cls):
         cls.db_klass, cls.python_klass = Time, util.Time
         cls.first_value, cls.second_value, cls.third_value = \
-            time(2, 12, 7, 48),  util.Time(time(2, 12, 7, 49)), time(2, 12, 7, 50)
+            None,  util.Time(time(2, 12, 7, 49)), time(2, 12, 7, 50)
         super(TestTime, cls).setUpClass()
 
 
@@ -295,7 +295,7 @@ class TestBoolean(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         cls.db_klass, cls.python_klass = Boolean, bool
-        cls.first_value, cls.second_value, cls.third_value = True, False, True
+        cls.first_value, cls.second_value, cls.third_value = None, False, True
         super(TestBoolean, cls).setUpClass()
 
 
@@ -333,17 +333,17 @@ class TestUDT(DataType, BaseCassEngTestCase):
             date_param=datetime.utcnow(),
             map_param={1: time(2, 12, 7, 50), 2: util.Time(time(2, 12, 7, 49))},
             list_param=[datetime(1, 1, 2), datetime(1, 2, 3)],
-            set_param=set((datetime(1, 1, 3), util.Date(datetime(1, 1, 1)))),
+            set_param=None,
             tuple_param=(datetime(1, 1, 2), 2, False, 1, 2.324, uuid4())
         )
 
         cls.third_value = User(
             age=2,
-            date_param=datetime.utcnow(),
+            date_param=None,
             map_param={1: time(2, 12, 7, 51), 2: util.Time(time(2, 12, 7, 49))},
             list_param=[datetime(1, 1, 2), datetime(1, 1, 4)],
             set_param=set((datetime(1, 1, 3), util.Date(datetime(1, 1, 2)))),
-            tuple_param=(datetime(1, 1, 2), 3, False, 1, 2.3214, uuid4())
+            tuple_param=(None, 3, False, None, 2.3214, uuid4())
         )
 
         cls.model_class = UserModel
