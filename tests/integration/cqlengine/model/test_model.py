@@ -24,6 +24,7 @@ from cassandra.cqlengine import models
 from cassandra.cqlengine.models import Model, ModelDefinitionException
 from uuid import uuid1
 from tests.integration import pypy
+from tests.integration.cqlengine.base import TestQueryUpdateModel
 
 class TestModel(unittest.TestCase):
     """ Tests the non-io functionality of models """
@@ -207,3 +208,15 @@ class ModelOverWriteTest(unittest.TestCase):
         DerivedTimeModel.create(uuid=uuid_value2, value="second")
         DerivedTimeModel.objects.filter(uuid=uuid_value)
 
+
+class TestColumnComparison(unittest.TestCase):
+    def test_comparison(self):
+        l = [TestQueryUpdateModel.partition.column,
+             TestQueryUpdateModel.cluster.column,
+             TestQueryUpdateModel.count.column,
+             TestQueryUpdateModel.text.column,
+             TestQueryUpdateModel.text_set.column,
+             TestQueryUpdateModel.text_list.column,
+             TestQueryUpdateModel.text_map.column]
+
+        self.assertEqual(l, sorted(l))
