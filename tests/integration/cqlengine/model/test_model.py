@@ -174,7 +174,7 @@ class BuiltInAttributeConflictTest(unittest.TestCase):
                 my_primary_key = columns.Integer(primary_key=True)
                 filter = columns.Text()
 
-@pypy
+
 class ModelOverWriteTest(unittest.TestCase):
 
     def test_model_over_write(self):
