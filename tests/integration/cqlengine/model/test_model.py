@@ -220,3 +220,7 @@ class TestColumnComparison(unittest.TestCase):
              TestQueryUpdateModel.text_map.column]
 
         self.assertEqual(l, sorted(l))
+        self.assertNotEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
+        self.assertLessEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
+        self.assertGreater(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)
+        self.assertGreaterEqual(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)
