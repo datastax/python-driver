@@ -249,3 +249,24 @@ class TestConditional(BaseCassEngTestCase):
 
         self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
         self.assertEqual(TestConditionalModel.objects(id=t.id).first().count, 6)
+
+    def test_conditional_without_instance(self):
+        """
+        Test to ensure that the iff method is honored if it's called
+        directly from the Model class
+
+        @jira_ticket PYTHON-505
+        @expected_result the value is updated
+
+        @test_category object_mapper
+        """
+        uuid = uuid4()
+        TestConditionalModel.create(id=uuid, text='test_for_cassandra', count=5)
+
+        # This uses the iff method directly from the model class without
+        # an instance having been created
+        TestConditionalModel.iff(count=5).filter(id=uuid).update(text=None, count=6)
+
+        t = TestConditionalModel.filter(id=uuid).first()
+        self.assertIsNone(t.text)
+        self.assertEqual(t.count, 6)
