@@ -31,7 +31,7 @@ from cassandra.cqlengine.models import Model, ValidationError
 from cassandra.cqlengine.usertype import UserType
 from cassandra import util
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 
 
@@ -191,7 +191,7 @@ class TestVarInt(BaseCassEngTestCase):
 class DataType():
     @classmethod
     def setUpClass(cls):
-        if PROTOCOL_VERSION < 4:
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
             return
 
         class DataTypeTest(Model):
@@ -203,12 +203,12 @@ class DataType():
 
     @classmethod
     def tearDownClass(cls):
-        if PROTOCOL_VERSION < 4:
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
             return
         drop_table(cls.model_class)
 
     def setUp(self):
-        if PROTOCOL_VERSION < 4:
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
             raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
 
     def _check_value_is_correct_in_db(self, value):
@@ -318,6 +318,9 @@ class UserModel(Model):
 class TestUDT(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
+            return
+        
         cls.db_klass, cls.python_klass = UserDefinedType, User
         cls.first_value = User(
             age=1,
