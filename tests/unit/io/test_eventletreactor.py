@@ -19,31 +19,29 @@ except ImportError:
     import unittest # noqa
 
 from tests.unit.io.utils import TimerConnectionTests
-from tests.unit.io.eventlet_utils import restore_saved_module
-from tests import notpypy
-from tests import notmonkeypatch
+from tests import notpypy, MONKEY_PATCH_LOOP, notmonkeypatch
 
-import time
-from eventlet import monkey_patch, kill
+from eventlet import monkey_patch
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
 except ImportError:
     EventletConnection = None  # noqa
 
-@unittest.skipUnless(EventletConnection is not None, "Skpping the eventlet tests because it's not installed")
-@notmonkeypatch
 # There are some issues with some versions of pypy and eventlet
 @notpypy
+@unittest.skipIf(EventletConnection is None, "Skpping the eventlet tests because it's not installed")
+@notmonkeypatch
 class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
-
-    def setUp(self):
-        self.connection_class = EventletConnection
-        # We only to patch the time module
-        monkey_patch(time=True)
+    @classmethod
+    def setUpClass(cls):
+        # This is run even though the class is skipped, so we need
+        # to make sure no monkey patching is happening
+        if not MONKEY_PATCH_LOOP:
+            return
+        monkey_patch()
+        cls.connection_class = EventletConnection
         EventletConnection.initialize_reactor()
 
-    def tearDown(self):
-        kill(EventletConnection._timeout_watcher)
-        EventletConnection._timers = None
-        restore_saved_module(time)
+    # There is no unpatching because there is not a clear way
+    # of doing it reliably
