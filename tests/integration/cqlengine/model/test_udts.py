@@ -108,6 +108,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
     def test_can_insert_udts(self):
 
         sync_table(UserModel)
+        self.addCleanup(drop_table, UserModel)
 
         user = User(age=42, name="John")
         UserModel.create(id=0, info=user)
@@ -119,10 +120,10 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertTrue(type(john.info) is User)
         self.assertEqual(42, john.info.age)
         self.assertEqual("John", john.info.name)
-        drop_table(UserModel)
 
     def test_can_update_udts(self):
         sync_table(UserModel)
+        self.addCleanup(drop_table, UserModel)
 
         user = User(age=42, name="John")
         created_user = UserModel.create(id=0, info=user)
@@ -137,10 +138,10 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         mary_info = UserModel.objects().first().info
         self.assertEqual(22, mary_info["age"])
         self.assertEqual("Mary", mary_info["name"])
-        drop_table(UserModel)
 
     def test_can_update_udts_with_nones(self):
         sync_table(UserModel)
+        self.addCleanup(drop_table, UserModel)
 
         user = User(age=42, name="John")
         created_user = UserModel.create(id=0, info=user)
@@ -154,7 +155,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         john_info = UserModel.objects().first().info
         self.assertIsNone(john_info)
-        drop_table(UserModel)
 
     def test_can_create_same_udt_different_keyspaces(self):
         sync_type(DEFAULT_KEYSPACE, User)
@@ -174,6 +174,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             info = columns.UserDefinedType(UserGender)
 
         sync_table(UserModelGender)
+        self.addCleanup(drop_table, UserModelGender)
 
         user = UserGender(age=42, name="John")
         UserModelGender.create(id=0, info=user)
@@ -190,7 +191,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(42, john_info.age)
         self.assertIsNone(john_info.name)
         self.assertIsNone(john_info.gender)
-        drop_table(UserModelGender)
 
     def test_can_insert_nested_udts(self):
         class Depth_0(UserType):
@@ -214,6 +214,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             v_3 = columns.UserDefinedType(Depth_3)
 
         sync_table(DepthModel)
+        self.addCleanup(drop_table, DepthModel)
 
         udts = [Depth_0(age=42, name="John")]
         udts.append(Depth_1(value=udts[0]))
@@ -227,8 +228,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(udts[1], output.v_1)
         self.assertEqual(udts[2], output.v_2)
         self.assertEqual(udts[3], output.v_3)
-
-        drop_table(DepthModel)
 
     def test_can_insert_udts_with_nones(self):
         """
@@ -246,6 +245,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         @test_category data_types:udt
         """
         sync_table(AllDatatypesModel)
+        self.addCleanup(drop_table, AllDatatypesModel)
 
         input = AllDatatypes(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=None, i=None, j=None, k=None,
                              l=None, m=None, n=None)
@@ -255,8 +255,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         output = AllDatatypesModel.objects().first().data
         self.assertEqual(input, output)
-
-        drop_table(AllDatatypesModel)
 
     def test_can_insert_udts_with_all_datatypes(self):
         """
@@ -274,6 +272,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         @test_category data_types:udt
         """
         sync_table(AllDatatypesModel)
+        self.addCleanup(drop_table, AllDatatypesModel)
 
         input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True,
                              e=datetime.utcfromtimestamp(872835240), f=Decimal('12.3E+7'), g=2.39,
@@ -287,8 +286,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         for i in range(ord('a'), ord('a') + 14):
             self.assertEqual(input[chr(i)], output[chr(i)])
-
-        drop_table(AllDatatypesModel)
 
     def test_can_insert_udts_protocol_v4_datatypes(self):
         """
@@ -321,6 +318,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             data = columns.UserDefinedType(Allv4Datatypes)
 
         sync_table(Allv4DatatypesModel)
+        self.addCleanup(drop_table, Allv4DatatypesModel)
 
         input = Allv4Datatypes(a=Date(date(1970, 1, 1)), b=32523, c=Time(time(16, 47, 25, 7)), d=123)
         Allv4DatatypesModel.create(id=0, data=input)
@@ -330,8 +328,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         for i in range(ord('a'), ord('a') + 3):
             self.assertEqual(input[chr(i)], output[chr(i)])
-
-        drop_table(Allv4DatatypesModel)
 
     def test_nested_udts_inserts(self):
         """
@@ -366,14 +362,14 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         # Create table, insert data
         sync_table(Container)
+        self.addCleanup(drop_table, Container)
+
         Container.create(id=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'), names=names)
 
         # Validate input and output matches
         self.assertEqual(1, Container.objects.count())
         names_output = Container.objects().first().names
         self.assertEqual(names_output, names)
-
-        drop_table(Container)
 
     def test_udts_with_unicode(self):
         """
@@ -396,6 +392,8 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             info = columns.UserDefinedType(User)
 
         sync_table(UserModelText)
+        self.addCleanup(drop_table, UserModelText)
+
         # Two udt instances one with a unicode one with ascii
         user_template_ascii = User(age=25, name=ascii_name)
         user_template_unicode = User(age=25, name=unicode_name)
@@ -403,8 +401,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         UserModelText.create(id=ascii_name, info=user_template_unicode)
         UserModelText.create(id=unicode_name, info=user_template_ascii)
         UserModelText.create(id=unicode_name, info=user_template_unicode)
-
-        drop_table(UserModelText)
 
     def test_register_default_keyspace(self):
 
@@ -443,6 +439,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             info = columns.UserDefinedType(db_field_different)
 
         sync_table(TheModel)
+        self.addCleanup(drop_table, TheModel)
 
         cluster = connection.get_cluster()
         type_meta = cluster.metadata.keyspaces[TheModel._get_keyspace()].user_types[db_field_different.type_name()]
@@ -470,8 +467,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         # also excercise the db_Field mapping
         self.assertEqual(info.a, age)
         self.assertEqual(info.n, name)
-
-        drop_table(TheModel)
 
     def test_db_field_overload(self):
         """
@@ -528,6 +523,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             simple = columns.UserDefinedType(NestedUdt)
 
         sync_table(OuterModel)
+        self.addCleanup(drop_table, OuterModel)
 
         t = OuterModel.create(name='test1')
         t.nested = [NestedUdt(something='test')]
@@ -537,8 +533,6 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.assertEqual(t.nested[0].default_text, "default text")
         self.assertIsNotNone(t.simple.test_id)
         self.assertEqual(t.simple.default_text, "default text")
-
-        drop_table(OuterModel)
 
     def test_udt_validate(self):
         """
@@ -561,13 +555,12 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             info = columns.UserDefinedType(UserValidate)
 
         sync_table(UserModelValidate)
+        self.addCleanup(drop_table, UserModelValidate)
 
         user = UserValidate(age=1, name="Robert")
         item = UserModelValidate(id=1, info=user)
         with self.assertRaises(ValidationError):
             item.save()
-
-        drop_table(UserModelValidate)
 
     def test_udt_validate_with_default(self):
         """
@@ -590,10 +583,9 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
             info = columns.UserDefinedType(UserValidateDefault)
 
         sync_table(UserModelValidateDefault)
+        self.addCleanup(drop_table, UserModelValidateDefault)
 
         user = UserValidateDefault(age=1)
         item = UserModelValidateDefault(id=1, info=user)
         with self.assertRaises(ValidationError):
             item.save()
-
-        drop_table(UserModelValidateDefault)

@@ -23,8 +23,10 @@ from decimal import Decimal as D
 from uuid import uuid4, uuid1
 
 from cassandra import InvalidRequest
-from cassandra.cqlengine.columns import TimeUUID, Ascii, Text, Integer, BigInt, VarInt, DateTime, Date, UUID, Boolean, \
-    Decimal, Inet, Time, UserDefinedType, Map, List, Set, Tuple, Double, Float
+from cassandra.cqlengine.columns import (TimeUUID, Ascii, Text, Integer, BigInt,
+                                         VarInt, DateTime, Date, UUID, Boolean,
+                                         Decimal, Inet, Time, UserDefinedType,
+                                         Map, List, Set, Tuple, Double)
 from cassandra.cqlengine.connection import execute
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model, ValidationError
@@ -237,7 +239,7 @@ class DataType():
 
         return result
 
-    def test_date_io_using_datetime(self):
+    def test_param_io(self):
         first_value = self.first_value
         second_value = self.second_value
         third_value = self.third_value
@@ -255,7 +257,7 @@ class DataType():
         result.update(class_param=None).save()
         self._check_value_is_correct_in_db(None)
 
-    def test_date_none(self):
+    def test_param_none(self):
         self.model_class.objects.create(test_id=1, class_param=None)
         dt2 = self.model_class.objects(test_id=1).first()
         self.assertIsNone(dt2.class_param)
@@ -267,35 +269,61 @@ class DataType():
 class TestDate(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.db_klass, cls.python_klass = Date, util.Date
-        cls.first_value, cls.second_value, cls.third_value = \
-            datetime.utcnow(), util.Date(datetime(1, 1, 1)), datetime(1, 1, 2)
+        cls.db_klass, cls.python_klass = (
+            Date,
+            util.Date
+        )
+
+        cls.first_value, cls.second_value, cls.third_value = (
+            datetime.utcnow(),
+            util.Date(datetime(1, 1, 1)),
+            datetime(1, 1, 2)
+        )
         super(TestDate, cls).setUpClass()
 
 
 class TestTime(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.db_klass, cls.python_klass = Time, util.Time
-        cls.first_value, cls.second_value, cls.third_value = \
-            None,  util.Time(time(2, 12, 7, 49)), time(2, 12, 7, 50)
+        cls.db_klass, cls.python_klass = (
+            Time,
+            util.Time
+        )
+        cls.first_value, cls.second_value, cls.third_value = (
+            None,
+            util.Time(time(2, 12, 7, 49)),
+            time(2, 12, 7, 50)
+        )
         super(TestTime, cls).setUpClass()
 
 
 class TestDateTime(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.db_klass, cls.python_klass = DateTime, datetime
-        cls.first_value, cls.second_value, cls.third_value = \
-            datetime(2017, 4, 13, 18, 34, 24, 317000), datetime(1, 1, 1), datetime(1, 1, 2)
+        cls.db_klass, cls.python_klass = (
+            DateTime,
+            datetime
+        )
+        cls.first_value, cls.second_value, cls.third_value = (
+            datetime(2017, 4, 13, 18, 34, 24, 317000),
+            datetime(1, 1, 1),
+            datetime(1, 1, 2)
+        )
         super(TestDateTime, cls).setUpClass()
 
 
 class TestBoolean(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.db_klass, cls.python_klass = Boolean, bool
-        cls.first_value, cls.second_value, cls.third_value = None, False, True
+        cls.db_klass, cls.python_klass = (
+            Boolean,
+            bool
+        )
+        cls.first_value, cls.second_value, cls.third_value = (
+            None,
+            False,
+            True
+        )
         super(TestBoolean, cls).setUpClass()
 
 
