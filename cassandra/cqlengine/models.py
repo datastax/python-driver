@@ -504,7 +504,7 @@ class BaseModel(object):
         if not self._is_persisted:
             return False
 
-        return not any(self._values[k].changed for k in self._primary_keys)
+        return all(not self._values[k].changed for k in self._primary_keys)
 
     @classmethod
     def _get_keyspace(cls):
