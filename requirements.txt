@@ -1,4 +1,4 @@
-six >=1.6
+six >=1.9
 futures <=2.2.0
 # Futures is not required for Python 3, but it works up through 2.2.0 (after which it introduced breaking syntax).
 # This is left here to make sure install -r works with any runtime. When installing via setup.py, futures is omitted
