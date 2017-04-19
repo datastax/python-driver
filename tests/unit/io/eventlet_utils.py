@@ -16,13 +16,21 @@
 import os
 import select
 import socket
-import thread
-import Queue
+try:
+    import thread
+    import Queue
+    import __builtin__
+    #For python3 compatibility
+except ImportError:
+    import _thread as thread
+    import queue as Queue
+    import builtins as __builtin__
+
 import threading
-import __builtin__
 import ssl
 import time
-
+import eventlet
+from imp import reload
 
 def eventlet_un_patch_all():
     """
@@ -34,4 +42,7 @@ def eventlet_un_patch_all():
     for to_unpatch in modules_to_unpatch:
         reload(to_unpatch)
 
+def restore_saved_module(module):
+    reload(module)
+    del eventlet.patcher.already_patched[module.__name__]
 

@@ -20,6 +20,7 @@ import logging
 import sys
 import socket
 import platform
+import os
 
 log = logging.getLogger()
 log.setLevel('DEBUG')
@@ -44,7 +45,22 @@ def is_gevent_monkey_patched():
     return socket.socket is gevent.socket.socket
 
 
+def is_gevent_time_monkey_patched():
+    import gevent.monkey
+    return "time" in gevent.monkey.saved
+
+
+def is_eventlet_time_monkey_patched():
+    import eventlet
+    return eventlet.patcher.is_monkey_patched('time')
+
+
 def is_monkey_patched():
     return is_gevent_monkey_patched() or is_eventlet_monkey_patched()
 
+
+MONKEY_PATCH_LOOP = bool(os.getenv('MONKEY_PATCH_LOOP', False))
+
 notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adequate for windows")
+notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")
+notmonkeypatch = unittest.skipUnless(MONKEY_PATCH_LOOP, "Skpping this test because monkey patching is required")
