@@ -31,6 +31,7 @@ elif "async" in EVENT_LOOP_MANAGER:
 elif "twisted" in EVENT_LOOP_MANAGER:
     from cassandra.io.twistedreactor import TwistedConnection
     connection_class = TwistedConnection
+
 else:
     from cassandra.io.libevreactor import LibevConnection
     connection_class = LibevConnection

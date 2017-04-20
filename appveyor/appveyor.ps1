@@ -2,6 +2,8 @@ $env:JAVA_HOME="C:\Program Files\Java\jdk1.8.0"
 $env:PATH="$($env:JAVA_HOME)\bin;$($env:PATH)"
 $env:CCM_PATH="C:\Users\appveyor\ccm"
 $env:CASSANDRA_VERSION=$env:cassandra_version
+$env:EVENT_LOOP_MANAGER="async"
+
 python --version
 python -c "import platform; print(platform.architecture())"
 # Install Ant
