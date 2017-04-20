@@ -211,12 +211,21 @@ class DataType():
 
     def setUp(self):
         if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
-            raise unittest.SkipTest("Protocol v4 datatypes require native protocol 4+, currently using: {0}".format(PROTOCOL_VERSION))
+            raise unittest.SkipTest("Protocol v4 datatypes "
+                                    "require native protocol 4+ and C* version >=3.0, "
+                                    "currently using protocol {0} and C* version {1}".
+                                    format(PROTOCOL_VERSION, CASSANDRA_VERSION))
 
     def _check_value_is_correct_in_db(self, value):
-
+        """
+         Check that different ways of reading the value
+         from the model class give the same expected result
+        """
         if value is None:
             result = self.model_class.objects.all().allow_filtering().filter(test_id=0).first()
+            self.assertIsNone(result.class_param)
+
+            result = self.model_class.objects(test_id=0).first()
             self.assertIsNone(result.class_param)
 
         else:
@@ -244,20 +253,28 @@ class DataType():
         second_value = self.second_value
         third_value = self.third_value
 
+        # Check value is correctly written/read from the DB
         self.model_class.objects.create(test_id=0, class_param=first_value)
         result = self._check_value_is_correct_in_db(first_value)
         result.delete()
 
+        # Check the previous value has been correctly deleted and write a new value
         self.model_class.objects.create(test_id=0, class_param=second_value)
         result = self._check_value_is_correct_in_db(second_value)
 
+        # Check the value can be correctly updated from the Model class
         result.update(class_param=third_value).save()
         result = self._check_value_is_correct_in_db(third_value)
 
+        # Check None is correctly written to the DB
         result.update(class_param=None).save()
         self._check_value_is_correct_in_db(None)
 
     def test_param_none(self):
+        """
+         Test that None value is correctly written to the db
+         and then is correctly read
+        """
         self.model_class.objects.create(test_id=1, class_param=None)
         dt2 = self.model_class.objects(test_id=1).first()
         self.assertIsNone(dt2.class_param)
