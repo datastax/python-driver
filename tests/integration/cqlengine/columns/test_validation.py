@@ -33,8 +33,8 @@ from cassandra.cqlengine.models import Model, ValidationError
 from cassandra.cqlengine.usertype import UserType
 from cassandra import util
 
-from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION
-from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthanorequalcass30
+from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
 class TestDatetime(BaseCassEngTestCase):
@@ -69,6 +69,7 @@ class TestDatetime(BaseCassEngTestCase):
         dt2 = self.DatetimeTest.objects(test_id=1).first()
         self.assertEqual(dt2.created_at.timetuple()[:6], (now + timedelta(hours=1)).timetuple()[:6])
 
+    @greaterthanorequalcass30
     def test_datetime_date_support(self):
         today = date.today()
         self.DatetimeTest.objects.create(test_id=2, created_at=today)
