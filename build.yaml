@@ -82,6 +82,7 @@ build:
   - script: |
       export JAVA_HOME=$CCM_JAVA_HOME
       export PATH=$JAVA_HOME/bin:$PATH
+      export PYTHONPATH=""
 
       pip install git+https://github.com/pcmanus/ccm.git
       # Install dependencies
