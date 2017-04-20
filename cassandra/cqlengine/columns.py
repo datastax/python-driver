@@ -989,6 +989,12 @@ class UserDefinedType(Column):
                                        field_names=[c.db_field_name for c in self.user_type._fields.values()],
                                        field_types=[c.cql_type for c in self.user_type._fields.values()])
 
+    def validate(self, value):
+        val = super(UserDefinedType, self).validate(value)
+        if val is None:
+            return
+        val.validate()
+        return val
 
 def resolve_udts(col_def, out_list):
     for col in col_def.sub_types:
