@@ -885,8 +885,8 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2,-1)
 
     def test_schedule_no_max(self):
-        base_delay = 2
-        max_delay = 100
+        base_delay = 2.0
+        max_delay = 100.0
         test_iter = 10000
         policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=None)
         sched_slice = list(islice(policy.new_schedule(), 0, test_iter))
@@ -895,8 +895,8 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertEqual(len(sched_slice), test_iter)
 
     def test_schedule_with_max(self):
-        base_delay = 2
-        max_delay = 100
+        base_delay = 2.0
+        max_delay = 100.0
         max_attempts = 64
         policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts)
         schedule = list(policy.new_schedule())
@@ -908,6 +908,16 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
                 self.assertEqual(delay, schedule[i - 1] * 2)
             else:
                 self.assertEqual(delay, max_delay)
+
+    def test_schedule_exactly_one_attempt(self):
+        base_delay = 2.0
+        max_delay = 100.0
+        max_attempts = 1
+        policy = ExponentialReconnectionPolicy(
+            base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts
+        )
+        self.assertEqual(len(list(policy.new_schedule())), 1)
+
 
 ONE = ConsistencyLevel.ONE
 
