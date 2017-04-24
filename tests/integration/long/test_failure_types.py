@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys,logging, traceback, time
+import sys,logging, traceback, time, re
 
 from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
                        FunctionFailure, ProtocolVersion)
@@ -134,7 +134,7 @@ class ClientExceptionTests(unittest.TestCase):
         # Ensure all nodes not on the list, but that are currently set to failing are enabled
         for node in self.nodes_currently_failing:
             if node not in failing_nodes:
-                node.stop(wait_other_notice=True, gently=False)
+                node.stop(wait_other_notice=True, gently=True)
                 node.start(wait_for_binary_proto=True, wait_other_notice=True)
                 self.nodes_currently_failing.remove(node)
 
@@ -324,22 +324,28 @@ class TimeoutTimerTest(unittest.TestCase):
         """
 
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
-        self.node1 = get_node(1)
+
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
+        self.session = self.cluster.connect(wait_for_all_pools=True)
+
+        # We make sure that the host that will be stopped
+        # is the one with which we have the control connection
+        self.control_connection_host_number = int(re.match(r"^127.0.0.(\d)$",
+                                                  self.cluster.get_control_connection_host().address).groups(0)[0])
+        self.node_to_stop = get_node(self.control_connection_host_number)
 
         ddl = '''
             CREATE TABLE test3rf.timeout (
                 k int PRIMARY KEY,
                 v int )'''
         self.session.execute(ddl)
-        self.node1.pause()
+        self.node_to_stop.pause()
 
     def tearDown(self):
         """
         Shutdown cluster and resume node1
         """
-        self.node1.resume()
+        self.node_to_stop.resume()
         self.session.execute("DROP TABLE test3rf.timeout")
         self.cluster.shutdown()
 
