@@ -134,7 +134,7 @@ class SchemaTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0.001)
         session = cluster.connect(wait_for_all_pools=True)
 
-        rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+        rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
         self.check_and_wait_for_agreement(session, rs, False)
         rs = session.execute("CREATE TABLE test_schema_disagreement.cf (key int PRIMARY KEY, value int)")
         self.check_and_wait_for_agreement(session, rs, False)
@@ -145,7 +145,7 @@ class SchemaTests(unittest.TestCase):
         # These should have schema agreement
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=100)
         session = cluster.connect()
-        rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+        rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
         self.check_and_wait_for_agreement(session, rs, True)
         rs = session.execute("CREATE TABLE test_schema_disagreement.cf (key int PRIMARY KEY, value int)")
         self.check_and_wait_for_agreement(session, rs, True)
