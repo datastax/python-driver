@@ -925,7 +925,8 @@ class QueryTrace(object):
             session_results = self._execute(
                 SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
-            is_complete = session_results and session_results[0].duration is not None
+            # PYTHON-730: There is race condition that the duration mutation is written before started_at the for fast queries
+            is_complete = session_results and session_results[0].duration is not None and session_results[0].started_at is not None
             if not session_results or (wait_for_complete and not is_complete):
                 time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
                 attempt += 1
