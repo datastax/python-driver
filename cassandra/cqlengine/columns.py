@@ -570,7 +570,6 @@ class Date(Column):
     db_type = 'date'
 
     def to_database(self, value):
-        value = super(Date, self).to_database(value)
         if value is None:
             return
 
@@ -580,7 +579,6 @@ class Date(Column):
         return d.days_from_epoch + SimpleDateType.EPOCH_OFFSET_DAYS
 
     def to_python(self, value):
-        value = super(Date, self).to_database(value)
         if value is None:
             return
         if isinstance(value, util.Date):
