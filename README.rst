@@ -63,12 +63,9 @@ If you would like to contribute, please feel free to open a pull request.
 
 Getting Help
 ------------
-Your two best options for getting help with the driver are the
+Your best options for getting help with the driver are the
 `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
-and the IRC channel.
-
-For IRC, use the #datastax-drivers channel on irc.freenode.net.  If you don't have an IRC client,
-you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_.
+and the ``#datastax-drivers`` channel in the `DataStax Academy Slack <https://academy.datastax.com/slack>`_.
 
 License
 -------
