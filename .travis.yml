@@ -1,16 +1,16 @@
 language: python
-python: 2.7
+python:
+  - "2.7"
+  - "3.3"
+  - "3.4"
+  - "3.5"
+  - "3.6"
+  - "pypy-5.4.1"
+
 sudo: false
 env:
-  - TOX_ENV=py27 CASS_VER=12 CASS_DRIVER_NO_CYTHON=1
-  - TOX_ENV=py27 CASS_VER=20 CASS_DRIVER_NO_CYTHON=1
-  - TOX_ENV=py27 CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
-  - TOX_ENV=py27 CASS_VER=21
-  - TOX_ENV=py33 CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
-  - TOX_ENV=py33 CASS_VER=21
-  - TOX_ENV=py34 CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
-  - TOX_ENV=py34 CASS_VER=21
-  - TOX_ENV=pypy CASS_VER=21 CASS_DRIVER_NO_CYTHON=1
+  - CASS_DRIVER_NO_CYTHON=1
+  - 
 
 addons:
   apt:
@@ -22,7 +22,8 @@ addons:
     - libev-dev
 
 install:
-  - pip install tox
+  - pip install tox-travis
 
 script:
-  - tox -e $TOX_ENV
+  - tox
+  - tox -e patched_loops
