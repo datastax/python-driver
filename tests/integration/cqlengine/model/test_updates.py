@@ -292,7 +292,7 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         item = ModelWithDefault.filter(id=1).first()
 
         udt, udt_default = UDT(age=1, mf={2: 1}), UDT(age=1, mf={2: 1})
-        item.update(mf={2:1})
+        item.update(mf={2:1}, udt=udt, udt_default=udt_default)
         self.assertEqual(ModelWithDefault.objects().all().get()._as_dict(),
                          {'id': 1, 'dummy': 1, 'mf': {2: 1}, "udt": udt, "udt_default": udt_default})
 
