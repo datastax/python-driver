@@ -16,7 +16,8 @@ import sys,logging, traceback, time, re
 
 from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
                        FunctionFailure, ProtocolVersion)
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.policies import WhiteListRoundRobinPolicy
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node
@@ -325,13 +326,13 @@ class TimeoutTimerTest(unittest.TestCase):
 
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        node1 = ExecutionProfile(
+            load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1'])
+        )
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: node1})
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
-        # We make sure that the host that will be stopped
-        # is the one with which we have the control connection
-        self.control_connection_host_number = int(re.match(r"^127.0.0.(\d)$",
-                                                  self.cluster.get_control_connection_host().address).groups(0)[0])
+        self.control_connection_host_number = 1
         self.node_to_stop = get_node(self.control_connection_host_number)
 
         ddl = '''
