@@ -570,7 +570,6 @@ class Date(Column):
     db_type = 'date'
 
     def to_database(self, value):
-        value = super(Date, self).to_database(value)
         if value is None:
             return
 
@@ -579,6 +578,14 @@ class Date(Column):
         d = value if isinstance(value, util.Date) else util.Date(value)
         return d.days_from_epoch + SimpleDateType.EPOCH_OFFSET_DAYS
 
+    def to_python(self, value):
+        if value is None:
+            return
+        if isinstance(value, util.Date):
+            return value
+        if isinstance(value, datetime):
+            value = value.date()
+        return util.Date(value)
 
 class Time(Column):
     """
@@ -597,6 +604,13 @@ class Time(Column):
         # str(util.Time) yields desired CQL encoding
         return value if isinstance(value, util.Time) else util.Time(value)
 
+    def to_python(self, value):
+        value = super(Time, self).to_database(value)
+        if value is None:
+            return
+        if isinstance(value, util.Time):
+            return value
+        return util.Time(value)
 
 class UUID(Column):
     """
@@ -973,6 +987,12 @@ class UserDefinedType(Column):
                                        field_names=[c.db_field_name for c in self.user_type._fields.values()],
                                        field_types=[c.cql_type for c in self.user_type._fields.values()])
 
+    def validate(self, value):
+        val = super(UserDefinedType, self).validate(value)
+        if val is None:
+            return
+        val.validate()
+        return val
 
 def resolve_udts(col_def, out_list):
     for col in col_def.sub_types:
