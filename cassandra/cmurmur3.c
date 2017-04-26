@@ -6,7 +6,7 @@
  *
  * Copyright (c) 2011 Austin Appleby (Murmur3 routine)
  * Copyright (c) 2011 Patrick Hensley (Python wrapper, packaging)
- * Copyright 2013-2016 DataStax (Minor modifications to match Cassandra's MM3 hashes)
+ * Copyright 2013-2017 DataStax (Minor modifications to match Cassandra's MM3 hashes)
  *
  */
 
