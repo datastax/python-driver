@@ -67,7 +67,7 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             BatchStatement, bind_params, QueryTrace,
+                             BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
 
@@ -3836,8 +3836,15 @@ class ResponseFuture(object):
         details from Cassandra. If the trace is not available after `max_wait`,
         :exc:`cassandra.query.TraceUnavailable` will be raised.
 
+        If the ResponseFuture is not done (async execution) and you try to retrieve the trace,
+        :exc:`cassandra.query.TraceUnavailable` will be raised.
+
         `query_cl` is the consistency level used to poll the trace tables.
         """
+        if self._final_result is _NOT_SET:
+            raise TraceUnavailable(
+                "Trace information was not available. The ResponseFuture is not done.")
+
         if self._query_traces:
             return self._get_query_trace(len(self._query_traces) - 1, max_wait, query_cl)
 
