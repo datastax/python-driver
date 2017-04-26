@@ -3841,7 +3841,7 @@ class ResponseFuture(object):
 
         `query_cl` is the consistency level used to poll the trace tables.
         """
-        if self._final_result is _NOT_SET:
+        if self._final_result is _NOT_SET and self._final_exception is None:
             raise TraceUnavailable(
                 "Trace information was not available. The ResponseFuture is not done.")
 
