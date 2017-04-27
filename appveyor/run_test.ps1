@@ -3,9 +3,9 @@ Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process -force
 Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser -force
 Get-ExecutionPolicy -List
 echo $env:Path
-echo $env:JAVA_HOME
-echo $env:PYTHONPATH
-echo $env:CASSANDRA_VERSION
+echo "JAVA_HOME: $env:JAVA_HOME"
+echo "PYTHONPATH: $env:PYTHONPATH"
+echo "Cassandra version: $env:CASSANDRA_VERSION"
 echo $env:ci_type
 python --version
 python -c "import platform; print(platform.architecture())"
