@@ -580,7 +580,7 @@ class ClusterTests(unittest.TestCase):
         check_trace(future.get_query_trace())
         cluster.shutdown()
 
-    def test_trace_unavaiable(self):
+    def test_trace_unavailable(self):
         """
         First checks that TraceUnavailable is arisen if the
         max_wait parameter is negative
