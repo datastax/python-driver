@@ -580,7 +580,20 @@ class ClusterTests(unittest.TestCase):
         check_trace(future.get_query_trace())
         cluster.shutdown()
 
-    def test_trace_timeout(self):
+    def test_trace_unavaiable(self):
+        """
+        First checks that TraceUnavailable is arisen if the
+        max_wait parameter is negative
+
+        Then checks that TraceUnavailable is arisen if the
+        result hasn't been set yet
+
+        @since 3.10
+        @jira_ticket PYTHON-196
+        @expected_result TraceUnavailable is arisen in both cases
+
+        @test_category query
+                """
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
@@ -589,6 +602,11 @@ class ClusterTests(unittest.TestCase):
         future = session.execute_async(statement, trace=True)
         future.result()
         self.assertRaises(TraceUnavailable, future.get_query_trace, -1.0)
+
+        query = SimpleStatement("SELECT * FROM system.local")
+        future = session.execute_async(query, trace=True)
+        self.assertRaises(TraceUnavailable, future.get_query_trace, max_wait=120)
+
         cluster.shutdown()
 
     def test_string_coverage(self):
