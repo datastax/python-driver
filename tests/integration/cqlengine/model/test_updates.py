@@ -183,9 +183,11 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
 
     def setUp(self):
         sync_table(ModelWithDefault)
+        sync_table(ModelWithDefaultCollection)
 
     def tearDown(self):
         drop_table(ModelWithDefault)
+        drop_table(ModelWithDefaultCollection)
 
     def test_value_override_with_default(self):
         """
@@ -309,28 +311,35 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         udt, udt_default = UDT(age=1, mf={6: 6}), UDT(age=1, mf={6: 6})
 
         item = ModelWithDefaultCollection.create(id=1, mf={1: 1}, dummy=1, udt=udt, udt_default=udt_default).save()
-        self.assertEqual(ModelWithDefaultCollection.all().get()._as_dict(),
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=1)._as_dict(),
                          {'id': 1, 'dummy': 1, 'mf': {1: 1}, "udt": udt, "udt_default": udt_default})
 
         udt, udt_default = UDT(age=1, mf={5: 5}), UDT(age=1, mf={5: 5})
         item.update(mf={2: 2}, udt=udt, udt_default=udt_default)
-        self.assertEqual(ModelWithDefaultCollection.all().get()._as_dict(),
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=1)._as_dict(),
                          {'id': 1, 'dummy': 1, 'mf': {2: 2}, "udt": udt, "udt_default": udt_default})
 
         udt, udt_default = UDT(age=1, mf=None), UDT(age=1, mf=None)
         expected_udt, expected_udt_default = UDT(age=1, mf={}), UDT(age=1, mf={})
         item.update(mf=None, udt=udt, udt_default=udt_default)
-        self.assertEqual(ModelWithDefaultCollection.all().get()._as_dict(),
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=1)._as_dict(),
                          {'id': 1, 'dummy': 1, 'mf': {}, "udt": expected_udt, "udt_default": expected_udt_default})
 
-        udt_default = UDT(age=1, mf=None), UDT(age=1, mf={5:5})
-        item = ModelWithDefaultCollection.create(id=2, dummy=2).save()
-        self.assertEqual(ModelWithDefaultCollection.all().get(id=2)._as_dict(),
+        udt_default = UDT(age=1, mf={2:2}, dummy_udt=42)
+        item = ModelWithDefaultCollection.create(id=2, dummy=2)
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
                          {'id': 2, 'dummy': 2, 'mf': {2: 2}, "udt": None, "udt_default": udt_default})
 
         udt, udt_default = UDT(age=1, mf={1: 1, 6: 6}), UDT(age=1, mf={1: 1, 6: 6})
         item.update(mf={1: 1, 4: 4}, udt=udt, udt_default=udt_default)
-        self.assertEqual(ModelWithDefaultCollection.all().get(id=2)._as_dict(),
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
                          {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
 
-        drop_table(ModelWithDefaultCollection)
+        item.update(udt_default=None)
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
+                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": None})
+
+        udt_default = UDT(age=1, mf={2:2})
+        item.update(udt_default=udt_default)
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
+                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
