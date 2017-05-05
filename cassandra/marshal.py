@@ -135,10 +135,13 @@ def vints_pack(values):
             num_extra_bytes = 0
             num_bits = v.bit_length()
             # We need to reserve (num_extra_bytes+1) bits in the first byte
-            # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX'
-            while num_bits > (8-(num_extra_bytes+1)):
+            # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX' # 2 bits reserved
+            # ie. with 8 extra bytes, the first byte needs to be '11111111'  # 8 bits reserved
+            reserved_bits = num_extra_bytes + 1
+            while num_bits > (8-(reserved_bits)):
                 num_extra_bytes += 1
                 num_bits -= 8
+                reserved_bits = min(num_extra_bytes + 1, 8)
                 revbytes.append(v & 0xff)
                 v >>= 8
 
