@@ -393,17 +393,14 @@ class PreparedStatementTests(unittest.TestCase):
 class ForcedHostSwitchPolicy(RoundRobinPolicy):
 
     def make_query_plan(self, working_keyspace=None, query=None):
-        if query is not None and "system.local" in str(query):
-            if hasattr(self, 'counter'):
-                self.counter += 1
-            else:
-                self.counter = 0
-            index = self.counter % 3
-            a = list(self._live_hosts)
-            value = [a[index]]
-            return value
+        if hasattr(self, 'counter'):
+            self.counter += 1
         else:
-            return list(self._live_hosts)
+            self.counter = 0
+        index = self.counter % 3
+        a = list(self._live_hosts)
+        value = [a[index]]
+        return value
 
 
 class PreparedStatementMetdataTest(unittest.TestCase):
@@ -456,18 +453,48 @@ class PreparedStatementArgTest(unittest.TestCase):
         clus = Cluster(
             load_balancing_policy=white_list,
             protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
-        try:
-            session = clus.connect(wait_for_all_pools=True)
-            mock_handler = MockLoggingHandler()
-            logger = logging.getLogger(cluster.__name__)
-            logger.addHandler(mock_handler)
-            select_statement = session.prepare("SELECT * FROM system.local")
-            session.execute(select_statement)
-            session.execute(select_statement)
-            session.execute(select_statement)
-            self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
-        finally:
-            clus.shutdown()
+        self.addCleanup(clus.shutdown)
+
+        session = clus.connect(wait_for_all_pools=True)
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cluster.__name__)
+        logger.addHandler(mock_handler)
+        select_statement = session.prepare("SELECT * FROM system.local")
+        session.execute(select_statement)
+        session.execute(select_statement)
+        session.execute(select_statement)
+        self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
+
+
+    def test_prepare_batch_statement(self):
+        """
+        Test to validate a prepared statement used inside a batch statement is correctly handled
+        by the driver
+
+        @since 3.10
+        @jira_ticket PYTHON-706
+        @expected_result queries will have to re-prepared on hosts that aren't the control connection
+        and the batch statement will be sent.
+        """
+        white_list = ForcedHostSwitchPolicy()
+        clus = Cluster(
+            load_balancing_policy=white_list,
+            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
+            reprepare_on_up=False)
+        self.addCleanup(clus.shutdown)
+
+        session = clus.connect(wait_for_all_pools=True)
+
+        insert_statement = session.prepare("INSERT INTO test3rf.test (k, v) VALUES  (?, ?)")
+
+        # This is going to query a host where the query
+        # is not prepared
+        batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
+        batch_statement.add(insert_statement, (1, 2))
+        session.execute(batch_statement)
+        select_results = session.execute("SELECT * FROM test3rf.test WHERE k = 1")
+        first_row = select_results[0][:2]
+        self.assertEqual((1, 2), first_row)
 
 
 class PrintStatementTests(unittest.TestCase):
