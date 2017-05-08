@@ -1002,6 +1002,9 @@ class UserDefinedType(Column):
         return val
 
     def to_python(self, value):
+        if value is None:
+            return
+
         copied_value = deepcopy(value)
         for name, field in self.user_type._fields.items():
             if copied_value[name] is not None or isinstance(field, BaseContainerColumn):
@@ -1010,6 +1013,9 @@ class UserDefinedType(Column):
         return copied_value
 
     def to_database(self, value):
+        if value is None:
+            return
+
         copied_value = deepcopy(value)
         for name, field in self.user_type._fields.items():
             if copied_value[name] is not None or isinstance(field, BaseContainerColumn):
