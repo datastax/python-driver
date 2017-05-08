@@ -151,6 +151,7 @@ class UDT(UserType):
     age = columns.Integer()
     mf = columns.Map(columns.Integer, columns.Integer)
     dummy_udt = columns.Integer(default=42)
+    time_col = columns.Time()
 
 
 class ModelWithDefault(Model):
@@ -343,3 +344,29 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         item.update(udt_default=udt_default)
         self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
                          {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
+
+
+    def test_udt_to_python(self):
+        """
+        Test the to_python and to_database are correctly called on UDTs
+        @since 3.10
+        @jira_ticket PYTHON-743
+        @expected_result the int value is correctly converted to utils.Time
+        and written to C*
+
+        @test_category object_mapper
+        """
+        item = ModelWithDefault(id=1)
+        item.save()
+
+        # We update time_col this way because we want to hit
+        # the to_python method from UserDefinedType, otherwise to_python
+        # would be called in UDT.__init__
+        user_to_update = UDT()
+        user_to_update.time_col = 10
+
+        item.update(udt=user_to_update)
+
+        udt, udt_default = UDT(time_col=10), UDT(age=1, mf={2:2})
+        self.assertEqual(ModelWithDefault.objects.get(id=1)._as_dict(),
+                         {'id': 1, 'dummy': 42, 'mf': {}, "udt": udt, "udt_default": udt_default})
