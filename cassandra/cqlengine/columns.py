@@ -1001,6 +1001,22 @@ class UserDefinedType(Column):
         val.validate()
         return val
 
+    def to_python(self, value):
+        copied_value = deepcopy(value)
+        for name, field in self.user_type._fields.items():
+            if copied_value[name] is not None or isinstance(field, BaseContainerColumn):
+                copied_value[name] = field.to_python(copied_value[name])
+
+        return copied_value
+
+    def to_database(self, value):
+        copied_value = deepcopy(value)
+        for name, field in self.user_type._fields.items():
+            if copied_value[name] is not None or isinstance(field, BaseContainerColumn):
+                copied_value[name] = field.to_database(copied_value[name])
+
+        return copied_value
+
 
 def resolve_udts(col_def, out_list):
     for col in col_def.sub_types:
