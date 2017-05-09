@@ -529,11 +529,17 @@ def setup_keyspace(ipformat=None, wait=True):
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
         execute_with_long_wait_retry(session, ddl)
 
-        ddl = '''
+        ddl_3f = '''
             CREATE TABLE test3rf.test (
                 k int PRIMARY KEY,
                 v int )'''
-        execute_with_long_wait_retry(session, ddl)
+        execute_with_long_wait_retry(session, ddl_3f)
+
+        ddl_1f = '''
+                    CREATE TABLE test1rf.test (
+                        k int PRIMARY KEY,
+                        v int )'''
+        execute_with_long_wait_retry(session, ddl_1f)
 
     except Exception:
         traceback.print_exc()

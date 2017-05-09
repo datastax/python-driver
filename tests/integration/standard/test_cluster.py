@@ -282,15 +282,15 @@ class ClusterTests(unittest.TestCase):
         session = cluster.connect()
         result = session.execute(
             """
-            INSERT INTO test3rf.test (k, v) VALUES (8889, 8889)
+            INSERT INTO test1rf.test (k, v) VALUES (8889, 8889)
             """)
         self.assertFalse(result)
 
-        result = session.execute("SELECT * FROM test3rf.test")
+        result = session.execute("SELECT * FROM test1rf.test")
         self.assertEqual([(8889, 8889)], result)
 
         # test_connect_on_keyspace
-        session2 = cluster.connect('test3rf')
+        session2 = cluster.connect('test1rf')
         result2 = session2.execute("SELECT * FROM test")
         self.assertEqual(result, result2)
         cluster.shutdown()
