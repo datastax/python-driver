@@ -75,10 +75,10 @@ class TestTokenFunction(BaseCassEngTestCase):
     @execute_count(15)
     def test_token_function(self):
         """ Tests that token functions work properly """
-        assert TokenTestModel.objects().count() == 0
+        assert TokenTestModel.objects.count() == 0
         for i in range(10):
             TokenTestModel.create(key=i, val=i)
-        assert TokenTestModel.objects().count() == 10
+        assert TokenTestModel.objects.count() == 10
         seen_keys = set()
         last_token = None
         for instance in TokenTestModel.objects().limit(5):

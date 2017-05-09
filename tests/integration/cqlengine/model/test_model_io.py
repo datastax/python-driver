@@ -210,7 +210,7 @@ class TestModelIO(BaseCassEngTestCase):
                                  m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'))
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
-        output = AllDatatypesModel.objects().first()
+        output = AllDatatypesModel.objects.first()
 
         for i, i_char in enumerate(range(ord('a'), ord('a') + 14)):
             self.assertEqual(input[i], output[chr(i_char)])
@@ -263,7 +263,7 @@ class TestModelIO(BaseCassEngTestCase):
         v4DatatypesModel.create(id=0, a=date(1970, 1, 1), b=32523, c=time(16, 47, 25, 7), d=123)
 
         self.assertEqual(1, v4DatatypesModel.objects.count())
-        output = v4DatatypesModel.objects().first()
+        output = v4DatatypesModel.objects.first()
 
         for i, i_char in enumerate(range(ord('a'), ord('a') + 3)):
             self.assertEqual(input[i], output[chr(i_char)])
@@ -288,16 +288,16 @@ class TestModelIO(BaseCassEngTestCase):
         sync_table(FloatingPointModel)
 
         FloatingPointModel.create(id=0, f=2.39)
-        output = FloatingPointModel.objects().first()
+        output = FloatingPointModel.objects.first()
         self.assertEqual(2.390000104904175, output.f)  # float loses precision
 
         FloatingPointModel.create(id=0, f=3.4028234663852886e+38, d=2.39)
-        output = FloatingPointModel.objects().first()
+        output = FloatingPointModel.objects.first()
         self.assertEqual(3.4028234663852886e+38, output.f)
         self.assertEqual(2.39, output.d)  # double retains precision
 
         FloatingPointModel.create(id=0, d=3.4028234663852886e+38)
-        output = FloatingPointModel.objects().first()
+        output = FloatingPointModel.objects.first()
         self.assertEqual(3.4028234663852886e+38, output.d)
 
 

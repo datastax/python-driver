@@ -115,7 +115,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         self.assertEqual(1, UserModel.objects.count())
 
-        john = UserModel.objects().first()
+        john = UserModel.objects.first()
         self.assertEqual(0, john.id)
         self.assertTrue(type(john.info) is User)
         self.assertEqual(42, john.info.age)
@@ -128,14 +128,14 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         user = User(age=42, name="John")
         created_user = UserModel.create(id=0, info=user)
 
-        john_info = UserModel.objects().first().info
+        john_info = UserModel.objects.first().info
         self.assertEqual(42, john_info.age)
         self.assertEqual("John", john_info.name)
 
         created_user.info = User(age=22, name="Mary")
         created_user.update()
 
-        mary_info = UserModel.objects().first().info
+        mary_info = UserModel.objects.first().info
         self.assertEqual(22, mary_info["age"])
         self.assertEqual("Mary", mary_info["name"])
 
@@ -146,14 +146,14 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         user = User(age=42, name="John")
         created_user = UserModel.create(id=0, info=user)
 
-        john_info = UserModel.objects().first().info
+        john_info = UserModel.objects.first().info
         self.assertEqual(42, john_info.age)
         self.assertEqual("John", john_info.name)
 
         created_user.info = None
         created_user.update()
 
-        john_info = UserModel.objects().first().info
+        john_info = UserModel.objects.first().info
         self.assertIsNone(john_info)
 
     def test_can_create_same_udt_different_keyspaces(self):
@@ -179,7 +179,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         user = UserGender(age=42, name="John")
         UserModelGender.create(id=0, info=user)
 
-        john_info = UserModelGender.objects().first().info
+        john_info = UserModelGender.objects.first().info
         self.assertEqual(42, john_info.age)
         self.assertEqual("John", john_info.name)
         self.assertIsNone(john_info.gender)
@@ -187,7 +187,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         user = UserGender(age=42)
         UserModelGender.create(id=0, info=user)
 
-        john_info = UserModelGender.objects().first().info
+        john_info = UserModelGender.objects.first().info
         self.assertEqual(42, john_info.age)
         self.assertIsNone(john_info.name)
         self.assertIsNone(john_info.gender)
@@ -222,7 +222,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         udts.append(Depth_3(value=udts[2]))
 
         DepthModel.create(id=0, v_0=udts[0], v_1=udts[1], v_2=udts[2], v_3=udts[3])
-        output = DepthModel.objects().first()
+        output = DepthModel.objects.first()
 
         self.assertEqual(udts[0], output.v_0)
         self.assertEqual(udts[1], output.v_1)
@@ -253,7 +253,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
 
-        output = AllDatatypesModel.objects().first().data
+        output = AllDatatypesModel.objects.first().data
         self.assertEqual(input, output)
 
     def test_can_insert_udts_with_all_datatypes(self):
@@ -282,7 +282,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         AllDatatypesModel.create(id=0, data=input)
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
-        output = AllDatatypesModel.objects().first().data
+        output = AllDatatypesModel.objects.first().data
 
         for i in range(ord('a'), ord('a') + 14):
             self.assertEqual(input[chr(i)], output[chr(i)])
@@ -324,7 +324,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         Allv4DatatypesModel.create(id=0, data=input)
 
         self.assertEqual(1, Allv4DatatypesModel.objects.count())
-        output = Allv4DatatypesModel.objects().first().data
+        output = Allv4DatatypesModel.objects.first().data
 
         for i in range(ord('a'), ord('a') + 3):
             self.assertEqual(input[chr(i)], output[chr(i)])
@@ -368,7 +368,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         # Validate input and output matches
         self.assertEqual(1, Container.objects.count())
-        names_output = Container.objects().first().names
+        names_output = Container.objects.first().names
         self.assertEqual(names_output, names)
 
     def test_udts_with_unicode(self):
@@ -458,7 +458,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         self.assertEqual(1, TheModel.objects.count())
 
-        john = TheModel.objects().first()
+        john = TheModel.objects.first()
         self.assertEqual(john.id, id)
         info = john.info
         self.assertIsInstance(info, db_field_different)
