@@ -108,8 +108,10 @@ class RoundRobinPolicyTest(unittest.TestCase):
                 self.assertEqual(sorted(qplan), hosts)
 
         threads = [Thread(target=check_query_plan) for i in range(4)]
-        map(lambda t: t.start(), threads)
-        map(lambda t: t.join(), threads)
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
     def test_thread_safety_during_modification(self):
         hosts = range(100)
