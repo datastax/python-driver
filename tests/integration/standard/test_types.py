@@ -27,11 +27,11 @@ from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
-from cassandra.util import sortedset
+from cassandra.util import sortedset, Duration
 from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
-    BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30
+    BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequalcass3_10
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_collection_sample
 
@@ -793,6 +793,55 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         finally:
             self.session.execute("DROP TABLE {0}".format(self.function_table_name))
 
+    @greaterthanorequalcass3_10
+    def test_smoke_duration_values(self):
+        """
+        Test to write several Duration values to the database and verify
+        they can be read correctly. The verify than an exception is arisen
+        if the value is too big
+
+        @since 3.10
+        @jira_ticket PYTHON-747
+        @expected_result the read value in C* matches the written one
+
+        @test_category data_types serialization
+        """
+        self.session.execute("""
+            CREATE TABLE duration_smoke (k int primary key, v duration)
+            """)
+        self.addCleanup(self.session.execute, "DROP TABLE duration_smoke")
+
+        prepared = self.session.prepare("""
+            INSERT INTO duration_smoke (k, v)
+            VALUES (?, ?)
+            """)
+
+        nanosecond_smoke_values = [0, -1, 1, 100, 1000, 1000000, 1000000000,
+                        10000000000000,-9223372036854775807, 9223372036854775807,
+                        int("7FFFFFFFFFFFFFFF", 16), int("-7FFFFFFFFFFFFFFF", 16)]
+        month_day_smoke_values = [0, -1, 1, 100, 1000, 1000000, 1000000000,
+                                  int("7FFFFFFF", 16), int("-7FFFFFFF", 16)]
+
+        for nanosecond_value in nanosecond_smoke_values:
+            for month_day_value in month_day_smoke_values:
+
+                # Must have the same sign
+                if (month_day_value <= 0) != (nanosecond_value <= 0):
+                    continue
+
+                self.session.execute(prepared, (1, Duration(month_day_value, month_day_value, nanosecond_value)))
+                results = self.session.execute("SELECT * FROM duration_smoke")
+
+                v = results[0][1]
+                self.assertEqual(Duration(month_day_value, month_day_value, nanosecond_value), v,
+                                 "Error encoding value {0},{0},{1}".format(month_day_value, nanosecond_value))
+
+        self.assertRaises(ValueError, self.session.execute, prepared,
+                          (1, Duration(0, 0, int("8FFFFFFFFFFFFFF0", 16))))
+        self.assertRaises(ValueError, self.session.execute, prepared,
+                          (1, Duration(0, int("8FFFFFFFFFFFFFF0", 16), 0)))
+        self.assertRaises(ValueError, self.session.execute, prepared,
+                          (1, Duration(int("8FFFFFFFFFFFFFF0", 16), 0, 0)))
 
 class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
