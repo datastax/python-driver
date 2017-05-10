@@ -1,26 +1,34 @@
 schedules:
-  commit:
+  commit_master:
     schedule: per_commit
-    branches:
-      include: [master, /python.*/]
-    env_vars: |
-      EVENT_LOOP_MANAGER='libev'
-    matrix:
-      exclude:
-        - python: [3.4, 3.6]
-
-  nightly_libev:
-    schedule: nightly
     branches:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
+        - python: [3.4, 3.6]
+
+  commit_branches:
+    schedule: per_commit
+    branches:
+      include: [/python.*/]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
         - cassandra: ['2.0', '2.1', '3.0']
 
+  nightly_libev:
+    schedule: weekly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+
   nightly_gevent:
-    schedule: nightly
+    schedule: weekly
     branches:
       include: [master]
     env_vars: |
@@ -28,37 +36,27 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6]
-          cassandra: ['2.0', '2.1', '3.0']
 
   nightly_eventlet:
-    schedule: nightly
+    schedule: weekly
     branches:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='eventlet'
-    matrix:
-      exclude:
-        - cassandra: ['2.0', '2.1', '3.0']
 
   nightly_async:
-    schedule: nightly
+    schedule: weekly
     branches:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='async'
-    matrix:
-      exclude:
-        - cassandra: ['2.0', '2.1', '3.0']
 
   nightly_twister:
-    schedule: nightly
+    schedule: weekly
     branches:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='twisted'
-    matrix:
-      exclude:
-        - cassandra: ['2.0', '2.1', '3.0']
 
 python:
   - 2.7
