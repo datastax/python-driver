@@ -13,26 +13,26 @@
 # limitations under the License.
 import os
 
-from cassandra.io.geventreactor import GeventConnection
-from cassandra.io.libevreactor import LibevConnection
-from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.io.eventletreactor import EventletConnection
-from cassandra.io.twistedreactor import TwistedConnection
-
 EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
 if EVENT_LOOP_MANAGER == "gevent":
     import gevent.monkey
     gevent.monkey.patch_all()
+    from cassandra.io.geventreactor import GeventConnection
     connection_class = GeventConnection
 elif EVENT_LOOP_MANAGER == "eventlet":
     from eventlet import monkey_patch
     monkey_patch()
+
+    from cassandra.io.eventletreactor import EventletConnection
     connection_class = EventletConnection
 elif EVENT_LOOP_MANAGER == "async":
+    from cassandra.io.asyncorereactor import AsyncoreConnection
     connection_class = AsyncoreConnection
 elif EVENT_LOOP_MANAGER == "twisted":
+    from cassandra.io.twistedreactor import TwistedConnection
     connection_class = TwistedConnection
 else:
+    from cassandra.io.libevreactor import LibevConnection
     connection_class = LibevConnection
 
 from cassandra.cluster import Cluster
