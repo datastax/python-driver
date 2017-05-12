@@ -28,7 +28,7 @@ from cassandra.protocol import SyntaxException
 from cassandra.cluster import Cluster, NoHostAvailable
 from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
 from greplin import scales
-from tests.integration import BasicSharedKeyspaceUnitTestCaseWTable, BasicExistingKeyspaceUnitTestCase, local
+from tests.integration import BasicSharedKeyspaceUnitTestCaseRF3WM, BasicExistingKeyspaceUnitTestCase, local
 
 def setup_module():
     use_singledc()
@@ -179,7 +179,7 @@ class MetricsTests(unittest.TestCase):
     #     pass
 
 
-class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
+class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
     @local
     def test_metrics_per_cluster(self):
         """
