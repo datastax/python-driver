@@ -22,6 +22,7 @@ from cassandra import util
 from cassandra.cqltypes import SimpleDateType, _cqltypes, UserType
 from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.functions import get_total_seconds
+from cassandra.util import Duration as _Duration
 
 log = logging.getLogger(__name__)
 
@@ -609,6 +610,25 @@ class Time(Column):
         if isinstance(value, util.Time):
             return value
         return util.Time(value)
+
+class Duration(Column):
+    """
+    Stores a duration (months, days, nanoseconds)
+
+    .. versionadded:: 3.10.0
+
+    requires C* 3.10+ and protocol v4+
+    """
+    db_type = 'duration'
+
+    def validate(self, value):
+        val = super(Duration, self).validate(value)
+        if val is None:
+            return
+        if not isinstance(val, _Duration):
+            raise TypeError('{0} {1} is not a valid Duration.'.format(self.column_name, value))
+        return val
+
 
 class UUID(Column):
     """
