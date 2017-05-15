@@ -105,7 +105,7 @@ class RoundRobinPolicyTest(unittest.TestCase):
         def check_query_plan():
             for i in range(100):
                 qplan = list(policy.make_query_plan())
-                self.assertEqual(sorted(qplan), hosts)
+                self.assertEqual(sorted(qplan), list(hosts))
 
         threads = [Thread(target=check_query_plan) for i in range(4)]
         for t in threads:
