@@ -920,6 +920,30 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         )
         self.assertEqual(len(list(policy.new_schedule())), 1)
 
+    def test_schedule_overflow(self):
+        """
+        Test to verify an OverflowError is handled correctly
+        in the ExponentialReconnectionPolicy
+        @since 3.10
+        @jira_ticket PYTHON-707
+        @expected_result all numbers should be less than sys.float_info.max
+        since that's the biggest max we can possibly have as that argument must be a float.
+        Note that is possible for a float to be inf.
+
+        @test_category policy
+        """
+
+        # This should lead to overflow
+        # Note that this may not happen in the fist iterations
+        # as sys.float_info.max * 2 = inf
+        base_delay = sys.float_info.max - 1
+        max_delay = sys.float_info.max
+        max_attempts = 2**12
+        policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts)
+        schedule = list(policy.new_schedule())
+        for number in schedule:
+            self.assertLessEqual(number, sys.float_info.max)
+
 
 ONE = ConsistencyLevel.ONE
 
