@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,10 +75,10 @@ class TestTokenFunction(BaseCassEngTestCase):
     @execute_count(15)
     def test_token_function(self):
         """ Tests that token functions work properly """
-        assert TokenTestModel.objects().count() == 0
+        assert TokenTestModel.objects.count() == 0
         for i in range(10):
             TokenTestModel.create(key=i, val=i)
-        assert TokenTestModel.objects().count() == 10
+        assert TokenTestModel.objects.count() == 10
         seen_keys = set()
         last_token = None
         for instance in TokenTestModel.objects().limit(5):
@@ -150,7 +150,7 @@ class TestTokenFunction(BaseCassEngTestCase):
             TokenTestModel.create(key=i, val=i)
         named = NamedTable(DEFAULT_KEYSPACE, TokenTestModel.__table_name__)
 
-        query = named.objects.all().limit(1)
+        query = named.all().limit(1)
         first_page = list(query)
         last = first_page[-1]
         self.assertTrue(len(first_page) is 1)

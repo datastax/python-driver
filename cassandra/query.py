@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -791,10 +791,13 @@ class BatchStatement(Statement):
         self._maybe_set_routing_attributes(statement)
         self._update_custom_payload(statement)
 
+    def __len__(self):
+        return len(self._statements_and_parameters)
+
     def __str__(self):
         consistency = ConsistencyLevel.value_to_name.get(self.consistency_level, 'Not Set')
         return (u'<BatchStatement type=%s, statements=%d, consistency=%s>' %
-                (self.batch_type, len(self._statements_and_parameters), consistency))
+                (self.batch_type, len(self), consistency))
     __repr__ = __str__
 
 
@@ -922,7 +925,8 @@ class QueryTrace(object):
             session_results = self._execute(
                 SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
-            is_complete = session_results and session_results[0].duration is not None
+            # PYTHON-730: There is race condition that the duration mutation is written before started_at the for fast queries
+            is_complete = session_results and session_results[0].duration is not None and session_results[0].started_at is not None
             if not session_results or (wait_for_complete and not is_complete):
                 time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
                 attempt += 1

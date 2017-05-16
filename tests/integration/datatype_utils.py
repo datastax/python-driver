@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ from decimal import Decimal
 from datetime import datetime, date, time
 from uuid import uuid1, uuid4
 
-from cassandra.util import OrderedMap, Date, Time, sortedset
+from cassandra.util import OrderedMap, Date, Time, sortedset, Duration
 
 from tests.integration import get_server_versions
 
@@ -39,6 +39,8 @@ PRIMITIVE_DATATYPES = sortedset([
     'varint',
 ])
 
+PRIMITIVE_DATATYPES_KEYS = PRIMITIVE_DATATYPES.copy()
+
 COLLECTION_TYPES = sortedset([
     'list',
     'set',
@@ -54,6 +56,9 @@ def update_datatypes():
 
     if _cass_version >= (2, 2, 0):
         PRIMITIVE_DATATYPES.update(['date', 'time', 'smallint', 'tinyint'])
+        PRIMITIVE_DATATYPES_KEYS.update(['date', 'time', 'smallint', 'tinyint'])
+    if _cass_version >= (3, 10):
+        PRIMITIVE_DATATYPES.add('duration')
 
     global SAMPLE_DATA
     SAMPLE_DATA = get_sample_data()
@@ -119,6 +124,9 @@ def get_sample_data():
 
         elif datatype == 'smallint':
             sample_data[datatype] = 32523
+
+        elif datatype == 'duration':
+            sample_data[datatype] = Duration(months=2, days=12, nanoseconds=21231)
 
         else:
             raise Exception("Missing handling of {0}".format(datatype))

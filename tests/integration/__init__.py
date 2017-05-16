@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
+EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
+if EVENT_LOOP_MANAGER == "gevent":
+    import gevent.monkey
+    gevent.monkey.patch_all()
+    from cassandra.io.geventreactor import GeventConnection
+    connection_class = GeventConnection
+elif EVENT_LOOP_MANAGER == "eventlet":
+    from eventlet import monkey_patch
+    monkey_patch()
+
+    from cassandra.io.eventletreactor import EventletConnection
+    connection_class = EventletConnection
+elif EVENT_LOOP_MANAGER == "async":
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+    connection_class = AsyncoreConnection
+elif EVENT_LOOP_MANAGER == "twisted":
+    from cassandra.io.twistedreactor import TwistedConnection
+    connection_class = TwistedConnection
+else:
+    from cassandra.io.libevreactor import LibevConnection
+    connection_class = LibevConnection
+
+from cassandra.cluster import Cluster
+Cluster.connection_class = connection_class
 
 try:
     import unittest2 as unittest
@@ -18,7 +44,6 @@ except ImportError:
     import unittest  # noqa
 from packaging.version import Version
 import logging
-import os
 import socket
 import sys
 import time
@@ -28,10 +53,10 @@ from threading import Event
 from subprocess import call
 from itertools import groupby
 
-from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists
-from cassandra.cluster import Cluster
+from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
+    InvalidRequest
+
 from cassandra.protocol import ConfigurationException
-from cassandra.policies import RoundRobinPolicy
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
@@ -107,12 +132,15 @@ def _get_cass_version_from_dse(dse_version):
         cass_ver = "2.1"
     elif dse_version.startswith('5.0'):
         cass_ver = "3.0"
+    elif dse_version.startswith("5.1"):
+        cass_ver = "3.10"
     else:
         log.error("Uknown dse version found {0}, defaulting to 2.1".format(dse_version))
         cass_ver = "2.1"
 
     return cass_ver
 
+CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 DSE_VERSION = os.getenv('DSE_VERSION', None)
 DSE_CRED = os.getenv('DSE_CREDS', None)
@@ -137,6 +165,18 @@ if DSE_VERSION:
         if DSE_CRED:
             log.info("Using DSE credentials file located at {0}".format(DSE_CRED))
             CCM_KWARGS['dse_credentials_file'] = DSE_CRED
+
+
+#This changes the default contact_point parameter in Cluster
+def set_default_cass_ip():
+    if CASSANDRA_IP.startswith("127.0.0."):
+        return
+    defaults = list(Cluster.__init__.__defaults__)
+    defaults = [[CASSANDRA_IP]] + defaults[1:]
+    try:
+        Cluster.__init__.__defaults__ = tuple(defaults)
+    except:
+        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
 
 
 def get_default_protocol():
@@ -206,6 +246,7 @@ default_protocol_version = get_default_protocol()
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
+local = unittest.skipUnless(CASSANDRA_IP.startswith("127.0.0."), 'Tests only runs against local C*')
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
@@ -215,6 +256,7 @@ greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= '2.1', 'Cassandra v
 greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra version 2.2 or greater required')
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
 greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cassandra version 3.6 or greater required')
+greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
@@ -297,6 +339,8 @@ def is_current_cluster(cluster_name, node_counts):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
+    set_default_cass_ip()
+
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
         if CCM_CLUSTER:
@@ -393,8 +437,8 @@ def execute_until_pass(session, query):
     while tries < 100:
         try:
             return session.execute(query)
-        except (ConfigurationException, AlreadyExists):
-            log.warn("Recieved already exists from query {0}   not exiting".format(query))
+        except (ConfigurationException, AlreadyExists, InvalidRequest):
+            log.warn("Received already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
@@ -412,7 +456,7 @@ def execute_with_long_wait_retry(session, query, timeout=30):
         try:
             return session.execute(query, timeout=timeout)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Recieved already exists from query {0}    not exiting".format(query))
+            log.warn("Received already exists from query {0}    not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
@@ -448,8 +492,9 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
         ex_type, ex, tb = sys.exc_info()
         log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
         del tb
-    log.warn("Shutting down cluster")
-    cluster.shutdown()
+    finally:
+        log.warn("Shutting down cluster")
+        cluster.shutdown()
 
 
 def setup_keyspace(ipformat=None, wait=True):

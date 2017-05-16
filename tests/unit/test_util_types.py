@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ except ImportError:
 
 import datetime
 
-from cassandra.util import Date, Time
+from cassandra.util import Date, Time, Duration
 
 
 class DateTests(unittest.TestCase):
@@ -150,3 +150,60 @@ class TimeTests(unittest.TestCase):
         self.assertRaises(TypeError, Time, 1.234)
         self.assertRaises(ValueError, Time, 123456789000000)
         self.assertRaises(TypeError, Time, datetime.datetime(2004, 12, 23, 11, 11, 1))
+
+
+class DurationTests(unittest.TestCase):
+
+    def test_valid_format(self):
+
+        valid = Duration(1, 1, 1)
+        self.assertEqual(valid.months, 1)
+        self.assertEqual(valid.days, 1)
+        self.assertEqual(valid.nanoseconds, 1)
+
+        valid = Duration(nanoseconds=100000)
+        self.assertEqual(valid.months, 0)
+        self.assertEqual(valid.days, 0)
+        self.assertEqual(valid.nanoseconds, 100000)
+
+        valid = Duration()
+        self.assertEqual(valid.months, 0)
+        self.assertEqual(valid.days, 0)
+        self.assertEqual(valid.nanoseconds, 0)
+
+        valid = Duration(-10, -21, -1000)
+        self.assertEqual(valid.months, -10)
+        self.assertEqual(valid.days, -21)
+        self.assertEqual(valid.nanoseconds, -1000)
+
+    def test_equality(self):
+
+        first = Duration(1, 1, 1)
+        second = Duration(-1, 1, 1)
+        self.assertNotEqual(first, second)
+
+        first = Duration(1, 1, 1)
+        second = Duration(1, 1, 1)
+        self.assertEqual(first, second)
+
+        first = Duration()
+        second = Duration(0, 0, 0)
+        self.assertEqual(first, second)
+
+        first = Duration(1000, 10000, 2345345)
+        second = Duration(1000, 10000, 2345345)
+        self.assertEqual(first, second)
+
+        first = Duration(12, 0 , 100)
+        second = Duration(nanoseconds=100, months=12)
+        self.assertEqual(first, second)
+
+    def test_str(self):
+
+        self.assertEqual(str(Duration(1, 1, 1)), "1mo1d1ns")
+        self.assertEqual(str(Duration(1, 1, -1)), "-1mo1d1ns")
+        self.assertEqual(str(Duration(1, 1, 1000000000000000)), "1mo1d1000000000000000ns")
+        self.assertEqual(str(Duration(52, 23, 564564)), "52mo23d564564ns")
+
+
+

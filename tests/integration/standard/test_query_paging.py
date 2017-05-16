@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -254,6 +254,15 @@ class QueryPagingTests(unittest.TestCase):
             self.assertSequenceEqual(range(1, 101), value_array)
 
     def test_paging_callbacks(self):
+        """
+        Test to validate callback api
+        @since 3.9.0
+        @jira_ticket PYTHON-733
+        @expected_result callbacks shouldn't be called twice per message
+        and the fetch_size should be handled in a transparent way to the user
+
+        @test_category queries
+        """
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
                                     [(i, ) for i in range(100)])
         execute_concurrent(self.session, list(statements_and_params))
@@ -266,8 +275,10 @@ class QueryPagingTests(unittest.TestCase):
 
             event = Event()
             counter = count()
+            number_of_calls = count()
 
-            def handle_page(rows, future, counter):
+            def handle_page(rows, future, counter, number_of_calls):
+                next(number_of_calls)
                 for row in rows:
                     next(counter)
 
@@ -280,26 +291,34 @@ class QueryPagingTests(unittest.TestCase):
                 event.set()
                 self.fail(err)
 
-            future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
+            future.add_callbacks(callback=handle_page, callback_args=(future, counter, number_of_calls),
+                                 errback=handle_error)
             event.wait()
+            self.assertEqual(next(number_of_calls), 100 // fetch_size + 1)
             self.assertEqual(next(counter), 100)
 
             # simple statement
             future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"), timeout=20)
             event.clear()
             counter = count()
+            number_of_calls = count()
 
-            future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
+            future.add_callbacks(callback=handle_page, callback_args=(future, counter, number_of_calls),
+                                 errback=handle_error)
             event.wait()
+            self.assertEqual(next(number_of_calls), 100 // fetch_size + 1)
             self.assertEqual(next(counter), 100)
 
             # prepared statement
             future = self.session.execute_async(prepared, timeout=20)
             event.clear()
             counter = count()
+            number_of_calls = count()
 
-            future.add_callbacks(callback=handle_page, callback_args=(future, counter), errback=handle_error)
+            future.add_callbacks(callback=handle_page, callback_args=(future, counter, number_of_calls),
+                                 errback=handle_error)
             event.wait()
+            self.assertEqual(next(number_of_calls), 100 // fetch_size + 1)
             self.assertEqual(next(counter), 100)
 
     def test_concurrent_with_paging(self):

@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,11 @@ class PreparedStatementTests(unittest.TestCase):
         """
         Test basic PreparedStatement usage
         """
-
+        self.session.execute(
+            """
+            DROP KEYSPACE IF EXISTS preparedtests
+            """
+        )
         self.session.execute(
             """
             CREATE KEYSPACE preparedtests

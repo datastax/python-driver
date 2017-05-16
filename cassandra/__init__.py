@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 7, 1, 'post0')
+__version_info__ = (3, 9, 0, 'post0')
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -123,6 +123,86 @@ ConsistencyLevel.name_to_value = {
 
 def consistency_value_to_name(value):
     return ConsistencyLevel.value_to_name[value] if value is not None else "Not Set"
+
+
+class ProtocolVersion(object):
+    """
+    Defines native protocol versions supported by this driver.
+    """
+    V1 = 1
+    """
+    v1, supported in Cassandra 1.2-->2.2
+    """
+
+    V2 = 2
+    """
+    v2, supported in Cassandra 2.0-->2.2;
+    added support for lightweight transactions, batch operations, and automatic query paging.
+    """
+
+    V3 = 3
+    """
+    v3, supported in Cassandra 2.1-->3.x+;
+    added support for protocol-level client-side timestamps (see :attr:`.Session.use_client_timestamp`),
+    serial consistency levels for :class:`~.BatchStatement`, and an improved connection pool.
+    """
+
+    V4 = 4
+    """
+    v4, supported in Cassandra 2.2-->3.x+;
+    added a number of new types, server warnings, new failure messages, and custom payloads. Details in the
+    `project docs <https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec>`_
+    """
+
+    V5 = 5
+    """
+    v5, in beta from 3.x+
+    """
+
+    SUPPORTED_VERSIONS = (V5, V4, V3, V2, V1)
+    """
+    A tuple of all supported protocol versions
+    """
+
+    BETA_VERSIONS = (V5,)
+    """
+    A tuple of all beta protocol versions
+    """
+
+    MIN_SUPPORTED = min(SUPPORTED_VERSIONS)
+    """
+    Minimum protocol version supported by this driver.
+    """
+
+    MAX_SUPPORTED = max(SUPPORTED_VERSIONS)
+    """
+    Maximum protocol versioni supported by this driver.
+    """
+
+    @classmethod
+    def get_lower_supported(cls, previous_version):
+        """
+        Return the lower supported protocol version. Beta versions are omitted.
+        """
+        try:
+            version = next(v for v in sorted(ProtocolVersion.SUPPORTED_VERSIONS, reverse=True) if
+                           v not in ProtocolVersion.BETA_VERSIONS and v < previous_version)
+        except StopIteration:
+            version = 0
+
+        return version
+
+    @classmethod
+    def uses_int_query_flags(cls, version):
+        return version >= cls.V5
+
+    @classmethod
+    def uses_prepare_flags(cls, version):
+        return version >= cls.V5
+
+    @classmethod
+    def uses_error_code_map(cls, version):
+        return version >= cls.V5
 
 
 class SchemaChangeType(object):

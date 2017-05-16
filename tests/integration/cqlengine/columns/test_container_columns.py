@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,11 +20,13 @@ import sys
 import traceback
 from uuid import uuid4
 
-from cassandra import WriteTimeout
+from cassandra import WriteTimeout, OperationTimedOut
 import cassandra.cqlengine.columns as columns
 from cassandra.cqlengine.functions import get_total_seconds
 from cassandra.cqlengine.models import Model, ValidationError
 from cassandra.cqlengine.management import sync_table, drop_table
+
+from tests.integration import CASSANDRA_IP
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import greaterthancass20, CASSANDRA_VERSION
@@ -134,8 +136,11 @@ class TestSetColumn(BaseCassEngTestCase):
                 break
             except WriteTimeout:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
+            except OperationTimedOut:
+                #This will happen if the host is remote
+                self.assertFalse(CASSANDRA_IP.startswith("127.0.0."))
         self.assertRaises(ValidationError, TestSetModel.create, **{'text_set': set(str(uuid4()) for i in range(65536))})
 
     def test_partial_updates(self):

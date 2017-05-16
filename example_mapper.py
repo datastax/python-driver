@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,6 +77,9 @@ def main():
         nick.iff(birth_year=1988).update(birth_year=1989)
     except LWTException:
         print "precondition not met"
+
+    log.info("### setting individual column to NULL by updating it to None")
+    nick.update(birth_year=None)
 
     # showing validation
     try:

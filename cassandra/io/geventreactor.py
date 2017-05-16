@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -125,7 +125,7 @@ class GeventConnection(Connection):
                 self.defunct(err)
                 return  # leave the read loop
 
-            if self._iobuf.tell():
+            if buf and self._iobuf.tell():
                 self.process_io_buffer()
             else:
                 log.debug("Connection %s closed by server", self)

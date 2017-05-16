@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,20 +18,11 @@ from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine import columns
+
 from tests.integration.cqlengine import is_prepend_reversed
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 from tests.integration.cqlengine import execute_count
-
-
-class TestQueryUpdateModel(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    cluster = columns.Integer(primary_key=True)
-    count = columns.Integer(required=False)
-    text = columns.Text(required=False, index=True)
-    text_set = columns.Set(columns.Text, required=False)
-    text_list = columns.List(columns.Text, required=False)
-    text_map = columns.Map(columns.Text, columns.Text, required=False)
+from tests.integration import greaterthancass20
 
 
 class QueryUpdateTests(BaseCassEngTestCase):
@@ -242,6 +233,83 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
         self.assertEqual(obj.text_map, {"foo": '1'})
 
+    @greaterthancass20
+    @execute_count(5)
+    def test_map_update_remove(self):
+        """
+        Test that map item removal with update(<columnname>__remove=...) works
+
+        @jira_ticket PYTHON-688
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+            partition=partition,
+            cluster=cluster,
+            text_map={"foo": '1', "bar": '2'}
+        )
+        TestQueryUpdateModel.objects(partition=partition, cluster=cluster).update(
+            text_map__remove={"bar"},
+            text_map__update={"foz": '4', "foo": '2'}
+        )
+        obj = TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster)
+        self.assertEqual(obj.text_map, {"foo": '2', "foz": '4'})
+
+        TestQueryUpdateModel.objects(partition=partition, cluster=cluster).update(
+            text_map__remove={"foo", "foz"}
+        )
+        self.assertEqual(
+            TestQueryUpdateModel.objects.get(partition=partition, cluster=cluster).text_map,
+            {}
+        )
+
+    def test_map_remove_rejects_non_sets(self):
+        """
+        Map item removal requires a set to match the CQL API
+
+        @jira_ticket PYTHON-688
+        """
+        partition = uuid4()
+        cluster = 1
+        TestQueryUpdateModel.objects.create(
+            partition=partition,
+            cluster=cluster,
+            text_map={"foo": '1', "bar": '2'}
+        )
+        with self.assertRaises(ValidationError):
+            TestQueryUpdateModel.objects(partition=partition, cluster=cluster).update(
+                text_map__remove=["bar"]
+            )
+
+    @execute_count(3)
+    def test_an_extra_delete_is_not_sent(self):
+        """
+        Test to ensure that an extra DELETE is not sent if an object is read
+        from the DB with a None value
+
+        @since 3.9
+        @jira_ticket PYTHON-719
+        @expected_result only three queries are executed, the first one for
+        inserting the object, the second one for reading it, and the third
+        one for updating it
+
+        @test_category object_mapper
+        """
+        partition = uuid4()
+        cluster = 1
+
+        TestQueryUpdateModel.objects.create(
+            partition=partition, cluster=cluster)
+
+        obj = TestQueryUpdateModel.objects(
+            partition=partition, cluster=cluster).first()
+
+        self.assertFalse({k: v for (k, v) in obj._values.items() if v.deleted})
+
+        obj.text = 'foo'
+        obj.save()
+        #execute_count will check the execution count and
+        #assert no more calls than necessary where made
 
 class StaticDeleteModel(Model):
     example_id = columns.Integer(partition_key=True, primary_key=True, default=uuid4)

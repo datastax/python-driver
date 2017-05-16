@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -113,6 +113,7 @@ class SchemaTests(unittest.TestCase):
                 execute_until_pass(session, "INSERT INTO test.cf (key, value) VALUES ({0}, {0})".format(j))
 
             execute_until_pass(session, "DROP KEYSPACE test")
+        cluster.shutdown()
 
     def test_for_schema_disagreement_attribute(self):
         """
@@ -139,7 +140,8 @@ class SchemaTests(unittest.TestCase):
         self.check_and_wait_for_agreement(session, rs, False)
         rs = session.execute("DROP KEYSPACE test_schema_disagreement")
         self.check_and_wait_for_agreement(session, rs, False)
-
+        cluster.shutdown()
+        
         # These should have schema agreement
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=100)
         session = cluster.connect()
@@ -149,6 +151,7 @@ class SchemaTests(unittest.TestCase):
         self.check_and_wait_for_agreement(session, rs, True)
         rs = session.execute("DROP KEYSPACE test_schema_disagreement")
         self.check_and_wait_for_agreement(session, rs, True)
+        cluster.shutdown()
 
     def check_and_wait_for_agreement(self, session, rs, exepected):
         self.assertEqual(rs.response_future.is_schema_agreed, exepected)

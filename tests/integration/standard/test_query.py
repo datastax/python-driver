@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,20 +20,29 @@ try:
 except ImportError:
     import unittest  # noqa
 import logging
+from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.policies import HostDistance, RoundRobinPolicy
-from tests.unit.cython.utils import notcython
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, notpy3
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
+    greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace
+from tests import notwindows
 
 import time
 import re
 
-
 def setup_module():
-    use_singledc()
+    use_singledc(start=False)
+    ccm_cluster = get_cluster()
+    ccm_cluster.clear()
+    # This is necessary because test_too_many_statements may
+    # timeout otherwise
+    config_options = {'write_request_timeout_in_ms': '20000'}
+    ccm_cluster.set_configuration_options(config_options)
+    ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+    setup_keyspace()
     global CASS_SERVER_VERSION
     CASS_SERVER_VERSION = get_server_versions()[0]
 
@@ -70,8 +79,6 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         for event in trace.events:
             str(event)
 
-    @notcython
-    @notpy3
     def test_row_error_message(self):
         """
         Test to validate, new column deserialization message
@@ -86,7 +93,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(ss)
         with self.assertRaises(DriverException) as context:
             self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
-        self.assertIn("Failed decoding result column", context.exception.message)
+        self.assertIn("Failed decoding result column", str(context.exception))
 
     def test_trace_id_to_resultset(self):
 
@@ -118,6 +125,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         for event in trace.events:
             str(event)
 
+    @local
     @greaterthanprotocolv3
     def test_client_ip_in_trace(self):
         """
@@ -182,6 +190,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
             self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ANY).trace_id)
         self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.QUORUM).trace_id)
 
+    @notwindows
     def test_incomplete_query_trace(self):
         """
         Tests to ensure that partial tracing works.
@@ -420,7 +429,9 @@ class PreparedStatementMetdataTest(unittest.TestCase):
 
         base_line = None
         for proto_version in get_supported_protocol_versions():
-            cluster = Cluster(protocol_version=proto_version)
+            beta_flag = True if proto_version in ProtocolVersion.BETA_VERSIONS else False
+            cluster = Cluster(protocol_version=proto_version, allow_beta_protocol_version=beta_flag)
+
             session = cluster.connect()
             select_statement = session.prepare("SELECT * FROM system.local")
             if proto_version == 1:
@@ -430,9 +441,9 @@ class PreparedStatementMetdataTest(unittest.TestCase):
             future = session.execute_async(select_statement)
             results = future.result()
             if base_line is None:
-                base_line = results[0].__dict__.keys()
+                base_line = results[0]._asdict().keys()
             else:
-                self.assertEqual(base_line, results[0].__dict__.keys())
+                self.assertEqual(base_line, results[0]._asdict().keys())
             cluster.shutdown()
 
 

@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 Connection pooling and host management.
 """
 
+from functools import total_ordering
 import logging
 import socket
 import time
@@ -41,6 +42,7 @@ class NoConnectionsAvailable(Exception):
     pass
 
 
+@total_ordering
 class Host(object):
     """
     Represents a single Cassandra node.

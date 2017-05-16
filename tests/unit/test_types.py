@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,10 @@ from cassandra.protocol import (write_string, read_longstring, write_stringmap,
                                 read_stringmap, read_inet, write_inet,
                                 read_string, write_longstring)
 from cassandra.query import named_tuple_factory
+from cassandra.pool import Host
+from cassandra.policies import SimpleConvictionPolicy, ConvictionPolicy
+from cassandra.util import Date, Time
+from cassandra.metadata import Token
 
 
 class TypeTests(unittest.TestCase):
@@ -67,6 +71,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype_simple('CompositeType'), cassandra.cqltypes.CompositeType)
         self.assertEqual(lookup_casstype_simple('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
         self.assertEqual(lookup_casstype_simple('ReversedType'), cassandra.cqltypes.ReversedType)
+        self.assertEqual(lookup_casstype_simple('DurationType'), cassandra.cqltypes.DurationType)
 
         self.assertEqual(str(lookup_casstype_simple('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
 
@@ -100,6 +105,7 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(lookup_casstype('CompositeType'), cassandra.cqltypes.CompositeType)
         self.assertEqual(lookup_casstype('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
         self.assertEqual(lookup_casstype('ReversedType'), cassandra.cqltypes.ReversedType)
+        self.assertEqual(lookup_casstype('DurationType'), cassandra.cqltypes.DurationType)
 
         self.assertEqual(str(lookup_casstype('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
 
@@ -246,3 +252,135 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cql_quote(u'test'), "'test'")
         self.assertEqual(cql_quote('test'), "'test'")
         self.assertEqual(cql_quote(0), '0')
+
+
+class TestOrdering(unittest.TestCase):
+    def _check_order_consistency(self, smaller, bigger, equal=False):
+        self.assertLessEqual(smaller, bigger)
+        self.assertGreaterEqual(bigger, smaller)
+        if equal:
+            self.assertEqual(smaller, bigger)
+        else:
+            self.assertNotEqual(smaller, bigger)
+            self.assertLess(smaller, bigger)
+            self.assertGreater(bigger, smaller)
+
+    def _shuffle_lists(self, *args):
+        return [item for sublist in zip(*args) for item in sublist]
+
+    def _check_sequence_consistency(self, ordered_sequence, equal=False):
+        for i, el in enumerate(ordered_sequence):
+            for previous in ordered_sequence[:i]:
+                self._check_order_consistency(previous, el, equal)
+            for posterior in ordered_sequence[i + 1:]:
+                self._check_order_consistency(el, posterior, equal)
+
+    def test_host_order(self):
+        """
+        Test Host class is ordered consistently
+
+        @since 3.9
+        @jira_ticket PYTHON-714
+        @expected_result the hosts are ordered correctly
+
+        @test_category data_types
+        """
+        hosts = [Host(addr, SimpleConvictionPolicy) for addr in
+                 ("127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4")]
+        hosts_equal = [Host(addr, SimpleConvictionPolicy) for addr in
+                       ("127.0.0.1", "127.0.0.1")]
+        hosts_equal_conviction = [Host("127.0.0.1", SimpleConvictionPolicy), Host("127.0.0.1", ConvictionPolicy)]
+        self._check_sequence_consistency(hosts)
+        self._check_sequence_consistency(hosts_equal, equal=True)
+        self._check_sequence_consistency(hosts_equal_conviction, equal=True)
+
+    def test_date_order(self):
+        """
+        Test Date class is ordered consistently
+
+        @since 3.9
+        @jira_ticket PYTHON-714
+        @expected_result the dates are ordered correctly
+
+        @test_category data_types
+        """
+        dates_from_string = [Date("2017-01-01"), Date("2017-01-05"), Date("2017-01-09"), Date("2017-01-13")]
+        dates_from_string_equal = [Date("2017-01-01"), Date("2017-01-01")]
+        self._check_sequence_consistency(dates_from_string)
+        self._check_sequence_consistency(dates_from_string_equal, equal=True)
+
+        date_format = "%Y-%m-%d"
+
+        dates_from_value = [
+            Date((datetime.datetime.strptime(dtstr, date_format) -
+                  datetime.datetime(1970, 1, 1)).days)
+            for dtstr in ("2017-01-02", "2017-01-06", "2017-01-10", "2017-01-14")
+        ]
+        dates_from_value_equal = [Date(1), Date(1)]
+        self._check_sequence_consistency(dates_from_value)
+        self._check_sequence_consistency(dates_from_value_equal, equal=True)
+
+        dates_from_datetime = [Date(datetime.datetime.strptime(dtstr, date_format))
+                               for dtstr in ("2017-01-03", "2017-01-07", "2017-01-11", "2017-01-15")]
+        dates_from_datetime_equal = [Date(datetime.datetime.strptime("2017-01-01", date_format)),
+                               Date(datetime.datetime.strptime("2017-01-01", date_format))]
+        self._check_sequence_consistency(dates_from_datetime)
+        self._check_sequence_consistency(dates_from_datetime_equal, equal=True)
+
+        dates_from_date = [
+            Date(datetime.datetime.strptime(dtstr, date_format).date()) for dtstr in
+            ("2017-01-04", "2017-01-08", "2017-01-12", "2017-01-16")
+        ]
+        dates_from_date_equal = [datetime.datetime.strptime(dtstr, date_format) for dtstr in
+                                 ("2017-01-09", "2017-01-9")]
+
+        self._check_sequence_consistency(dates_from_date)
+        self._check_sequence_consistency(dates_from_date_equal, equal=True)
+
+        self._check_sequence_consistency(self._shuffle_lists(dates_from_string, dates_from_value,
+                                                             dates_from_datetime, dates_from_date))
+
+    def test_timer_order(self):
+        """
+        Test Time class is ordered consistently
+
+        @since 3.9
+        @jira_ticket PYTHON-714
+        @expected_result the times are ordered correctly
+
+        @test_category data_types
+        """
+        time_from_int = [Time(1000), Time(4000), Time(7000), Time(10000)]
+        time_from_int_equal = [Time(1), Time(1)]
+        self._check_sequence_consistency(time_from_int)
+        self._check_sequence_consistency(time_from_int_equal, equal=True)
+
+        time_from_datetime = [Time(datetime.time(hour=0, minute=0, second=0, microsecond=us))
+                              for us in (2, 5, 8, 11)]
+        time_from_datetime_equal = [Time(datetime.time(hour=0, minute=0, second=0, microsecond=us))
+                                    for us in (1, 1)]
+        self._check_sequence_consistency(time_from_datetime)
+        self._check_sequence_consistency(time_from_datetime_equal, equal=True)
+
+        time_from_string = [Time("00:00:00.000003000"), Time("00:00:00.000006000"),
+                            Time("00:00:00.000009000"), Time("00:00:00.000012000")]
+        time_from_string_equal = [Time("00:00:00.000004000"), Time("00:00:00.000004000")]
+        self._check_sequence_consistency(time_from_string)
+        self._check_sequence_consistency(time_from_string_equal, equal=True)
+
+        self._check_sequence_consistency(self._shuffle_lists(time_from_int, time_from_datetime, time_from_string))
+
+    def test_token_order(self):
+        """
+        Test Token class is ordered consistently
+
+        @since 3.9
+        @jira_ticket PYTHON-714
+        @expected_result the tokens are ordered correctly
+
+        @test_category data_types
+        """
+        tokens = [Token(1), Token(2), Token(3), Token(4)]
+        tokens_equal = [Token(1), Token(1)]
+        self._check_sequence_consistency(tokens)
+        self._check_sequence_consistency(tokens_equal, equal=True)

@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,9 +26,10 @@ from cassandra.cluster import Cluster, UserTypeDoesNotExist
 from cassandra.query import dict_factory
 from cassandra.util import OrderedMap
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, greaterthancass20, greaterthanorequalcass36
-from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, \
-    get_sample, get_collection_sample
+from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, \
+    greaterthancass20, greaterthanorequalcass36, lessthancass30
+from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, PRIMITIVE_DATATYPES_KEYS, \
+    COLLECTION_TYPES, get_sample, get_collection_sample
 
 nested_collection_udt = namedtuple('nested_collection_udt', ['m', 't', 'l', 's'])
 nested_collection_udt_nested = namedtuple('nested_collection_udt_nested', ['m', 't', 'l', 's', 'u'])
@@ -562,7 +563,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         alpha_type_list = []
         start_index = ord('a')
         for i, collection_type in enumerate(COLLECTION_TYPES):
-            for j, datatype in enumerate(PRIMITIVE_DATATYPES):
+            for j, datatype in enumerate(PRIMITIVE_DATATYPES_KEYS):
                 if collection_type == "map":
                     type_string = "{0}_{1} {2}<{3}, {3}>".format(chr(start_index + i), chr(start_index + j),
                                                                  collection_type, datatype)
@@ -584,7 +585,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         # register UDT
         alphabet_list = []
         for i in range(ord('a'), ord('a') + len(COLLECTION_TYPES)):
-            for j in range(ord('a'), ord('a') + len(PRIMITIVE_DATATYPES)):
+            for j in range(ord('a'), ord('a') + len(PRIMITIVE_DATATYPES_KEYS)):
                 alphabet_list.append('{0}_{1}'.format(chr(i), chr(j)))
 
         Alldatatypes = namedtuple("alldatatypes", alphabet_list)
@@ -593,7 +594,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         # insert UDT data
         params = []
         for collection_type in COLLECTION_TYPES:
-            for datatype in PRIMITIVE_DATATYPES:
+            for datatype in PRIMITIVE_DATATYPES_KEYS:
                 params.append((get_collection_sample(collection_type, datatype)))
 
         insert = s.prepare("INSERT INTO mytable (a, b) VALUES (?, ?)")
@@ -691,6 +692,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(k[0], 'alphanum')
         self.assertEqual(k.field_0_, 'alphanum')  # named tuple with positional field name
 
+    @lessthancass30
     def test_type_alteration(self):
         s = self.session
         type_name = "type_name"
@@ -723,6 +725,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(val['v0'], 3)
         self.assertEqual(val['v1'], six.b('\xde\xad\xbe\xef'))
 
+    @lessthancass30
     def test_alter_udt(self):
         """
         Test to ensure that altered UDT's are properly surfaced without needing to restart the underlying session.

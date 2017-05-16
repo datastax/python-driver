@@ -4,9 +4,11 @@ DataStax Python Driver for Apache Cassandra
 .. image:: https://travis-ci.org/datastax/python-driver.png?branch=master
    :target: https://travis-ci.org/datastax/python-driver
 
-A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (1.2+) and DataStax Enterprise (3.1+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
+A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (2.1+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
 
-The driver supports Python 2.6, 2.7, 3.3, and 3.4.
+The driver supports Python 2.7, 3.3, 3.4, 3.5, and 3.6.
+
+If you require compatibility with DataStax Enterprise, use the `DataStax Enterprise Python Driver <http://docs.datastax.com/en/developer/python-dse-driver/>`_.
 
 Feedback Requested
 ------------------
@@ -63,16 +65,13 @@ If you would like to contribute, please feel free to open a pull request.
 
 Getting Help
 ------------
-Your two best options for getting help with the driver are the
+Your best options for getting help with the driver are the
 `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
-and the IRC channel.
-
-For IRC, use the #datastax-drivers channel on irc.freenode.net.  If you don't have an IRC client,
-you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_.
+and the ``#datastax-drivers`` channel in the `DataStax Academy Slack <https://academy.datastax.com/slack>`_.
 
 License
 -------
-Copyright 2013-2016 DataStax
+Copyright 2013-2017 DataStax
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

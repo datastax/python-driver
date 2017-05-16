@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ except ImportError:
 from cassandra.query import BatchStatement
 from cassandra.cluster import Cluster
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, local
 
 
 def setup_module():
@@ -93,6 +93,7 @@ class ClientWarningTests(unittest.TestCase):
         self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
         self.assertIsNotNone(future.get_query_trace())
 
+    @local
     def test_warning_with_custom_payload(self):
         """
         Test to validate client warning with custom payload
@@ -111,6 +112,7 @@ class ClientWarningTests(unittest.TestCase):
         self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
         self.assertDictEqual(future.custom_payload, payload)
 
+    @local
     def test_warning_with_trace_and_custom_payload(self):
         """
         Test to validate client warning with tracing and client warning

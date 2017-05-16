@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -121,7 +121,9 @@ class LibevLoop(object):
 
         for conn in self._live_conns | self._new_conns | self._closed_conns:
             conn.close()
-            map(lambda w: w.stop(), (w for w in (conn._write_watcher, conn._read_watcher) if w))
+            for watcher in (conn._write_watcher, conn._read_watcher):
+                if watcher:
+                    watcher.stop()
 
         self.notify()  # wake the timer watcher
         log.debug("Waiting for event loop thread to join...")

@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -359,10 +359,13 @@ class MapUpdateClause(ContainerUpdateClause):
     col_type = columns.Map
 
     _updates = None
+    _removals = None
 
     def _analyze(self):
         if self._operation == "update":
             self._updates = self.value.keys()
+        elif self._operation == "remove":
+            self._removals = {v for v in self.value.keys()}
         else:
             if self.previous is None:
                 self._updates = sorted([k for k, v in self.value.items()])
@@ -373,12 +376,14 @@ class MapUpdateClause(ContainerUpdateClause):
     def get_context_size(self):
         if self.is_assignment:
             return 1
-        return len(self._updates or []) * 2
+        return int((len(self._updates or []) * 2) + int(bool(self._removals)))
 
     def update_context(self, ctx):
         ctx_id = self.context_id
         if self.is_assignment:
             ctx[str(ctx_id)] = {}
+        elif self._removals is not None:
+            ctx[str(ctx_id)] = self._removals
         else:
             for key in self._updates or []:
                 val = self.value.get(key)
@@ -390,7 +395,7 @@ class MapUpdateClause(ContainerUpdateClause):
     def is_assignment(self):
         if not self._analyzed:
             self._analyze()
-        return self.previous is None and not self._updates
+        return self.previous is None and not self._updates and not self._removals
 
     def __unicode__(self):
         qs = []
@@ -398,6 +403,9 @@ class MapUpdateClause(ContainerUpdateClause):
         ctx_id = self.context_id
         if self.is_assignment:
             qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
+        elif self._removals is not None:
+            qs += ['"{0}" = "{0}" - %({1})s'.format(self.field, ctx_id)]
+            ctx_id += 1
         else:
             for _ in self._updates or []:
                 qs += ['"{0}"[%({1})s] = %({2})s'.format(self.field, ctx_id, ctx_id + 1)]

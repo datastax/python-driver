@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -291,7 +291,6 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
     @classmethod
     def tearDownClass(cls):
         models.DEFAULT_KEYSPACE = cls.default_keyspace
-        setup_connection(models.DEFAULT_KEYSPACE)
         super(TestNamedWithMV, cls).tearDownClass()
 
     @greaterthanorequalcass30

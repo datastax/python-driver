@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,10 @@
 # limitations under the License.
 
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
-from tests.integration import VERIFY_CYTHON
+try:
+    from tests.integration import VERIFY_CYTHON
+except ImportError:
+    VERIFY_CYTHON = False
 
 try:
     import unittest2 as unittest

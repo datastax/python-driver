@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ import logging
 import six
 import threading
 
-from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist
+from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist, ConsistencyLevel
 from cassandra.query import SimpleStatement, dict_factory
 
 from cassandra.cqlengine import CQLEngineException
@@ -81,6 +81,13 @@ class Connection(object):
         self.cluster_options = cluster_options if cluster_options else {}
         self.lazy_connect_lock = threading.RLock()
 
+    @classmethod
+    def from_session(cls, name, session):
+        instance = cls(name=name, hosts=session.hosts)
+        instance.cluster, instance.session = session.cluster, session
+        instance.setup_session()
+        return instance
+
     def setup(self):
         """Setup the connection"""
         global cluster, session
@@ -132,21 +139,65 @@ class Connection(object):
                 self.setup()
 
 
-def register_connection(name, hosts, consistency=None, lazy_connect=False,
-                        retry_connect=False, cluster_options=None, default=False):
+def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
+                        retry_connect=False, cluster_options=None, default=False,
+                        session=None):
+    """
+    Add a connection to the connection registry. ``hosts`` and ``session`` are
+    mutually exclusive, and ``consistency``, ``lazy_connect``,
+    ``retry_connect``, and ``cluster_options`` only work with ``hosts``. Using
+    ``hosts`` will create a new :class:`cassandra.cluster.Cluster` and
+    :class:`cassandra.cluster.Session`.
+
+    :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`).
+    :param int consistency: The default :class:`~.ConsistencyLevel` for the
+        registered connection's new session. Default is the same as
+        :attr:`.Session.default_consistency_level`. For use with ``hosts`` only;
+        will fail when used with ``session``.
+    :param bool lazy_connect: True if should not connect until first use. For
+        use with ``hosts`` only; will fail when used with ``session``.
+    :param bool retry_connect: True if we should retry to connect even if there
+        was a connection failure initially. For use with ``hosts`` only; will
+        fail when used with ``session``.
+    :param dict cluster_options: A dict of options to be used as keyword
+        arguments to :class:`cassandra.cluster.Cluster`. For use with ``hosts``
+        only; will fail when used with ``session``.
+    :param bool default: If True, set the new connection as the cqlengine
+        default
+    :param Session session: A :class:`cassandra.cluster.Session` to be used in
+        the created connection.
+    """
 
     if name in _connections:
         log.warning("Registering connection '{0}' when it already exists.".format(name))
 
-    conn = Connection(name, hosts, consistency=consistency,lazy_connect=lazy_connect,
-                      retry_connect=retry_connect, cluster_options=cluster_options)
+    if session is not None:
+        invalid_config_args = (hosts is not None or
+                               consistency is not None or
+                               lazy_connect is not False or
+                               retry_connect is not False or
+                               cluster_options is not None)
+        if invalid_config_args:
+            raise CQLEngineException(
+                "Session configuration arguments and 'session' argument are mutually exclusive"
+            )
+        conn = Connection.from_session(name, session=session)
+        conn.setup_session()
+    else:  # use hosts argument
+        if consistency is None:
+            consistency = ConsistencyLevel.LOCAL_ONE
+        conn = Connection(
+            name, hosts=hosts,
+            consistency=consistency, lazy_connect=lazy_connect,
+            retry_connect=retry_connect, cluster_options=cluster_options
+        )
+        conn.setup()
 
     _connections[name] = conn
 
     if default:
         set_default_connection(name)
 
-    conn.setup()
     return conn
 
 
@@ -222,7 +273,12 @@ def set_session(s):
     This may be relaxed in the future
     """
 
-    conn = get_connection()
+    try:
+        conn = get_connection()
+    except CQLEngineException:
+        # no default connection set; initalize one
+        register_connection('default', session=s, default=True)
+        conn = get_connection()
 
     if conn.session:
         log.warning("configuring new default connection for cqlengine when one was already set")
@@ -281,7 +337,6 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connect
         query = SimpleStatement(str(query), consistency_level=consistency_level, fetch_size=query.fetch_size)
     elif isinstance(query, six.string_types):
         query = SimpleStatement(query, consistency_level=consistency_level)
-
     log.debug(format_log_context(query.query_string, connection=connection))
 
     result = conn.session.execute(query, params, timeout=timeout)
@@ -304,7 +359,11 @@ def get_cluster(connection=None):
 def register_udt(keyspace, type_name, klass, connection=None):
     udt_by_keyspace[keyspace][type_name] = klass
 
-    cluster = get_cluster(connection)
+    try:
+        cluster = get_cluster(connection)
+    except CQLEngineException:
+        cluster = None
+
     if cluster:
         try:
             cluster.register_user_type(keyspace, type_name, klass)

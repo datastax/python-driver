@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import os, sys, traceback, logging, ssl, time
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, remove_cluster
+from tests.integration import PROTOCOL_VERSION, get_cluster, remove_cluster, use_single_node
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def setup_cluster_ssl(client_auth=False):
     ssl connectivity, and client authenticiation if needed.
     """
 
-    use_singledc(start=False)
+    use_single_node(start=False)
     ccm_cluster = get_cluster()
     ccm_cluster.stop()
 
@@ -66,16 +66,6 @@ def setup_cluster_ssl(client_auth=False):
 
     ccm_cluster.set_configuration_options(config_options)
     ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-
-
-def teardown_module():
-    """
-    The rest of the tests don't need ssl enabled, remove the cluster so as to not interfere with other tests.
-    """
-
-    ccm_cluster = get_cluster()
-    ccm_cluster.stop()
-    remove_cluster()
 
 
 def validate_ssl_options(ssl_options):
@@ -115,6 +105,12 @@ class SSLConnectionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         setup_cluster_ssl()
+
+    @classmethod
+    def tearDownClass(cls):
+        ccm_cluster = get_cluster()
+        ccm_cluster.stop()
+        remove_cluster()
 
     def test_can_connect_with_ssl_ca(self):
         """
@@ -203,6 +199,12 @@ class SSLConnectionAuthTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         setup_cluster_ssl(client_auth=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        ccm_cluster = get_cluster()
+        ccm_cluster.stop()
+        remove_cluster()
 
     def test_can_connect_with_ssl_client_auth(self):
         """

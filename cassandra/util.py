@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 from __future__ import with_statement
 import calendar
 import datetime
+from functools import total_ordering
 import random
 import six
 import uuid
@@ -861,6 +862,7 @@ if six.PY3:
     long = int
 
 
+@total_ordering
 class Time(object):
     '''
     Idealized time, independent of day.
@@ -972,6 +974,9 @@ class Time(object):
             datetime.time(hour=self.hour, minute=self.minute, second=self.second,
                           microsecond=self.nanosecond // Time.MICRO) == other
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __lt__(self, other):
         if not isinstance(other, Time):
             return NotImplemented
@@ -985,6 +990,7 @@ class Time(object):
                                         self.second, self.nanosecond)
 
 
+@total_ordering
 class Date(object):
     '''
     Idealized date: year, month, day
@@ -1061,6 +1067,9 @@ class Date(object):
             return self.date() == other
         except Exception:
             return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __lt__(self, other):
         if not isinstance(other, Date):
@@ -1193,3 +1202,33 @@ def _sanitize_identifiers(field_names):
                 names_out[index] = "%s_" % (names_out[index],)
             observed_names.add(names_out[index])
     return names_out
+
+
+class Duration(object):
+    """
+    Cassandra Duration Type
+    """
+
+    months = 0
+    days = 0
+    nanoseconds = 0
+
+    def __init__(self, months=0, days=0, nanoseconds=0):
+        self.months = months
+        self.days = days
+        self.nanoseconds = nanoseconds
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.months == other.months and self.days == other.days and self.nanoseconds == other.nanoseconds
+
+    def __repr__(self):
+        return "Duration({0}, {1}, {2})".format(self.months, self.days, self.nanoseconds)
+
+    def __str__(self):
+        has_negative_values = self.months < 0 or self.days < 0 or self.nanoseconds < 0
+        return '%s%dmo%dd%dns' % (
+            '-' if has_negative_values else '',
+            abs(self.months),
+            abs(self.days),
+            abs(self.nanoseconds)
+        )

@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -322,6 +322,11 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         if not self.is_defunct:
             self.error_all_requests(
                 ConnectionShutdown("Connection to %s was closed" % self.host))
+
+            #This happens when the connection is shutdown while waiting for the ReadyMessage
+            if not self.connected_event.is_set():
+                self.last_error = ConnectionShutdown("Connection to %s was closed" % self.host)
+                
             # don't leave in-progress operations hanging
             self.connected_event.set()
 

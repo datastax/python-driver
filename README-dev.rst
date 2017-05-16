@@ -102,6 +102,12 @@ You can also specify a cassandra directory (to test unreleased versions)::
 
     CASSANDRA_DIR=/home/thobbs/cassandra python setup.py nosetests -w tests/integration/standard
 
+Specifying the usage of an already running Cassandra cluster
+----------------------------------------------------
+The test will start the appropriate Cassandra clusters when necessary  but if you don't want this to happen because a Cassandra cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example: 
+
+	USE_CASS_EXTERNAL=1 python setup.py nosetests -w tests/integration/standard
+
 Specify a Protocol Version for Tests
 ------------------------------------
 The protocol version defaults to 1 for cassandra 1.2 and 2 otherwise.  You can explicitly set
@@ -111,7 +117,7 @@ it with the ``PROTOCOL_VERSION`` environment variable::
 
 Testing Multiple Python Versions
 --------------------------------
-If you want to test all of python 2.6, 2.7, and pypy, use tox (this is what
+If you want to test all of python 2.7, 3.3, 3.4 and pypy, use tox (this is what
 TravisCI runs)::
 
     tox
@@ -126,6 +132,10 @@ and change ``tests/unit/`` to ``tests/``.
 
 Running the Benchmarks
 ======================
+There needs to be a version of cassandra running locally so before running the benchmarks, if ccm is installed:
+	
+	ccm create benchmark_cluster -v 3.0.1 -n 1 -s
+
 To run the benchmarks, pick one of the files under the ``benchmarks/`` dir and run it::
 
     python benchmarks/future_batches.py

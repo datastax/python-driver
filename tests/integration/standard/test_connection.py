@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ from threading import Thread, Event
 import time
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable, Cluster
+from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
@@ -32,7 +32,7 @@ from cassandra.policies import WhiteListRoundRobinPolicy, HostStateListener
 from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_node
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDRA_IP, local
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -49,7 +49,8 @@ class ConnectionTimeoutTest(unittest.TestCase):
     def setUp(self):
         self.defaultInFlight = Connection.max_in_flight
         Connection.max_in_flight = 2
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=
+                            WhiteListRoundRobinPolicy([CASSANDRA_IP]))
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -104,6 +105,7 @@ class HeartbeatTest(unittest.TestCase):
     def tearDown(self):
         self.cluster.shutdown()
 
+    @local
     def test_heart_beat_timeout(self):
         # Setup a host listener to ensure the nodes don't go down
         test_listener = TestHostListener()
@@ -190,9 +192,10 @@ class ConnectionTests(object):
         e = None
         for i in range(5):
             try:
-                conn = self.klass.factory(host='127.0.0.1', timeout=timeout, protocol_version=PROTOCOL_VERSION)
+                contact_point = CASSANDRA_IP
+                conn = self.klass.factory(host=contact_point, timeout=timeout, protocol_version=PROTOCOL_VERSION)
                 break
-            except (OperationTimedOut, NoHostAvailable) as e:
+            except (OperationTimedOut, NoHostAvailable, ConnectionShutdown) as e:
                 continue
 
         if conn:
@@ -364,7 +367,8 @@ class ConnectionTests(object):
         for i in range(max_retry_count):
             start = time.time()
             try:
-                self.get_connection(timeout=sys.float_info.min)
+                conn = self.get_connection(timeout=sys.float_info.min)
+                conn.close()
             except Exception as e:
                 end = time.time()
                 self.assertAlmostEqual(start, end, 1)

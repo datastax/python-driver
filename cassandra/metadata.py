@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 from binascii import unhexlify
 from bisect import bisect_right
 from collections import defaultdict, Mapping
+from functools import total_ordering
 from hashlib import md5
 from itertools import islice, cycle
 import json
@@ -1081,15 +1082,6 @@ class TableMetadata(object):
     Metadata describing configuration for table extensions
     """
 
-    _extension_registry = {}
-
-    class _RegisteredExtensionType(type):
-        def __new__(mcs, name, bases, dct):
-            cls = super(TableMetadata._RegisteredExtensionType, mcs).__new__(mcs, name, bases, dct)
-            if name != 'RegisteredTableExtension':
-                TableMetadata._extension_registry[cls.name] = cls
-            return cls
-
     def __init__(self, keyspace_name, name, partition_key=None, clustering_key=None, columns=None, triggers=None, options=None):
         self.keyspace_name = keyspace_name
         self.name = name
@@ -1138,9 +1130,10 @@ class TableMetadata(object):
         for view_meta in self.views.values():
             ret += "\n\n%s;" % (view_meta.as_cql_query(formatted=True),)
 
-        if self.extensions:  # None
-            for k in six.viewkeys(self._extension_registry) & self.extensions:  # no viewkeys on OrderedMapSerializeKey
-                ext = self._extension_registry[k]
+        if self.extensions:
+            registry = _RegisteredExtensionType._extension_registry
+            for k in six.viewkeys(registry) & self.extensions:  # no viewkeys on OrderedMapSerializeKey
+                ext = registry[k]
                 cql = ext.after_table_cql(self, k, self.extensions[k])
                 if cql:
                     ret += "\n\n%s" % (cql,)
@@ -1260,7 +1253,18 @@ class TableExtensionInterface(object):
         pass
 
 
-@six.add_metaclass(TableMetadata._RegisteredExtensionType)
+class _RegisteredExtensionType(type):
+
+    _extension_registry = {}
+
+    def __new__(mcs, name, bases, dct):
+        cls = super(_RegisteredExtensionType, mcs).__new__(mcs, name, bases, dct)
+        if name != 'RegisteredTableExtension':
+            mcs._extension_registry[cls.name] = cls
+        return cls
+
+
+@six.add_metaclass(_RegisteredExtensionType)
 class RegisteredTableExtension(TableExtensionInterface):
     """
     Extending this class registers it by name (associated by key in the `system_schema.tables.extensions` map).
@@ -1489,6 +1493,7 @@ class TokenMap(object):
         return []
 
 
+@total_ordering
 class Token(object):
     """
     Abstract class representing a token.
@@ -1508,14 +1513,6 @@ class Token(object):
     @classmethod
     def from_string(cls, token_string):
         raise NotImplementedError()
-
-    def __cmp__(self, other):
-        if self.value < other.value:
-            return -1
-        elif self.value == other.value:
-            return 0
-        else:
-            return 1
 
     def __eq__(self, other):
         return self.value == other.value
@@ -2327,6 +2324,7 @@ class SchemaParserV3(SchemaParserV22):
         view_meta = MaterializedViewMetadata(keyspace_name, view_name, base_table_name,
                                              include_all_columns, where_clause, self._build_table_options(row))
         self._build_table_columns(view_meta, col_rows)
+        view_meta.extensions = row.get('extensions', {})
 
         return view_meta
 
@@ -2487,6 +2485,11 @@ class MaterializedViewMetadata(object):
     view.
     """
 
+    extensions = None
+    """
+    Metadata describing configuration for table extensions
+    """
+
     def __init__(self, keyspace_name, view_name, base_table_name, include_all_columns, where_clause, options):
         self.keyspace_name = keyspace_name
         self.name = view_name
@@ -2523,12 +2526,21 @@ class MaterializedViewMetadata(object):
 
         properties = TableMetadataV3._property_string(formatted, self.clustering_key, self.options)
 
-        return "CREATE MATERIALIZED VIEW %(keyspace)s.%(name)s AS%(sep)s" \
+        ret = "CREATE MATERIALIZED VIEW %(keyspace)s.%(name)s AS%(sep)s" \
                "SELECT %(selected_cols)s%(sep)s" \
                "FROM %(keyspace)s.%(base_table)s%(sep)s" \
                "WHERE %(where_clause)s%(sep)s" \
                "PRIMARY KEY %(pk)s%(sep)s" \
                "WITH %(properties)s" % locals()
+
+        if self.extensions:
+            registry = _RegisteredExtensionType._extension_registry
+            for k in six.viewkeys(registry) & self.extensions:  # no viewkeys on OrderedMapSerializeKey
+                ext = registry[k]
+                cql = ext.after_table_cql(self, k, self.extensions[k])
+                if cql:
+                    ret += "\n\n%s" % (cql,)
+        return ret
 
     def export_as_string(self):
         return self.as_cql_query(formatted=True) + ";"

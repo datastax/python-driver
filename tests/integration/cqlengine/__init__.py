@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ except ImportError:
 from cassandra import ConsistencyLevel
 
 from cassandra.cqlengine import connection
-from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
+from cassandra.cqlengine.management import create_keyspace_simple, drop_keyspace, CQLENG_ALLOW_SCHEMA_MANAGEMENT
 import cassandra
 
-from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION
+from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION, CASSANDRA_IP, set_default_cass_ip
 DEFAULT_KEYSPACE = 'cqlengine_test'
 
 
@@ -35,11 +35,15 @@ def setup_package():
     warnings.simplefilter('always')  # for testing warnings, make sure all are let through
     os.environ[CQLENG_ALLOW_SCHEMA_MANAGEMENT] = '1'
 
+    set_default_cass_ip()
     use_single_node()
 
     setup_connection(DEFAULT_KEYSPACE)
     create_keyspace_simple(DEFAULT_KEYSPACE, 1)
 
+
+def teardown_package():
+    connection.unregister_connection("default")
 
 def is_prepend_reversed():
     # do we have https://issues.apache.org/jira/browse/CASSANDRA-8733 ?
@@ -48,7 +52,7 @@ def is_prepend_reversed():
 
 
 def setup_connection(keyspace_name):
-    connection.setup(['127.0.0.1'],
+    connection.setup([CASSANDRA_IP],
                      consistency=ConsistencyLevel.ONE,
                      protocol_version=PROTOCOL_VERSION,
                      default_keyspace=keyspace_name)

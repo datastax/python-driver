@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,8 @@
 
 import sys,logging, traceback, time
 
-from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,\
-    FunctionFailure
-from cassandra.protocol import MAX_SUPPORTED_VERSION
+from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
+                       FunctionFailure, ProtocolVersion)
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
@@ -70,7 +69,7 @@ class ClientExceptionTests(unittest.TestCase):
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
         try:
-            self.cluster = Cluster(protocol_version=MAX_SUPPORTED_VERSION, allow_beta_protocol_version=True)
+            self.cluster = Cluster(protocol_version=ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=True)
             self.session = self.cluster.connect()
         except NoHostAvailable:
             log.info("Protocol Version 5 not supported,")
@@ -158,9 +157,9 @@ class ClientExceptionTests(unittest.TestCase):
                 self.execute_helper(session, statement)
             if self.support_v5 and (isinstance(cm.exception, WriteFailure) or isinstance(cm.exception, ReadFailure)):
                 if isinstance(cm.exception, ReadFailure):
-                    self.assertEqual(cm.exception.error_code_map.values()[0], 1)
+                    self.assertEqual(list(cm.exception.error_code_map.values())[0], 1)
                 else:
-                    self.assertEqual(cm.exception.error_code_map.values()[0], 0)
+                    self.assertEqual(list(cm.exception.error_code_map.values())[0], 0)
 
     def test_write_failures_from_coordinator(self):
         """
@@ -323,8 +322,6 @@ class TimeoutTimerTest(unittest.TestCase):
         """
         Setup sessions and pause node1
         """
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
 
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
         self.node1 = get_node(1)

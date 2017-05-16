@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,50 +18,30 @@ try:
 except ImportError:
     import unittest # noqa
 
-from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
-from tests import is_eventlet_monkey_patched
-import time
+from tests.unit.io.utils import TimerConnectionTests
+from tests import notpypy, MONKEY_PATCH_LOOP, notmonkeypatch
+
+from eventlet import monkey_patch
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
 except ImportError:
     EventletConnection = None  # noqa
 
-
-class EventletTimerTest(unittest.TestCase):
-
-    def setUp(self):
-        if EventletConnection is None:
-            raise unittest.SkipTest("Eventlet libraries not available")
-        if not is_eventlet_monkey_patched():
-            raise unittest.SkipTest("Can't test eventlet without monkey patching")
+# There are some issues with some versions of pypy and eventlet
+@notpypy
+@unittest.skipIf(EventletConnection is None, "Skpping the eventlet tests because it's not installed")
+@notmonkeypatch
+class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
+    @classmethod
+    def setUpClass(cls):
+        # This is run even though the class is skipped, so we need
+        # to make sure no monkey patching is happening
+        if not MONKEY_PATCH_LOOP:
+            return
+        monkey_patch()
+        cls.connection_class = EventletConnection
         EventletConnection.initialize_reactor()
 
-    def test_multi_timer_validation(self, *args):
-        """
-        Verify that timer timeouts are honored appropriately
-        """
-        # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, EventletConnection, 0, 100, 1, 100)
-        # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, EventletConnection, 100, 0, -1, 100)
-        # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, EventletConnection, 0, 100, 1, 100, True)
-
-    def test_timer_cancellation(self):
-        """
-        Verify that timer cancellation is honored
-        """
-
-        # Various lists for tracking callback stage
-        timeout = .1
-        callback = TimerCallback(timeout)
-        timer = EventletConnection.create_timer(timeout, callback.invoke)
-        timer.cancel()
-        # Release context allow for timer thread to run.
-        time.sleep(.2)
-        timer_manager = EventletConnection._timers
-        # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())
+    # There is no unpatching because there is not a clear way
+    # of doing it reliably

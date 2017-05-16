@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ import time
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
-from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION
+from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
+    set_default_cass_ip
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -29,18 +30,25 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
+#This can be tested for remote hosts, but the cluster has to be configured accordingly
+#@local
+
+
 def setup_module():
-    use_singledc(start=False)
-    ccm_cluster = get_cluster()
-    ccm_cluster.stop()
-    config_options = {'authenticator': 'PasswordAuthenticator',
-                      'authorizer': 'CassandraAuthorizer'}
-    ccm_cluster.set_configuration_options(config_options)
-    log.debug("Starting ccm test cluster with %s", config_options)
-    ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-    # there seems to be some race, with some versions of C* taking longer to 
-    # get the auth (and default user) setup. Sleep here to give it a chance
-    time.sleep(10)
+    if CASSANDRA_IP.startswith("127.0.0."):
+        use_singledc(start=False)
+        ccm_cluster = get_cluster()
+        ccm_cluster.stop()
+        config_options = {'authenticator': 'PasswordAuthenticator',
+                          'authorizer': 'CassandraAuthorizer'}
+        ccm_cluster.set_configuration_options(config_options)
+        log.debug("Starting ccm test cluster with %s", config_options)
+        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        # there seems to be some race, with some versions of C* taking longer to
+        # get the auth (and default user) setup. Sleep here to give it a chance
+        time.sleep(10)
+    else:
+        set_default_cass_ip()
 
 
 def teardown_module():
@@ -99,38 +107,43 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Bad credentials.*Username and/or '
-                                'password are incorrect.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
     def test_connect_wrong_username(self):
         cluster = self.cluster_as('wrong_user', 'cassandra')
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Bad credentials.*Username and/or '
-                                'password are incorrect.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.*',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
     def test_connect_empty_pwd(self):
         cluster = self.cluster_as('Cassandra', '')
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Bad credentials.*Username and/or '
-                                'password are incorrect.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.*',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
     def test_connect_no_auth_provider(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.assertRaisesRegexp(NoHostAvailable,
-                                '.*AuthenticationFailed.*Remote end requires authentication.*',
-                                cluster.connect)
-        assert_quiescent_pool_state(self, cluster)
-        cluster.shutdown()
+        try:
+            self.assertRaisesRegexp(NoHostAvailable,
+                                    '.*AuthenticationFailed.*',
+                                    cluster.connect)
+            assert_quiescent_pool_state(self, cluster)
+        finally:
+            cluster.shutdown()
 
 
 class SaslAuthenticatorTests(AuthenticationTests):
