@@ -29,11 +29,11 @@ from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.management import drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.query import SimpleStatement
-from cassandra.util import Date, Time
+from cassandra.util import Date, Time, Duration
 from cassandra.cqlengine.statements import SelectStatement, DeleteStatement, WhereClause
 from cassandra.cqlengine.operators import EqualsOperator
 
-from tests.integration import PROTOCOL_VERSION
+from tests.integration import PROTOCOL_VERSION, greaterthanorequalcass3_10
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
@@ -163,6 +163,7 @@ class TestModelIO(BaseCassEngTestCase):
         sync_table(TestModel)
         sync_table(TestModel)
 
+    @greaterthanorequalcass3_10
     def test_can_insert_model_with_all_column_types(self):
         """
         Test for inserting all column types into a Model
@@ -195,6 +196,7 @@ class TestModelIO(BaseCassEngTestCase):
             l = columns.TimeUUID()
             m = columns.UUID()
             n = columns.VarInt()
+            o = columns.Duration()
 
         sync_table(AllDatatypesModel)
 
@@ -207,7 +209,8 @@ class TestModelIO(BaseCassEngTestCase):
                                  e=datetime.utcfromtimestamp(872835240), f=Decimal('12.3E+7'), g=2.39,
                                  h=3.4028234663852886e+38, i='123.123.123.123', j=2147483647, k='text',
                                  l=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
-                                 m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'))
+                                 m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'),
+                                 o=Duration(2, 3, 4))
 
         self.assertEqual(1, AllDatatypesModel.objects.count())
         output = AllDatatypesModel.objects.first()

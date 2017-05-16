@@ -26,14 +26,14 @@ from cassandra import InvalidRequest
 from cassandra.cqlengine.columns import (TimeUUID, Ascii, Text, Integer, BigInt,
                                          VarInt, DateTime, Date, UUID, Boolean,
                                          Decimal, Inet, Time, UserDefinedType,
-                                         Map, List, Set, Tuple, Double)
+                                         Map, List, Set, Tuple, Double, Duration)
 from cassandra.cqlengine.connection import execute
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model, ValidationError
 from cassandra.cqlengine.usertype import UserType
 from cassandra import util
 
-from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthanorequalcass30
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthanorequalcass30, greaterthanorequalcass3_10
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
@@ -344,6 +344,20 @@ class TestBoolean(DataType, BaseCassEngTestCase):
         )
         super(TestBoolean, cls).setUpClass()
 
+@greaterthanorequalcass3_10
+class TestDuration(DataType, BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.db_klass, cls.python_klass = (
+            Duration,
+            util.Duration
+        )
+        cls.first_value, cls.second_value, cls.third_value = (
+            util.Duration(0, 0, 0),
+            util.Duration(1, 2, 3),
+            util.Duration(0, 0, 0)
+        )
+        super(TestDuration, cls).setUpClass()
 
 class User(UserType):
     # We use Date and Time to ensure to_python
