@@ -642,7 +642,7 @@ class HostConnectionPool(object):
 
         raise NoConnectionsAvailable()
 
-    def return_connection(self, connection):
+    def return_connection(self, connection, mark_host_down=False):  #noqa
         with connection.lock:
             connection.in_flight -= 1
             in_flight = connection.in_flight
