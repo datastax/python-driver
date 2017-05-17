@@ -494,18 +494,69 @@ class PreparedStatementArgTest(unittest.TestCase):
             reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
+        table = "test3rf.%s" % self._testMethodName.lower()
+
         session = clus.connect(wait_for_all_pools=True)
 
-        insert_statement = session.prepare("INSERT INTO test3rf.test (k, v) VALUES  (?, ?)")
+        session.execute("DROP TABLE IF EXISTS %s" % table)
+        session.execute("CREATE TABLE %s (k int PRIMARY KEY, v int )" % table)
+
+        insert_statement = session.prepare("INSERT INTO %s (k, v) VALUES  (?, ?)" % table)
 
         # This is going to query a host where the query
         # is not prepared
         batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
         batch_statement.add(insert_statement, (1, 2))
         session.execute(batch_statement)
-        select_results = session.execute("SELECT * FROM test3rf.test WHERE k = 1")
+        select_results = session.execute("SELECT * FROM %s WHERE k = 1" % table)
         first_row = select_results[0][:2]
         self.assertEqual((1, 2), first_row)
+
+    def test_prepare_batch_statement_after_alter(self):
+        """
+        Test to validate a prepared statement used inside a batch statement is correctly handled
+        by the driver. The metadata might be updated when a table is altered. This tests combines
+        queries not being prepared and an update of the prepared statement metadata
+
+        @since 3.10
+        @jira_ticket PYTHON-706
+        @expected_result queries will have to re-prepared on hosts that aren't the control connection
+        and the batch statement will be sent.
+        """
+        white_list = ForcedHostSwitchPolicy()
+        clus = Cluster(
+            load_balancing_policy=white_list,
+            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
+            reprepare_on_up=False)
+        self.addCleanup(clus.shutdown)
+
+        table = "test3rf.%s" % self._testMethodName.lower()
+
+        session = clus.connect(wait_for_all_pools=True)
+
+        session.execute("DROP TABLE IF EXISTS %s" % table)
+        session.execute("CREATE TABLE %s (k int PRIMARY KEY, a int, b int, d int)" % table)
+        insert_statement = session.prepare("INSERT INTO %s (k, b, d) VALUES  (?, ?, ?)" % table)
+
+        # Altering the table might trigger an update in the insert metadata
+        session.execute("ALTER TABLE %s ADD c int" % table)
+
+        values_to_insert = [(1, 2, 3), (2, 3, 4), (3, 4, 5), (4, 5, 6)]
+
+        # We query the three hosts in order (due to the ForcedHostSwitchPolicy)
+        # the first three queries will have to be repreapred and the rest should
+        # work as normal batch prepared statements
+        for i in range(10):
+            value_to_insert = values_to_insert[i % len(values_to_insert)]
+            batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
+            batch_statement.add(insert_statement, value_to_insert)
+            session.execute(batch_statement)
+
+        select_results = session.execute("SELECT * FROM %s" % table)
+        expected_results = [(1, None, 2, None, 3), (2, None, 3, None, 4),
+             (3, None, 4, None, 5), (4, None, 5, None, 6)]
+        
+        self.assertEqual(set(expected_results), set(select_results._current_rows))
 
 
 class PrintStatementTests(unittest.TestCase):
