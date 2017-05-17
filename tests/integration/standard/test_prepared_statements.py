@@ -390,7 +390,7 @@ class PreparedStatementTests(unittest.TestCase):
         with self.assertRaises(InvalidRequest):
             self.session.execute(prepared, [0])
 
-    # TODO revisit this test
+    # TODO revisit this test, it on hold now due to CASSANDRA-10786
     @unittest.skip
     def test_invalidated_result_metadata(self):
         """
