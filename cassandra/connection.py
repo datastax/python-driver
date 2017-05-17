@@ -1007,7 +1007,7 @@ class ConnectionHeartbeat(Thread):
                 for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
                     connection.defunct(exc)
-                    owner.return_connection(connection)
+                    owner.return_connection(connection, mark_host_down=True)
             except self.ShutdownException:
                 pass
             except Exception:

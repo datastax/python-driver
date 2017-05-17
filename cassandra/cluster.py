@@ -1395,10 +1395,8 @@ class Cluster(object):
         """
         if self.is_shutdown:
             return
-
         with host.lock:
             was_up = host.is_up
-
             # ignore down signals if we have open pools to the host
             # this is to avoid closing pools when a control connection host became isolated
             if self._discount_down_events and self.profile_manager.distance(host) != HostDistance.IGNORED:
@@ -3134,7 +3132,7 @@ class ControlConnection(object):
         c = getattr(self, '_connection', None)
         return [c] if c else []
 
-    def return_connection(self, connection):
+    def return_connection(self, connection, mark_host_down=False):  # noqa
         if connection is self._connection and (connection.is_defunct or connection.is_closed):
             self.reconnect()
 
