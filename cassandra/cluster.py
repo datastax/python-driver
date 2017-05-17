@@ -3319,7 +3319,6 @@ class ResponseFuture(object):
         self.message = message
         self.query = query
         self.timeout = timeout
-        self._time_remaining = timeout
         self._retry_policy = retry_policy
         self._metrics = metrics
         self.prepared_statement = prepared_statement
@@ -3333,6 +3332,12 @@ class ResponseFuture(object):
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
         self._start_timer()
+
+    @property
+    def _time_remaining(self):
+        if self.timeout is None:
+            return None
+        return (self._start_time + self.timeout) - time.time()
 
     def _start_timer(self):
         if self._timer is None:
@@ -3364,8 +3369,6 @@ class ResponseFuture(object):
         self._timer = None
         if not self._event.is_set():
             if self._time_remaining is not None:
-                elapsed = time.time() - self._start_time
-                self._time_remaining -= elapsed
                 if self._time_remaining <= 0:
                     self._on_timeout()
                     return
