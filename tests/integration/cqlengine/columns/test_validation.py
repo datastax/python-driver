@@ -348,16 +348,24 @@ class TestBoolean(DataType, BaseCassEngTestCase):
 class TestDuration(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.db_klass, cls.python_klass = (
-            Duration,
-            util.Duration
-        )
-        cls.first_value, cls.second_value, cls.third_value = (
-            util.Duration(0, 0, 0),
-            util.Duration(1, 2, 3),
-            util.Duration(0, 0, 0)
-        )
-        super(TestDuration, cls).setUpClass()
+        # setUpClass is executed despite the whole class being skipped
+        if CASSANDRA_VERSION >= "3.10":
+            cls.db_klass, cls.python_klass = (
+                Duration,
+                util.Duration
+            )
+            cls.first_value, cls.second_value, cls.third_value = (
+                util.Duration(0, 0, 0),
+                util.Duration(1, 2, 3),
+                util.Duration(0, 0, 0)
+            )
+            super(TestDuration, cls).setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        if CASSANDRA_VERSION >= "3.10":
+            super(TestDuration, cls).tearDownClass()
+
 
 class User(UserType):
     # We use Date and Time to ensure to_python
