@@ -359,18 +359,29 @@ class HostConnection(object):
 
         raise NoConnectionsAvailable("All request IDs are currently in use")
 
-    def return_connection(self, connection):
+    def return_connection(self, connection, mark_host_down=False):
         with connection.lock:
             connection.in_flight -= 1
         with self._stream_available_condition:
             self._stream_available_condition.notify()
 
-        if (connection.is_defunct or connection.is_closed) and not connection.signaled_error:
-            log.debug("Defunct or closed connection (%s) returned to pool, potentially "
-                      "marking host %s as down", id(connection), self.host)
-            is_down = self._session.cluster.signal_connection_failure(
-                self.host, connection.last_error, is_host_addition=False)
-            connection.signaled_error = True
+        if connection.is_defunct or connection.is_closed:
+            if connection.signaled_error and not mark_host_down:
+                return
+
+            is_down = False
+            if not connection.signaled_error:
+                log.debug("Defunct or closed connection (%s) returned to pool, potentially "
+                          "marking host %s as down", id(connection), self.host)
+                is_down = self._session.cluster.signal_connection_failure(
+                    self.host, connection.last_error, is_host_addition=False)
+                connection.signaled_error = True
+
+            # Force mark down a host on error, used by the ConnectionHeartbeat
+            if mark_host_down and not is_down:
+                is_down = True
+                self._session.cluster.on_down(self.host, is_host_addition=False)
+
             if is_down:
                 self.shutdown()
             else:
@@ -382,6 +393,11 @@ class HostConnection(object):
                     self._session.submit(self._replace, connection)
 
     def _replace(self, connection):
+        with self._lock:
+            if self.is_shutdown:
+                self._is_replacing = False
+                return
+
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
             conn = self._session.cluster.connection_factory(self.host.address)
@@ -626,7 +642,7 @@ class HostConnectionPool(object):
 
         raise NoConnectionsAvailable()
 
-    def return_connection(self, connection):
+    def return_connection(self, connection, mark_host_down=False):  #noqa
         with connection.lock:
             connection.in_flight -= 1
             in_flight = connection.in_flight
