@@ -23,9 +23,12 @@ from cassandra import OperationTimedOut
 from cassandra.cluster import ExecutionProfile
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy
+from cassandra.connection import Connection
+
 from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21
 from tests import notwindows
 
+from mock import patch
 
 def setup_module():
     use_singledc()
@@ -44,18 +47,24 @@ class BadRoundRobinPolicy(RoundRobinPolicy):
         return hosts
 
 
+# This doesn't work well with Windows clock granularity
+@notwindows
 class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(1)
+
         spec_ep_brr = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 20))
         spec_ep_rr = ExecutionProfile(speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 20))
         spec_ep_rr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 1))
-        self.cluster.add_execution_profile("spec_ep_brr", spec_ep_brr)
-        self.cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
-        self.cluster.add_execution_profile("spec_ep_rr_lim", spec_ep_rr_lim)
+        spec_ep_brr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0.4, 10))
 
-    #This doesn't work well with Windows clock granularity
-    @notwindows
+        cls.cluster.add_execution_profile("spec_ep_brr", spec_ep_brr)
+        cls.cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
+        cls.cluster.add_execution_profile("spec_ep_rr_lim", spec_ep_rr_lim)
+        cls.cluster.add_execution_profile("spec_ep_brr_lim", spec_ep_brr_lim)
+
     @greaterthancass21
     def test_speculative_execution(self):
         """
@@ -102,3 +111,29 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
         # Test timeout with spec_ex
         with self.assertRaises(OperationTimedOut):
             result = self.session.execute(statement, execution_profile='spec_ep_rr', timeout=.5)
+
+    #TODO redo this tests with Scassandra
+    def test_speculative_and_timeout(self):
+        """
+        Test to ensure the timeout is honored when using speculative execution
+        @since 3.10
+        @jira_ticket PYTHON-750
+        @expected_result speculative retries be schedule every fixed period, during the maximum
+        period of the timeout.
+
+        @test_category metadata
+        """
+        # We mock this so no messages are sent, otherwise a reponse might arrive
+        # and we would not know how many hosts we queried
+        with patch.object(Connection, "send_msg", return_value = 100) as mocked_send_msg:
+
+            statement = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", is_idempotent=True)
+
+            # An OperationTimedOut is placed here in response_future,
+            # that's why we can't call session.execute,which would raise it, but
+            # we have to directly wait for the event
+            response_future = self.session.execute_async(statement, execution_profile='spec_ep_brr_lim', timeout=2.2)
+            response_future._event.wait()
+
+            # This is because 2.2 / 0.4 + 1 = 6
+            self.assertEqual(len(response_future.attempted_hosts), 6)
