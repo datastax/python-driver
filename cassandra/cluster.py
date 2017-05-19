@@ -3355,7 +3355,8 @@ class ResponseFuture(object):
         errors = self._errors
         if not errors:
             if self.is_schema_agreed:
-                errors = {self._current_host.address: "Client request timeout. See Session.execute[_async](timeout)"}
+                key = self._current_host.address if self.current_host else 'no host queried before timeout'
+                errors = {key: "Client request timeout. See Session.execute[_async](timeout)"}
             else:
                 connection = self.session.cluster.control_connection._connection
                 host = connection.host if connection else 'unknown'
