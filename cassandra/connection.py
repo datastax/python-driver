@@ -1032,8 +1032,6 @@ class Timer(object):
     def __init__(self, timeout, callback):
         self.end = time.time() + timeout
         self.callback = callback
-        if timeout < 0:
-            self.callback()
 
     def __lt__(self, other):
         return self.end < other.end
