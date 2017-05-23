@@ -1,3 +1,36 @@
+3.10.0
+======
+May 24, 2017
+
+Features
+--------
+* Add Duration type to cqlengine (PYTHON-750)
+* Community PR review: Raise error on primary key update only if its value changed (PYTHON-705)
+* get_query_trace() contract is ambiguous (PYTHON-196)
+
+Bug Fixes
+---------
+* Queries using speculative execution policy timeout prematurely (PYTHON-755)
+* Fix `map` where results are not consumed (PYTHON-749)
+* Driver fails to encode Duration's with large values (PYTHON-747)
+* UDT values are not updated correctly in CQLEngine (PYTHON-743)
+* UDT types are not validated in CQLEngine (PYTHON-742)
+* to_python is not implemented for types columns.Type and columns.Date in CQLEngine (PYTHON-741)
+* Clients spin infinitely trying to connect to a host that is drained (PYTHON-734)
+* Resulset.get_query_trace returns empty trace sometimes (PYTHON-730)
+* Memory grows and doesn't get removed (PYTHON-720)
+* Fix RuntimeError caused by change dict size during iteration (PYTHON-708)
+* fix ExponentialReconnectionPolicy may throw OverflowError problem (PYTHON-707)
+* Avoid using nonexistent prepared statement in ResponseFuture (PYTHON-706)
+
+Other
+-----
+* Update README (PYTHON-746)
+* Test python versions 3.5 and 3.6 (PYTHON-737)
+* Docs Warning About Prepare "select *" (PYTHON-626)
+* Increase Coverage in CqlEngine Test Suite (PYTHON-505)
+* Example SSL connection code does not verify server certificates (PYTHON-469)
+
 3.9.0
 =====
 
