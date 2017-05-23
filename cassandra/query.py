@@ -366,6 +366,21 @@ class PreparedStatement(object):
 
     A :class:`.PreparedStatement` should be prepared only once. Re-preparing a statement
     may affect performance (as the operation requires a network roundtrip).
+
+    |prepared_stmt_head|: Do not use ``*`` in prepared statements if you might
+    change the schema of the table being queried. The driver and server each
+    maintain a map between metadata for a schema and statements that were
+    prepared against that schema. When a user changes a schema, e.g. by adding
+    or removing a column, the server invalidates its mappings involving that
+    schema. However, there is currently no way to propagate that invalidation
+    to drivers. Thus, after a schema change, the driver will incorrectly
+    interpret the results of ``SELECT *`` queries prepared before the schema
+    change. This is currently being addressed in `CASSANDRA-10786
+    <https://issues.apache.org/jira/browse/CASSANDRA-10786>`_.
+
+    .. |prepared_stmt_head| raw:: html
+
+       <b>A note about <code>*</code> in prepared statements</b>
     """
 
     column_metadata = None  #TODO: make this bind_metadata in next major
