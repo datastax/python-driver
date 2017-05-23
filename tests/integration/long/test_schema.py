@@ -136,7 +136,8 @@ class SchemaTests(unittest.TestCase):
 
         rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
         self.check_and_wait_for_agreement(session, rs, False)
-        rs = session.execute("CREATE TABLE test_schema_disagreement.cf (key int PRIMARY KEY, value int)")
+        rs = session.execute(SimpleStatement("CREATE TABLE test_schema_disagreement.cf (key int PRIMARY KEY, value int)",
+                                             consistency_level=ConsistencyLevel.ALL))
         self.check_and_wait_for_agreement(session, rs, False)
         rs = session.execute("DROP KEYSPACE test_schema_disagreement")
         self.check_and_wait_for_agreement(session, rs, False)
@@ -147,7 +148,8 @@ class SchemaTests(unittest.TestCase):
         session = cluster.connect()
         rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
         self.check_and_wait_for_agreement(session, rs, True)
-        rs = session.execute("CREATE TABLE test_schema_disagreement.cf (key int PRIMARY KEY, value int)")
+        rs = session.execute(SimpleStatement("CREATE TABLE test_schema_disagreement.cf (key int PRIMARY KEY, value int)",
+                                             consistency_level=ConsistencyLevel.ALL))
         self.check_and_wait_for_agreement(session, rs, True)
         rs = session.execute("DROP KEYSPACE test_schema_disagreement")
         self.check_and_wait_for_agreement(session, rs, True)
