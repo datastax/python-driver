@@ -192,13 +192,23 @@ class ClusterTests(unittest.TestCase):
 
         @test_category connection
         """
+        # Test with empty list
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(Cluster(protocol_version=PROTOCOL_VERSION), [])
+            Session(cluster, [])
+        cluster.shutdown()
+
+        # Test with only invalid
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host("1.2.3.4", SimpleConvictionPolicy)])
-        session = Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host(x, SimpleConvictionPolicy) for x in
+            Session(cluster, [Host("1.2.3.4", SimpleConvictionPolicy)])
+        cluster.shutdown()
+
+        # Test with valid and invalid hosts
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        Session(cluster, [Host(x, SimpleConvictionPolicy) for x in
                                       ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
-        session.shutdown()
+        cluster.shutdown()
 
     def test_protocol_negotiation(self):
         """
