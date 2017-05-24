@@ -10,7 +10,6 @@ python:
 sudo: false
 env:
   - CASS_DRIVER_NO_CYTHON=1
-  - 
 
 addons:
   apt:
