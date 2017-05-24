@@ -2,9 +2,9 @@ Python Cassandra Driver
 =======================
 A Python client driver for `Apache Cassandra <http://cassandra.apache.org>`_.
 This driver works exclusively with the Cassandra Query Language v3 (CQL3)
-and Cassandra's native protocol.  Cassandra 1.2+ is supported.
+and Cassandra's native protocol.  Cassandra 2.1+ is supported.
 
-The driver supports Python 2.6, 2.7, 3.3, and 3.4.
+The driver supports Python 2.6, 2.7, 3.3, 3.4, 3.5, and 3.6.
 
 This driver is open source under the
 `Apache v2 License <http://www.apache.org/licenses/LICENSE-2.0.html>`_.

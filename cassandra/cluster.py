@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
-                             BatchStatement, bind_params, QueryTrace,
+                             BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
 
@@ -1395,10 +1395,8 @@ class Cluster(object):
         """
         if self.is_shutdown:
             return
-
         with host.lock:
             was_up = host.is_up
-
             # ignore down signals if we have open pools to the host
             # this is to avoid closing pools when a control connection host became isolated
             if self._discount_down_events and self.profile_manager.distance(host) != HostDistance.IGNORED:
@@ -1565,7 +1563,7 @@ class Cluster(object):
         open, attempt to open connections until that number is met.
         """
         for session in self.sessions:
-            for pool in session._pools.values():
+            for pool in tuple(session._pools.values()):
                 pool.ensure_core_connections()
 
     @staticmethod
@@ -2259,7 +2257,7 @@ class Session(object):
         Intended for internal use only.
         """
         futures = []
-        for host in self._pools.keys():
+        for host in tuple(self._pools.keys()):
             if host != excluded_host and host.is_up:
                 future = ResponseFuture(self, PrepareMessage(query=query), None, self.default_timeout)
 
@@ -2304,7 +2302,7 @@ class Session(object):
             future.cancel()
         wait_futures(self._initial_connect_futures)
 
-        for pool in list(self._pools.values()):
+        for pool in tuple(self._pools.values()):
             pool.shutdown()
 
     def __enter__(self):
@@ -2455,7 +2453,7 @@ class Session(object):
             if not remaining_callbacks:
                 callback(host_errors)
 
-        for pool in self._pools.values():
+        for pool in tuple(self._pools.values()):
             pool._set_keyspace_for_all_conns(keyspace, pool_finished_setting_keyspace)
 
     def user_type_registered(self, keyspace, user_type, klass):
@@ -2496,7 +2494,7 @@ class Session(object):
             return self.cluster.executor.submit(fn, *args, **kwargs)
 
     def get_pool_state(self):
-        return dict((host, pool.get_state()) for host, pool in self._pools.items())
+        return dict((host, pool.get_state()) for host, pool in tuple(self._pools.items()))
 
     def get_pools(self):
         return self._pools.values()
@@ -3134,7 +3132,7 @@ class ControlConnection(object):
         c = getattr(self, '_connection', None)
         return [c] if c else []
 
-    def return_connection(self, connection):
+    def return_connection(self, connection, mark_host_down=False):  # noqa
         if connection is self._connection and (connection.is_defunct or connection.is_closed):
             self.reconnect()
 
@@ -3319,7 +3317,6 @@ class ResponseFuture(object):
         self.message = message
         self.query = query
         self.timeout = timeout
-        self._time_remaining = timeout
         self._retry_policy = retry_policy
         self._metrics = metrics
         self.prepared_statement = prepared_statement
@@ -3333,6 +3330,12 @@ class ResponseFuture(object):
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
         self._start_timer()
+
+    @property
+    def _time_remaining(self):
+        if self.timeout is None:
+            return None
+        return (self._start_time + self.timeout) - time.time()
 
     def _start_timer(self):
         if self._timer is None:
@@ -3352,7 +3355,8 @@ class ResponseFuture(object):
         errors = self._errors
         if not errors:
             if self.is_schema_agreed:
-                errors = {self._current_host.address: "Client request timeout. See Session.execute[_async](timeout)"}
+                key = self._current_host.address if self._current_host else 'no host queried before timeout'
+                errors = {key: "Client request timeout. See Session.execute[_async](timeout)"}
             else:
                 connection = self.session.cluster.control_connection._connection
                 host = connection.host if connection else 'unknown'
@@ -3364,8 +3368,6 @@ class ResponseFuture(object):
         self._timer = None
         if not self._event.is_set():
             if self._time_remaining is not None:
-                elapsed = time.time() - self._start_time
-                self._time_remaining -= elapsed
                 if self._time_remaining <= 0:
                     self._on_timeout()
                     return
@@ -3691,9 +3693,11 @@ class ResponseFuture(object):
 
         if isinstance(response, ResultMessage):
             if response.kind == RESULT_KIND_PREPARED:
-                # result metadata is the only thing that could have changed from an alter
-                _, _, _, result_metadata = response.results
-                self.prepared_statement.result_metadata = result_metadata
+                if self.prepared_statement:
+                    # result metadata is the only thing that could have
+                    # changed from an alter
+                    _, _, _, result_metadata = response.results
+                    self.prepared_statement.result_metadata = result_metadata
 
                 # use self._query to re-use the same host and
                 # at the same time properly borrow the connection
@@ -3836,8 +3840,15 @@ class ResponseFuture(object):
         details from Cassandra. If the trace is not available after `max_wait`,
         :exc:`cassandra.query.TraceUnavailable` will be raised.
 
+        If the ResponseFuture is not done (async execution) and you try to retrieve the trace,
+        :exc:`cassandra.query.TraceUnavailable` will be raised.
+
         `query_cl` is the consistency level used to poll the trace tables.
         """
+        if self._final_result is _NOT_SET and self._final_exception is None:
+            raise TraceUnavailable(
+                "Trace information was not available. The ResponseFuture is not done.")
+
         if self._query_traces:
             return self._get_query_trace(len(self._query_traces) - 1, max_wait, query_cl)
 

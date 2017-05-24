@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -396,7 +396,7 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = ['six >=1.6']
+    dependencies = ['six >=1.9']
 
     if not PY3:
         dependencies.append('futures')

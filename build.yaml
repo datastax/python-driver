@@ -1,36 +1,94 @@
 schedules:
-  commit:
+  commit_master:
     schedule: per_commit
     branches:
-      include: [master, /python.*/]
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
+
+  commit_branches:
+    schedule: per_commit
+    branches:
+      include: [/python.*/]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
+        - cassandra: ['2.0', '2.1', '3.0']
+
+  weekly_libev:
+    schedule: weekly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+
+  weekly_gevent:
+    schedule: weekly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='gevent'
+    matrix:
+      exclude:
+        - python: [3.4, 3.5, 3.6]
+
+  weekly_eventlet:
+    schedule: weekly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='eventlet'
+
+  weekly_async:
+    schedule: weekly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='async'
+
+  weekly_twister:
+    schedule: weekly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='twisted'
 
 python:
   - 2.7
   - 3.4
+  - 3.5
+  - 3.6
+
 os:
   - ubuntu/trusty64
+
 cassandra:
   - '2.0'
   - '2.1'
   - '2.2'
   - '3.0'
-  - '3.11'
+  - '3.10'
+
 env:
-  EVENT_LOOP_MANAGER:
-    - libev
   CYTHON:
     - CYTHON
     - NO_CYTHON
+
 build:
   - script: |
       export JAVA_HOME=$CCM_JAVA_HOME
       export PATH=$JAVA_HOME/bin:$PATH
+      export PYTHONPATH=""
 
       pip install git+https://github.com/pcmanus/ccm.git
       # Install dependencies
-      if [[ $EVENT_LOOP_MANAGER == 'libev' ]]; then
-        sudo apt-get install -y libev4 libev-dev
-      fi
+      sudo apt-get install -y libev4 libev-dev
+
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
       FORCE_CYTHON=False
@@ -45,13 +103,14 @@ build:
         python setup.py build_ext --inplace --no-cython
       fi
 
+      echo "Running with event loop manager: $EVENT_LOOP_MANAGER"
       echo "==========RUNNING CQLENGINE TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
 
       echo "==========RUNNING INTEGRATION TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
       echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
   - xunit:
     - "*_results.xml"

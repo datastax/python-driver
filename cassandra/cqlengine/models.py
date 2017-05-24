@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -504,7 +504,7 @@ class BaseModel(object):
         if not self._is_persisted:
             return False
 
-        return all([not self._values[k].changed for k in self._primary_keys])
+        return all(not self._values[k].changed for k in self._primary_keys)
 
     @classmethod
     def _get_keyspace(cls):
@@ -754,18 +754,24 @@ class BaseModel(object):
         It is possible to do a blind update, that is, to update a field without having first selected the object out of the database.
         See :ref:`Blind Updates <blind_updates>`
         """
-        for k, v in values.items():
-            col = self._columns.get(k)
+        for column_id, v in values.items():
+            col = self._columns.get(column_id)
 
             # check for nonexistant columns
             if col is None:
-                raise ValidationError("{0}.{1} has no column named: {2}".format(self.__module__, self.__class__.__name__, k))
+                raise ValidationError(
+                    "{0}.{1} has no column named: {2}".format(
+                        self.__module__, self.__class__.__name__, column_id))
 
             # check for primary key update attempts
             if col.is_primary_key:
-                raise ValidationError("Cannot apply update to primary key '{0}' for {1}.{2}".format(k, self.__module__, self.__class__.__name__))
+                current_value = getattr(self, column_id)
+                if v != current_value:
+                    raise ValidationError(
+                        "Cannot apply update to primary key '{0}' for {1}.{2}".format(
+                            column_id, self.__module__, self.__class__.__name__))
 
-            setattr(self, k, v)
+            setattr(self, column_id, v)
 
         # handle polymorphic models
         if self._is_polymorphic:

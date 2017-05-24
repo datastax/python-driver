@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -366,6 +366,21 @@ class PreparedStatement(object):
 
     A :class:`.PreparedStatement` should be prepared only once. Re-preparing a statement
     may affect performance (as the operation requires a network roundtrip).
+
+    |prepared_stmt_head|: Do not use ``*`` in prepared statements if you might
+    change the schema of the table being queried. The driver and server each
+    maintain a map between metadata for a schema and statements that were
+    prepared against that schema. When a user changes a schema, e.g. by adding
+    or removing a column, the server invalidates its mappings involving that
+    schema. However, there is currently no way to propagate that invalidation
+    to drivers. Thus, after a schema change, the driver will incorrectly
+    interpret the results of ``SELECT *`` queries prepared before the schema
+    change. This is currently being addressed in `CASSANDRA-10786
+    <https://issues.apache.org/jira/browse/CASSANDRA-10786>`_.
+
+    .. |prepared_stmt_head| raw:: html
+
+       <b>A note about <code>*</code> in prepared statements</b>
     """
 
     column_metadata = None  #TODO: make this bind_metadata in next major
@@ -925,7 +940,8 @@ class QueryTrace(object):
             session_results = self._execute(
                 SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
-            is_complete = session_results and session_results[0].duration is not None
+            # PYTHON-730: There is race condition that the duration mutation is written before started_at the for fast queries
+            is_complete = session_results and session_results[0].duration is not None and session_results[0].started_at is not None
             if not session_results or (wait_for_complete and not is_complete):
                 time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
                 attempt += 1

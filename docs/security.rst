@@ -74,11 +74,16 @@ For example:
 .. code-block:: python
 
     from cassandra.cluster import Cluster
-    from ssl import PROTOCOL_TLSv1
+    from ssl import PROTOCOL_TLSv1, CERT_REQUIRED
 
-    ssl_opts = {'ca_certs': '/path/to/my/ca.certs',
-                'ssl_version': PROTOCOL_TLSv1}
+    ssl_opts = {
+        'ca_certs': '/path/to/my/ca.certs',
+        'ssl_version': PROTOCOL_TLSv1,
+        'cert_reqs': CERT_REQUIRED  # Certificates are required and validated
+    }
     cluster = Cluster(ssl_options=ssl_opts)
 
-For further reading, Andrew Mussey has published a thorough guide on
+This is only an example to show how to pass the ssl parameters. Consider reading
+the `python ssl documentation <https://docs.python.org/2/library/ssl.html#ssl.wrap_socket>`_ for
+your configuration. For further reading, Andrew Mussey has published a thorough guide on
 `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.

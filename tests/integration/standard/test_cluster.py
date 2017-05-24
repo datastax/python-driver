@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -580,7 +580,20 @@ class ClusterTests(unittest.TestCase):
         check_trace(future.get_query_trace())
         cluster.shutdown()
 
-    def test_trace_timeout(self):
+    def test_trace_unavailable(self):
+        """
+        First checks that TraceUnavailable is arisen if the
+        max_wait parameter is negative
+
+        Then checks that TraceUnavailable is arisen if the
+        result hasn't been set yet
+
+        @since 3.10
+        @jira_ticket PYTHON-196
+        @expected_result TraceUnavailable is arisen in both cases
+
+        @test_category query
+                """
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
@@ -589,6 +602,11 @@ class ClusterTests(unittest.TestCase):
         future = session.execute_async(statement, trace=True)
         future.result()
         self.assertRaises(TraceUnavailable, future.get_query_trace, -1.0)
+
+        query = SimpleStatement("SELECT * FROM system.local")
+        future = session.execute_async(query, trace=True)
+        self.assertRaises(TraceUnavailable, future.get_query_trace, max_wait=120)
+
         cluster.shutdown()
 
     def test_string_coverage(self):
@@ -906,18 +924,17 @@ class ClusterTests(unittest.TestCase):
 
         @test_category config_profiles
         """
+        max_retry_count = 10
+        for i in range(max_retry_count):
+            node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+            with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
+                session = cluster.connect(wait_for_all_pools=True)
+                pools = session.get_pool_state()
+                self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+                self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
 
-        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
-        with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
-            session = cluster.connect(wait_for_all_pools=True)
-            pools = session.get_pool_state()
-            self.assertGreater(len(cluster.metadata.all_hosts()), 2)
-            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
+                node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2', '127.0.0.3']))
 
-            node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
-
-            max_retry_count = 10
-            for i in range(max_retry_count):
                 start = time.time()
                 try:
                     self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile,
@@ -927,8 +944,8 @@ class ClusterTests(unittest.TestCase):
                 except AssertionError:
                     end = time.time()
                     self.assertAlmostEqual(start, end, 1)
-            else:
-                raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
+        else:
+            raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
 
 
 class LocalHostAdressTranslator(AddressTranslator):

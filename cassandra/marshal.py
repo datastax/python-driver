@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -127,20 +127,26 @@ def vints_unpack(term):  # noqa
 def vints_pack(values):
     revbytes = bytearray()
     values = [int(v) for v in values[::-1]]
-    for v in values:
-        v = encode_zig_zag(v)
+    for value in values:
+        v = encode_zig_zag(value)
         if v < 128:
             revbytes.append(v)
         else:
             num_extra_bytes = 0
             num_bits = v.bit_length()
             # We need to reserve (num_extra_bytes+1) bits in the first byte
-            # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX'
-            while num_bits > (8-(num_extra_bytes+1)):
+            # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX' # 2 bits reserved
+            # ie. with 8 extra bytes, the first byte needs to be '11111111'  # 8 bits reserved
+            reserved_bits = num_extra_bytes + 1
+            while num_bits > (8-(reserved_bits)):
                 num_extra_bytes += 1
                 num_bits -= 8
+                reserved_bits = min(num_extra_bytes + 1, 8)
                 revbytes.append(v & 0xff)
                 v >>= 8
+
+            if num_extra_bytes > 8:
+                raise ValueError('Value %d is too big and cannot be encoded as vint' % value)
 
             # We can now store the last bits in the first byte
             n = 8 - num_extra_bytes

@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -105,11 +105,13 @@ class RoundRobinPolicyTest(unittest.TestCase):
         def check_query_plan():
             for i in range(100):
                 qplan = list(policy.make_query_plan())
-                self.assertEqual(sorted(qplan), hosts)
+                self.assertEqual(sorted(qplan), list(hosts))
 
         threads = [Thread(target=check_query_plan) for i in range(4)]
-        map(lambda t: t.start(), threads)
-        map(lambda t: t.join(), threads)
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
     def test_thread_safety_during_modification(self):
         hosts = range(100)
@@ -885,8 +887,8 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2,-1)
 
     def test_schedule_no_max(self):
-        base_delay = 2
-        max_delay = 100
+        base_delay = 2.0
+        max_delay = 100.0
         test_iter = 10000
         policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=None)
         sched_slice = list(islice(policy.new_schedule(), 0, test_iter))
@@ -895,8 +897,8 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertEqual(len(sched_slice), test_iter)
 
     def test_schedule_with_max(self):
-        base_delay = 2
-        max_delay = 100
+        base_delay = 2.0
+        max_delay = 100.0
         max_attempts = 64
         policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts)
         schedule = list(policy.new_schedule())
@@ -908,6 +910,40 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
                 self.assertEqual(delay, schedule[i - 1] * 2)
             else:
                 self.assertEqual(delay, max_delay)
+
+    def test_schedule_exactly_one_attempt(self):
+        base_delay = 2.0
+        max_delay = 100.0
+        max_attempts = 1
+        policy = ExponentialReconnectionPolicy(
+            base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts
+        )
+        self.assertEqual(len(list(policy.new_schedule())), 1)
+
+    def test_schedule_overflow(self):
+        """
+        Test to verify an OverflowError is handled correctly
+        in the ExponentialReconnectionPolicy
+        @since 3.10
+        @jira_ticket PYTHON-707
+        @expected_result all numbers should be less than sys.float_info.max
+        since that's the biggest max we can possibly have as that argument must be a float.
+        Note that is possible for a float to be inf.
+
+        @test_category policy
+        """
+
+        # This should lead to overflow
+        # Note that this may not happen in the fist iterations
+        # as sys.float_info.max * 2 = inf
+        base_delay = sys.float_info.max - 1
+        max_delay = sys.float_info.max
+        max_attempts = 2**12
+        policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts)
+        schedule = list(policy.new_schedule())
+        for number in schedule:
+            self.assertLessEqual(number, sys.float_info.max)
+
 
 ONE = ConsistencyLevel.ONE
 

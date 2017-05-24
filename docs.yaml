@@ -10,7 +10,11 @@ sections:
     prefix: /
     type: sphinx
     directory: docs
+prebuilds:
+  - python setup.py build_ext --inplace --force --no-murmur3 --no-cython
 versions:
+  - name: '3.10'
+    ref: 64572368
   - name: 3.9
     ref: 3.9-doc
   - name: 3.8

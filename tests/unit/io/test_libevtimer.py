@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from mock import patch, Mock
 import time
 
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
+from tests.unit.io.utils import TimerConnectionTests
 from tests import is_monkey_patched
 
 

@@ -1,4 +1,4 @@
-# Copyright 2013-2016 DataStax, Inc.
+# Copyright 2013-2017 DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
+EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
+if "gevent" in EVENT_LOOP_MANAGER:
+    import gevent.monkey
+    gevent.monkey.patch_all()
+    from cassandra.io.geventreactor import GeventConnection
+    connection_class = GeventConnection
+elif "eventlet" in EVENT_LOOP_MANAGER:
+    from eventlet import monkey_patch
+    monkey_patch()
+
+    from cassandra.io.eventletreactor import EventletConnection
+    connection_class = EventletConnection
+elif "async" in EVENT_LOOP_MANAGER:
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+    connection_class = AsyncoreConnection
+elif "twisted" in EVENT_LOOP_MANAGER:
+    from cassandra.io.twistedreactor import TwistedConnection
+    connection_class = TwistedConnection
+else:
+    from cassandra.io.libevreactor import LibevConnection
+    connection_class = LibevConnection
+
+from cassandra.cluster import Cluster
+Cluster.connection_class = connection_class
 
 try:
     import unittest2 as unittest
@@ -18,7 +44,6 @@ except ImportError:
     import unittest  # noqa
 from packaging.version import Version
 import logging
-import os
 import socket
 import sys
 import time
@@ -30,9 +55,8 @@ from itertools import groupby
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
     InvalidRequest
-from cassandra.cluster import Cluster
+
 from cassandra.protocol import ConfigurationException
-from cassandra.policies import RoundRobinPolicy
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
@@ -232,6 +256,8 @@ greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= '2.1', 'Cassandra v
 greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra version 2.2 or greater required')
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
 greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cassandra version 3.6 or greater required')
+greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
+greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'Cassandra version 3.10 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
