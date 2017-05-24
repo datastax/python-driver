@@ -297,7 +297,7 @@ class ClusterTests(unittest.TestCase):
         self.assertFalse(result)
 
         result = session.execute("SELECT * FROM test1rf.test")
-        self.assertEqual([(8889, 8889)], result)
+        self.assertEqual([(8889, 8889)], result, "Rows in ResultSet are {0}".format(result.current_rows))
 
         # test_connect_on_keyspace
         session2 = cluster.connect('test1rf')
