@@ -9,9 +9,9 @@ Releasing
   * When in doubt, follow PEP 440 versioning
 * Add the new version in ``docs.yaml``
 
-* Commit the changelog and version changes
+* Commit the changelog and version changes, e.g. ``git commit -m'version 1.0.0'``
 * Tag the release.  For example: ``git tag -a 1.0.0 -m 'version 1.0.0'``
-* Push the commit and tag: ``git push --tags origin master``
+* Push the tag and new ``master``: ``git push origin 1.0.0 ; git push origin master``
 * Upload the package to pypi::
 
     python setup.py register
