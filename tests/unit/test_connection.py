@@ -358,8 +358,9 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.assertEqual(max_connection.send_msg.call_count, 0)
         self.assertEqual(max_connection.send_msg.call_count, 0)
         max_connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
+        holder.shutdown_on_error = True
         holder.return_connection.assert_has_calls(
-            [call(max_connection, mark_host_down=True)] * get_holders.call_count)
+            [call(max_connection)] * get_holders.call_count)
 
     def test_unexpected_response(self, *args):
         request_id = 999
@@ -387,8 +388,9 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         exc = connection.defunct.call_args_list[0][0][0]
         self.assertIsInstance(exc, ConnectionException)
         self.assertRegexpMatches(exc.args[0], r'^Received unexpected response to OptionsMessage.*')
+        holder.shutdown_on_error = True
         holder.return_connection.assert_has_calls(
-            [call(connection, mark_host_down=True)] * get_holders.call_count)
+            [call(connection)] * get_holders.call_count)
 
     def test_timeout(self, *args):
         request_id = 999
@@ -417,8 +419,9 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.assertIsInstance(exc, OperationTimedOut)
         self.assertEqual(exc.errors, 'Connection heartbeat timeout after 0.05 seconds')
         self.assertEqual(exc.last_host, 'localhost')
+        holder.shutdown_on_error = True
         holder.return_connection.assert_has_calls(
-            [call(connection, mark_host_down=True)] * get_holders.call_count)
+            [call(connection)] * get_holders.call_count)
 
 
 class TimerTest(unittest.TestCase):
