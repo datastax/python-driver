@@ -1,3 +1,10 @@
+3.11
+====
+
+Bug Fixes
+---------
+* is_idempotent flag is not propagated from PreparedStatement to BoundStatement (PYTHON-736)
+
 3.10.0
 ======
 May 24, 2017
