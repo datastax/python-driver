@@ -25,7 +25,6 @@ import six
 from six import BytesIO
 from socket import error as socket_error
 
-from cassandra.io.libevreactor import _cleanup as libev__cleanup
 from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
                                   ConnectionException, ProtocolError)
 
@@ -37,6 +36,7 @@ from tests import is_monkey_patched
 
 
 try:
+    from cassandra.io.libevreactor import _cleanup as libev__cleanup
     from cassandra.io.libevreactor import LibevConnection, LibevLoop
 except ImportError:
     LibevConnection = None  # noqa
