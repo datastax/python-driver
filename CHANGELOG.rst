@@ -4,6 +4,7 @@
 Features
 --------
 * Add idle_heartbeat_timeout cluster option to tune how long to wait for heartbeat responses. (PYTHON-762)
+* Add HostFilterPolicy (PYTHON-761)
 
 Bug Fixes
 ---------
@@ -18,6 +19,10 @@ Other
 -----
 * Bump Cython dependency version to 0.25.2 (PYTHON-754)
 * Fix DeprecationWarning when using lz4 (PYTHON-769)
+
+Other
+-----
+* Deprecate WhiteListRoundRobinPolicy (PYTHON-759)
 
 3.10.0
 ======

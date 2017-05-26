@@ -23,7 +23,8 @@ from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
-                                TokenAwarePolicy, WhiteListRoundRobinPolicy)
+                                TokenAwarePolicy, WhiteListRoundRobinPolicy,
+                                HostFilterPolicy)
 from cassandra.query import SimpleStatement
 
 from tests.integration import use_singledc, use_multidc, remove_cluster, PROTOCOL_VERSION
@@ -665,3 +666,37 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             pass
         finally:
             cluster.shutdown()
+
+    def test_black_list_with_host_filter_policy(self):
+        use_singledc()
+        keyspace = 'test_black_list_with_hfp'
+        ignored_address = (IP_FORMAT % 2)
+        hfp = HostFilterPolicy(
+            child_policy=RoundRobinPolicy(),
+            predicate=lambda host: host.address != ignored_address
+        )
+        cluster = Cluster(
+            (IP_FORMAT % 1,),
+            load_balancing_policy=hfp,
+            protocol_version=PROTOCOL_VERSION,
+            topology_event_refresh_window=0,
+            status_event_refresh_window=0
+        )
+        self.addCleanup(cluster.shutdown)
+        session = cluster.connect()
+        self._wait_for_nodes_up([1, 2, 3])
+
+        self.assertNotIn(ignored_address, [h.address for h in hfp.make_query_plan()])
+
+        create_schema(cluster, session, keyspace)
+        self._insert(session, keyspace)
+        self._query(session, keyspace)
+
+        self.coordinator_stats.assert_query_count_equals(self, 1, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
+
+        # policy should not allow reconnecting to ignored host
+        force_stop(2)
+        self._wait_for_nodes_down([2])
+        self.assertFalse(cluster.metadata._hosts[ignored_address].is_currently_reconnecting())

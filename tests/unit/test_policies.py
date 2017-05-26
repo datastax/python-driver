@@ -18,9 +18,10 @@ except ImportError:
     import unittest  # noqa
 
 from itertools import islice, cycle
-from mock import Mock, patch
+from mock import Mock, patch, call
 from random import randint
 import six
+from six.moves._thread import LockType
 import sys
 import struct
 from threading import Thread
@@ -34,7 +35,7 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 RetryPolicy, WriteType,
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
-                                IdentityTranslator, EC2MultiRegionTranslator)
+                                IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy)
 from cassandra.pool import Host
 from cassandra.query import Statement
 
@@ -1231,6 +1232,23 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
 
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
 
+    def test_deprecated(self):
+        import warnings
+
+        warnings.resetwarnings()  # in case we've instantiated one before
+
+        # set up warning filters to allow all, set up restore when this test is done
+        filters_backup, warnings.filters = warnings.filters, []
+        self.addCleanup(setattr, warnings, 'filters', filters_backup)
+
+        with warnings.catch_warnings(record=True) as caught_warnings:
+            WhiteListRoundRobinPolicy([])
+            self.assertEqual(len(caught_warnings), 1)
+            warning_message = caught_warnings[-1]
+            self.assertEqual(warning_message.category, DeprecationWarning)
+            self.assertIn('4.0', warning_message.message.args[0])
+
+
 class AddressTranslatorTest(unittest.TestCase):
 
     def test_identity_translator(self):
@@ -1243,3 +1261,181 @@ class AddressTranslatorTest(unittest.TestCase):
         translated = ec2t.translate(addr)
         self.assertIsNot(translated, addr)  # verifies that the resolver path is followed
         self.assertEqual(translated, addr)  # and that it resolves to the same address
+
+
+class HostFilterPolicyInitTest(unittest.TestCase):
+
+    def setUp(self):
+        self.child_policy, self.predicate = (Mock(name='child_policy'),
+                                             Mock(name='predicate'))
+
+    def _check_init(self, hfp):
+        self.assertIs(hfp._child_policy, self.child_policy)
+        self.assertIsInstance(hfp._hosts_lock, LockType)
+
+        # we can't use a simple assertIs because we wrap the function
+        arg0, arg1 = Mock(name='arg0'), Mock(name='arg1')
+        hfp.predicate(arg0)
+        hfp.predicate(arg1)
+        self.predicate.assert_has_calls([call(arg0), call(arg1)])
+
+    def test_init_arg_order(self):
+        self._check_init(HostFilterPolicy(self.child_policy, self.predicate))
+
+    def test_init_kwargs(self):
+        self._check_init(HostFilterPolicy(
+            predicate=self.predicate, child_policy=self.child_policy
+        ))
+
+    def test_immutable_predicate(self):
+        expected_message_regex = "can't set attribute"
+        hfp = HostFilterPolicy(child_policy=Mock(name='child_policy'),
+                               predicate=Mock(name='predicate'))
+        with self.assertRaisesRegexp(AttributeError, expected_message_regex):
+            hfp.predicate = object()
+
+
+class HostFilterPolicyDeferralTest(unittest.TestCase):
+
+    def setUp(self):
+        self.passthrough_hfp = HostFilterPolicy(
+            child_policy=Mock(name='child_policy'),
+            predicate=Mock(name='passthrough_predicate',
+                           return_value=True)
+        )
+        self.filterall_hfp = HostFilterPolicy(
+            child_policy=Mock(name='child_policy'),
+            predicate=Mock(name='filterall_predicate',
+                           return_value=False)
+        )
+
+    def _check_host_triggered_method(self, policy, name):
+        arg, kwarg = Mock(name='arg'), Mock(name='kwarg')
+        expect_deferral = policy is self.passthrough_hfp
+        method, child_policy_method = (getattr(policy, name),
+                                       getattr(policy._child_policy, name))
+
+        result = method(arg, kw=kwarg)
+
+        if expect_deferral:
+            # method calls the child policy's method...
+            child_policy_method.assert_called_once_with(arg, kw=kwarg)
+            # and returns its return value
+            self.assertIs(result, child_policy_method.return_value)
+        else:
+            child_policy_method.assert_not_called()
+
+    def test_defer_on_up_to_child_policy(self):
+        self._check_host_triggered_method(self.passthrough_hfp, 'on_up')
+
+    def test_defer_on_down_to_child_policy(self):
+        self._check_host_triggered_method(self.passthrough_hfp, 'on_down')
+
+    def test_defer_on_add_to_child_policy(self):
+        self._check_host_triggered_method(self.passthrough_hfp, 'on_add')
+
+    def test_defer_on_remove_to_child_policy(self):
+        self._check_host_triggered_method(self.passthrough_hfp, 'on_remove')
+
+    def test_filtered_host_on_up_doesnt_call_child_policy(self):
+        self._check_host_triggered_method(self.filterall_hfp, 'on_up')
+
+    def test_filtered_host_on_down_doesnt_call_child_policy(self):
+        self._check_host_triggered_method(self.filterall_hfp, 'on_down')
+
+    def test_filtered_host_on_add_doesnt_call_child_policy(self):
+        self._check_host_triggered_method(self.filterall_hfp, 'on_add')
+
+    def test_filtered_host_on_remove_doesnt_call_child_policy(self):
+        self._check_host_triggered_method(self.filterall_hfp, 'on_remove')
+
+    def _check_check_supported_deferral(self, policy):
+        policy.check_supported()
+        policy._child_policy.check_supported.assert_called_once()
+
+    def test_check_supported_defers_to_child(self):
+        self._check_check_supported_deferral(self.passthrough_hfp)
+
+    def test_check_supported_defers_to_child_when_predicate_filtered(self):
+        self._check_check_supported_deferral(self.filterall_hfp)
+
+
+class HostFilterPolicyDistanceTest(unittest.TestCase):
+
+    def setUp(self):
+        self.hfp = HostFilterPolicy(
+            child_policy=Mock(name='child_policy', distance=Mock(name='distance')),
+            predicate=lambda host: host.address == 'acceptme'
+        )
+        self.ignored_host = Host(inet_address='ignoreme', conviction_policy_factory=Mock())
+        self.accepted_host = Host(inet_address='acceptme', conviction_policy_factory=Mock())
+
+    def test_ignored_with_filter(self):
+        self.assertEqual(self.hfp.distance(self.ignored_host),
+                         HostDistance.IGNORED)
+        self.assertNotEqual(self.hfp.distance(self.accepted_host),
+                            HostDistance.IGNORED)
+
+    def test_accepted_filter_defers_to_child_policy(self):
+        self.hfp._child_policy.distance.side_effect = distances = Mock(), Mock()
+
+        # getting the distance for an ignored host shouldn't affect subsequent results
+        self.hfp.distance(self.ignored_host)
+        # first call of _child_policy with count() side effect
+        self.assertEqual(self.hfp.distance(self.accepted_host), distances[0])
+        # second call of _child_policy with count() side effect
+        self.assertEqual(self.hfp.distance(self.accepted_host), distances[1])
+
+
+class HostFilterPolicyPopulateTest(unittest.TestCase):
+
+    def test_populate_deferred_to_child(self):
+        hfp = HostFilterPolicy(
+            child_policy=Mock(name='child_policy'),
+            predicate=lambda host: True
+        )
+        mock_cluster, hosts = (Mock(name='cluster'),
+                               ['host1', 'host2', 'host3'])
+        hfp.populate(mock_cluster, hosts)
+        hfp._child_policy.populate.assert_called_once_with(
+            cluster=mock_cluster,
+            hosts=hosts
+        )
+
+    def test_child_not_populated_with_filtered_hosts(self):
+        hfp = HostFilterPolicy(
+            child_policy=Mock(name='child_policy'),
+            predicate=lambda host: 'acceptme' in host
+        )
+        mock_cluster, hosts = (Mock(name='cluster'),
+                               ['acceptme0', 'ignoreme0', 'ignoreme1', 'acceptme1'])
+        hfp.populate(mock_cluster, hosts)
+        hfp._child_policy.populate.assert_called_once()
+        self.assertEqual(
+            hfp._child_policy.populate.call_args[1]['hosts'],
+            ['acceptme0', 'acceptme1']
+        )
+
+
+class HostFilterPolicyQueryPlanTest(unittest.TestCase):
+
+    def test_query_plan_deferred_to_child(self):
+        child_policy = Mock(
+            name='child_policy',
+            make_query_plan=Mock(
+                return_value=[object(), object(), object()]
+            )
+        )
+        hfp = HostFilterPolicy(
+            child_policy=child_policy,
+            predicate=lambda host: True
+        )
+        working_keyspace, query = (Mock(name='working_keyspace'),
+                                   Mock(name='query'))
+        qp = list(hfp.make_query_plan(working_keyspace=working_keyspace,
+                                      query=query))
+        hfp._child_policy.make_query_plan.assert_called_once_with(
+            working_keyspace=working_keyspace,
+            query=query
+        )
+        self.assertEqual(qp, hfp._child_policy.make_query_plan.return_value)

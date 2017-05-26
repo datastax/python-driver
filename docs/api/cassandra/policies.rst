@@ -24,6 +24,14 @@ Load Balancing
 .. autoclass:: TokenAwarePolicy
    :members:
 
+.. autoclass:: HostFilterPolicy
+
+   # we document these methods manually so we can specify a param to predicate
+
+   .. automethod:: predicate(host)
+   .. automethod:: distance
+   .. automethod:: make_query_plan
+
 Translating Server Node Addresses
 ---------------------------------
 
