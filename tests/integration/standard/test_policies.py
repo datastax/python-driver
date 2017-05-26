@@ -113,7 +113,7 @@ class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
             result = self.session.execute(statement, execution_profile='spec_ep_rr', timeout=.5)
 
         # PYTHON-736 Test speculation policy works with a prepared statement
-        statement = self.session.prepare("SELECT timeout(100) FROM d WHERE k = ?")
+        statement = self.session.prepare("SELECT timeout(i) FROM d WHERE k = ?")
         # non-idempotent
         result = self.session.execute(statement, (0,), execution_profile='spec_ep_brr')
         self.assertEqual(1, len(result.response_future.attempted_hosts))
