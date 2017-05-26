@@ -421,7 +421,6 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy.on_up(hosts[2])
         policy.on_up(hosts[3])
 
-
         another_host = Host(5, SimpleConvictionPolicy)
         another_host.set_location_info("dc3", "rack1")
         new_host.set_location_info("dc3", "rack1")
@@ -755,7 +754,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         @test_category policy
         """
         self._assert_shuffle(keyspace=None, routing_key='routing_key')
- 
+
     def test_no_shuffle_if_given_no_routing_key(self):
         """
         Test to validate the hosts are not shuffled when no routing_key is provided
@@ -766,7 +765,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         @test_category policy
         """
         self._assert_shuffle(keyspace='keyspace', routing_key=None)
- 
+
     @patch('cassandra.policies.shuffle')
     def _assert_shuffle(self, patched_shuffle, keyspace, routing_key):
         hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
@@ -884,7 +883,7 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, -1, 0)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 0, -1)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 9000, 1)
-        self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2,-1)
+        self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2, -1)
 
     def test_schedule_no_max(self):
         base_delay = 2.0
@@ -1235,8 +1234,7 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
 class AddressTranslatorTest(unittest.TestCase):
 
     def test_identity_translator(self):
-        it = IdentityTranslator()
-        addr = '127.0.0.1'
+        IdentityTranslator()
 
     @patch('socket.getfqdn', return_value='localhost')
     def test_ec2_multi_region_translator(self, *_):

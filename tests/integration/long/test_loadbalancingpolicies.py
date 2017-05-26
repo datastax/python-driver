@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct, time, logging, sys, traceback
+import logging
+import struct
+import sys
+import traceback
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile
+from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
@@ -40,7 +43,7 @@ log = logging.getLogger(__name__)
 class LoadBalancingPolicyTests(unittest.TestCase):
 
     def setUp(self):
-        remove_cluster() # clear ahead of test so it doesn't use one left in unknown state
+        remove_cluster()  # clear ahead of test so it doesn't use one left in unknown state
         self.coordinator_stats = CoordinatorStats()
         self.prepared = None
         self.probe_cluster = None
@@ -105,7 +108,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             query_string = 'SELECT * FROM %s.cf WHERE k = ?' % keyspace
             if not self.prepared or self.prepared.query_string != query_string:
                 self.prepared = session.prepare(query_string)
-                self.prepared.consistency_level=consistency_level
+                self.prepared.consistency_level = consistency_level
             for i in range(count):
                 tries = 0
                 while True:
@@ -508,7 +511,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.coordinator_stats.reset_counts()
         stop(2)
-        self._wait_for_nodes_down([2],cluster)
+        self._wait_for_nodes_down([2], cluster)
 
         self._query(session, keyspace)
 

@@ -619,6 +619,7 @@ class WriteType(object):
     A lighweight-transaction write, such as "DELETE ... IF EXISTS".
     """
 
+
 WriteType.name_to_value = {
     'SIMPLE': WriteType.SIMPLE,
     'BATCH': WriteType.BATCH,
