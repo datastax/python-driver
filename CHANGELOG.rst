@@ -5,6 +5,10 @@ Bug Fixes
 ---------
 * is_idempotent flag is not propagated from PreparedStatement to BoundStatement (PYTHON-736)
 
+Other
+-----
+* Bump Cython dependency version to 0.25.2 (PYTHON-754)
+
 3.10.0
 ======
 May 24, 2017
