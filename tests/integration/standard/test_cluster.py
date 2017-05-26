@@ -192,13 +192,23 @@ class ClusterTests(unittest.TestCase):
 
         @test_category connection
         """
+        # Test with empty list
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(Cluster(protocol_version=PROTOCOL_VERSION), [])
+            Session(cluster, [])
+        cluster.shutdown()
+
+        # Test with only invalid
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host("1.2.3.4", SimpleConvictionPolicy)])
-        session = Session(Cluster(protocol_version=PROTOCOL_VERSION), [Host(x, SimpleConvictionPolicy) for x in
+            Session(cluster, [Host("1.2.3.4", SimpleConvictionPolicy)])
+        cluster.shutdown()
+
+        # Test with valid and invalid hosts
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        Session(cluster, [Host(x, SimpleConvictionPolicy) for x in
                                       ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
-        session.shutdown()
+        cluster.shutdown()
 
     def test_protocol_negotiation(self):
         """
@@ -282,15 +292,15 @@ class ClusterTests(unittest.TestCase):
         session = cluster.connect()
         result = session.execute(
             """
-            INSERT INTO test3rf.test (k, v) VALUES (8889, 8889)
+            INSERT INTO test1rf.test (k, v) VALUES (8889, 8889)
             """)
         self.assertFalse(result)
 
-        result = session.execute("SELECT * FROM test3rf.test")
-        self.assertEqual([(8889, 8889)], result)
+        result = session.execute("SELECT * FROM test1rf.test")
+        self.assertEqual([(8889, 8889)], result, "Rows in ResultSet are {0}".format(result.current_rows))
 
         # test_connect_on_keyspace
-        session2 = cluster.connect('test3rf')
+        session2 = cluster.connect('test1rf')
         result2 = session2.execute("SELECT * FROM test")
         self.assertEqual(result, result2)
         cluster.shutdown()

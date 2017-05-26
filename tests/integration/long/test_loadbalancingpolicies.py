@@ -16,7 +16,7 @@ import struct, time, logging, sys, traceback
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
-from cassandra.cluster import Cluster, NoHostAvailable, Session
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
@@ -475,9 +475,19 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                                    '(k1, k2, i) '
                                    'VALUES '
                                    '(?, ?, ?)' % table)
-        session.execute(prepared.bind((1, 2, 3)))
+        bound = prepared.bind((1, 2, 3))
+        result = session.execute(bound)
+        self.assertIn(result.response_future.attempted_hosts[0],
+                      cluster.metadata.get_replicas(keyspace, bound.routing_key))
 
-        results = session.execute('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table)
+        # There could be race condition with querying a node
+        # which doesn't yet have the data so we query one of
+        # the replicas
+        results = session.execute(SimpleStatement('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table,
+                                                  routing_key=bound.routing_key))
+        self.assertIn(results.response_future.attempted_hosts[0],
+                      cluster.metadata.get_replicas(keyspace, bound.routing_key))
+
         self.assertTrue(results[0].i)
 
         cluster.shutdown()

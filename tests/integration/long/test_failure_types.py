@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys,logging, traceback, time
+import sys,logging, traceback, time, re
 
 from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
                        FunctionFailure, ProtocolVersion)
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.policies import WhiteListRoundRobinPolicy
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node
@@ -134,7 +135,7 @@ class ClientExceptionTests(unittest.TestCase):
         # Ensure all nodes not on the list, but that are currently set to failing are enabled
         for node in self.nodes_currently_failing:
             if node not in failing_nodes:
-                node.stop(wait_other_notice=True, gently=False)
+                node.stop(wait_other_notice=True, gently=True)
                 node.start(wait_for_binary_proto=True, wait_other_notice=True)
                 self.nodes_currently_failing.remove(node)
 
@@ -324,22 +325,28 @@ class TimeoutTimerTest(unittest.TestCase):
         """
 
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
-        self.node1 = get_node(1)
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        self.session = self.cluster.connect()
+
+        node1 = ExecutionProfile(
+            load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1'])
+        )
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: node1})
+        self.session = self.cluster.connect(wait_for_all_pools=True)
+
+        self.control_connection_host_number = 1
+        self.node_to_stop = get_node(self.control_connection_host_number)
 
         ddl = '''
             CREATE TABLE test3rf.timeout (
                 k int PRIMARY KEY,
                 v int )'''
         self.session.execute(ddl)
-        self.node1.pause()
+        self.node_to_stop.pause()
 
     def tearDown(self):
         """
         Shutdown cluster and resume node1
         """
-        self.node1.resume()
+        self.node_to_stop.resume()
         self.session.execute("DROP TABLE test3rf.timeout")
         self.cluster.shutdown()
 

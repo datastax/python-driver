@@ -529,11 +529,17 @@ def setup_keyspace(ipformat=None, wait=True):
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
         execute_with_long_wait_retry(session, ddl)
 
-        ddl = '''
+        ddl_3f = '''
             CREATE TABLE test3rf.test (
                 k int PRIMARY KEY,
                 v int )'''
-        execute_with_long_wait_retry(session, ddl)
+        execute_with_long_wait_retry(session, ddl_3f)
+
+        ddl_1f = '''
+                    CREATE TABLE test1rf.test (
+                        k int PRIMARY KEY,
+                        v int )'''
+        execute_with_long_wait_retry(session, ddl_1f)
 
     except Exception:
         traceback.print_exc()
@@ -675,7 +681,7 @@ class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
         drop_keyspace_shutdown_cluster(cls.ks_name, cls.session, cls.cluster)
 
 
-class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
+class BasicSharedKeyspaceUnitTestCaseRF1(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
     creates a keyspace named after the testclass with a rf of 1, and a table named after the class
@@ -695,16 +701,6 @@ class BasicSharedKeyspaceUnitTestCaseRF2(BasicSharedKeyspaceUnitTestCase):
         self.common_setup(2)
 
 
-class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
-    """
-    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
-    creates a keyspace named after the testc lass with a rf of 2, and a table named after the class
-    """
-    @classmethod
-    def setUpClass(self):
-        self.common_setup(3, True, True, True)
-
-
 class BasicSharedKeyspaceUnitTestCaseRF3(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
@@ -715,14 +711,14 @@ class BasicSharedKeyspaceUnitTestCaseRF3(BasicSharedKeyspaceUnitTestCase):
         self.common_setup(3)
 
 
-class BasicSharedKeyspaceUnitTestCaseRF3WTable(BasicSharedKeyspaceUnitTestCase):
+class BasicSharedKeyspaceUnitTestCaseRF3WM(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
-    creates a keyspace named after the test class with a rf of 3 and a table named after the class
+    creates a keyspace named after the test class with a rf of 3 with metrics enabled
     """
     @classmethod
     def setUpClass(self):
-        self.common_setup(3, True)
+        self.common_setup(3, True, True, True)
 
 
 class BasicSharedKeyspaceUnitTestCaseWFunctionTable(BasicSharedKeyspaceUnitTestCase):

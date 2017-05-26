@@ -28,7 +28,7 @@ from cassandra.protocol import SyntaxException
 from cassandra.cluster import Cluster, NoHostAvailable
 from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
 from greplin import scales
-from tests.integration import BasicSharedKeyspaceUnitTestCaseWTable, BasicExistingKeyspaceUnitTestCase, local
+from tests.integration import BasicSharedKeyspaceUnitTestCaseRF3WM, BasicExistingKeyspaceUnitTestCase, local
 
 def setup_module():
     use_singledc()
@@ -146,7 +146,7 @@ class MetricsTests(unittest.TestCase):
         # Sometimes this commands continues with the other nodes having not noticed
         # 1 is down, and a Timeout error is returned instead of an Unavailable
         get_node(1).stop(wait=True, wait_other_notice=True)
-
+        time.sleep(5)
         try:
             # Test write
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
@@ -179,7 +179,7 @@ class MetricsTests(unittest.TestCase):
     #     pass
 
 
-class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
+class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
     @local
     def test_metrics_per_cluster(self):
         """
