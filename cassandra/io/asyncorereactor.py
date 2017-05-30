@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import atexit
+# import atexit
 from collections import deque
 from functools import partial
 import logging
@@ -200,7 +200,11 @@ class AsyncoreLoop(object):
             dispatcher = _BusyWaitDispatcher()
         self._loop_dispatcher = dispatcher
 
-        atexit.register(partial(_cleanup, weakref.ref(self)))
+        # XXX this can cause AsynccoreConnection in flight to never complete
+        #     this is seen when the loop exits from a shutdown, an underlying
+        #     AsynccoreConnection completes auth successfully then blocks on
+        #     a keyspace query. At this point the program is hung during atexit.
+        # atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
         should_start = False
