@@ -21,6 +21,7 @@ from binascii import unhexlify
 from mock import Mock
 import os
 import six
+import sys
 import timeit
 
 import cassandra
@@ -335,10 +336,16 @@ class Murmur3TokensTest(unittest.TestCase):
 
     def _verify_hash(self, fn):
         self.assertEqual(fn(six.b('123')), -7468325962851647638)
-        self.assertEqual(fn(b'\x00\xff\x10\xfa\x99' * 10), 5837342703291459765)
         self.assertEqual(fn(b'\xfe' * 8), -8927430733708461935)
         self.assertEqual(fn(b'\x10' * 8), 1446172840243228796)
-        self.assertEqual(fn(six.b(str(cassandra.metadata.MAX_LONG))), 7162290910810015547)
+        # Because Murmur algorithm is optimized for different platforms,
+        # it produces different results on little/big endian systems
+        if sys.byteorder == 'little':
+            self.assertEqual(fn(b'\x00\xff\x10\xfa\x99' * 10), 5837342703291459765)
+            self.assertEqual(fn(six.b(str(cassandra.metadata.MAX_LONG))), 7162290910810015547)
+        elif sys.byteorder == 'big':
+            self.assertEqual(fn(b'\x00\xff\x10\xfa\x99' * 10), 7344307397358811229)
+            self.assertEqual(fn(six.b(str(cassandra.metadata.MAX_LONG))), 4310195068031998765)
 
 
 class MD5TokensTest(unittest.TestCase):
