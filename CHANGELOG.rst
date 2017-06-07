@@ -4,6 +4,7 @@
 Bug Fixes
 ---------
 * is_idempotent flag is not propagated from PreparedStatement to BoundStatement (PYTHON-736)
+* Fix asyncore hang on exit (PYTHON-767)
 
 Other
 -----
