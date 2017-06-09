@@ -5,6 +5,7 @@ Bug Fixes
 ---------
 * is_idempotent flag is not propagated from PreparedStatement to BoundStatement (PYTHON-736)
 * Fix asyncore hang on exit (PYTHON-767)
+* Driver takes several minutes to remove a bad host from session (PYTHON-762)
 
 Other
 -----

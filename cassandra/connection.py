@@ -990,11 +990,14 @@ class ConnectionHeartbeat(Thread):
                             owner.return_connection(connection)
                     self._raise_if_stopped()
 
+                # Wait max `self._interval` seconds for all HeartbeatFutures to complete
+                timeout = self._interval
+                start_time = time.time()
                 for f in futures:
                     self._raise_if_stopped()
                     connection = f.connection
                     try:
-                        f.wait(self._interval)
+                        f.wait(timeout)
                         # TODO: move this, along with connection locks in pool, down into Connection
                         with connection.lock:
                             connection.in_flight -= 1
@@ -1003,6 +1006,8 @@ class ConnectionHeartbeat(Thread):
                         log.warning("Heartbeat failed for connection (%s) to %s",
                                     id(connection), connection.host)
                         failed_connections.append((f.connection, f.owner, e))
+
+                    timeout = self._interval - (time.time() - start_time)
 
                 for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
