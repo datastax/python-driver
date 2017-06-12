@@ -348,6 +348,13 @@ def pre_build_check():
         compiler = new_compiler(compiler=be.compiler)
         customize_compiler(compiler)
 
+        try:
+            # We must be able to initialize the compiler if it has that method
+            if hasattr(compiler, "initialize"):
+                compiler.initialize()
+        except:
+            return False
+
         executables = []
         if compiler.compiler_type in ('unix', 'cygwin'):
             executables = [compiler.executables[exe][0] for exe in ('compiler_so', 'linker_so')]
