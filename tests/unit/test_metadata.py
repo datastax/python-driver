@@ -84,23 +84,23 @@ class StrategiesTest(unittest.TestCase):
     def test_nts_make_token_replica_map(self):
         token_to_host_owner = {}
 
-        dc1_1 = Host('dc1.1', SimpleConvictionPolicy)
-        dc1_2 = Host('dc1.2', SimpleConvictionPolicy)
-        dc1_3 = Host('dc1.3', SimpleConvictionPolicy)
+        dc1_1 = Host('dc1.1', SimpleConvictionPolicy, 9042)
+        dc1_2 = Host('dc1.2', SimpleConvictionPolicy, 9042)
+        dc1_3 = Host('dc1.3', SimpleConvictionPolicy, 9042)
         for host in (dc1_1, dc1_2, dc1_3):
             host.set_location_info('dc1', 'rack1')
         token_to_host_owner[MD5Token(0)] = dc1_1
         token_to_host_owner[MD5Token(100)] = dc1_2
         token_to_host_owner[MD5Token(200)] = dc1_3
 
-        dc2_1 = Host('dc2.1', SimpleConvictionPolicy)
-        dc2_2 = Host('dc2.2', SimpleConvictionPolicy)
+        dc2_1 = Host('dc2.1', SimpleConvictionPolicy, 9042)
+        dc2_2 = Host('dc2.2', SimpleConvictionPolicy, 9042)
         dc2_1.set_location_info('dc2', 'rack1')
         dc2_2.set_location_info('dc2', 'rack1')
         token_to_host_owner[MD5Token(1)] = dc2_1
         token_to_host_owner[MD5Token(101)] = dc2_2
 
-        dc3_1 = Host('dc3.1', SimpleConvictionPolicy)
+        dc3_1 = Host('dc3.1', SimpleConvictionPolicy, 9042)
         dc3_1.set_location_info('dc3', 'rack3')
         token_to_host_owner[MD5Token(2)] = dc3_1
 
@@ -135,7 +135,7 @@ class StrategiesTest(unittest.TestCase):
         vnodes_per_host = 500
         for i in range(dc1hostnum):
 
-            host = Host('dc1.{0}'.format(i), SimpleConvictionPolicy)
+            host = Host('dc1.{0}'.format(i), SimpleConvictionPolicy, 9042)
             host.set_location_info('dc1', "rack1")
             for vnode_num in range(vnodes_per_host):
                 md5_token = MD5Token(current_token+vnode_num)
@@ -159,10 +159,10 @@ class StrategiesTest(unittest.TestCase):
         token_to_host_owner = {}
 
         # (A) not enough distinct racks, first skipped is used
-        dc1_1 = Host('dc1.1', SimpleConvictionPolicy)
-        dc1_2 = Host('dc1.2', SimpleConvictionPolicy)
-        dc1_3 = Host('dc1.3', SimpleConvictionPolicy)
-        dc1_4 = Host('dc1.4', SimpleConvictionPolicy)
+        dc1_1 = Host('dc1.1', SimpleConvictionPolicy, 9042)
+        dc1_2 = Host('dc1.2', SimpleConvictionPolicy, 9042)
+        dc1_3 = Host('dc1.3', SimpleConvictionPolicy, 9042)
+        dc1_4 = Host('dc1.4', SimpleConvictionPolicy, 9042)
         dc1_1.set_location_info('dc1', 'rack1')
         dc1_2.set_location_info('dc1', 'rack1')
         dc1_3.set_location_info('dc1', 'rack2')
@@ -173,9 +173,9 @@ class StrategiesTest(unittest.TestCase):
         token_to_host_owner[MD5Token(300)] = dc1_4
 
         # (B) distinct racks, but not contiguous
-        dc2_1 = Host('dc2.1', SimpleConvictionPolicy)
-        dc2_2 = Host('dc2.2', SimpleConvictionPolicy)
-        dc2_3 = Host('dc2.3', SimpleConvictionPolicy)
+        dc2_1 = Host('dc2.1', SimpleConvictionPolicy, 9042)
+        dc2_2 = Host('dc2.2', SimpleConvictionPolicy, 9042)
+        dc2_3 = Host('dc2.3', SimpleConvictionPolicy, 9042)
         dc2_1.set_location_info('dc2', 'rack1')
         dc2_2.set_location_info('dc2', 'rack1')
         dc2_3.set_location_info('dc2', 'rack2')
@@ -198,7 +198,7 @@ class StrategiesTest(unittest.TestCase):
         self.assertItemsEqual(token_replicas, (dc1_1, dc1_2, dc1_3, dc2_1, dc2_3))
 
     def test_nts_make_token_replica_map_empty_dc(self):
-        host = Host('1', SimpleConvictionPolicy)
+        host = Host('1', SimpleConvictionPolicy, 9042)
         host.set_location_info('dc1', 'rack1')
         token_to_host_owner = {MD5Token(0): host}
         ring = [MD5Token(0)]
@@ -213,9 +213,9 @@ class StrategiesTest(unittest.TestCase):
                          strategy.export_for_schema())
 
     def test_simple_strategy_make_token_replica_map(self):
-        host1 = Host('1', SimpleConvictionPolicy)
-        host2 = Host('2', SimpleConvictionPolicy)
-        host3 = Host('3', SimpleConvictionPolicy)
+        host1 = Host('1', SimpleConvictionPolicy, 9042)
+        host2 = Host('2', SimpleConvictionPolicy, 9042)
+        host3 = Host('3', SimpleConvictionPolicy, 9042)
         token_to_host_owner = {
             MD5Token(0): host1,
             MD5Token(100): host2,
@@ -305,7 +305,7 @@ class NameEscapingTest(unittest.TestCase):
 class GetReplicasTest(unittest.TestCase):
     def _get_replicas(self, token_klass):
         tokens = [token_klass(i) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
-        hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
+        hosts = [Host("ip%d" % i, SimpleConvictionPolicy, 9042) for i in range(len(tokens))]
         token_to_primary_replica = dict(zip(tokens, hosts))
         keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
         metadata = Mock(spec=Metadata, keyspaces={'ks': keyspace})
@@ -560,8 +560,8 @@ class HostsTests(unittest.TestCase):
         PYTHON-572
         """
         metadata = Metadata()
-        metadata.add_or_return_host(Host('dc1.1', SimpleConvictionPolicy))
-        metadata.add_or_return_host(Host('dc1.2', SimpleConvictionPolicy))
+        metadata.add_or_return_host(Host('dc1.1', SimpleConvictionPolicy, 9042))
+        metadata.add_or_return_host(Host('dc1.2', SimpleConvictionPolicy, 9042))
 
         self.assertEqual(len(metadata.all_hosts()), 2)
 

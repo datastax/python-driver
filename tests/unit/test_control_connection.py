@@ -34,9 +34,9 @@ class MockMetadata(object):
 
     def __init__(self):
         self.hosts = {
-            "192.168.1.0": Host("192.168.1.0", SimpleConvictionPolicy),
-            "192.168.1.1": Host("192.168.1.1", SimpleConvictionPolicy),
-            "192.168.1.2": Host("192.168.1.2", SimpleConvictionPolicy)
+            ("192.168.1.0", 9042): Host("192.168.1.0", SimpleConvictionPolicy, 9042),
+            ("192.168.1.1", 9042): Host("192.168.1.1", SimpleConvictionPolicy, 9042),
+            ("192.168.1.2", 9042): Host("192.168.1.2", SimpleConvictionPolicy, 9042)
         }
         for host in self.hosts.values():
             host.set_up()
@@ -46,6 +46,8 @@ class MockMetadata(object):
         self.token_map = {}
 
     def get_host(self, rpc_address):
+        if not isinstance(rpc_address, tuple):
+            return self.hosts.get((rpc_address, 9042))
         return self.hosts.get(rpc_address)
 
     def all_hosts(self):
@@ -65,6 +67,9 @@ class MockCluster(object):
     down_host = None
     contact_points = []
     is_shutdown = False
+    port = 9042
+    protocol_version = 5
+    allow_server_port_discovery = False
 
     def __init__(self):
         self.metadata = MockMetadata()
@@ -74,10 +79,10 @@ class MockCluster(object):
         self.executor = Mock(spec=ThreadPoolExecutor)
         self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(RoundRobinPolicy())
 
-    def add_host(self, address, datacenter, rack, signal=False, refresh_nodes=True):
-        host = Host(address, SimpleConvictionPolicy, datacenter, rack)
+    def add_host(self, address, port, datacenter, rack, signal=False, refresh_nodes=True):
+        host = Host(address, SimpleConvictionPolicy, port, datacenter, rack)
         self.added_hosts.append(host)
-        return host
+        return host, None
 
     def remove_host(self, host):
         self.removed_hosts.append(host)
@@ -92,6 +97,7 @@ class MockCluster(object):
 class MockConnection(object):
 
     is_defunct = False
+    port = 9042
 
     def __init__(self):
         self.host = "192.168.1.0"
@@ -105,6 +111,14 @@ class MockConnection(object):
             [["192.168.1.1", "10.0.0.1", "a", "dc1", "rack1", ["1", "101", "201"]],
              ["192.168.1.2", "10.0.0.2", "a", "dc1", "rack1", ["2", "102", "202"]]]
         ]
+
+        #%The new schema version
+        self.peer_results_v2 = [
+            ["native_address",  "native_port", "peer", "peer_port", "schema_version", "data_center", "rack", "tokens"],
+            [["192.168.1.1", 9042, "10.0.0.1", 7042, "a", "dc1", "rack1", ["1", "101", "201"]],
+             ["192.168.1.2", 9042, "10.0.0.2", 7040, "a", "dc1", "rack1", ["2", "102", "202"]]]
+        ]
+
         local_response = ResultMessage(
             kind=RESULT_KIND_ROWS, results=self.local_results)
         peer_response = ResultMessage(
@@ -224,7 +238,7 @@ class ControlConnectionTest(unittest.TestCase):
 
         # change the schema version on one of the existing entries
         self.connection.peer_results[1][1][3] = 'c'
-        self.cluster.metadata.get_host('192.168.1.1').is_up = False
+        self.cluster.metadata.get_host(('192.168.1.1', 9042)).is_up = False
 
         self.assertTrue(self.control_connection.wait_for_schema_agreement())
         self.assertEqual(self.time.clock, 0)
@@ -236,8 +250,8 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.peer_results[1].append(
             ["0.0.0.0", PEER_IP, "b", "dc1", "rack1", ["3", "103", "203"]]
         )
-        host = Host("0.0.0.0", SimpleConvictionPolicy)
-        self.cluster.metadata.hosts[PEER_IP] = host
+        host = Host("0.0.0.0", SimpleConvictionPolicy, 9042)
+        self.cluster.metadata.hosts[(PEER_IP, 9042)] = host
         host.is_up = False
 
         # even though the new host has a different schema version, it's
@@ -308,6 +322,8 @@ class ControlConnectionTest(unittest.TestCase):
             ["192.168.1.3", "10.0.0.3", "a", "dc1", "rack1", ["3", "103", "203"]]
         )
         self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
+        #print "Cluster protocol version %d and connection protocol version %d" % (self.cluster.protocol_version, self.connection.protocol_version)
+        print "Cluster protocol version %d" % (self.cluster.protocol_version)
         self.control_connection.refresh_node_list_and_token_map()
         self.assertEqual(1, len(self.cluster.added_hosts))
         self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
@@ -348,7 +364,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, ('1.2.3.4', 9000))
 
         event = {
             'change_type': 'REMOVED_NODE',
@@ -364,12 +380,12 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, ('1.2.3.4', 9000))
 
     def test_handle_status_change(self):
         event = {
             'change_type': 'UP',
-            'address': ('1.2.3.4', 9000)
+            'address': ('1.2.3.4', 9042)
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_status_change(event)
@@ -378,17 +394,17 @@ class ControlConnectionTest(unittest.TestCase):
         # do the same with a known Host
         event = {
             'change_type': 'UP',
-            'address': ('192.168.1.0', 9000)
+            'address': ('192.168.1.0', 9042)
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_status_change(event)
-        host = self.cluster.metadata.hosts['192.168.1.0']
+        host = self.cluster.metadata.hosts[('192.168.1.0', 9042)]
         self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.cluster.on_up, host)
 
         self.cluster.scheduler.schedule.reset_mock()
         event = {
             'change_type': 'DOWN',
-            'address': ('1.2.3.4', 9000)
+            'address': ('1.2.3.4', 9042)
         }
         self.control_connection._handle_status_change(event)
         self.assertFalse(self.cluster.scheduler.schedule.called)
@@ -396,10 +412,10 @@ class ControlConnectionTest(unittest.TestCase):
         # do the same with a known Host
         event = {
             'change_type': 'DOWN',
-            'address': ('192.168.1.0', 9000)
+            'address': ('192.168.1.0', 9042)
         }
         self.control_connection._handle_status_change(event)
-        host = self.cluster.metadata.hosts['192.168.1.0']
+        host = self.cluster.metadata.hosts[('192.168.1.0', 9042)]
         self.assertIs(host, self.cluster.down_host)
 
     def test_handle_schema_change(self):
@@ -454,7 +470,7 @@ class ControlConnectionTest(unittest.TestCase):
         cc_no_schema_refresh._handle_status_change(status_event)
         cc_no_schema_refresh._handle_topology_change(topo_event)
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map),
-                                                            call(ANY, cc_no_schema_refresh._refresh_nodes_if_not_up, '1.2.3.4')])
+                                                            call(ANY, cc_no_schema_refresh._refresh_nodes_if_not_up, ('1.2.3.4', 9000))])
 
         cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1, 0)
         cluster.scheduler.reset_mock()
@@ -470,6 +486,58 @@ class ControlConnectionTest(unittest.TestCase):
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_topo_refresh.refresh_node_list_and_token_map),
                                                             call(0.0, cc_no_topo_refresh.refresh_schema,
                                                                  **schema_event)])
+
+    def test_refresh_nodes_and_tokens_add_host2(self):
+        self.connection.peer_results[1].append(
+            ["192.168.1.3", "10.0.0.3", "a", "dc1", "rack1", ["3", "103", "203"]]
+        )
+        self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
+        # print "Cluster protocol version %d and connection protocol version %d" % (self.cluster.protocol_version, self.connection.protocol_version)
+        print "Cluster protocol version %d" % (self.cluster.protocol_version)
+        self.control_connection.refresh_node_list_and_token_map()
+        self.assertEqual(1, len(self.cluster.added_hosts))
+        self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
+        self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
+        self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
+
+    def test_refresh_nodes_and_tokens_add_host_detects_port(self):
+        self.cluster.allow_server_port_discovery = True
+        del self.connection.peer_results[:]
+        self.connection.peer_results.extend(self.connection.peer_results_v2)
+        self.connection.peer_results[1].append(
+            ["192.168.1.3", 666, "10.0.0.3", 666, "a", "dc1", "rack1", ["3", "103", "203"]]
+        )
+        self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
+        # print "Cluster protocol version %d and connection protocol version %d" % (self.cluster.protocol_version, self.connection.protocol_version)
+        print "Cluster protocol version %d" % (self.cluster.protocol_version)
+        self.control_connection.refresh_node_list_and_token_map()
+        self.assertEqual(1, len(self.cluster.added_hosts))
+        self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
+        self.assertEqual(self.cluster.added_hosts[0].rpc_port, 666)
+        self.assertEquals(self.cluster.added_hosts[0].broadcast_port, 666)
+        self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
+        self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
+
+    #Shouldn't detect the RPC port if allow_server_port_discovery is false
+    def test_refresh_nodes_and_tokens_add_host_doesnt_detect_port(self):
+        self.cluster.allow_server_port_discovery = False
+        del self.connection.peer_results[:]
+        self.connection.peer_results.extend(self.connection.peer_results_v2)
+        self.connection.peer_results[1].append(
+            ["192.168.1.3", 666, "10.0.0.3", 666, "a", "dc1", "rack1", ["3", "103", "203"]]
+        )
+        self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
+        # print "Cluster protocol version %d and connection protocol version %d" % (self.cluster.protocol_version, self.connection.protocol_version)
+        print "Cluster protocol version %d" % (self.cluster.protocol_version)
+        self.control_connection.refresh_node_list_and_token_map()
+        self.assertEqual(1, len(self.cluster.added_hosts))
+        self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
+        #rpc_port is not detected from the cluster since we need to connect to the configured port
+        self.assertEqual(self.cluster.added_hosts[0].rpc_port, 9042)
+        #we still detect the cluster supplied broadcast_port
+        self.assertEquals(self.cluster.added_hosts[0].broadcast_port, 666)
+        self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
+        self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
 
 
 class EventTimingTest(unittest.TestCase):

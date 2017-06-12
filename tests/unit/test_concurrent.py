@@ -250,7 +250,7 @@ class ConcurrencyTest((unittest.TestCase)):
         PYTHON-585
         """
         max_recursion = sys.getrecursionlimit()
-        s = Session(Cluster(), [Host("127.0.0.1", SimpleConvictionPolicy)])
+        s = Session(Cluster(), [Host("127.0.0.1", SimpleConvictionPolicy, 9042)])
         self.assertRaises(TypeError, execute_concurrent_with_args, s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=True)
 
         results = execute_concurrent_with_args(s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=False)  # previously

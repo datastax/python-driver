@@ -159,12 +159,17 @@ class ProtocolVersion(object):
     v5, in beta from 3.x+
     """
 
-    SUPPORTED_VERSIONS = (V5, V4, V3, V2, V1)
+    V6 = 6
+    """
+    v6, in beta from 4.0+
+    """
+
+    SUPPORTED_VERSIONS = (V6, V5, V4, V3, V2, V1)
     """
     A tuple of all supported protocol versions
     """
 
-    BETA_VERSIONS = (V5,)
+    BETA_VERSIONS = (V6,)
     """
     A tuple of all beta protocol versions
     """

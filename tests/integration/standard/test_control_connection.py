@@ -23,7 +23,7 @@ except ImportError:
 
 from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, greaterthanorequalcass40, protocolv5
 from tests.integration.datatype_utils import update_datatypes
 
 
@@ -103,3 +103,77 @@ class ControlConnectionTests(unittest.TestCase):
         new_host = self.cluster.get_control_connection_host()
         self.assertNotEqual(host, new_host)
 
+    @greaterthanorequalcass40
+    @protocolv5
+    def test_control_connection_port_discovery(self):
+        """
+        Test to validate that if allow_server_port_discovery the correct port is discovered
+        Unit tests already validate that the port can be picked up (or not) from the query. This validates
+        it picks up the correct port from a real server and is able to connect.
+
+        @since 4.0
+
+        @test_category metadata
+        """
+        if PROTOCOL_VERSION < 5:
+            raise unittest.SkipTest(
+                "Native protocol 4,0+ is required to test allow_server_port_discovery")
+        self.cluster.shutdown()
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_server_port_discovery=True)
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host, None)
+
+        self.session = self.cluster.connect()
+        cc_host = self.cluster.control_connection._connection.host
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host.address, cc_host)
+        self.assertEqual(host.is_up, True)
+        hosts = self.cluster.metadata.all_hosts()
+        self.assertEqual(3, len(hosts))
+
+        for host in hosts:
+            self.assertEquals(9042, host.rpc_port)
+            self.assertEquals(7000, host.broadcast_port)
+
+        # reconnect and make sure that the new host is reflected correctly
+        self.cluster.control_connection._reconnect()
+        new_host = self.cluster.get_control_connection_host()
+        self.assertNotEqual(host, new_host)
+
+    def test_control_connection_port_discovery_disabled(self):
+        """
+        Test to validate that if allow_server_port_discovery is disabled and it still connects using the configured
+        port. A unit test already validates the choice of config vs result of the query.
+
+        @since 4.0
+
+        @test_category metadata
+        """
+        if PROTOCOL_VERSION < 5:
+            raise unittest.SkipTest(
+                "Native protocol 4,0+ is required to test allow_server_port_discovery")
+        self.cluster.shutdown()
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_server_port_discovery=False)
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host, None)
+
+        self.session = self.cluster.connect()
+        cc_host = self.cluster.control_connection._connection.host
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host.address, cc_host)
+        self.assertEqual(host.is_up, True)
+        hosts = self.cluster.metadata.all_hosts()
+        self.assertEqual(3, len(hosts))
+
+        for host in hosts:
+            self.assertEquals(9042, host.rpc_port)
+            self.assertEquals(7000, host.broadcast_port)
+
+        # reconnect and make sure that the new host is reflected correctly
+        self.cluster.control_connection._reconnect()
+        new_host = self.cluster.get_control_connection_host()
+        self.assertNotEqual(host, new_host)

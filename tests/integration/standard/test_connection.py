@@ -119,7 +119,7 @@ class HeartbeatTest(unittest.TestCase):
     def test_heart_beat_timeout(self):
         # Setup a host listener to ensure the nodes don't go down
         test_listener = TestHostListener()
-        host = "127.0.0.1"
+        host = "127.0.0.1:9042"
         node = get_node(1)
         initial_connections = self.fetch_connections(host, self.cluster)
         self.assertNotEqual(len(initial_connections), 0)
