@@ -46,6 +46,8 @@
 
    .. autoattribute:: idle_heartbeat_interval
 
+   .. autoattribute:: idle_heartbeat_timeout
+
    .. autoattribute:: schema_event_refresh_window
 
    .. autoattribute:: topology_event_refresh_window

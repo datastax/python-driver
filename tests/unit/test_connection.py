@@ -277,8 +277,8 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         get_holders = Mock(return_value=holders)
         return get_holders
 
-    def run_heartbeat(self, get_holders_fun, count=2, interval=0.05):
-        ch = ConnectionHeartbeat(interval, get_holders_fun)
+    def run_heartbeat(self, get_holders_fun, count=2, interval=0.05, timeout=0.05):
+        ch = ConnectionHeartbeat(interval, get_holders_fun, timeout=timeout)
         time.sleep(interval * count)
         ch.stop()
         self.assertTrue(get_holders_fun.call_count)

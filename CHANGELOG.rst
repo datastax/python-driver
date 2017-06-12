@@ -1,6 +1,10 @@
 3.11
 ====
 
+Features
+--------
+* Add idle_heartbeat_timeout cluster option to tune how long to wait for heartbeat responses. (PYTHON-762)
+
 Bug Fixes
 ---------
 * is_idempotent flag is not propagated from PreparedStatement to BoundStatement (PYTHON-736)

@@ -951,9 +951,10 @@ class HeartbeatFuture(object):
 
 class ConnectionHeartbeat(Thread):
 
-    def __init__(self, interval_sec, get_connection_holders):
+    def __init__(self, interval_sec, get_connection_holders, timeout):
         Thread.__init__(self, name="Connection heartbeat")
         self._interval = interval_sec
+        self._timeout = timeout
         self._get_connection_holders = get_connection_holders
         self._shutdown_event = Event()
         self.daemon = True
@@ -990,8 +991,8 @@ class ConnectionHeartbeat(Thread):
                             owner.return_connection(connection)
                     self._raise_if_stopped()
 
-                # Wait max `self._interval` seconds for all HeartbeatFutures to complete
-                timeout = self._interval
+                # Wait max `self._timeout` seconds for all HeartbeatFutures to complete
+                timeout = self._timeout
                 start_time = time.time()
                 for f in futures:
                     self._raise_if_stopped()
@@ -1007,7 +1008,7 @@ class ConnectionHeartbeat(Thread):
                                     id(connection), connection.host)
                         failed_connections.append((f.connection, f.owner, e))
 
-                    timeout = self._interval - (time.time() - start_time)
+                    timeout = self._timeout - (time.time() - start_time)
 
                 for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
