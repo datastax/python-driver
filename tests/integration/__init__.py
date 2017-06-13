@@ -114,7 +114,7 @@ def _tuple_version(version_string):
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
-
+SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 
 # If set to to true this will force the Cython tests to run regardless of whether they are installed
 cython_env = os.getenv('VERIFY_CYTHON', "False")
@@ -265,6 +265,7 @@ lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra versi
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
+ifsimulacron = unittest.skipIf(SIMULACRON_JAR is None, "Simulacron jar hasn't been specified")
 
 
 def wait_for_node_socket(node, timeout):

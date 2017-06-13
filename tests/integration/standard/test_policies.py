@@ -19,38 +19,17 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra import OperationTimedOut
-from cassandra.cluster import ExecutionProfile, Cluster
-from cassandra.query import SimpleStatement
-from cassandra.policies import ConstantSpeculativeExecutionPolicy, HostFilterPolicy, RoundRobinPolicy, \
+from cassandra.cluster import Cluster
+from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, \
     SimpleConvictionPolicy
-from cassandra.connection import Connection
 from cassandra.pool import Host
 
-from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21, PROTOCOL_VERSION
-from tests import notwindows
-from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, stopt_simulacron, NO_THEN
+from tests.integration import PROTOCOL_VERSION
 
-from mock import patch
 from concurrent.futures import wait as wait_futures
 
 def setup_module():
-    #use_singledc()
-    pass
-
-
-class BadRoundRobinPolicy(RoundRobinPolicy):
-
-    def make_query_plan(self, working_keyspace=None, query=None):
-        pos = self._position
-        self._position += 1
-
-        hosts = []
-        for _ in range(10):
-            hosts.extend(self._live_hosts)
-
-        return hosts
-
+    use_singledc()
 
 class HostFilterPolicyTests(unittest.TestCase):
 
@@ -94,114 +73,3 @@ class HostFilterPolicyTests(unittest.TestCase):
             response = session.execute("SELECT * from system.local")
             queried_hosts.update(response.response_future.attempted_hosts)
         self.assertEqual(queried_hosts, all_hosts)
-
-
-# This doesn't work well with Windows clock granularity
-@notwindows
-class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        start_and_prime_singledc()
-
-        cls.common_setup(1)
-
-        spec_ep_brr = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 20))
-        spec_ep_rr = ExecutionProfile(speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 20))
-        spec_ep_rr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 1))
-        spec_ep_brr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0.4, 10))
-
-        cls.cluster.add_execution_profile("spec_ep_brr", spec_ep_brr)
-        cls.cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
-        cls.cluster.add_execution_profile("spec_ep_rr_lim", spec_ep_rr_lim)
-        cls.cluster.add_execution_profile("spec_ep_brr_lim", spec_ep_brr_lim)
-
-    @classmethod
-    def tearDownClass(cls):
-        stopt_simulacron()
-
-    @greaterthancass21
-    def test_speculative_execution(self):
-        """
-        Test to ensure that speculative execution honors LBP, and that they retry appropriately.
-
-        This test will use various LBP, and ConstantSpeculativeExecutionPolicy settings and ensure the proper number of hosts are queried
-        @since 3.7.0
-        @jira_ticket PYTHON-218
-        @expected_result speculative retries should honor max retries, idempotent state of queries, and underlying lbp.
-
-        @test_category metadata
-        """
-        query_to_prime = "INSERT INTO test3rf.test (k, v) VALUES (0, 1);"
-        prime_query(query_to_prime, then={"delay_in_ms": 4000})
-
-        statement = SimpleStatement(query_to_prime, is_idempotent=True)
-        statement_non_idem = SimpleStatement(query_to_prime, is_idempotent=False)
-
-        # This LBP should repeat hosts up to around 30
-        result = self.session.execute(statement, execution_profile='spec_ep_brr')
-        self.assertEqual(21, len(result.response_future.attempted_hosts))
-
-        # This LBP should keep host list to 3
-        result = self.session.execute(statement, execution_profile='spec_ep_rr')
-        self.assertEqual(3, len(result.response_future.attempted_hosts))
-        # Spec_execution policy should limit retries to 1
-        result = self.session.execute(statement, execution_profile='spec_ep_rr_lim')
-
-        self.assertEqual(2, len(result.response_future.attempted_hosts))
-
-        # Spec_execution policy should not be used if  the query is not idempotent
-        result = self.session.execute(statement_non_idem, execution_profile='spec_ep_brr')
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
-
-        # Default policy with non_idem query
-        result = self.session.execute(statement_non_idem)
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
-
-        # Should be able to run an idempotent query against default execution policy with no speculative_execution_policy
-        result = self.session.execute(statement)
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
-
-        # Test timeout with spec_ex
-        with self.assertRaises(OperationTimedOut):
-            result = self.session.execute(statement, execution_profile='spec_ep_rr', timeout=.5)
-
-        """
-        # PYTHON-736 Test speculation policy works with a prepared statement
-        statement = self.session.prepare("SELECT timeout(i) FROM d WHERE k = ?")
-        # non-idempotent
-        result = self.session.execute(statement, (0,), execution_profile='spec_ep_brr')
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
-        # idempotent
-        statement.is_idempotent = True
-        result = self.session.execute(statement, (0,), execution_profile='spec_ep_brr')
-        self.assertLess(1, len(result.response_future.attempted_hosts))
-        """
-
-
-    def test_speculative_and_timeout(self):
-        """
-        Test to ensure the timeout is honored when using speculative execution
-        @since 3.10
-        @jira_ticket PYTHON-750
-        @expected_result speculative retries be schedule every fixed period, during the maximum
-        period of the timeout.
-
-        @test_category metadata
-        """
-        # We mock this so no messages are sent, otherwise a reponse might arrive
-        # and we would not know how many hosts we queried
-        prime_query("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", then=NO_THEN)
-
-        statement = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", is_idempotent=True)
-
-        # An OperationTimedOut is placed here in response_future,
-        # that's why we can't call session.execute,which would raise it, but
-        # we have to directly wait for the event
-        response_future = self.session.execute_async(statement, execution_profile='spec_ep_brr_lim',
-                                                     timeout=2.2)
-        response_future._event.wait(4)
-        self.assertIsInstance(response_future._final_exception, OperationTimedOut)
-
-        # This is because 2.2 / 0.4 + 1 = 6
-        self.assertEqual(len(response_future.attempted_hosts), 6)

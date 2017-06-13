@@ -89,7 +89,10 @@ class TestHostListener(HostStateListener):
     host_down = None
 
     def on_down(self, host):
-        host_down = host
+        self.host_down = True
+
+    def on_up(self, host):
+        self.host_down = False
 
 
 class HeartbeatTest(unittest.TestCase):
@@ -98,7 +101,8 @@ class HeartbeatTest(unittest.TestCase):
 
     @since 3.3
     @jira_ticket PYTHON-286
-    @expected_result host should not be marked down when heartbeat fails
+    @expected_result host should be marked down when heartbeat fails. This
+    happens after PYTHON-734
 
     @test_category connection heartbeat
     """
@@ -124,6 +128,7 @@ class HeartbeatTest(unittest.TestCase):
             node.pause()
             # Wait for connections associated with this host go away
             self.wait_for_no_connections(host, self.cluster)
+            self.assertTrue(test_listener.host_down)
             # Resume paused node
         finally:
             node.resume()
@@ -138,7 +143,7 @@ class HeartbeatTest(unittest.TestCase):
             time.sleep(.1)
         self.assertLess(count, 100, "Never connected to the first node")
         new_connections = self.wait_for_connections(host, self.cluster)
-        self.assertIsNone(test_listener.host_down)
+        self.assertFalse(test_listener.host_down)
         # Make sure underlying new connections don't match previous ones
         for connection in initial_connections:
             self.assertFalse(connection in new_connections)
