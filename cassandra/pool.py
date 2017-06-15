@@ -421,6 +421,7 @@ class HostConnection(object):
 
         if self._connection:
             self._connection.close()
+            self._connection = None
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         if self.is_shutdown or not self._connection:
