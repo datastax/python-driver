@@ -11,6 +11,8 @@ Bug Fixes
 * Fix asyncore hang on exit (PYTHON-767)
 * Driver takes several minutes to remove a bad host from session (PYTHON-762)
 * Installation doesn't always fall back to no cython in Windows (PYTHON-763)
+* Fix sites where `sessions` can change during iteration (PYTHON-793)
+
 
 Other
 -----

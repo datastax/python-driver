@@ -964,7 +964,7 @@ class Cluster(object):
                         "be returned when reading type %s.%s.", self.protocol_version, keyspace, user_type)
 
         self._user_types[keyspace][user_type] = klass
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.user_type_registered(keyspace, user_type, klass)
         UserType.evict_udt_class(keyspace, user_type)
 
@@ -994,7 +994,7 @@ class Cluster(object):
         for host in filter(lambda h: h.is_up, self.metadata.all_hosts()):
             profile.load_balancing_policy.on_up(host)
         futures = set()
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             futures.update(session.update_created_pools())
         _, not_done = wait_futures(futures, pool_wait_timeout)
         if not_done:
@@ -1209,7 +1209,7 @@ class Cluster(object):
 
     def get_connection_holders(self):
         holders = []
-        for s in self.sessions:
+        for s in tuple(self.sessions):
             holders.extend(s.get_pools())
         holders.append(self.control_connection)
         return holders
@@ -1235,7 +1235,7 @@ class Cluster(object):
 
         self.control_connection.shutdown()
 
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.shutdown()
 
         self.executor.shutdown()
@@ -1262,7 +1262,7 @@ class Cluster(object):
     def _cleanup_failed_on_up_handling(self, host):
         self.profile_manager.on_down(host)
         self.control_connection.on_down(host)
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.remove_pool(host)
 
         self._start_reconnector(host, is_host_addition=False)
@@ -1301,7 +1301,7 @@ class Cluster(object):
                 host._currently_handling_node_up = False
 
         # see if there are any pools to add or remove now that the host is marked up
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.update_created_pools()
 
     def on_up(self, host):
@@ -1338,7 +1338,7 @@ class Cluster(object):
                 self._prepare_all_queries(host)
                 log.debug("Done preparing all queries for host %s, ", host)
 
-            for session in self.sessions:
+            for session in tuple(self.sessions):
                 session.remove_pool(host)
 
             log.debug("Signalling to load balancing policies that host %s is up", host)
@@ -1351,7 +1351,7 @@ class Cluster(object):
             futures_lock = Lock()
             futures_results = []
             callback = partial(self._on_up_future_completed, host, futures, futures_results, futures_lock)
-            for session in self.sessions:
+            for session in tuple(self.sessions):
                 future = session.add_or_renew_pool(host, is_host_addition=False)
                 if future is not None:
                     have_future = True
@@ -1415,7 +1415,7 @@ class Cluster(object):
             # this is to avoid closing pools when a control connection host became isolated
             if self._discount_down_events and self.profile_manager.distance(host) != HostDistance.IGNORED:
                 connected = False
-                for session in self.sessions:
+                for session in tuple(self.sessions):
                     pool_states = session.get_pool_state()
                     pool_state = pool_states.get(host)
                     if pool_state:
@@ -1431,7 +1431,7 @@ class Cluster(object):
 
         self.profile_manager.on_down(host)
         self.control_connection.on_down(host)
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.on_down(host)
 
         for listener in self.listeners:
@@ -1488,7 +1488,7 @@ class Cluster(object):
             self._finalize_add(host)
 
         have_future = False
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             future = session.add_or_renew_pool(host, is_host_addition=True)
             if future is not None:
                 have_future = True
@@ -1506,7 +1506,7 @@ class Cluster(object):
             listener.on_add(host)
 
         # see if there are any pools to add or remove now that the host is marked up
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.update_created_pools()
 
     def on_remove(self, host):
@@ -1516,7 +1516,7 @@ class Cluster(object):
         log.debug("Removing host %s", host)
         host.set_down()
         self.profile_manager.on_remove(host)
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.on_remove(host)
         for listener in self.listeners:
             listener.on_remove(host)
@@ -1576,7 +1576,7 @@ class Cluster(object):
         If any host has fewer than the configured number of core connections
         open, attempt to open connections until that number is met.
         """
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             for pool in tuple(session._pools.values()):
                 pool.ensure_core_connections()
 
