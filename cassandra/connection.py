@@ -810,7 +810,29 @@ class Connection(object):
         When the operation completes, `callback` will be called with
         two arguments: this connection and an Exception if an error
         occurred, otherwise :const:`None`.
+
+        This method will always increment :attr:`.in_flight` attribute, even if
+        it doesn't need to make a request, just to maintain an
+        ":attr:`.in_flight` is incremented" invariant.
         """
+        # Here we increment in_flight unconditionally, whether we need to issue
+        # a request or not. This is bad, but allows callers -- specifically
+        # _set_keyspace_for_all_conns -- to assume that we increment
+        # self.in_flight during this call. This allows the passed callback to
+        # safely call HostConnection{Pool,}.return_connection on this
+        # Connection.
+        #
+        # We use a busy wait on the lock here because:
+        # - we'll only spin if the connection is at max capacity, which is very
+        #   unlikely for a set_keyspace call
+        # - it allows us to avoid signaling a condition every time a request completes
+        while True:
+            with self.lock:
+                if self.in_flight < self.max_request_id:
+                    self.in_flight += 1
+                    break
+            time.sleep(0.001)
+
         if not keyspace or keyspace == self.keyspace:
             callback(self, None)
             return
@@ -828,19 +850,9 @@ class Connection(object):
                 callback(self, self.defunct(ConnectionException(
                     "Problem while setting keyspace: %r" % (result,), self.host)))
 
-        request_id = None
-        # we use a busy wait on the lock here because:
-        # - we'll only spin if the connection is at max capacity, which is very
-        #   unlikely for a set_keyspace call
-        # - it allows us to avoid signaling a condition every time a request completes
-        while True:
-            with self.lock:
-                if self.in_flight < self.max_request_id:
-                    request_id = self.get_request_id()
-                    self.in_flight += 1
-                    break
-
-            time.sleep(0.001)
+        # We've incremented self.in_flight above, so we "have permission" to
+        # acquire a new request id
+        request_id = self.get_request_id()
 
         self.send_msg(query, request_id, process_result)
 

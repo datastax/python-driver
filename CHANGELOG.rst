@@ -12,6 +12,7 @@ Bug Fixes
 * Driver takes several minutes to remove a bad host from session (PYTHON-762)
 * Installation doesn't always fall back to no cython in Windows (PYTHON-763)
 * Avoid to replace a connection that is supposed to shutdown (PYTHON-772)
+* request_ids may not be returned to the pool (PYTHON-739)
 
 Other
 -----
