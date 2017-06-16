@@ -1012,10 +1012,10 @@ class ConnectionHeartbeat(Thread):
 
                 for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
-                    connection.defunct(exc)
                     if not connection.is_control_connection:
                         # Only HostConnection supports shutdown_on_error
                         owner.shutdown_on_error = True
+                    connection.defunct(exc)
                     owner.return_connection(connection)
             except self.ShutdownException:
                 pass
