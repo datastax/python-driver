@@ -436,9 +436,10 @@ class Connection(object):
         try:
             return self.request_ids.popleft()
         except IndexError:
-            self.highest_request_id += 1
+            new_request_id = self.highest_request_id + 1
             # in_flight checks should guarantee this
             assert self.highest_request_id <= self.max_request_id
+            self.highest_request_id = new_request_id
             return self.highest_request_id
 
     def handle_pushed(self, response):
