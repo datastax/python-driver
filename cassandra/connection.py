@@ -61,6 +61,12 @@ try:
 except ImportError:
     pass
 else:
+    # The compress and decompress functions we need were moved from the lz4 to
+    # the lz4.block namespace, so we try both here.
+    try:
+        lz4_block = lz4.block
+    except AttributeError:
+        lz4_block = lz4
 
     # Cassandra writes the uncompressed message length in big endian order,
     # but the lz4 lib requires little endian order, so we wrap these
@@ -68,11 +74,11 @@ else:
 
     def lz4_compress(byts):
         # write length in big-endian instead of little-endian
-        return int32_pack(len(byts)) + lz4.compress(byts)[4:]
+        return int32_pack(len(byts)) + lz4_block.compress(byts)[4:]
 
     def lz4_decompress(byts):
         # flip from big-endian to little-endian
-        return lz4.decompress(byts[3::-1] + byts[4:])
+        return lz4_block.decompress(byts[3::-1] + byts[4:])
 
     locally_supported_compressions['lz4'] = (lz4_compress, lz4_decompress)
 
