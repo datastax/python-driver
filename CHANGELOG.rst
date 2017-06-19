@@ -17,6 +17,7 @@ Bug Fixes
 Other
 -----
 * Bump Cython dependency version to 0.25.2 (PYTHON-754)
+* Fix DeprecationWarning when using lz4 (PYTHON-769)
 
 3.10.0
 ======
