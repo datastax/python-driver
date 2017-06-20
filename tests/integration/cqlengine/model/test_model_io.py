@@ -734,6 +734,11 @@ class ComplexModelRouting(Model):
     text_2 = columns.Text()
 
 
+class DateTimePKModel(Model):
+    start_date = columns.DateTime(primary_key=True, required=True)
+    stop_date = columns.DateTime()
+
+
 class TestModelRoutingKeys(BaseCassEngTestCase):
 
     @classmethod
@@ -743,6 +748,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         sync_table(BasicModel)
         sync_table(BasicModelMulti)
         sync_table(ComplexModelRouting)
+        sync_table(DateTimePKModel)
 
     @classmethod
     def tearDownClass(cls):
@@ -751,6 +757,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         drop_table(BasicModel)
         drop_table(BasicModelMulti)
         drop_table(ComplexModelRouting)
+        drop_table(DateTimePKModel)
 
     def test_routing_key_is_ignored(self):
         """
@@ -874,6 +881,29 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         self._check_partition_value_generation(BasicModelMulti, DeleteStatement(BasicModelMulti.__table_name__), reverse=True)
         self._check_partition_value_generation(ComplexModelRouting, SelectStatement(ComplexModelRouting.__table_name__), reverse=True)
         self._check_partition_value_generation(ComplexModelRouting, DeleteStatement(ComplexModelRouting.__table_name__), reverse=True)
+
+    def test_datetime_pk_query(self):
+        self.assertEqual(DateTimePKModel.objects.count(), 0)
+
+        test_instance = DateTimePKModel()
+        self.assertIsNone(test_instance.start_date)
+        self.assertIsNone(test_instance.stop_date)
+
+        now = datetime.now()
+        test_instance.start_date = now
+        test_instance.save()
+        self.assertEqual(DateTimePKModel.objects.count(), 1)
+
+        test_instance = DateTimePKModel.get(start_date=test_instance.start_date)
+        self.assertIsInstance(test_instance.start_date, datetime)
+        self.assertEqual(test_instance.start_date, now)
+
+        values_list = tuple(DateTimePKModel.objects(
+            start_date=test_instance.start_date).values_list(
+                'start_date', flat=True).all())
+        self.assertEqual(len(values_list), 1)
+        self.assertIsInstance(values_list[0], datetime)
+        self.assertEqual(values_list[0], now)
 
     def _check_partition_value_generation(self, model, state, reverse=False):
         """
