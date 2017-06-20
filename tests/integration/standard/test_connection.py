@@ -85,7 +85,10 @@ class TestHostListener(HostStateListener):
     host_down = None
 
     def on_down(self, host):
-        host_down = host
+        self.host_down = True
+
+    def on_up(self, host):
+        self.host_down = False
 
 
 class HeartbeatTest(unittest.TestCase):
@@ -107,7 +110,7 @@ class HeartbeatTest(unittest.TestCase):
         self.cluster.shutdown()
 
     @local
-    def test_heart_beat_timeout(self):
+    def test_heart_beat(self):
         # Setup a host listener to ensure the nodes don't go down
         test_listener = TestHostListener()
         host = "127.0.0.1"
@@ -120,6 +123,7 @@ class HeartbeatTest(unittest.TestCase):
             node.pause()
             # Wait for connections associated with this host go away
             self.wait_for_no_connections(host, self.cluster)
+            self.assertTrue(test_listener.host_down)
             # Resume paused node
         finally:
             node.resume()
@@ -134,7 +138,7 @@ class HeartbeatTest(unittest.TestCase):
             time.sleep(.1)
         self.assertLess(count, 100, "Never connected to the first node")
         new_connections = self.wait_for_connections(host, self.cluster)
-        self.assertIsNone(test_listener.host_down)
+        self.assertFalse(test_listener.host_down)
         # Make sure underlying new connections don't match previous ones
         for connection in initial_connections:
             self.assertFalse(connection in new_connections)
