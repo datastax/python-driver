@@ -605,19 +605,36 @@ class ClusterTests(unittest.TestCase):
         @test_category query
                 """
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.addCleanup(cluster.shutdown)
         session = cluster.connect()
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
-        future = session.execute_async(statement, trace=True)
-        future.result()
-        self.assertRaises(TraceUnavailable, future.get_query_trace, -1.0)
 
-        query = SimpleStatement("SELECT * FROM system.local")
-        future = session.execute_async(query, trace=True)
-        self.assertRaises(TraceUnavailable, future.get_query_trace, max_wait=120)
+        max_retry_count = 10
+        for i in range(max_retry_count):
+            future = session.execute_async(statement, trace=True)
+            future.result()
+            try:
+                result = future.get_query_trace(-1.0)
+                # In case the result has time to come back before this timeout due to a race condition
+                check_trace(result)
+            except TraceUnavailable:
+                break
+        else:
+            raise Exception("get_query_trace didn't raise TraceUnavailable after {} tries".format(max_retry_count))
 
-        cluster.shutdown()
+
+        for i in range(max_retry_count):
+            future = session.execute_async(statement, trace=True)
+            try:
+                result = future.get_query_trace(max_wait=120)
+                # In case the result has been set check the trace
+                check_trace(result)
+            except TraceUnavailable:
+                break
+        else:
+            raise Exception("get_query_trace didn't raise TraceUnavailable after {} tries".format(max_retry_count))
 
     def test_string_coverage(self):
         """
