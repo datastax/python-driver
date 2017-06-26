@@ -21,14 +21,14 @@ schedules:
         - cassandra: ['2.0', '2.1', '3.0']
 
   weekly_libev:
-    schedule: weekly
+    schedule: 0 10 * * 6
     branches:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
 
   weekly_gevent:
-    schedule: weekly
+    schedule: 0 14 * * 6
     branches:
       include: [master]
     env_vars: |
@@ -38,21 +38,21 @@ schedules:
         - python: [3.4, 3.5, 3.6]
 
   weekly_eventlet:
-    schedule: weekly
+    schedule: 0 18 * * 6
     branches:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='eventlet'
 
   weekly_async:
-    schedule: weekly
+    schedule: 0 10 * * 7
     branches:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='async'
 
   weekly_twister:
-    schedule: weekly
+    schedule: 0 14 * * 7
     branches:
       include: [master]
     env_vars: |
