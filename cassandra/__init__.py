@@ -387,6 +387,14 @@ class WriteTimeout(Timeout):
         self.write_type = write_type
 
 
+class CDCWriteFailure(RequestExecutionException):
+    """
+    Hit limit on data in CDC folder, writes are rejected
+    """
+    def __init__(self, message):
+        Exception.__init__(self, message)
+
+
 class CoordinationFailure(RequestExecutionException):
     """
     Replicas sent a failure to the coordinator.

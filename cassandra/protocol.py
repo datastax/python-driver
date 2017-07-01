@@ -331,6 +331,11 @@ class WriteFailureMessage(RequestExecutionException):
         return WriteFailure(self.summary_msg(), **self.info)
 
 
+class CDCWriteException(RequestExecutionException):
+    summary = 'Failed to execute write due to CDC space exhaustion.'
+    error_code = 0x1600
+
+
 class SyntaxException(RequestValidationException):
     summary = 'Syntax error in CQL query'
     error_code = 0x2000
