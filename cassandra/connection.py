@@ -444,7 +444,7 @@ class Connection(object):
         except IndexError:
             new_request_id = self.highest_request_id + 1
             # in_flight checks should guarantee this
-            assert self.highest_request_id <= self.max_request_id
+            assert new_request_id <= self.max_request_id
             self.highest_request_id = new_request_id
             return self.highest_request_id
 
