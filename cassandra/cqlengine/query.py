@@ -355,9 +355,15 @@ class AbstractQuerySet(object):
         # because explicit is better than implicit
         self._limit = 10000
 
-        # see the defer and only methods
+        # We store the fields for which we use the Equal operator
+        # in a query, so we don't select it from the DB. _defer_fields
+        # will contain the names of the fields in the DB, not the names
+        # of the variables used by the mapper
         self._defer_fields = set()
         self._deferred_values = {}
+
+        # This variable will hold the names in the database of the fields
+        # for which we want to query
         self._only_fields = []
 
         self._values_list = False
@@ -719,7 +725,7 @@ class AbstractQuerySet(object):
             else:
                 query_val = column.to_database(val)
                 if not col_op:  # only equal values should be deferred
-                    clone._defer_fields.add(col_name)
+                    clone._defer_fields.add(column.db_field_name)
                     clone._deferred_values[column.db_field_name] = val  # map by db field name for substitution in results
 
             clone._where.append(WhereClause(column.db_field_name, operator, query_val, quote_field=quote_field))
@@ -941,6 +947,8 @@ class AbstractQuerySet(object):
                 "Can't resolve fields {0} in {1}".format(
                     ', '.join(missing_fields), self.model.__name__))
 
+        fields = [self.model._columns[field].db_field_name for field in fields]
+
         if action == 'defer':
             clone._defer_fields.update(fields)
         elif action == 'only':
@@ -1068,18 +1076,18 @@ class ModelQuerySet(AbstractQuerySet):
 
     def _select_fields(self):
         if self._defer_fields or self._only_fields:
-            fields = self.model._columns.keys()
+            fields = [columns.db_field_name for columns in self.model._columns.values()]
             if self._defer_fields:
                 fields = [f for f in fields if f not in self._defer_fields]
                 # select the partition keys if all model fields are set defer
                 if not fields:
-                    fields = self.model._partition_keys
+                    fields = [columns.db_field_name for columns in self.model._partition_keys.values()]
             if self._only_fields:
                 fields = [f for f in fields if f in self._only_fields]
             if not fields:
                 raise QueryException('No fields in select query. Only fields: "{0}", defer fields: "{1}"'.format(
                     ','.join(self._only_fields), ','.join(self._defer_fields)))
-            return [self.model._columns[f].db_field_name for f in fields]
+            return fields
         return super(ModelQuerySet, self)._select_fields()
 
     def _get_result_constructor(self):
