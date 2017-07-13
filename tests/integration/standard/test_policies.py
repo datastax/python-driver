@@ -20,12 +20,14 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra import OperationTimedOut
-from cassandra.cluster import ExecutionProfile
+from cassandra.cluster import ExecutionProfile, Cluster
 from cassandra.query import SimpleStatement
-from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy
+from cassandra.policies import ConstantSpeculativeExecutionPolicy, HostFilterPolicy, RoundRobinPolicy, \
+    SimpleConvictionPolicy
 from cassandra.connection import Connection
+from cassandra.pool import Host
 
-from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21
+from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21, PROTOCOL_VERSION
 from tests import notwindows
 
 from mock import patch
@@ -45,6 +47,49 @@ class BadRoundRobinPolicy(RoundRobinPolicy):
             hosts.extend(self._live_hosts)
 
         return hosts
+
+
+class HostFilterPolicyTests(unittest.TestCase):
+
+    def test_predicate_changes(self):
+        """
+        Test to validate hostfilter reacts correctly when the predicate return
+        a different subset of the hosts
+        HostFilterPolicy
+        @since 3.8
+        @jira_ticket PYTHON-961
+        @expected_result the excluded hosts are ignored
+
+        @test_category policy
+        """
+        external_event = True
+        contact_point = "127.0.0.1"
+
+        single_host = {Host(contact_point, SimpleConvictionPolicy)}
+        all_hosts = {Host("127.0.0.{}".format(i), SimpleConvictionPolicy) for i in (1, 2, 3)}
+
+        predicate = lambda host: host.address == contact_point if external_event else True
+        cluster = Cluster((contact_point,), load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
+                                                                                 predicate=predicate),
+                          protocol_version=PROTOCOL_VERSION, topology_event_refresh_window=0,
+                          status_event_refresh_window=0)
+        session = cluster.connect(wait_for_all_pools=True)
+
+        queried_hosts = set()
+        for _ in range(10):
+            response = session.execute("SELECT * from system.local")
+            queried_hosts.update(response.response_future.attempted_hosts)
+
+        self.assertEqual(queried_hosts, single_host)
+
+        external_event = False
+        session.update_created_pools()
+
+        queried_hosts = set()
+        for _ in range(10):
+            response = session.execute("SELECT * from system.local")
+            queried_hosts.update(response.response_future.attempted_hosts)
+        self.assertEqual(queried_hosts, all_hosts)
 
 
 # This doesn't work well with Windows clock granularity
