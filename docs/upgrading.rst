@@ -46,9 +46,16 @@ materialize a list using the iterator:
     results = session.execute("SELECT * FROM system.local")
     row_list = list(results)
 
-For backward compatability, :class:`~.ResultSet` supports indexing. If
-the result is paged, all pages will be materialized. A warning will
-be logged if a paged query is implicitly materialized.
+For backward compatability, :class:`~.ResultSet` supports indexing. When
+accessed at an index, a `~.ResultSet` object will materialize all its pages:
+
+.. code-block:: python
+
+    results = session.execute("SELECT * FROM system.local")
+    first_result = results[0]  # materializes results, fetching all pages
+
+This can send requests and load (possibly large) results into memory, so
+`~.ResultSet` will log a warning on implicit materialization.
 
 Trace information is not attached to executed Statements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
