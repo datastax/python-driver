@@ -15,6 +15,7 @@ Bug Fixes
 * Avoid to replace a connection that is supposed to shutdown (PYTHON-772)
 * request_ids may not be returned to the pool (PYTHON-739)
 * Fix murmur3 on big-endian systems (PYTHON-653)
+* Ensure unused connections are closed if a Session is deleted by the GC (PYTHON-774)
 
 Other
 -----

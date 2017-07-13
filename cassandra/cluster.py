@@ -2325,6 +2325,10 @@ class Session(object):
     def __exit__(self, *args):
         self.shutdown()
 
+    def __del__(self):
+        # Ensure all connections are closed, in case the Session object is deleted by the GC
+        self.shutdown()
+
     def add_or_renew_pool(self, host, is_host_addition):
         """
         For internal use only.
