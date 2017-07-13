@@ -29,7 +29,7 @@ from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
-from cassandra.policies import WhiteListRoundRobinPolicy, HostStateListener
+from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateListener
 from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched, notwindows
@@ -50,8 +50,12 @@ class ConnectionTimeoutTest(unittest.TestCase):
     def setUp(self):
         self.defaultInFlight = Connection.max_in_flight
         Connection.max_in_flight = 2
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=
-                            WhiteListRoundRobinPolicy([CASSANDRA_IP]))
+        self.cluster = Cluster(
+            protocol_version=PROTOCOL_VERSION,
+            load_balancing_policy=HostFilterPolicy(
+                RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
+            )
+        )
         self.session = self.cluster.connect()
 
     def tearDown(self):

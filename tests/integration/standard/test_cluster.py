@@ -29,7 +29,7 @@ from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfil
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
-                                WhiteListRoundRobinPolicy, AddressTranslator)
+                                AddressTranslator, HostFilterPolicy)
 from cassandra.pool import Host
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
@@ -477,7 +477,10 @@ class ClusterTests(unittest.TestCase):
     def test_refresh_schema_no_wait(self):
         contact_points = [CASSANDRA_IP]
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
-                          contact_points=contact_points, load_balancing_policy=WhiteListRoundRobinPolicy(contact_points))
+                          contact_points=contact_points,
+                          load_balancing_policy=HostFilterPolicy(
+                              RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
+                          ))
         session = cluster.connect()
 
         schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
@@ -618,7 +621,7 @@ class ClusterTests(unittest.TestCase):
             try:
                 result = future.get_query_trace(-1.0)
                 # In case the result has time to come back before this timeout due to a race condition
-                check_trace(result)
+                self.check_trace(result)
             except TraceUnavailable:
                 break
         else:
@@ -630,7 +633,7 @@ class ClusterTests(unittest.TestCase):
             try:
                 result = future.get_query_trace(max_wait=120)
                 # In case the result has been set check the trace
-                check_trace(result)
+                self.check_trace(result)
             except TraceUnavailable:
                 break
         else:
@@ -774,7 +777,11 @@ class ClusterTests(unittest.TestCase):
         @test_category config_profiles
         """
         query = "select release_version from system.local"
-        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy([CASSANDRA_IP]))
+        node1 = ExecutionProfile(
+            load_balancing_policy=HostFilterPolicy(
+                RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
+            )
+        )
         with Cluster(execution_profiles={'node1': node1}) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
 
@@ -925,8 +932,16 @@ class ClusterTests(unittest.TestCase):
         @test_category config_profiles
         """
 
-        node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
-        node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2']))
+        node1 = ExecutionProfile(
+            load_balancing_policy=HostFilterPolicy(
+                RoundRobinPolicy(), lambda host: host.address == "127.0.0.1"
+            )
+        )
+        node2 = ExecutionProfile(
+            load_balancing_policy=HostFilterPolicy(
+                RoundRobinPolicy(), lambda host: host.address == "127.0.0.2"
+            )
+        )
         with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1, 'node2': node2}) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
             pools = session.get_pool_state()
@@ -935,7 +950,11 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2')))
 
             # dynamically update pools on add
-            node3 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.3']))
+            node3 = ExecutionProfile(
+                load_balancing_policy=HostFilterPolicy(
+                    RoundRobinPolicy(), lambda host: host.address == "127.0.0.3"
+                )
+            )
             cluster.add_execution_profile('node3', node3)
             pools = session.get_pool_state()
             self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2', '127.0.0.3')))
@@ -953,14 +972,22 @@ class ClusterTests(unittest.TestCase):
         """
         max_retry_count = 10
         for i in range(max_retry_count):
-            node1 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+            node1 = ExecutionProfile(
+                load_balancing_policy=HostFilterPolicy(
+                    RoundRobinPolicy(), lambda host: host.address == "127.0.0.1"
+                )
+            )
             with Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
                 session = cluster.connect(wait_for_all_pools=True)
                 pools = session.get_pool_state()
                 self.assertGreater(len(cluster.metadata.all_hosts()), 2)
                 self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
 
-                node2 = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.2', '127.0.0.3']))
+                node2 = ExecutionProfile(
+                    load_balancing_policy=HostFilterPolicy(
+                        RoundRobinPolicy(), lambda host: host.address in ["127.0.0.2", "127.0.0.3"]
+                    )
+                )
 
                 start = time.time()
                 try:
@@ -1030,7 +1057,9 @@ class TestAddressTranslation(unittest.TestCase):
 
 @local
 class ContextManagementTest(unittest.TestCase):
-    load_balancing_policy = WhiteListRoundRobinPolicy([CASSANDRA_IP])
+    load_balancing_policy = HostFilterPolicy(
+        RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
+    )
     cluster_kwargs = {'execution_profiles': {EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=
                                                                                     load_balancing_policy)},
                       'schema_metadata_enabled': False,
@@ -1150,7 +1179,6 @@ class HostStateTest(unittest.TestCase):
 
 @local
 class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
-
     ignored_addresses = ['127.0.0.3']
     ignore_node_3_policy = IgnoredHostPolicy(ignored_addresses)
 
@@ -1189,7 +1217,8 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
 @local
 class DuplicateRpcTest(unittest.TestCase):
 
-    load_balancing_policy = WhiteListRoundRobinPolicy(['127.0.0.1'])
+    load_balancing_policy = HostFilterPolicy(RoundRobinPolicy(),
+                                             lambda host: host.address == "127.0.0.1")
 
     def setUp(self):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)

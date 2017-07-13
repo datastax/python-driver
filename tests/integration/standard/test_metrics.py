@@ -14,7 +14,7 @@
 
 import time
 
-from cassandra.policies import WhiteListRoundRobinPolicy, FallthroughRetryPolicy
+from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, FallthroughRetryPolicy
 
 try:
     import unittest2 as unittest
@@ -39,7 +39,9 @@ class MetricsTests(unittest.TestCase):
     def setUp(self):
         contact_point = ['127.0.0.2']
         self.cluster = Cluster(contact_points=contact_point, metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
-                               load_balancing_policy=WhiteListRoundRobinPolicy(contact_point),
+                               load_balancing_policy=HostFilterPolicy(
+                                   RoundRobinPolicy(), lambda host: host.address in contact_point
+                               ),
                                default_retry_policy=FallthroughRetryPolicy())
         self.session = self.cluster.connect("test3rf", wait_for_all_pools=True)
 
