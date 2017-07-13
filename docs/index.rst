@@ -4,7 +4,7 @@ A Python client driver for `Apache Cassandra <http://cassandra.apache.org>`_.
 This driver works exclusively with the Cassandra Query Language v3 (CQL3)
 and Cassandra's native protocol.  Cassandra 2.1+ is supported.
 
-The driver supports Python 2.6, 2.7, 3.3, 3.4, 3.5, and 3.6.
+The driver supports Python 2.7, 3.3, 3.4, 3.5, and 3.6.
 
 This driver is open source under the
 `Apache v2 License <http://www.apache.org/licenses/LICENSE-2.0.html>`_.
@@ -74,8 +74,7 @@ Visit the :doc:`FAQ section <faq>` in this documentation.
 
 Please send questions to the `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_.
 
-Alternatively, you can use IRC.  Connect to the #datastax-drivers channel on irc.freenode.net.
-If you don't have an IRC client, you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_.
+Alternatively, you can use the `#datastax-drivers` channel in the DataStax Acadamy Slack to ask questions in real time.
 
 Reporting Issues
 ----------------
