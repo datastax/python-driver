@@ -17,7 +17,7 @@ import sys,logging, traceback, time, re
 from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
                        FunctionFailure, ProtocolVersion)
 from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
-from cassandra.policies import WhiteListRoundRobinPolicy
+from cassandra.policies import HostFilterPolicy, RoundRobinPolicy
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node
@@ -327,7 +327,9 @@ class TimeoutTimerTest(unittest.TestCase):
         # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
 
         node1 = ExecutionProfile(
-            load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1'])
+            load_balancing_policy=HostFilterPolicy(
+                RoundRobinPolicy(), lambda host: host.address == "127.0.0.1"
+            )
         )
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: node1})
         self.session = self.cluster.connect(wait_for_all_pools=True)
