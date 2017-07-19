@@ -26,7 +26,7 @@ Load Balancing
 
 .. autoclass:: HostFilterPolicy
 
-   # we document these methods manually so we can specify a param to predicate
+   .. we document these methods manually so we can specify a param to predicate
 
    .. automethod:: predicate(host)
    .. automethod:: distance
