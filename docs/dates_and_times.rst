@@ -7,7 +7,7 @@ reasoning behind it, and describe approaches to working with these types.
 timestamps (Cassandra DateType)
 -------------------------------
 
-Timestamps in Cassandra are timezone-naive timestamps encoded as microseconds since UNIX epoch. Clients working with
+Timestamps in Cassandra are timezone-naive timestamps encoded as millseconds since UNIX epoch. Clients working with
 timestamps in this database usually find it easiest to reason about them if they are always assumed to be UTC. To quote the
 pytz documentation, "The preferred way of dealing with times is to always work in UTC, converting to localtime only when
 generating output to be read by humans." The driver adheres to this tenant, and assumes UTC is always in the database. The
@@ -34,7 +34,7 @@ Note the second point above applies even to "local" times created using ``now()`
 These do not contain timezone information intrinsically, so they will be assumed to be UTC and not shifted. When generating
 timestamps in the application, it is clearer to use ``datetime.utcnow()`` to be explicit about it.
 
-If the input for a timestamp is numeric, it is assumed to be a epoch-relative microsecond timestamp, as specified in the
+If the input for a timestamp is numeric, it is assumed to be a epoch-relative millisecond timestamp, as specified in the
 CQL spec -- no scaling or conversion is done.
 
 Read Path
