@@ -668,6 +668,15 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             cluster.shutdown()
 
     def test_black_list_with_host_filter_policy(self):
+        """
+        Test to validate removing certain hosts from the query plan with
+        HostFilterPolicy
+        @since 3.8
+        @jira_ticket PYTHON-961
+        @expected_result the excluded hosts are ignored
+
+        @test_category policy
+        """
         use_singledc()
         keyspace = 'test_black_list_with_hfp'
         ignored_address = (IP_FORMAT % 2)
@@ -692,9 +701,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 1, 8)
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
+        self.coordinator_stats.assert_query_count_equals(self, 3, 4)
 
         # policy should not allow reconnecting to ignored host
         force_stop(2)

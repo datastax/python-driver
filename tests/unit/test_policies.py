@@ -1402,13 +1402,13 @@ class HostFilterPolicyPopulateTest(unittest.TestCase):
             hosts=hosts
         )
 
-    def test_child_not_populated_with_filtered_hosts(self):
+    def test_child_is_populated_with_filtered_hosts(self):
         hfp = HostFilterPolicy(
             child_policy=Mock(name='child_policy'),
-            predicate=lambda host: 'acceptme' in host
+            predicate=lambda host: False
         )
         mock_cluster, hosts = (Mock(name='cluster'),
-                               ['acceptme0', 'ignoreme0', 'ignoreme1', 'acceptme1'])
+                               ['acceptme0', 'acceptme1'])
         hfp.populate(mock_cluster, hosts)
         hfp._child_policy.populate.assert_called_once()
         self.assertEqual(
@@ -1439,3 +1439,58 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
             query=query
         )
         self.assertEqual(qp, hfp._child_policy.make_query_plan.return_value)
+
+    def test_wrap_token_aware(self):
+        cluster = Mock(spec=Cluster)
+        hosts = [Host("127.0.0.{}".format(i), SimpleConvictionPolicy) for i in range(1, 6)]
+        for host in hosts:
+            host.set_up()
+
+        def get_replicas(keyspace, packed_key):
+            return hosts[:2]
+
+        cluster.metadata.get_replicas.side_effect = get_replicas
+
+        child_policy = TokenAwarePolicy(RoundRobinPolicy())
+
+        hfp = HostFilterPolicy(
+            child_policy=child_policy,
+            predicate=lambda host: host.address != "127.0.0.1" and host.address != "127.0.0.4"
+        )
+        hfp.populate(cluster, hosts)
+
+        # We don't allow randomness for ordering the replicas in RoundRobin
+        hfp._child_policy._child_policy._position = 0
+
+
+        mocked_query = Mock()
+        query_plan = hfp.make_query_plan("keyspace", mocked_query)
+        # First the not filtered replica, and then the rest of the allowed hosts ordered
+        query_plan = list(query_plan)
+        self.assertEqual(query_plan[0], Host("127.0.0.2", SimpleConvictionPolicy))
+        self.assertEqual(set(query_plan[1:]),{Host("127.0.0.3", SimpleConvictionPolicy),
+                                              Host("127.0.0.5", SimpleConvictionPolicy)})
+
+    def test_create_whitelist(self):
+        cluster = Mock(spec=Cluster)
+        hosts = [Host("127.0.0.{}".format(i), SimpleConvictionPolicy) for i in range(1, 6)]
+        for host in hosts:
+            host.set_up()
+
+        child_policy = RoundRobinPolicy()
+
+        hfp = HostFilterPolicy(
+            child_policy=child_policy,
+            predicate=lambda host: host.address == "127.0.0.1" or host.address == "127.0.0.4"
+        )
+        hfp.populate(cluster, hosts)
+
+        # We don't allow randomness for ordering the replicas in RoundRobin
+        hfp._child_policy._position = 0
+
+        mocked_query = Mock()
+        query_plan = hfp.make_query_plan("keyspace", mocked_query)
+        # Only the filtered replicas should be allowed
+        self.assertEqual(set(query_plan), {Host("127.0.0.1", SimpleConvictionPolicy),
+                                           Host("127.0.0.4", SimpleConvictionPolicy)})
+
