@@ -74,8 +74,7 @@ Visit the :doc:`FAQ section <faq>` in this documentation.
 
 Please send questions to the `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_.
 
-Alternatively, you can use IRC.  Connect to the #datastax-drivers channel on irc.freenode.net.
-If you don't have an IRC client, you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_.
+Alternatively, you can use the `#datastax-drivers` channel in the DataStax Acadamy Slack to ask questions in real time.
 
 Reporting Issues
 ----------------

@@ -8,6 +8,8 @@ A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ a
 
 The driver supports Python 2.6, 2.7, 3.3, and 3.4.
 
+If you require compatibility with DataStax Enterprise, use the `DataStax Enterprise Python Driver <http://docs.datastax.com/en/developer/python-dse-driver/>`_.
+
 Feedback Requested
 ------------------
 **Help us focus our efforts!** Provide your input on the `Platform and Runtime Survey <https://docs.google.com/a/datastax.com/forms/d/10wkbKLqmqs91gvhFW5u43y60pg_geZDolVNrxfO5_48/viewform>`_ (we kept it short).
@@ -63,12 +65,9 @@ If you would like to contribute, please feel free to open a pull request.
 
 Getting Help
 ------------
-Your two best options for getting help with the driver are the
+Your best options for getting help with the driver are the
 `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
-and the IRC channel.
-
-For IRC, use the #datastax-drivers channel on irc.freenode.net.  If you don't have an IRC client,
-you can use `freenode's web-based client <http://webchat.freenode.net/?channels=#datastax-drivers>`_.
+and the ``#datastax-drivers`` channel in the `DataStax Academy Slack <https://academy.datastax.com/slack>`_.
 
 License
 -------
