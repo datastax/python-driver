@@ -1311,19 +1311,15 @@ class HostFilterPolicyDeferralTest(unittest.TestCase):
 
     def _check_host_triggered_method(self, policy, name):
         arg, kwarg = Mock(name='arg'), Mock(name='kwarg')
-        expect_deferral = policy is self.passthrough_hfp
         method, child_policy_method = (getattr(policy, name),
                                        getattr(policy._child_policy, name))
 
         result = method(arg, kw=kwarg)
 
-        if expect_deferral:
-            # method calls the child policy's method...
-            child_policy_method.assert_called_once_with(arg, kw=kwarg)
-            # and returns its return value
-            self.assertIs(result, child_policy_method.return_value)
-        else:
-            child_policy_method.assert_not_called()
+        # method calls the child policy's method...
+        child_policy_method.assert_called_once_with(arg, kw=kwarg)
+        # and returns its return value
+        self.assertIs(result, child_policy_method.return_value)
 
     def test_defer_on_up_to_child_policy(self):
         self._check_host_triggered_method(self.passthrough_hfp, 'on_up')
