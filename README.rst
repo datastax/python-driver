@@ -10,6 +10,8 @@ The driver supports Python 2.7, 3.3, 3.4, 3.5, and 3.6.
 
 If you require compatibility with DataStax Enterprise, use the `DataStax Enterprise Python Driver <http://docs.datastax.com/en/developer/python-dse-driver/>`_.
 
+If you require compatibility with DataStax Enterprise, use the `DataStax Enterprise Python Driver <http://docs.datastax.com/en/developer/python-dse-driver/>`_.
+
 Feedback Requested
 ------------------
 **Help us focus our efforts!** Provide your input on the `Platform and Runtime Survey <https://docs.google.com/a/datastax.com/forms/d/10wkbKLqmqs91gvhFW5u43y60pg_geZDolVNrxfO5_48/viewform>`_ (we kept it short).
