@@ -14,7 +14,7 @@
 
 import time
 
-from cassandra.policies import WhiteListRoundRobinPolicy, FallthroughRetryPolicy
+from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, FallthroughRetryPolicy
 
 try:
     import unittest2 as unittest
@@ -28,7 +28,7 @@ from cassandra.protocol import SyntaxException
 from cassandra.cluster import Cluster, NoHostAvailable
 from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
 from greplin import scales
-from tests.integration import BasicSharedKeyspaceUnitTestCaseWTable, BasicExistingKeyspaceUnitTestCase, local
+from tests.integration import BasicSharedKeyspaceUnitTestCaseRF3WM, BasicExistingKeyspaceUnitTestCase, local
 
 def setup_module():
     use_singledc()
@@ -39,7 +39,9 @@ class MetricsTests(unittest.TestCase):
     def setUp(self):
         contact_point = ['127.0.0.2']
         self.cluster = Cluster(contact_points=contact_point, metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
-                               load_balancing_policy=WhiteListRoundRobinPolicy(contact_point),
+                               load_balancing_policy=HostFilterPolicy(
+                                   RoundRobinPolicy(), lambda host: host.address in contact_point
+                               ),
                                default_retry_policy=FallthroughRetryPolicy())
         self.session = self.cluster.connect("test3rf", wait_for_all_pools=True)
 
@@ -146,7 +148,7 @@ class MetricsTests(unittest.TestCase):
         # Sometimes this commands continues with the other nodes having not noticed
         # 1 is down, and a Timeout error is returned instead of an Unavailable
         get_node(1).stop(wait=True, wait_other_notice=True)
-
+        time.sleep(5)
         try:
             # Test write
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
@@ -179,7 +181,7 @@ class MetricsTests(unittest.TestCase):
     #     pass
 
 
-class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
+class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
     @local
     def test_metrics_per_cluster(self):
         """
@@ -194,6 +196,8 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseWTable):
         cluster2 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
                            default_retry_policy=FallthroughRetryPolicy())
         cluster2.connect(self.ks_name, wait_for_all_pools=True)
+
+        self.assertEqual(len(cluster2.metadata.all_hosts()), 3)
 
         query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
         self.session.execute(query)

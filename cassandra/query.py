@@ -496,7 +496,8 @@ class BoundStatement(Statement):
             self.keyspace = meta[0].keyspace_name
 
         Statement.__init__(self, retry_policy, consistency_level, routing_key,
-                           serial_consistency_level, fetch_size, keyspace, custom_payload)
+                           serial_consistency_level, fetch_size, keyspace, custom_payload,
+                           prepared_statement.is_idempotent)
 
     def bind(self, values):
         """

@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct, time, logging, sys, traceback
+import logging
+import struct
+import sys
+import traceback
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
-from cassandra.cluster import Cluster, NoHostAvailable, Session
+from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
-                                TokenAwarePolicy, WhiteListRoundRobinPolicy)
+                                TokenAwarePolicy, WhiteListRoundRobinPolicy,
+                                HostFilterPolicy)
 from cassandra.query import SimpleStatement
 
 from tests.integration import use_singledc, use_multidc, remove_cluster, PROTOCOL_VERSION
@@ -40,7 +44,7 @@ log = logging.getLogger(__name__)
 class LoadBalancingPolicyTests(unittest.TestCase):
 
     def setUp(self):
-        remove_cluster() # clear ahead of test so it doesn't use one left in unknown state
+        remove_cluster()  # clear ahead of test so it doesn't use one left in unknown state
         self.coordinator_stats = CoordinatorStats()
         self.prepared = None
         self.probe_cluster = None
@@ -105,7 +109,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             query_string = 'SELECT * FROM %s.cf WHERE k = ?' % keyspace
             if not self.prepared or self.prepared.query_string != query_string:
                 self.prepared = session.prepare(query_string)
-                self.prepared.consistency_level=consistency_level
+                self.prepared.consistency_level = consistency_level
             for i in range(count):
                 tries = 0
                 while True:
@@ -475,9 +479,19 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                                    '(k1, k2, i) '
                                    'VALUES '
                                    '(?, ?, ?)' % table)
-        session.execute(prepared.bind((1, 2, 3)))
+        bound = prepared.bind((1, 2, 3))
+        result = session.execute(bound)
+        self.assertIn(result.response_future.attempted_hosts[0],
+                      cluster.metadata.get_replicas(keyspace, bound.routing_key))
 
-        results = session.execute('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table)
+        # There could be race condition with querying a node
+        # which doesn't yet have the data so we query one of
+        # the replicas
+        results = session.execute(SimpleStatement('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table,
+                                                  routing_key=bound.routing_key))
+        self.assertIn(results.response_future.attempted_hosts[0],
+                      cluster.metadata.get_replicas(keyspace, bound.routing_key))
+
         self.assertTrue(results[0].i)
 
         cluster.shutdown()
@@ -498,7 +512,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.coordinator_stats.reset_counts()
         stop(2)
-        self._wait_for_nodes_down([2],cluster)
+        self._wait_for_nodes_down([2], cluster)
 
         self._query(session, keyspace)
 
@@ -652,3 +666,52 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             pass
         finally:
             cluster.shutdown()
+
+    def test_black_list_with_host_filter_policy(self):
+        """
+        Test to validate removing certain hosts from the query plan with
+        HostFilterPolicy
+        @since 3.8
+        @jira_ticket PYTHON-961
+        @expected_result the excluded hosts are ignored
+
+        @test_category policy
+        """
+        use_singledc()
+        keyspace = 'test_black_list_with_hfp'
+        ignored_address = (IP_FORMAT % 2)
+        hfp = HostFilterPolicy(
+            child_policy=RoundRobinPolicy(),
+            predicate=lambda host: host.address != ignored_address
+        )
+        cluster = Cluster(
+            (IP_FORMAT % 1,),
+            load_balancing_policy=hfp,
+            protocol_version=PROTOCOL_VERSION,
+            topology_event_refresh_window=0,
+            status_event_refresh_window=0
+        )
+        self.addCleanup(cluster.shutdown)
+        session = cluster.connect()
+        self._wait_for_nodes_up([1, 2, 3])
+
+        self.assertNotIn(ignored_address, [h.address for h in hfp.make_query_plan()])
+
+        create_schema(cluster, session, keyspace)
+        self._insert(session, keyspace)
+        self._query(session, keyspace)
+
+        # RoundRobin doesn't provide a gurantee on the order of the hosts
+        # so we will have that for 127.0.0.1 and 127.0.0.3 the count for one
+        # will be 4 and for the other 8
+        first_node_count = self.coordinator_stats.get_query_count(1)
+        third_node_count = self.coordinator_stats.get_query_count(3)
+        self.assertEqual(first_node_count + third_node_count, 12)
+        self.assertTrue(first_node_count == 8 or first_node_count == 4)
+
+        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+
+        # policy should not allow reconnecting to ignored host
+        force_stop(2)
+        self._wait_for_nodes_down([2])
+        self.assertFalse(cluster.metadata._hosts[ignored_address].is_currently_reconnecting())

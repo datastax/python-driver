@@ -348,6 +348,13 @@ def pre_build_check():
         compiler = new_compiler(compiler=be.compiler)
         customize_compiler(compiler)
 
+        try:
+            # We must be able to initialize the compiler if it has that method
+            if hasattr(compiler, "initialize"):
+                compiler.initialize()
+        except:
+            return False
+
         executables = []
         if compiler.compiler_type in ('unix', 'cygwin'):
             executables = [compiler.executables[exe][0] for exe in ('compiler_so', 'linker_so')]
@@ -388,7 +395,7 @@ def run_setup(extensions):
         # 1.) build_ext eats errors at compile time, letting the install complete while producing useful feedback
         # 2.) there could be a case where the python environment has cython installed but the system doesn't have build tools
         if pre_build_check():
-            cython_dep = 'Cython>=0.20,<0.25'
+            cython_dep = 'Cython>=0.20,!=0.25,<0.26'
             user_specified_cython_version = os.environ.get('CASS_DRIVER_ALLOWED_CYTHON_VERSION')
             if user_specified_cython_version is not None:
                 cython_dep = 'Cython==%s' % (user_specified_cython_version,)
@@ -424,6 +431,8 @@ def run_setup(extensions):
             'Programming Language :: Python :: 2.7',
             'Programming Language :: Python :: 3.3',
             'Programming Language :: Python :: 3.4',
+            'Programming Language :: Python :: 3.5',
+            'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: Implementation :: CPython',
             'Programming Language :: Python :: Implementation :: PyPy',
             'Topic :: Software Development :: Libraries :: Python Modules'

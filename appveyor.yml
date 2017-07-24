@@ -1,10 +1,10 @@
 environment:
   matrix:
     - PYTHON: "C:\\Python27-x64"
-      cassandra_version: 3.0.5
+      cassandra_version: 3.10
       ci_type: standard
     - PYTHON: "C:\\Python34"
-      cassandra_version: 3.0.5
+      cassandra_version: 3.10
       ci_type: unit
 os: Visual Studio 2015
 platform:

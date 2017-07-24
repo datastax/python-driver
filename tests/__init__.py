@@ -63,4 +63,4 @@ MONKEY_PATCH_LOOP = bool(os.getenv('MONKEY_PATCH_LOOP', False))
 
 notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adequate for windows")
 notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")
-notmonkeypatch = unittest.skipUnless(MONKEY_PATCH_LOOP, "Skpping this test because monkey patching is required")
+notmonkeypatch = unittest.skipUnless(MONKEY_PATCH_LOOP, "Skipping this test because monkey patching is required")

@@ -1,3 +1,34 @@
+3.11.0
+======
+July 24, 2017
+
+
+Features
+--------
+* Add idle_heartbeat_timeout cluster option to tune how long to wait for heartbeat responses. (PYTHON-762)
+* Add HostFilterPolicy (PYTHON-761)
+
+Bug Fixes
+---------
+* is_idempotent flag is not propagated from PreparedStatement to BoundStatement (PYTHON-736)
+* Fix asyncore hang on exit (PYTHON-767)
+* Driver takes several minutes to remove a bad host from session (PYTHON-762)
+* Installation doesn't always fall back to no cython in Windows (PYTHON-763)
+* Avoid to replace a connection that is supposed to shutdown (PYTHON-772)
+* request_ids may not be returned to the pool (PYTHON-739)
+* Fix murmur3 on big-endian systems (PYTHON-653)
+* Ensure unused connections are closed if a Session is deleted by the GC (PYTHON-774)
+* Fix .values_list by using db names internally (cqlengine) (PYTHON-785)
+
+Other
+-----
+* Bump Cython dependency version to 0.25.2 (PYTHON-754)
+* Fix DeprecationWarning when using lz4 (PYTHON-769)
+* Deprecate WhiteListRoundRobinPolicy (PYTHON-759)
+* Improve upgrade guide for materializing pages (PYTHON-464)
+* Documentation for time/date specifies timestamp inupt as microseconds (PYTHON-717)
+* Point to DSA Slack, not IRC, in docs index
+
 3.10.0
 ======
 May 24, 2017

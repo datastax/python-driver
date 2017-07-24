@@ -17,6 +17,7 @@ import logging
 from random import randint, shuffle
 from threading import Lock
 import socket
+from warnings import warn
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 
@@ -396,6 +397,10 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
 class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     """
+    |wlrrp| **is deprecated. It will be removed in 4.0.** It can effectively be
+    reimplemented using :class:`.HostFilterPolicy`. For more information, see
+    PYTHON-758_.
+
     A subclass of :class:`.RoundRobinPolicy` which evenly
     distributes queries across all nodes in the cluster,
     regardless of what datacenter the nodes may be in, but
@@ -405,12 +410,25 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     https://datastax-oss.atlassian.net/browse/JAVA-145
     Where connection errors occur when connection
     attempts are made to private IP addresses remotely
+
+    .. |wlrrp| raw:: html
+
+       <b><code>WhiteListRoundRobinPolicy</code></b>
+
+    .. _PYTHON-758: https://datastax-oss.atlassian.net/browse/PYTHON-758
+
     """
     def __init__(self, hosts):
         """
         The `hosts` parameter should be a sequence of hosts to permit
         connections to.
         """
+        msg = ('WhiteListRoundRobinPolicy is deprecated. '
+               'It will be removed in 4.0. '
+               'It can effectively be reimplemented using HostFilterPolicy.')
+        warn(msg, DeprecationWarning)
+        # DeprecationWarnings are silent by default so we also log the message
+        log.warning(msg)
 
         self._allowed_hosts = hosts
         self._allowed_hosts_resolved = [endpoint[4][0] for a in self._allowed_hosts
@@ -439,6 +457,118 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     def on_add(self, host):
         if host.address in self._allowed_hosts_resolved:
             RoundRobinPolicy.on_add(self, host)
+
+
+class HostFilterPolicy(LoadBalancingPolicy):
+    """
+    A :class:`.LoadBalancingPolicy` subclass configured with a child policy,
+    and a single-argument predicate. This policy defers to the child policy for
+    hosts where ``predicate(host)`` is truthy. Hosts for which
+    ``predicate(host)`` is falsey will be considered :attr:`.IGNORED`, and will
+    not be used in a query plan.
+
+    This can be used in the cases where you need a whitelist or blacklist
+    policy, e.g. to prepare for decommissioning nodes or for testing:
+
+    .. code-block:: python
+
+        def address_is_ignored(host):
+            return host.address in [ignored_address0, ignored_address1]
+
+        blacklist_filter_policy = HostFilterPolicy(
+            child_policy=RoundRobinPolicy(),
+            predicate=address_is_ignored
+        )
+
+        cluster = Cluster(
+            primary_host,
+            load_balancing_policy=blacklist_filter_policy,
+        )
+
+    See the note in the :meth:`.make_query_plan` documentation for a caveat on
+    how wrapping ordering polices (e.g. :class:`.RoundRobinPolicy`) may break
+    desirable properties of the wrapped policy.
+
+    Please note that whitelist and blacklist policies are not recommended for
+    general, day-to-day use. You probably want something like
+    :class:`.DCAwareRoundRobinPolicy`, which prefers a local DC but has
+    fallbacks, over a brute-force method like whitelisting or blacklisting.
+    """
+
+    def __init__(self, child_policy, predicate):
+        """
+        :param child_policy: an instantiated :class:`.LoadBalancingPolicy`
+                             that this one will defer to.
+        :param predicate: a one-parameter function that takes a :class:`.Host`.
+                          If it returns a falsey value, the :class:`.Host` will
+                          be :attr:`.IGNORED` and not returned in query plans.
+        """
+        super(HostFilterPolicy, self).__init__()
+        self._child_policy = child_policy
+        self._predicate = predicate
+
+    def on_up(self, host, *args, **kwargs):
+        return self._child_policy.on_up(host, *args, **kwargs)
+
+    def on_down(self, host, *args, **kwargs):
+        return self._child_policy.on_down(host, *args, **kwargs)
+
+    def on_add(self, host, *args, **kwargs):
+        return self._child_policy.on_add(host, *args, **kwargs)
+
+    def on_remove(self, host, *args, **kwargs):
+        return self._child_policy.on_remove(host, *args, **kwargs)
+
+    @property
+    def predicate(self):
+        """
+        A predicate, set on object initialization, that takes a :class:`.Host`
+        and returns a value. If the value is falsy, the :class:`.Host` is
+        :class:`~HostDistance.IGNORED`. If the value is truthy,
+        :class:`.HostFilterPolicy` defers to the child policy to determine the
+        host's distance.
+
+        This is a read-only value set in ``__init__``, implemented as a
+        ``property``.
+        """
+        return self._predicate
+
+    def distance(self, host):
+        """
+        Checks if ``predicate(host)``, then returns
+        :attr:`~HostDistance.IGNORED` if falsey, and defers to the child policy
+        otherwise.
+        """
+        if self.predicate(host):
+            return self._child_policy.distance(host)
+        else:
+            return HostDistance.IGNORED
+
+    def populate(self, cluster, hosts):
+        self._child_policy.populate(cluster=cluster, hosts=hosts)
+
+    def make_query_plan(self, working_keyspace=None, query=None):
+        """
+        Defers to the child policy's
+        :meth:`.LoadBalancingPolicy.make_query_plan` and filters the results.
+
+        Note that this filtering may break desirable properties of the wrapped
+        policy in some cases. For instance, imagine if you configure this
+        policy to filter out ``host2``, and to wrap a round-robin policy that
+        rotates through three hosts in the order ``host1, host2, host3``,
+        ``host2, host3, host1``, ``host3, host1, host2``, repeating. This
+        policy will yield ``host1, host3``, ``host3, host1``, ``host3, host1``,
+        disproportionately favoring ``host3``.
+        """
+        child_qp = self._child_policy.make_query_plan(
+            working_keyspace=working_keyspace, query=query
+        )
+        for host in child_qp:
+            if self.predicate(host):
+                yield host
+
+    def check_supported(self):
+        return self._child_policy.check_supported()
 
 
 class ConvictionPolicy(object):
@@ -618,6 +748,7 @@ class WriteType(object):
     """
     A lighweight-transaction write, such as "DELETE ... IF EXISTS".
     """
+
 
 WriteType.name_to_value = {
     'SIMPLE': WriteType.SIMPLE,

@@ -508,7 +508,8 @@ class PreparedStatementArgTest(unittest.TestCase):
         batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
         batch_statement.add(insert_statement, (1, 2))
         session.execute(batch_statement)
-        select_results = session.execute("SELECT * FROM %s WHERE k = 1" % table)
+        select_results = session.execute(SimpleStatement("SELECT * FROM %s WHERE k = 1" % table,
+                                                         consistency_level=ConsistencyLevel.ALL))
         first_row = select_results[0][:2]
         self.assertEqual((1, 2), first_row)
 

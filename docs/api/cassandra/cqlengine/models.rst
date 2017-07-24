@@ -171,7 +171,7 @@ Model
 
        Sets the ttl values to run instance updates and inserts queries with.
 
-    .. method:: using(keyspace=None, connection=None)
+    .. method:: using(connection=None)
 
         Change the context on the fly of the model instance (keyspace, connection)
 

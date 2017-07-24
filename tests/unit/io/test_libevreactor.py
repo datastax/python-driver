@@ -20,11 +20,10 @@ import errno
 import math
 from mock import patch, Mock
 import os
+import weakref
 import six
 from six import BytesIO
 from socket import error as socket_error
-import sys
-import time
 
 from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
                                   ConnectionException, ProtocolError)
@@ -32,13 +31,13 @@ from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
-from tests.unit.io.utils import TimerCallback
-from tests.unit.io.utils import submit_and_wait_for_completion
+
 from tests import is_monkey_patched
 
 
 try:
-    from cassandra.io.libevreactor import LibevConnection
+    from cassandra.io.libevreactor import _cleanup as libev__cleanup
+    from cassandra.io.libevreactor import LibevConnection, LibevLoop
 except ImportError:
     LibevConnection = None  # noqa
 
@@ -296,3 +295,37 @@ class LibevConnectionTest(unittest.TestCase):
 
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
+
+    def test_watchers_are_finished(self, *args):
+        """
+        Test for asserting that watchers are closed in LibevConnection
+
+        This test simulates a process termination without calling cluster.shutdown(), which would trigger
+        LibevConnection._libevloop._cleanup. It will check the watchers have been closed
+        Finally it will restore the LibevConnection reactor so it doesn't affect
+        the rest of the tests
+
+        @since 3.10
+        @jira_ticket PYTHON-747
+        @expected_result the watchers are closed
+
+        @test_category connection
+        """
+        with patch.object(LibevConnection._libevloop, "_thread"), \
+             patch.object(LibevConnection._libevloop, "notify"):
+
+            self.make_connection()
+
+            # We have to make a copy because the connections shouldn't
+            # be alive when we verify them
+            live_connections = set(LibevConnection._libevloop._live_conns)
+
+            # This simulates the process ending without cluster.shutdown()
+            # being called, then with atexit _cleanup for libevreactor would
+            # be called
+            libev__cleanup(weakref.ref(LibevConnection._libevloop))
+            for conn in live_connections:
+                for watcher in (conn._write_watcher, conn._read_watcher):
+                    self.assertTrue(watcher.stop.mock_calls)
+
+        LibevConnection._libevloop._shutdown = False

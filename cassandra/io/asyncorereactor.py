@@ -240,6 +240,8 @@ class AsyncoreLoop(object):
         self._timers.add_timer(timer)
 
     def _cleanup(self):
+        global _dispatcher_map
+
         self._shutdown = True
         if not self._thread:
             return
@@ -252,6 +254,12 @@ class AsyncoreLoop(object):
                 "Please call Cluster.shutdown() to avoid this.")
 
         log.debug("Event loop thread was joined")
+
+        # Ensure all connections are closed and  in-flight requests cancelled
+        for conn in tuple(_dispatcher_map.values()):
+            conn.close()
+
+        log.debug("Dispatchers were closed")
 
 
 class AsyncoreConnection(Connection, asyncore.dispatcher):
@@ -326,7 +334,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             #This happens when the connection is shutdown while waiting for the ReadyMessage
             if not self.connected_event.is_set():
                 self.last_error = ConnectionShutdown("Connection to %s was closed" % self.host)
-                
+
             # don't leave in-progress operations hanging
             self.connected_event.set()
 

@@ -61,6 +61,12 @@ try:
 except ImportError:
     pass
 else:
+    # The compress and decompress functions we need were moved from the lz4 to
+    # the lz4.block namespace, so we try both here.
+    try:
+        lz4_block = lz4.block
+    except AttributeError:
+        lz4_block = lz4
 
     # Cassandra writes the uncompressed message length in big endian order,
     # but the lz4 lib requires little endian order, so we wrap these
@@ -68,11 +74,11 @@ else:
 
     def lz4_compress(byts):
         # write length in big-endian instead of little-endian
-        return int32_pack(len(byts)) + lz4.compress(byts)[4:]
+        return int32_pack(len(byts)) + lz4_block.compress(byts)[4:]
 
     def lz4_decompress(byts):
         # flip from big-endian to little-endian
-        return lz4.decompress(byts[3::-1] + byts[4:])
+        return lz4_block.decompress(byts[3::-1] + byts[4:])
 
     locally_supported_compressions['lz4'] = (lz4_compress, lz4_decompress)
 
@@ -436,9 +442,10 @@ class Connection(object):
         try:
             return self.request_ids.popleft()
         except IndexError:
-            self.highest_request_id += 1
+            new_request_id = self.highest_request_id + 1
             # in_flight checks should guarantee this
-            assert self.highest_request_id <= self.max_request_id
+            assert new_request_id <= self.max_request_id
+            self.highest_request_id = new_request_id
             return self.highest_request_id
 
     def handle_pushed(self, response):
@@ -810,7 +817,29 @@ class Connection(object):
         When the operation completes, `callback` will be called with
         two arguments: this connection and an Exception if an error
         occurred, otherwise :const:`None`.
+
+        This method will always increment :attr:`.in_flight` attribute, even if
+        it doesn't need to make a request, just to maintain an
+        ":attr:`.in_flight` is incremented" invariant.
         """
+        # Here we increment in_flight unconditionally, whether we need to issue
+        # a request or not. This is bad, but allows callers -- specifically
+        # _set_keyspace_for_all_conns -- to assume that we increment
+        # self.in_flight during this call. This allows the passed callback to
+        # safely call HostConnection{Pool,}.return_connection on this
+        # Connection.
+        #
+        # We use a busy wait on the lock here because:
+        # - we'll only spin if the connection is at max capacity, which is very
+        #   unlikely for a set_keyspace call
+        # - it allows us to avoid signaling a condition every time a request completes
+        while True:
+            with self.lock:
+                if self.in_flight < self.max_request_id:
+                    self.in_flight += 1
+                    break
+            time.sleep(0.001)
+
         if not keyspace or keyspace == self.keyspace:
             callback(self, None)
             return
@@ -828,19 +857,9 @@ class Connection(object):
                 callback(self, self.defunct(ConnectionException(
                     "Problem while setting keyspace: %r" % (result,), self.host)))
 
-        request_id = None
-        # we use a busy wait on the lock here because:
-        # - we'll only spin if the connection is at max capacity, which is very
-        #   unlikely for a set_keyspace call
-        # - it allows us to avoid signaling a condition every time a request completes
-        while True:
-            with self.lock:
-                if self.in_flight < self.max_request_id:
-                    request_id = self.get_request_id()
-                    self.in_flight += 1
-                    break
-
-            time.sleep(0.001)
+        # We've incremented self.in_flight above, so we "have permission" to
+        # acquire a new request id
+        request_id = self.get_request_id()
 
         self.send_msg(query, request_id, process_result)
 
@@ -951,9 +970,10 @@ class HeartbeatFuture(object):
 
 class ConnectionHeartbeat(Thread):
 
-    def __init__(self, interval_sec, get_connection_holders):
+    def __init__(self, interval_sec, get_connection_holders, timeout):
         Thread.__init__(self, name="Connection heartbeat")
         self._interval = interval_sec
+        self._timeout = timeout
         self._get_connection_holders = get_connection_holders
         self._shutdown_event = Event()
         self.daemon = True
@@ -990,11 +1010,14 @@ class ConnectionHeartbeat(Thread):
                             owner.return_connection(connection)
                     self._raise_if_stopped()
 
+                # Wait max `self._timeout` seconds for all HeartbeatFutures to complete
+                timeout = self._timeout
+                start_time = time.time()
                 for f in futures:
                     self._raise_if_stopped()
                     connection = f.connection
                     try:
-                        f.wait(self._interval)
+                        f.wait(timeout)
                         # TODO: move this, along with connection locks in pool, down into Connection
                         with connection.lock:
                             connection.in_flight -= 1
@@ -1004,10 +1027,15 @@ class ConnectionHeartbeat(Thread):
                                     id(connection), connection.host)
                         failed_connections.append((f.connection, f.owner, e))
 
+                    timeout = self._timeout - (time.time() - start_time)
+
                 for connection, owner, exc in failed_connections:
                     self._raise_if_stopped()
+                    if not connection.is_control_connection:
+                        # Only HostConnection supports shutdown_on_error
+                        owner.shutdown_on_error = True
                     connection.defunct(exc)
-                    owner.return_connection(connection, mark_host_down=True)
+                    owner.return_connection(connection)
             except self.ShutdownException:
                 pass
             except Exception:

@@ -31,6 +31,7 @@ elif "async" in EVENT_LOOP_MANAGER:
 elif "twisted" in EVENT_LOOP_MANAGER:
     from cassandra.io.twistedreactor import TwistedConnection
     connection_class = TwistedConnection
+
 else:
     from cassandra.io.libevreactor import LibevConnection
     connection_class = LibevConnection
@@ -112,6 +113,8 @@ def _tuple_version(version_string):
 
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
+KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
+
 
 # If set to to true this will force the Cython tests to run regardless of whether they are installed
 cython_env = os.getenv('VERIFY_CYTHON', "False")
@@ -308,7 +311,7 @@ def use_single_node(start=True, workloads=[]):
 
 
 def remove_cluster():
-    if USE_CASS_EXTERNAL:
+    if USE_CASS_EXTERNAL or KEEP_TEST_CLUSTER:
         return
 
     global CCM_CLUSTER
@@ -415,7 +418,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
 
 
 def teardown_package():
-    if USE_CASS_EXTERNAL:
+    if USE_CASS_EXTERNAL or KEEP_TEST_CLUSTER:
         return
     # when multiple modules are run explicitly, this runs between them
     # need to make sure CCM_CLUSTER is properly cleared for that case
@@ -529,11 +532,17 @@ def setup_keyspace(ipformat=None, wait=True):
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}'''
         execute_with_long_wait_retry(session, ddl)
 
-        ddl = '''
+        ddl_3f = '''
             CREATE TABLE test3rf.test (
                 k int PRIMARY KEY,
                 v int )'''
-        execute_with_long_wait_retry(session, ddl)
+        execute_with_long_wait_retry(session, ddl_3f)
+
+        ddl_1f = '''
+                    CREATE TABLE test1rf.test (
+                        k int PRIMARY KEY,
+                        v int )'''
+        execute_with_long_wait_retry(session, ddl_1f)
 
     except Exception:
         traceback.print_exc()
@@ -675,7 +684,7 @@ class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
         drop_keyspace_shutdown_cluster(cls.ks_name, cls.session, cls.cluster)
 
 
-class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
+class BasicSharedKeyspaceUnitTestCaseRF1(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
     creates a keyspace named after the testclass with a rf of 1, and a table named after the class
@@ -695,16 +704,6 @@ class BasicSharedKeyspaceUnitTestCaseRF2(BasicSharedKeyspaceUnitTestCase):
         self.common_setup(2)
 
 
-class BasicSharedKeyspaceUnitTestCaseWTable(BasicSharedKeyspaceUnitTestCase):
-    """
-    This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
-    creates a keyspace named after the testc lass with a rf of 2, and a table named after the class
-    """
-    @classmethod
-    def setUpClass(self):
-        self.common_setup(3, True, True, True)
-
-
 class BasicSharedKeyspaceUnitTestCaseRF3(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
@@ -715,14 +714,14 @@ class BasicSharedKeyspaceUnitTestCaseRF3(BasicSharedKeyspaceUnitTestCase):
         self.common_setup(3)
 
 
-class BasicSharedKeyspaceUnitTestCaseRF3WTable(BasicSharedKeyspaceUnitTestCase):
+class BasicSharedKeyspaceUnitTestCaseRF3WM(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
-    creates a keyspace named after the test class with a rf of 3 and a table named after the class
+    creates a keyspace named after the test class with a rf of 3 with metrics enabled
     """
     @classmethod
     def setUpClass(self):
-        self.common_setup(3, True)
+        self.common_setup(3, True, True, True)
 
 
 class BasicSharedKeyspaceUnitTestCaseWFunctionTable(BasicSharedKeyspaceUnitTestCase):

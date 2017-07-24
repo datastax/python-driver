@@ -7,7 +7,9 @@ def body_and_tail(data):
     nblocks = l // 16
     tail = l % 16
     if nblocks:
-        return struct.unpack_from('qq' * nblocks, data), struct.unpack_from('b' * tail, data, -tail), l
+        # we use '<', specifying little-endian byte order for data bigger than
+        # a byte so behavior is the same on little- and big-endian platforms
+        return struct.unpack_from('<' + ('qq' * nblocks), data), struct.unpack_from('b' * tail, data, -tail), l
     else:
         return tuple(), struct.unpack_from('b' * tail, data, -tail), l
 

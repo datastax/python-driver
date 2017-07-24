@@ -590,6 +590,12 @@ class Cluster(object):
     Setting to zero disables heartbeats.
     """
 
+    idle_heartbeat_timeout = 30
+    """
+    Timeout, in seconds, on which the heartbeat wait for idle connection responses.
+    Lowering this value can help to discover bad connections earlier.
+    """
+
     schema_event_refresh_window = 2
     """
     Window, in seconds, within which a schema component will be refreshed after
@@ -756,7 +762,8 @@ class Cluster(object):
                  reprepare_on_up=True,
                  execution_profiles=None,
                  allow_beta_protocol_version=False,
-                 timestamp_generator=None):
+                 timestamp_generator=None,
+                 idle_heartbeat_timeout=30):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -847,6 +854,7 @@ class Cluster(object):
         self.max_schema_agreement_wait = max_schema_agreement_wait
         self.control_connection_timeout = control_connection_timeout
         self.idle_heartbeat_interval = idle_heartbeat_interval
+        self.idle_heartbeat_timeout = idle_heartbeat_timeout
         self.schema_event_refresh_window = schema_event_refresh_window
         self.topology_event_refresh_window = topology_event_refresh_window
         self.status_event_refresh_window = status_event_refresh_window
@@ -1187,7 +1195,11 @@ class Cluster(object):
                 self.profile_manager.check_supported()  # todo: rename this method
 
                 if self.idle_heartbeat_interval:
-                    self._idle_heartbeat = ConnectionHeartbeat(self.idle_heartbeat_interval, self.get_connection_holders)
+                    self._idle_heartbeat = ConnectionHeartbeat(
+                        self.idle_heartbeat_interval,
+                        self.get_connection_holders,
+                        timeout=self.idle_heartbeat_timeout
+                    )
                 self._is_setup = True
 
         session = self._new_session(keyspace)
@@ -1395,8 +1407,10 @@ class Cluster(object):
         """
         if self.is_shutdown:
             return
+
         with host.lock:
             was_up = host.is_up
+
             # ignore down signals if we have open pools to the host
             # this is to avoid closing pools when a control connection host became isolated
             if self._discount_down_events and self.profile_manager.distance(host) != HostDistance.IGNORED:
@@ -2311,6 +2325,10 @@ class Session(object):
     def __exit__(self, *args):
         self.shutdown()
 
+    def __del__(self):
+        # Ensure all connections are closed, in case the Session object is deleted by the GC
+        self.shutdown()
+
     def add_or_renew_pool(self, host, is_host_addition):
         """
         For internal use only.
@@ -3132,7 +3150,7 @@ class ControlConnection(object):
         c = getattr(self, '_connection', None)
         return [c] if c else []
 
-    def return_connection(self, connection, mark_host_down=False):  # noqa
+    def return_connection(self, connection):
         if connection is self._connection and (connection.is_defunct or connection.is_closed):
             self.reconnect()
 
