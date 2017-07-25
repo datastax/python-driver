@@ -28,7 +28,7 @@ from cassandra.connection import Connection
 from cassandra.pool import Host
 
 from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21, PROTOCOL_VERSION
-from tests import notwindows
+from tests.integration import requiresmallclockgranularity
 
 from mock import patch
 
@@ -92,8 +92,7 @@ class HostFilterPolicyTests(unittest.TestCase):
         self.assertEqual(queried_hosts, all_hosts)
 
 
-# This doesn't work well with Windows clock granularity
-@notwindows
+@requiresmallclockgranularity
 class SpecExecTest(BasicSharedKeyspaceUnitTestCase):
 
     @classmethod

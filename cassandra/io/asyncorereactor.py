@@ -18,9 +18,10 @@ import logging
 import os
 import socket
 import sys
-from threading import Lock, Thread
+from threading import Lock, Thread, Event
 import time
 import weakref
+import sys
 
 from six.moves import range
 
@@ -49,6 +50,33 @@ def _cleanup(loop_weakref):
         return
 
     loop._cleanup()
+
+
+class WaitableTimer(Timer):
+    def __init__(self, timeout, callback):
+        Timer.__init__(self, timeout, callback)
+        self.callback = callback
+        self.event = Event()
+
+        self.final_exception = None
+
+    def finish(self, time_now):
+        try:
+            finished = Timer.finish(self, time_now)
+            if finished:
+                self.event.set()
+                return True
+            return False
+
+        except Exception as e:
+            self.final_exception = e
+            self.event.set()
+            return True
+
+    def wait(self, timeout=None):
+        self.event.wait(timeout)
+        if self.final_exception:
+            raise self.final_exception
 
 
 class _PipeWrapper(object):
@@ -239,6 +267,11 @@ class AsyncoreLoop(object):
     def add_timer(self, timer):
         self._timers.add_timer(timer)
 
+        # This function is called from a different thread than the event loop
+        # thread, so for this call to be thread safe, we must wake up the loop
+        # in case it's stuck at a select
+        self.wake_loop()
+
     def _cleanup(self):
         global _dispatcher_map
 
@@ -305,15 +338,22 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self.deque_lock = Lock()
 
         self._connect_socket()
-        asyncore.dispatcher.__init__(self, self._socket, _dispatcher_map)
+
+        # start the event loop if needed
+        self._loop.maybe_start()
+
+        init_handler = WaitableTimer(
+            timeout=0,
+            callback=partial(asyncore.dispatcher.__init__,
+                             self, self._socket, _dispatcher_map)
+        )
+        AsyncoreConnection._loop.add_timer(init_handler)
+        init_handler.wait(kwargs["connect_timeout"])
 
         self._writable = True
         self._readable = True
 
         self._send_options_message()
-
-        # start the event loop if needed
-        self._loop.maybe_start()
 
     def close(self):
         with self.lock:
@@ -324,7 +364,10 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         log.debug("Closing connection (%s) to %s", id(self), self.host)
         self._writable = False
         self._readable = False
-        asyncore.dispatcher.close(self)
+
+        # We don't have to wait for this to be closed, we can just schedule it
+        AsyncoreConnection.create_timer(0, partial(asyncore.dispatcher.close, self))
+
         log.debug("Closed socket to %s", self.host)
 
         if not self.is_defunct:
