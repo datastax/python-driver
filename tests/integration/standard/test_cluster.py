@@ -1020,7 +1020,7 @@ class ClusterTests(unittest.TestCase):
         queried_hosts = set()
         with Cluster(protocol_version=PROTOCOL_VERSION,
                      load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy())) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             session.execute('''
                     CREATE TABLE test1rf.table_with_big_key (
                         k1 int,
@@ -1042,7 +1042,7 @@ class ClusterTests(unittest.TestCase):
                      load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
                      predicate=lambda host: host.address != only_replica)) as cluster:
 
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             prepared = session.prepare("""SELECT * from test1rf.table_with_big_key
                                           WHERE k1 = ? AND k2 = ? AND k3 = ? AND k4 = ?""")
             for _ in range(10):
