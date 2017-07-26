@@ -31,6 +31,7 @@ from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthancass21
 from tests import notwindows
 
 from mock import patch
+from concurrent.futures import wait as wait_futures
 
 def setup_module():
     use_singledc()
@@ -83,7 +84,8 @@ class HostFilterPolicyTests(unittest.TestCase):
         self.assertEqual(queried_hosts, single_host)
 
         external_event = False
-        session.update_created_pools()
+        futures = session.update_created_pools()
+        wait_futures(futures, timeout=cluster.connect_timeout)
 
         queried_hosts = set()
         for _ in range(10):
