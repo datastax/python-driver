@@ -47,6 +47,7 @@ def _cleanup(loop_weakref):
         loop = loop_weakref()
     except ReferenceError:
         return
+
     loop._cleanup()
 
 

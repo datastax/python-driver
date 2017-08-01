@@ -16,19 +16,21 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import time
 import logging
+import time
 
-from cassandra import OperationTimedOut
-from cassandra.cluster import Cluster, _Scheduler, EXEC_PROFILE_DEFAULT, ExecutionProfile
-from cassandra.policies import RoundRobinPolicy, HostStateListener
 from concurrent.futures import ThreadPoolExecutor
 
-from tests.integration import ifsimulacron, CASSANDRA_VERSION
-from tests.integration.simulacron.utils import start_and_prime_cluster_defaults, prime_query, stop_simulacron, \
-    prime_request, PrimeOptions, NO_THEN
+from cassandra import OperationTimedOut
+from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
+                               _Scheduler)
+from cassandra.policies import HostStateListener, RoundRobinPolicy
+from tests.integration import CASSANDRA_VERSION, requiressimulacron
+from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
+                                                prime_query, prime_request,
+                                                start_and_prime_cluster_defaults,
+                                                stop_simulacron)
 
-import time
 
 class TrackDownListener(HostStateListener):
     hosts_marked_down = []
@@ -43,7 +45,7 @@ class ThreadTracker(ThreadPoolExecutor):
         self.called_functions.append(fn.__name__)
         return super(ThreadTracker, self).submit(fn, *args, **kwargs)
 
-@ifsimulacron
+@requiressimulacron
 class ConnectionTest(unittest.TestCase):
 
     def test_heart_beat_timeout(self):
@@ -65,6 +67,7 @@ class ConnectionTest(unittest.TestCase):
         idle_heartbeat_interval = 1
 
         start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc, CASSANDRA_VERSION)
+        self.addCleanup(stop_simulacron)
 
         listener = TrackDownListener()
         executor = ThreadTracker(max_workers=16)
@@ -76,6 +79,7 @@ class ConnectionTest(unittest.TestCase):
                           executor_threads=16,
                           execution_profiles={
                               EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())})
+        self.addCleanup(cluster.shutdown)
 
         cluster.scheduler.shutdown()
         cluster.executor = executor
@@ -83,11 +87,9 @@ class ConnectionTest(unittest.TestCase):
 
         session = cluster.connect(wait_for_all_pools=True)
         cluster.register_listener(listener)
+
         log = logging.getLogger()
         log.setLevel('CRITICAL')
-
-        self.addCleanup(cluster.shutdown)
-        self.addCleanup(stop_simulacron)
         self.addCleanup(log.setLevel, "DEBUG")
 
         prime_query(query_to_prime, then=NO_THEN)
@@ -105,7 +107,7 @@ class ConnectionTest(unittest.TestCase):
 
         # We allow from some extra time for all the hosts to be to on_down
         # The callbacks should start happening after idle_heartbeat_timeout + idle_heartbeat_interval
-        time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval)*2)
+        time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval) * 2)
 
         for host in cluster.metadata.all_hosts():
             self.assertIn(host, listener.hosts_marked_down)

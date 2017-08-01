@@ -29,20 +29,24 @@ class SimulacronCluster(object):
         self.json = json_text
         self.o = json.loads(json_text)
 
-    def get_cluster_id(self):
+    @property
+    def cluster_id(self):
         return self.o["id"]
 
-    def get_cluster_name(self):
+    @property
+    def cluster_name(self):
         return self.o["name"]
 
-    def get_data_centers_ids(self):
+    @property
+    def data_center_ids(self):
         return [dc["id"] for dc in self.o["data_centers"]]
 
-    def get_data_centers_names(self):
+    @property
+    def data_centers_names(self):
         return [dc["name"] for dc in self.o["data_centers"]]
 
     def get_node_ids(self, datacenter_id):
-        datacenter = list(filter(lambda x: x["id"] ==  datacenter_id, self.o["data_centers"])).pop()
+        datacenter = list(filter(lambda x: x["id"] == datacenter_id, self.o["data_centers"])).pop()
         return [node["id"] for node in datacenter["nodes"]]
 
 
@@ -216,14 +220,9 @@ class PrimeQuery(SimulacronRequest):
         self.datacenter_id = datacenter_id
         self.node_id = node_id
 
-        if self.cluster_id is not None:
-            self.path += "/{}".format(self.cluster_id)
-
-        if self.cluster_id is not None:
-            self.path += "/{}".format(self.datacenter_id)
-
-        if self.cluster_id is not None:
-            self.path += "/{}".format(self.node_id)
+        self.path += '/'.join([component for component in
+                               (self.cluster_id, self.datacenter_id, self.node_id)
+                               if component is not None])
 
     def fetch_url_params(self):
         return ""
@@ -249,7 +248,7 @@ class ClusterQuery(SimulacronRequest):
 
     def fetch_url_params(self):
         return "?cassandra_version={0}&data_centers={1}&name={2}".\
-            format(self.cassandra_version,  self.data_centers, self.cluster_name)
+            format(self.cassandra_version, self.data_centers, self.cluster_name)
 
 
 def prime_driver_defaults():
@@ -297,9 +296,9 @@ def start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, version=Non
 
 
 default_column_types = {
-      "key": "bigint",
-      "value": "ascii"
-    }
+    "key": "bigint",
+    "value": "ascii"
+}
 
 default_row = {"key": 2, "value": "value"}
 default_rows = [default_row]
@@ -309,9 +308,7 @@ def prime_request(request):
     """
     :param request: It could be PrimeQuery class or an PrimeOptions class
     """
-    client_simulacron = SimulacronClient()
-    response = client_simulacron.submit_request(request)
-    return response
+    return SimulacronClient().submit_request(request)
 
 
 def prime_query(query, rows=default_rows, column_types=default_column_types, when=None, then=None, cluster_name=DEFAULT_CLUSTER):
@@ -328,6 +325,4 @@ def clear_queries():
     """
     Clears all the queries that have been primed to simulacron
     """
-    client_simulacron = SimulacronClient()
-    client_simulacron.clear_all_queries()
-
+    SimulacronClient().clear_all_queries()

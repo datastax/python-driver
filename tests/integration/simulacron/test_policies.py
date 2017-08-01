@@ -21,7 +21,7 @@ from cassandra.cluster import Cluster, ExecutionProfile
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass21, ifsimulacron, SIMULACRON_JAR
+from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimulacron, SIMULACRON_JAR
 from tests import notwindows
 from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, \
     stop_simulacron, NO_THEN, clear_queries
@@ -42,7 +42,7 @@ class BadRoundRobinPolicy(RoundRobinPolicy):
 
 # This doesn't work well with Windows clock granularity
 @notwindows
-@ifsimulacron
+@requiressimulacron
 class SpecExecTest(unittest.TestCase):
 
     @classmethod
