@@ -314,6 +314,15 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         self.assertEqual(result_set.column_names, [u'user', u'game', u'year', u'month', u'day', u'score'])
 
+    def test_basic_json_query(self):
+        insert_query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)", consistency_level = ConsistencyLevel.QUORUM)
+        json_query = SimpleStatement("SELECT JSON * FROM test3rf.test where k=1", consistency_level = ConsistencyLevel.QUORUM)
+
+        self.session.execute(insert_query)
+        results = self.session.execute(json_query)
+        self.assertEqual(results.column_names, ["[json]"])
+        self.assertEqual(results[0][0], '{"k": 1, "v": 1}')
+
 
 class PreparedStatementTests(unittest.TestCase):
 
