@@ -39,6 +39,10 @@ class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
         # to make sure no monkey patching is happening
         if not MONKEY_PATCH_LOOP:
             return
+
+        # This is being added temporarily due to a bug in eventlet:
+        # https://github.com/eventlet/eventlet/issues/401
+        import eventlet; eventlet.sleep()
         monkey_patch()
         cls.connection_class = EventletConnection
         EventletConnection.initialize_reactor()
