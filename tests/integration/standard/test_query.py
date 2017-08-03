@@ -29,6 +29,7 @@ from cassandra.policies import HostDistance, RoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace
 from tests import notwindows
+from tests.integration import greaterthanorequalcass30
 
 import time
 import re
@@ -314,6 +315,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         self.assertEqual(result_set.column_names, [u'user', u'game', u'year', u'month', u'day', u'score'])
 
+    @greaterthanorequalcass30
     def test_basic_json_query(self):
         insert_query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)", consistency_level = ConsistencyLevel.QUORUM)
         json_query = SimpleStatement("SELECT JSON * FROM test3rf.test where k=1", consistency_level = ConsistencyLevel.QUORUM)
