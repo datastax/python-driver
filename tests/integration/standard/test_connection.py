@@ -127,6 +127,9 @@ class HeartbeatTest(unittest.TestCase):
             node.pause()
             # Wait for connections associated with this host go away
             self.wait_for_no_connections(host, self.cluster)
+
+            # Wait to seconds for the driver to be notified
+            time.sleep(2)
             self.assertTrue(test_listener.host_down)
             # Resume paused node
         finally:
