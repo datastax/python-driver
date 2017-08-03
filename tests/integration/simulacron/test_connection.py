@@ -21,14 +21,19 @@ import time
 
 from concurrent.futures import ThreadPoolExecutor
 
+from mock import Mock
+
 from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler)
 from cassandra.policies import HostStateListener, RoundRobinPolicy
-from tests.integration import CASSANDRA_VERSION, requiressimulacron
+from tests.integration import (CASSANDRA_VERSION, PROTOCOL_VERSION,
+                               requiressimulacron)
+from tests.integration.util import assert_quiescent_pool_state
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
                                                 start_and_prime_cluster_defaults,
+                                                start_and_prime_singledc,
                                                 stop_simulacron)
 
 
@@ -114,3 +119,39 @@ class ConnectionTest(unittest.TestCase):
 
         # In this case HostConnection._replace shouldn't be called
         self.assertNotIn("_replace", executor.called_functions)
+
+    def test_callbacks_and_pool_when_oto(self):
+        """
+        Test to ensure the callbacks are correcltly called and the connection
+        is returned when there is an OTO
+        @since 3.12
+        @jira_ticket PYTHON-630
+        @expected_result the connection is correctly returned to the pool
+        after an OTO, also the only the errback is called and not the callback
+        when the message finally arrives.
+
+        @test_category metadata
+        """
+        start_and_prime_singledc()
+        self.addCleanup(stop_simulacron)
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+
+        query_to_prime = "SELECT * from testkesypace.testtable"
+
+        server_delay = 2  # seconds
+        prime_query(query_to_prime, then={"delay_in_ms": server_delay * 1000})
+
+        future = session.execute_async(query_to_prime, timeout=1)
+        callback, errback = Mock(name='callback'), Mock(name='errback')
+        future.add_callbacks(callback, errback)
+        self.assertRaises(OperationTimedOut, future.result)
+
+        assert_quiescent_pool_state(self, cluster)
+
+        time.sleep(server_delay + 1)
+        # PYTHON-630 -- only the errback should be called
+        errback.assert_called_once()
+        callback.assert_not_called()

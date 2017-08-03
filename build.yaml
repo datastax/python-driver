@@ -14,11 +14,11 @@ schedules:
     branches:
       include: [/python.*/]
     env_vars: |
-      EVENT_LOOP_MANAGER='async'
+      EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
         - python: [3.4, 3.6]
-        - cassandra: ['2.0', '2.1']
+        - cassandra: ['2.0', '2.1', '3.0']
 
   weekly_libev:
     schedule: 0 10 * * 6
