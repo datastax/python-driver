@@ -24,5 +24,13 @@ install:
   - pip install tox-travis
 
 script:
+  - |
+    changed_code_filenames=`git diff --name-only $TRAVIS_COMMIT_RANGE`
+    changed_driver_filenames=`echo "$changed_code_filenames" | grep '^cassandra'`
+    changelog_changed=`echo "$changed_code_filenames" | grep '^CHANGELOG.rst'`
+    if [ "$changed_driver_filenames" ] && [ "$changelog_changed" = "" ] ; then
+      echo "This PR includes code changes, but no CHANGELOG changes. Please include a CHANGELOG entry."
+      exit 1
+    fi
   - tox
   - tox -e patched_loops
