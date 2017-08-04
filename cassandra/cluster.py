@@ -448,6 +448,8 @@ class Cluster(object):
             raise ValueError("Cannot set Cluster.load_balancing_policy while using Configuration Profiles. Set this in a profile instead.")
         self._load_balancing_policy = lbp
         self._config_mode = _ConfigMode.LEGACY
+        if self.profile_manager is not None:
+            self.profile_manager.profiles[EXEC_PROFILE_DEFAULT].load_balancing_policy = lbp
 
     @property
     def _default_load_balancing_policy(self):
@@ -476,6 +478,8 @@ class Cluster(object):
             raise ValueError("Cannot set Cluster.default_retry_policy while using Configuration Profiles. Set this in a profile instead.")
         self._default_retry_policy = policy
         self._config_mode = _ConfigMode.LEGACY
+        if self.profile_manager is not None:
+            self.profile_manager.profiles[EXEC_PROFILE_DEFAULT].load_balancing_policy = policy
 
     conviction_policy_factory = SimpleConvictionPolicy
     """
