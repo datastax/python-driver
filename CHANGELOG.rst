@@ -1,3 +1,11 @@
+3.12.0
+======
+
+Bug Fixes
+---------
+* Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception (PYTHON-781)
+
+
 3.11.0
 ======
 July 24, 2017
