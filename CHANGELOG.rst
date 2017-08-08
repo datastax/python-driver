@@ -1,3 +1,11 @@
+3.12.0
+======
+
+Bug Fixes
+---------
+* Both _set_final_exception/result called for the same ResponseFuture (PYTHON-630)
+
+
 3.11.0
 ======
 July 24, 2017

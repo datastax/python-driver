@@ -3370,6 +3370,22 @@ class ResponseFuture(object):
             self._timer.cancel()
 
     def _on_timeout(self):
+
+        try:
+            self._connection._requests.pop(self._req_id)
+        # This prevents the race condition of the
+        # event loop thread just receiving the waited message
+        # If it arrives after this, it will be ignored
+        except KeyError:
+            return
+
+        pool = self.session._pools.get(self._current_host)
+        if pool and not pool.is_shutdown:
+            with self._connection.lock:
+                self._connection.request_ids.append(self._req_id)
+
+            pool.return_connection(self._connection)
+
         errors = self._errors
         if not errors:
             if self.is_schema_agreed:

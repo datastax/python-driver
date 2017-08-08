@@ -33,7 +33,8 @@ from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateList
 from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDRA_IP, local, requiresmallclockgranularity
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDRA_IP, local, \
+    requiresmallclockgranularity, greaterthancass20
 try:
     from cassandra.io.libevreactor import LibevConnection
 except ImportError:
@@ -114,6 +115,7 @@ class HeartbeatTest(unittest.TestCase):
         self.cluster.shutdown()
 
     @local
+    @greaterthancass20
     def test_heart_beat_timeout(self):
         # Setup a host listener to ensure the nodes don't go down
         test_listener = TestHostListener()
