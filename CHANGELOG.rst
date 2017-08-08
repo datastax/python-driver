@@ -5,7 +5,7 @@ Bug Fixes
 ---------
 * Both _set_final_exception/result called for the same ResponseFuture (PYTHON-630)
 * Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception (PYTHON-781)
-
+* ControlConnection._reconnect_internal is usually called several times when a reconnection needs to happen (PYTHON-807)
 
 3.11.0
 ======

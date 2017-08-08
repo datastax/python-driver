@@ -34,7 +34,8 @@ from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
                                                 start_and_prime_cluster_defaults,
                                                 start_and_prime_singledc,
-                                                stop_simulacron)
+                                                stop_simulacron,
+                                                clear_queries)
 
 
 class TrackDownListener(HostStateListener):
@@ -119,6 +120,12 @@ class ConnectionTest(unittest.TestCase):
 
         # In this case HostConnection._replace shouldn't be called
         self.assertNotIn("_replace", executor.called_functions)
+
+        clear_queries()
+        # We leave some time for the connections to recover
+        time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval) * 3)
+        
+        assert_quiescent_pool_state(self, cluster)
 
     def test_callbacks_and_pool_when_oto(self):
         """

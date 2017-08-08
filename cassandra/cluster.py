@@ -2635,6 +2635,8 @@ class ControlConnection(object):
 
         self._event_schedule_times = {}
 
+        self._is_reconnecting = False
+
     def connect(self):
         if self._is_shutdown:
             return
@@ -2736,7 +2738,10 @@ class ControlConnection(object):
     def reconnect(self):
         if self._is_shutdown:
             return
+        if self._is_reconnecting:
+            return
 
+        self._is_reconnecting = True
         self._submit(self._reconnect)
 
     def _reconnect(self):
@@ -2764,6 +2769,8 @@ class ControlConnection(object):
         except Exception:
             log.debug("[control connection] error reconnecting", exc_info=True)
             raise
+        finally:
+            self._is_reconnecting = False
 
     def _get_and_set_reconnection_handler(self, new_handler):
         """
@@ -3157,7 +3164,7 @@ class ControlConnection(object):
 
     def get_connections(self):
         c = getattr(self, '_connection', None)
-        return [c] if c else []
+        return [c] if c and not self._is_reconnecting else []
 
     def return_connection(self, connection):
         if connection is self._connection and (connection.is_defunct or connection.is_closed):
