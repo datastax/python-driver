@@ -41,7 +41,6 @@ class BadRoundRobinPolicy(RoundRobinPolicy):
 
 
 # This doesn't work well with Windows clock granularity
-@notwindows
 @requiressimulacron
 class SpecExecTest(unittest.TestCase):
 
@@ -54,10 +53,16 @@ class SpecExecTest(unittest.TestCase):
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
 
-        spec_ep_brr = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 20))
-        spec_ep_rr = ExecutionProfile(speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 20))
-        spec_ep_rr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.01, 1))
-        spec_ep_brr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(), speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0.4, 10))
+        spec_ep_brr = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(),
+                                       speculative_execution_policy=ConstantSpeculativeExecutionPolicy(1, 6),
+                                       request_timeout=12)
+        spec_ep_rr = ExecutionProfile(speculative_execution_policy=ConstantSpeculativeExecutionPolicy(.5, 10),
+                                      request_timeout=12)
+        spec_ep_rr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(),
+                                          speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0.5, 1),
+                                          request_timeout=12)
+        spec_ep_brr_lim = ExecutionProfile(load_balancing_policy=BadRoundRobinPolicy(),
+                                           speculative_execution_policy=ConstantSpeculativeExecutionPolicy(4, 10))
 
         cls.cluster.add_execution_profile("spec_ep_brr", spec_ep_brr)
         cls.cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
@@ -88,14 +93,14 @@ class SpecExecTest(unittest.TestCase):
         @test_category metadata
         """
         query_to_prime = "INSERT INTO test3rf.test (k, v) VALUES (0, 1);"
-        prime_query(query_to_prime, then={"delay_in_ms": 4000})
+        prime_query(query_to_prime, then={"delay_in_ms": 10000})
 
         statement = SimpleStatement(query_to_prime, is_idempotent=True)
         statement_non_idem = SimpleStatement(query_to_prime, is_idempotent=False)
 
         # This LBP should repeat hosts up to around 30
         result = self.session.execute(statement, execution_profile='spec_ep_brr')
-        self.assertEqual(21, len(result.response_future.attempted_hosts))
+        self.assertEqual(7, len(result.response_future.attempted_hosts))
 
         # This LBP should keep host list to 3
         result = self.session.execute(statement, execution_profile='spec_ep_rr')
@@ -110,11 +115,11 @@ class SpecExecTest(unittest.TestCase):
         self.assertEqual(1, len(result.response_future.attempted_hosts))
 
         # Default policy with non_idem query
-        result = self.session.execute(statement_non_idem)
+        result = self.session.execute(statement_non_idem, timeout=12)
         self.assertEqual(1, len(result.response_future.attempted_hosts))
 
         # Should be able to run an idempotent query against default execution policy with no speculative_execution_policy
-        result = self.session.execute(statement)
+        result = self.session.execute(statement, timeout=12)
         self.assertEqual(1, len(result.response_future.attempted_hosts))
 
         # Test timeout with spec_ex
@@ -147,17 +152,18 @@ class SpecExecTest(unittest.TestCase):
 
         @test_category metadata
         """
-        prime_query("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", then=NO_THEN)
+        query_to_prime = "INSERT INTO testkeyspace.testtable (k, v) VALUES (0, 1);"
+        prime_query(query_to_prime, then=NO_THEN)
 
-        statement = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 1);", is_idempotent=True)
+        statement = SimpleStatement(query_to_prime, is_idempotent=True)
 
         # An OperationTimedOut is placed here in response_future,
         # that's why we can't call session.execute,which would raise it, but
         # we have to directly wait for the event
         response_future = self.session.execute_async(statement, execution_profile='spec_ep_brr_lim',
-                                                     timeout=2.2)
-        response_future._event.wait(4)
+                                                     timeout=14)
+        response_future._event.wait(16)
         self.assertIsInstance(response_future._final_exception, OperationTimedOut)
 
-        # This is because 2.2 / 0.4 + 1 = 6
-        self.assertEqual(len(response_future.attempted_hosts), 6)
+        # This is because 14 / 4 + 1 = 4
+        self.assertEqual(len(response_future.attempted_hosts), 4)
