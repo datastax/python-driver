@@ -22,7 +22,6 @@ from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy
 
 from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimulacron, SIMULACRON_JAR
-from tests import notwindows
 from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, \
     stop_simulacron, NO_THEN, clear_queries
 

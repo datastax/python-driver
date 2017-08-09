@@ -11,8 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
-from tests.integration.simulacron.utils import stop_simulacron
+from tests.integration.simulacron.utils import stop_simulacron, clear_queries
+
 
 def teardown_package():
     stop_simulacron()
+
+
+class SimulacronBase(unittest.TestCase):
+    def tearDown(self):
+        clear_queries()
+        stop_simulacron()
