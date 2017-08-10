@@ -1175,6 +1175,9 @@ class Cluster(object):
 
                 self.profile_manager.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
+                self.load_balancing_policy.populate(
+                    weakref.proxy(self), self.metadata.all_hosts()
+                )
 
                 try:
                     self.control_connection.connect()
@@ -2661,7 +2664,13 @@ class ControlConnection(object):
         a connection to that host.
         """
         errors = {}
-        for host in self._cluster._default_load_balancing_policy.make_query_plan():
+        lbp = (
+            self._cluster.load_balancing_policy
+            if self._cluster._config_mode == _ConfigMode.LEGACY else
+            self._cluster._default_load_balancing_policy
+        )
+
+        for host in lbp.make_query_plan():
             try:
                 return self._try_connect(host)
             except ConnectionException as exc:

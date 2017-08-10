@@ -824,6 +824,18 @@ class ClusterTests(unittest.TestCase):
             # make sure original profile is not impacted
             self.assertTrue(session.execute(query, execution_profile='node1')[0].release_version)
 
+    def test_setting_lbp_legacy(self):
+        cluster = Cluster()
+        self.addCleanup(cluster.shutdown)
+        cluster.load_balancing_policy = RoundRobinPolicy()
+        self.assertEqual(
+            list(cluster.load_balancing_policy.make_query_plan()), []
+        )
+        cluster.connect()
+        self.assertNotEqual(
+            list(cluster.load_balancing_policy.make_query_plan()), []
+        )
+
     def test_profile_lb_swap(self):
         """
         Tests that profile load balancing policies are not shared
