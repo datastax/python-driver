@@ -6,6 +6,7 @@ echo $env:Path
 echo "JAVA_HOME: $env:JAVA_HOME"
 echo "PYTHONPATH: $env:PYTHONPATH"
 echo "Cassandra version: $env:CASSANDRA_VERSION"
+echo "Simulacron jar: $env:SIMULACRON_JAR"
 echo $env:ci_type
 python --version
 python -c "import platform; print(platform.architecture())"
@@ -27,6 +28,12 @@ if($env:ci_type -eq 'unit'){
 }
 
 if($env:ci_type -eq 'standard'){
+    echo "Running simulacron tests"
+    nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=simulacron_results.xml .\tests\integration\simulacron
+    $simulacron_tests_result = $lastexitcode
+    $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\simulacron_results.xml))
+    echo "uploading Simulacron test results"
+
     echo "Running CQLEngine integration tests"
     nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=cqlengine_results.xml .\tests\integration\cqlengine
     $cqlengine_tests_result = $lastexitcode
@@ -46,6 +53,6 @@ if($env:ci_type -eq 'long'){
     echo "uploading standard integration test results"
 }
 
-$exit_result = $unit_tests_result + $cqlengine_tests_result + $integration_tests_result
+$exit_result = $unit_tests_result + $cqlengine_tests_result + $integration_tests_result + $simulacron_tests_result
 echo "Exit result: $exit_result"
 exit $exit_result
