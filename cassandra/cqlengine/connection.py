@@ -259,8 +259,7 @@ def default():
     except:
         pass
 
-    conn = register_connection('default', hosts=None, default=True)
-    conn.setup()
+    register_connection('default', hosts=None, default=True)
 
     log.debug("cqlengine connection initialized with default session to localhost")
 
