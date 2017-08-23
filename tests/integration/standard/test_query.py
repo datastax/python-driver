@@ -1037,6 +1037,11 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(create_mv_monthlyhigh)
         self.session.execute(create_mv_filtereduserhigh)
 
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.alltimehigh".format(self.keyspace_name))
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.dailyhigh".format(self.keyspace_name))
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.monthlyhigh".format(self.keyspace_name))
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.filtereduserhigh".format(self.keyspace_name))
+
         prepared_insert = self.session.prepare("""INSERT INTO {0}.scores (user, game, year, month, day, score) VALUES  (?, ?, ? ,? ,?, ?)""".format(self.keyspace_name))
 
         bound = prepared_insert.bind(('pcmanus', 'Coup', 2015, 5, 1, 4000))
