@@ -353,7 +353,7 @@ class AbstractQuerySet(object):
 
         # CQL has a default limit of 10000, it's defined here
         # because explicit is better than implicit
-        self._limit = 10000
+        self._limit = None
 
         # We store the fields for which we use the Equal operator
         # in a query, so we don't select it from the DB. _defer_fields
@@ -873,8 +873,6 @@ class AbstractQuerySet(object):
     def limit(self, v):
         """
         Limits the number of results returned by Cassandra. Use *0* or *None* to disable.
-
-        *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
 
         .. code-block:: python
 
