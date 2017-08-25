@@ -5,7 +5,7 @@ Bug Fixes
 ---------
 * Both _set_final_exception/result called for the same ResponseFuture (PYTHON-630)
 * Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception (PYTHON-781)
-
+* Remove default limit on QuerySets (PYTHON-517)
 
 3.11.0
 ======
