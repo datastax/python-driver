@@ -23,7 +23,6 @@ from cassandra import util
 from cassandra.cqlengine import connection
 import cassandra
 import datetime
-from numpy.random import randint
 
 from cassandra.cqlengine.management import create_keyspace_simple
 
@@ -61,11 +60,12 @@ def insert_data(num=1):
     print("----- INSERT COLUMNS -----")
 
     INSERT_USER = 0
-    INSERT_PROP = ['AAAAA', 'BBBBB', 'CCCCC']
+    INSERT_PROP = 0
 
     while (INSERT_USER < num):
-        test_table.create(user=str(INSERT_USER), prop=INSERT_PROP[randint(3)])
+        test_table.create(user=str(INSERT_USER), prop=str(INSERT_USER))
         INSERT_USER += 1
+        INSERT_PROP += 1
 
 # Test
 class LimitTest(unittest.TestCase):
