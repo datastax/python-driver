@@ -23,19 +23,19 @@ class MessageTest(unittest.TestCase):
         message = PrepareMessage("a")
         io = Mock()
 
-        message.send_body(io,4)
+        message.send_body(io, 4)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',)])
 
         io.reset_mock()
-        message.send_body(io,5)
+        message.send_body(io, 5)
 
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x00\x00\x00',)])
 
     def test_execute_message(self):
-        message = ExecuteMessage('1',[],4)
+        message = ExecuteMessage('1', [], 4)
         io = Mock()
 
-        message.send_body(io,4)
+        message.send_body(io, 4)
         self._check_calls(io, [(b'\x00\x01',), (b'1',), (b'\x00\x04',), (b'\x01',), (b'\x00\x00',)])
 
         io.reset_mock()
