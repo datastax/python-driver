@@ -63,7 +63,6 @@ class MessageTest(unittest.TestCase):
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00\x00\x00\x00',)])
 
     def _check_calls(self, io, expected):
-        self.assertEqual(len(io.write.mock_calls), len(expected))
         self.assertEqual(
             tuple(c[1] for c in io.write.mock_calls),
             tuple(expected)
@@ -86,11 +85,28 @@ class MessageTest(unittest.TestCase):
         for version in ProtocolVersion.SUPPORTED_VERSIONS:
             message.send_body(io, version)
             if ProtocolVersion.uses_prepare_flags(version):
-                # This should pass after PYTHON-696
                 self.assertEqual(len(io.write.mock_calls), 3)
-                # self.assertEqual(uint32_unpack(io.write.mock_calls[2][1][0]) & _WITH_SERIAL_CONSISTENCY_FLAG, 1)
             else:
                 self.assertEqual(len(io.write.mock_calls), 2)
+            io.reset_mock()
+
+    def test_prepare_flag_with_keyspace(self):
+        message = PrepareMessage("a", keyspace='ks')
+        io = Mock()
+
+        for version in ProtocolVersion.SUPPORTED_VERSIONS:
+            if ProtocolVersion.uses_keyspace_flag(version):
+                message.send_body(io, version)
+                self._check_calls(io, [
+                    ('\x00\x00\x00\x01',),
+                    ('a',),
+                    ('\x00\x00\x00\x80',),
+                    (b'\x00\x02',),
+                    (b'ks',),
+                ])
+            else:
+                with self.assertRaises(UnsupportedOperation):
+                    message.send_body(io, version)
             io.reset_mock()
 
     def test_keyspace_flag_raises_before_v5(self):
@@ -127,16 +143,3 @@ class MessageTest(unittest.TestCase):
             (b'\x00\x08',),  # length of keyspace string
             (b'keyspace',),
         ])
-
-    def test_prepared_with_keyspace(self):
-        io = Mock(name='io')
-        base_expected = [
-            (b'\x00\x00\x00\x01',),
-            (b'a',),
-            (b'\x00\x03',),
-            (b'\x00\x00\x00\x80',),  # options w/ keyspace flag
-        ]
-
-        QueryMessage('a', consistency_level=3, keyspace='ks').send_body(
-            io, protocol_version=5
-        )

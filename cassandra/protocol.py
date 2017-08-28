@@ -780,14 +780,38 @@ class PrepareMessage(_MessageType):
     opcode = 0x09
     name = 'PREPARE'
 
-    def __init__(self, query):
+    def __init__(self, query, keyspace=None):
         self.query = query
+        self.keyspace = keyspace
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
+
+        flags = 0x00
+
+        if self.keyspace is not None:
+            if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                flags |= _WITH_KEYSPACE_FLAG
+            else:
+                raise UnsupportedOperation(
+                    "Keyspaces may only be set on queries with protocol version "
+                    "5 or higher. Consider setting Cluster.protocol_version to 5.")
+
         if ProtocolVersion.uses_prepare_flags(protocol_version):
-            # Write the flags byte; with 0 value for now, but this should change in PYTHON-678
-            write_uint(f, 0)
+            write_uint(f, flags)
+        else:
+            # checks above should prevent this, but just to be safe...
+            if flags:
+                raise UnsupportedOperation(
+                    "Attempted to set flags with value {flags:0=#8x} on"
+                    "protocol version {pv}, which doesn't support flags"
+                    "in prepared statements."
+                    "Consider setting Cluster.protocol_version to 5."
+                    "".format(flags=flags, pv=protocol_version))
+
+        if ProtocolVersion.uses_keyspace_flag(protocol_version):
+            if self.keyspace:
+                write_string(f, self.keyspace)
 
 
 class ExecuteMessage(_MessageType):
@@ -909,7 +933,8 @@ class BatchMessage(_MessageType):
                 write_long(f, self.timestamp)
 
             if ProtocolVersion.uses_keyspace_flag(protocol_version):
-                write_string(self.keyspace)
+                if self.keyspace is not None:
+                    write_string(f, self.keyspace)
 
 
 known_event_types = frozenset((
