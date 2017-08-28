@@ -507,6 +507,7 @@ _PAGE_SIZE_FLAG = 0x04
 _WITH_PAGING_STATE_FLAG = 0x08
 _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
 _PROTOCOL_TIMESTAMP = 0x20
+_WITH_KEYSPACE_FLAG = 0x80
 
 
 class QueryMessage(_MessageType):
@@ -514,13 +515,14 @@ class QueryMessage(_MessageType):
     name = 'QUERY'
 
     def __init__(self, query, consistency_level, serial_consistency_level=None,
-                 fetch_size=None, paging_state=None, timestamp=None):
+                 fetch_size=None, paging_state=None, timestamp=None, keyspace=None):
         self.query = query
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.fetch_size = fetch_size
         self.paging_state = paging_state
         self.timestamp = timestamp
+        self.keyspace = keyspace
         self._query_params = None  # only used internally. May be set to a list of native-encoded values to have them sent with the request.
 
     def send_body(self, f, protocol_version):
@@ -558,6 +560,14 @@ class QueryMessage(_MessageType):
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP
 
+        if self.keyspace is not None:
+            if protocol_version >= 5:
+                flags |= _WITH_KEYSPACE_FLAG
+            else:
+                raise UnsupportedOperation(
+                    "Keyspaces may only be set on queries with protocol version "
+                    "5 or higher. Consider setting Cluster.protocol_version to 5.")
+
         if ProtocolVersion.uses_int_query_flags(protocol_version):
             write_uint(f, flags)
         else:
@@ -576,6 +586,8 @@ class QueryMessage(_MessageType):
             write_consistency_level(f, self.serial_consistency_level)
         if self.timestamp is not None:
             write_long(f, self.timestamp)
+        if self.keyspace is not None:
+            write_string(f, self.keyspace)
 
 
 CUSTOM_TYPE = object()

@@ -1,11 +1,10 @@
-
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest # noqa
 
 from mock import Mock
-from cassandra import ProtocolVersion
+from cassandra import ProtocolVersion, UnsupportedOperation
 from cassandra.protocol import PrepareMessage, QueryMessage, ExecuteMessage
 
 class MessageTest(unittest.TestCase):
@@ -53,20 +52,24 @@ class MessageTest(unittest.TestCase):
 
         @test_category connection
         """
-        message = QueryMessage("a",3)
+        message = QueryMessage("a", 3)
         io = Mock()
-        
-        message.send_body(io,4)
+
+        message.send_body(io, 4)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00',)])
 
         io.reset_mock()
-        message.send_body(io,5)
+        message.send_body(io, 5)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00\x00\x00\x00',)])
 
     def _check_calls(self, io, expected):
         self.assertEqual(len(io.write.mock_calls), len(expected))
-        for call, expect in zip(io.write.mock_calls, expected):
-            self.assertEqual(call[1], expect)
+        self.assertEqual(
+            tuple(c[1] for c in io.write.mock_calls),
+            tuple(expected)
+        )
+        # for call, expect in zip(io.write.mock_calls, expected):
+        #     self.assertEqual(call[1], expect)
 
     def test_prepare_flag(self):
         """
@@ -89,3 +92,51 @@ class MessageTest(unittest.TestCase):
             else:
                 self.assertEqual(len(io.write.mock_calls), 2)
             io.reset_mock()
+
+    def test_keyspace_flag_raises_before_v5(self):
+        keyspace_message = QueryMessage('a', consistency_level=3, keyspace='ks')
+        io = Mock(name='io')
+
+        with self.assertRaisesRegex(UnsupportedOperation, 'Keyspaces.*set'):
+            keyspace_message.send_body(io, protocol_version=4)
+        io.assert_not_called()
+
+    def test_keyspace_written_with_length(self):
+        io = Mock(name='io')
+        base_expected = [
+            (b'\x00\x00\x00\x01',),
+            (b'a',),
+            (b'\x00\x03',),
+            (b'\x00\x00\x00\x80',),  # options w/ keyspace flag
+        ]
+
+        QueryMessage('a', consistency_level=3, keyspace='ks').send_body(
+            io, protocol_version=5
+        )
+        self._check_calls(io, base_expected + [
+            (b'\x00\x02',),  # length of keyspace string
+            (b'ks',),
+        ])
+
+        io.reset_mock()
+
+        QueryMessage('a', consistency_level=3, keyspace='keyspace').send_body(
+            io, protocol_version=5
+        )
+        self._check_calls(io, base_expected + [
+            (b'\x00\x08',),  # length of keyspace string
+            (b'keyspace',),
+        ])
+
+    def test_prepared_with_keyspace(self):
+        io = Mock(name='io')
+        base_expected = [
+            (b'\x00\x00\x00\x01',),
+            (b'a',),
+            (b'\x00\x03',),
+            (b'\x00\x00\x00\x80',),  # options w/ keyspace flag
+        ]
+
+        QueryMessage('a', consistency_level=3, keyspace='ks').send_body(
+            io, protocol_version=5
+        )
