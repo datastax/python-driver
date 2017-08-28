@@ -561,7 +561,7 @@ class QueryMessage(_MessageType):
             flags |= _PROTOCOL_TIMESTAMP
 
         if self.keyspace is not None:
-            if protocol_version >= 5:
+            if ProtocolVersion.uses_keyspace_flag(protocol_version):
                 flags |= _WITH_KEYSPACE_FLAG
             else:
                 raise UnsupportedOperation(
