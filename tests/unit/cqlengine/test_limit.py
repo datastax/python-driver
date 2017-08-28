@@ -25,64 +25,67 @@ import cassandra
 import datetime
 
 from cassandra.cqlengine.management import create_keyspace_simple
-
-KEYSPACE = 'test_keyspace'
-TABLE = "test_table"
-COLUMNS_NUM = 10100
-
-cluster = Cluster(['127.0.0.1', '127.0.0.2', '127.0.0.3'])
-session = cluster.connect()
-
-## Connection Setting
-c = connection.setup(['127.0.0.1'], 'cqlengine', protocol_version=3)
+from tests.integration import PROTOCOL_VERSION
 
 ## Create DB object
 class test_table(Model):
-    __keyspace__=KEYSPACE
 
+    __keyspace__ = "test_keyspace"
     user = columns.Integer(primary_key=True)
     prop = columns.Text()
-
-
-def create_database():
-    print("----- CREATE KEYSPACE & TABLE -----")
-
-    create_keyspace_simple(KEYSPACE, replication_factor=3)
-    session.set_keyspace(KEYSPACE)
-
-    try:
-        session.execute("CREATE TABLE " + TABLE + " (user int, prop text, PRIMARY KEY (user))")
-    except cassandra.AlreadyExists:
-        print('TABLE ' + TABLE + " is already exists")
-
-
-def insert_data(num=1):
-    print("----- INSERT COLUMNS -----")
-
-    INSERT_USER = 0
-    INSERT_PROP = 0
-
-    while (INSERT_USER < num):
-        test_table.create(user=str(INSERT_USER), prop=str(INSERT_USER))
-        INSERT_USER += 1
-        INSERT_PROP += 1
 
 # Test
 class LimitTest(unittest.TestCase):
 
+    def setUp(self):
+        self.KEYSPACE = 'test_keyspace'
+        self.TABLE = 'test_table'
+        self.COLUMNS_NUM = 10100
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1', '127.0.0.2', '127.0.0.3'])
+        self.session = self.cluster.connect()
+        self.c = connection.setup(['127.0.0.1'], 'cqlengine', protocol_version=3)
+
+    def create_database(self):
+        print("----- CREATE KEYSPACE & TABLE -----")
+
+        create_keyspace_simple(self.KEYSPACE, replication_factor=3)
+        self.session.set_keyspace(self.KEYSPACE)
+
+        try:
+            self.session.execute("CREATE TABLE " + self.TABLE + " (user int, prop text, PRIMARY KEY (user))")
+        except cassandra.AlreadyExists:
+            print('TABLE ' + self.TABLE + " is already exists")
+
+    def insert_data(self, num=1):
+        print("----- INSERT COLUMNS -----")
+
+        INSERT_USER = 0
+        INSERT_PROP = 0
+
+        while (INSERT_USER < num):
+            self.table.create(user=str(INSERT_USER), prop=str(INSERT_PROP))
+            INSERT_USER += 1
+            INSERT_PROP += 2
+
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
     def test_check_number_columns(self):
+
+        self.create_database()
+
+        self.session.set_keyspace(self.KEYSPACE)
+
+        self.table = test_table()
+        self.insert_data(self.COLUMNS_NUM)
+
         # No limit()
         Limit = len(test_table.all())
+
         # None
         All = len(test_table.all().limit(None))
 
         self.assertEqual(Limit, All)
 
-if __name__ == '__main__':
-
-    create_database()
-    insert_data(COLUMNS_NUM)
-
-    session.set_keyspace(KEYSPACE)
-
-    unittest.main(exit=False)
+        self.tearDown()
