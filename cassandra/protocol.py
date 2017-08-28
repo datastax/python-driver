@@ -864,12 +864,14 @@ class BatchMessage(_MessageType):
     name = 'BATCH'
 
     def __init__(self, batch_type, queries, consistency_level,
-                 serial_consistency_level=None, timestamp=None):
+                 serial_consistency_level=None, timestamp=None,
+                 keyspace=None):
         self.batch_type = batch_type
         self.queries = queries
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.timestamp = timestamp
+        self.keyspace = keyspace
 
     def send_body(self, f, protocol_version):
         write_byte(f, self.batch_type.value)
@@ -893,6 +895,8 @@ class BatchMessage(_MessageType):
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
             if self.timestamp is not None:
                 flags |= _PROTOCOL_TIMESTAMP
+            if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                flags |= _WITH_KEYSPACE_FLAG
 
             if ProtocolVersion.uses_int_query_flags(protocol_version):
                 write_int(f, flags)
@@ -903,6 +907,9 @@ class BatchMessage(_MessageType):
                 write_consistency_level(f, self.serial_consistency_level)
             if self.timestamp is not None:
                 write_long(f, self.timestamp)
+
+            if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                write_string(self.keyspace)
 
 
 known_event_types = frozenset((
