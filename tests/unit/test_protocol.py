@@ -69,8 +69,6 @@ class MessageTest(unittest.TestCase):
             tuple(c[1] for c in io.write.mock_calls),
             tuple(expected)
         )
-        # for call, expect in zip(io.write.mock_calls, expected):
-        #     self.assertEqual(call[1], expect)
 
     def test_prepare_flag(self):
         """
