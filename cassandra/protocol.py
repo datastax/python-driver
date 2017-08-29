@@ -919,8 +919,13 @@ class BatchMessage(_MessageType):
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
             if self.timestamp is not None:
                 flags |= _PROTOCOL_TIMESTAMP
-            if ProtocolVersion.uses_keyspace_flag(protocol_version):
-                flags |= _WITH_KEYSPACE_FLAG
+            if self.keyspace:
+                if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                    flags |= _WITH_KEYSPACE_FLAG
+                else:
+                    raise UnsupportedOperation(
+                        "Keyspaces may only be set on queries with protocol version "
+                        "5 or higher. Consider setting Cluster.protocol_version to 5.")
 
             if ProtocolVersion.uses_int_query_flags(protocol_version):
                 write_int(f, flags)

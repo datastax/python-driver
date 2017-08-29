@@ -5,7 +5,9 @@ except ImportError:
 
 from mock import Mock
 from cassandra import ProtocolVersion, UnsupportedOperation
-from cassandra.protocol import PrepareMessage, QueryMessage, ExecuteMessage
+from cassandra.protocol import (PrepareMessage, QueryMessage, ExecuteMessage,
+                                BatchMessage)
+from cassandra.query import SimpleStatement, BatchType
 
 class MessageTest(unittest.TestCase):
 
@@ -143,3 +145,28 @@ class MessageTest(unittest.TestCase):
             (b'\x00\x08',),  # length of keyspace string
             (b'keyspace',),
         ])
+
+    def test_batch_message_with_keyspace(self):
+        self.maxDiff = None
+        io = Mock(name='io')
+        batch = BatchMessage(
+            batch_type=BatchType.LOGGED,
+            queries=((False, 'stmt a', ('param a',)),
+                     (False, 'stmt b', ('param b',)),
+                     (False, 'stmt c', ('param c',))
+                     ),
+            consistency_level=3,
+            keyspace='ks'
+        )
+        batch.send_body(io, protocol_version=5)
+        self._check_calls(io,
+            (('\x00',), ('\x00\x03',), ('\x00',),
+             ('\x00\x00\x00\x06',), ('stmt a',),
+             ('\x00\x01',), ('\x00\x00\x00\x07',), ('param a',),
+             ('\x00',), ('\x00\x00\x00\x06',), ('stmt b',),
+             ('\x00\x01',), ('\x00\x00\x00\x07',), ('param b',),
+             ('\x00',), ('\x00\x00\x00\x06',), ('stmt c',),
+             ('\x00\x01',), ('\x00\x00\x00\x07',), ('param c',),
+             ('\x00\x03',),
+             ('\x00\x00\x00\x80',), ('\x00\x02',), ('ks',))
+        )
