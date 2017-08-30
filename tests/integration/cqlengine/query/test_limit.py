@@ -81,11 +81,16 @@ class LimitTest(unittest.TestCase):
         self.insert_data(self.COLUMNS_NUM)
 
         # No limit()
-        Limit = len(test_table.all())
+        Limit = len(self.table.all())
 
         # None
-        All = len(test_table.all().limit(None))
+        All = len(self.table.all().limit(None))
 
         self.assertEqual(Limit, All)
 
-        self.tearDown()
+
+
+
+if __name__ == '__main__':
+
+    unittest.main(exit=False)
