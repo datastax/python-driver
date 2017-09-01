@@ -41,6 +41,7 @@ from cassandra.cqlengine import statements
 from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
+from cassandra.cqlengine.management import sync_table
 from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21
 from tests.integration.cqlengine import execute_count
 
@@ -305,6 +306,11 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         q = TestModel.objects.defer(['test_id', 'attempt_id', 'description', 'expected_result', 'test_result'])
         self.assertEqual(q._select_fields(), ['test_id'])
 
+    def test_limit(self):
+        sync_table(TestModel)
+        for i in range(10010):
+            TestModel.objects.create(test_id=i,attempt_id=i)
+        self.assertEqual(len(TestModel.all()), 10010)
 
 class BaseQuerySetUsage(BaseCassEngTestCase):
 

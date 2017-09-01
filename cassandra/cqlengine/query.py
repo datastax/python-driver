@@ -351,8 +351,6 @@ class AbstractQuerySet(object):
 
         self._allow_filtering = False
 
-        # CQL has a default limit of 10000, it's defined here
-        # because explicit is better than implicit
         self._limit = None
 
         # We store the fields for which we use the Equal operator
