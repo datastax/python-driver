@@ -27,11 +27,8 @@ from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor
 
 from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
-from cassandra.metadata import (Metadata, KeyspaceMetadata, IndexMetadata,
-                                Token, MD5Token, TokenMap, murmur3, Function, Aggregate, protect_name, protect_names,
-                                get_schema_parser, RegisteredTableExtension, _RegisteredExtensionType)
-from cassandra.policies import SimpleConvictionPolicy
-from cassandra.pool import Host
+from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate,  protect_name, protect_names,
+                                RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,)
 
 from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
@@ -1464,31 +1461,6 @@ class TokenMetadataTest(unittest.TestCase):
         self.assertTrue(issubclass(tmap.token_class, Token))
         self.assertEqual(expected_node_count, len(tmap.ring))
         cluster.shutdown()
-
-    def test_getting_replicas(self):
-        tokens = [MD5Token(i) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
-        hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
-        token_to_primary_replica = dict(zip(tokens, hosts))
-        keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
-        metadata = Mock(spec=Metadata, keyspaces={'ks': keyspace})
-        token_map = TokenMap(MD5Token, token_to_primary_replica, tokens, metadata)
-
-        # tokens match node tokens exactly
-        for i, token in enumerate(tokens):
-            expected_host = hosts[(i + 1) % len(hosts)]
-            replicas = token_map.get_replicas("ks", token)
-            self.assertEqual(set(replicas), set([expected_host]))
-
-        # shift the tokens back by one
-        for token, expected_host in zip(tokens, hosts):
-            replicas = token_map.get_replicas("ks", MD5Token(token.value - 1))
-            self.assertEqual(set(replicas), set([expected_host]))
-
-        # shift the tokens forward by one
-        for i, token in enumerate(tokens):
-            replicas = token_map.get_replicas("ks", MD5Token(token.value + 1))
-            expected_host = hosts[(i + 1) % len(hosts)]
-            self.assertEqual(set(replicas), set([expected_host]))
 
 
 class KeyspaceAlterMetadata(unittest.TestCase):
