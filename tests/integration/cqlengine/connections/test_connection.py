@@ -21,13 +21,15 @@ except ImportError:
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns, connection
 from cassandra.cqlengine.management import sync_table
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, _clusters_for_shutdown
 from cassandra.query import dict_factory
 
 from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry, local
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE, setup_connection
 from cassandra.cqlengine import models
+
+from mock import patch
 
 
 class TestConnectModel(Model):
@@ -69,6 +71,7 @@ class ConnectionTest(BaseCassEngTestCase):
 
     def tearDown(self):
         self.c.shutdown()
+        connection.unregister_connection("default")
 
     def test_connection_session_switch(self):
         """
@@ -104,3 +107,19 @@ class ConnectionTest(BaseCassEngTestCase):
     def test_connection_setup_with_default(self):
         connection.default()
         self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
+
+    def test_only_one_connection_is_created(self):
+        """
+        Test to ensure that only one new connection is created by
+        connection.register_connection
+
+        @since 3.12
+        @jira_ticket PYTHON-814
+        @expected_result Only one connection is created
+
+        @test_category object_mapper
+        """
+        number_of_clusters_before = len(_clusters_for_shutdown)
+        connection.default()
+        number_of_clusters_after = len(_clusters_for_shutdown)
+        self.assertEqual(number_of_clusters_after - number_of_clusters_before, 1)
