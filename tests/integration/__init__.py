@@ -182,8 +182,19 @@ def set_default_cass_ip():
         Cluster.__init__.__func__.__defaults__ = tuple(defaults)
 
 
-def get_default_protocol():
+def set_default_beta_flag_true():
+    defaults = list(Cluster.__init__.__defaults__)
+    defaults = defaults[:-3] + [True] + defaults[-2:]
+    try:
+        Cluster.__init__.__defaults__ = tuple(defaults)
+    except:
+        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
 
+
+def get_default_protocol():
+    if Version(CASSANDRA_VERSION) >= Version('4.0'):
+        set_default_beta_flag_true()
+        return 5
     if Version(CASSANDRA_VERSION) >= Version('2.2'):
         return 4
     elif Version(CASSANDRA_VERSION) >= Version('2.1'):
@@ -261,6 +272,7 @@ greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cass
 greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cassandra version 3.6 or greater required')
 greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'Cassandra version 3.10 or greater required')
+greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
@@ -690,7 +702,7 @@ class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
 class BasicSharedKeyspaceUnitTestCaseRF1(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
-    creates a keyspace named after the testclass with a rf of 1, and a table named after the class
+    creates a keyspace named after the testclass with a rf of 1
     """
     @classmethod
     def setUpClass(self):

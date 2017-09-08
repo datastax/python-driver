@@ -508,6 +508,7 @@ _WITH_PAGING_STATE_FLAG = 0x08
 _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
 _PROTOCOL_TIMESTAMP = 0x20
 _WITH_KEYSPACE_FLAG = 0x80
+_PREPARED_WITH_KEYSPACE_FLAG = 0x01
 
 
 class QueryMessage(_MessageType):
@@ -791,7 +792,7 @@ class PrepareMessage(_MessageType):
 
         if self.keyspace is not None:
             if ProtocolVersion.uses_keyspace_flag(protocol_version):
-                flags |= _WITH_KEYSPACE_FLAG
+                flags |= _PREPARED_WITH_KEYSPACE_FLAG
             else:
                 raise UnsupportedOperation(
                     "Keyspaces may only be set on queries with protocol version "

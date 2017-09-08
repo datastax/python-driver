@@ -98,9 +98,9 @@ class MessageTest(unittest.TestCase):
             if ProtocolVersion.uses_keyspace_flag(version):
                 message.send_body(io, version)
                 self._check_calls(io, [
-                    ('\x00\x00\x00\x01',),
-                    ('a',),
-                    ('\x00\x00\x00\x80',),
+                    (b'\x00\x00\x00\x01',),
+                    (b'a',),
+                    (b'\x00\x00\x00\x01',),
                     (b'\x00\x02',),
                     (b'ks',),
                 ])
@@ -158,13 +158,13 @@ class MessageTest(unittest.TestCase):
         )
         batch.send_body(io, protocol_version=5)
         self._check_calls(io,
-            (('\x00',), ('\x00\x03',), ('\x00',),
-             ('\x00\x00\x00\x06',), ('stmt a',),
-             ('\x00\x01',), ('\x00\x00\x00\x07',), ('param a',),
-             ('\x00',), ('\x00\x00\x00\x06',), ('stmt b',),
-             ('\x00\x01',), ('\x00\x00\x00\x07',), ('param b',),
-             ('\x00',), ('\x00\x00\x00\x06',), ('stmt c',),
-             ('\x00\x01',), ('\x00\x00\x00\x07',), ('param c',),
-             ('\x00\x03',),
-             ('\x00\x00\x00\x80',), ('\x00\x02',), ('ks',))
+            ((b'\x00',), (b'\x00\x03',), (b'\x00',),
+             (b'\x00\x00\x00\x06',), (b'stmt a',),
+             (b'\x00\x01',), (b'\x00\x00\x00\x07',), ('param a',),
+             (b'\x00',), (b'\x00\x00\x00\x06',), (b'stmt b',),
+             (b'\x00\x01',), (b'\x00\x00\x00\x07',), ('param b',),
+             (b'\x00',), (b'\x00\x00\x00\x06',), (b'stmt c',),
+             (b'\x00\x01',), (b'\x00\x00\x00\x07',), ('param c',),
+             (b'\x00\x03',),
+             (b'\x00\x00\x00\x80',), (b'\x00\x02',), (b'ks',))
         )
