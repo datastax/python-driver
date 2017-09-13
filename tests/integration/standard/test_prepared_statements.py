@@ -24,7 +24,9 @@ from cassandra import InvalidRequest
 from cassandra import ConsistencyLevel, ProtocolVersion
 from cassandra.cluster import Cluster
 from cassandra.query import PreparedStatement, UNSET_VALUE, tuple_factory
-from tests.integration import get_server_versions, greaterthanorequalcass4_0, BasicSharedKeyspaceUnitTestCase
+from tests.integration import (get_server_versions, greaterthanorequalcass4_0,
+                               set_default_beta_flag_true,
+                               BasicSharedKeyspaceUnitTestCase)
 
 
 def setup_module():

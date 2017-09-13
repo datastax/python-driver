@@ -182,10 +182,20 @@ def set_default_cass_ip():
         Cluster.__init__.__func__.__defaults__ = tuple(defaults)
 
 
+def set_default_beta_flag_true():
+    defaults = list(Cluster.__init__.__defaults__)
+    defaults = defaults[:-3] + [True] + defaults[-2:]
+    try:
+        Cluster.__init__.__defaults__ = tuple(defaults)
+    except:
+        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
+
+
 def get_default_protocol():
 
     version = Version(CASSANDRA_VERSION)
     if version >= Version('4.0'):
+        set_default_beta_flag_true()
         return 5
     elif version >= Version('2.2'):
         return 4
