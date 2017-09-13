@@ -184,11 +184,14 @@ def set_default_cass_ip():
 
 def get_default_protocol():
 
-    if Version(CASSANDRA_VERSION) >= Version('2.2'):
+    version = Version(CASSANDRA_VERSION)
+    if version >= Version('4.0'):
+        return 5
+    elif version >= Version('2.2'):
         return 4
-    elif Version(CASSANDRA_VERSION) >= Version('2.1'):
+    elif version >= Version('2.1'):
         return 3
-    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
+    elif version >= Version('2.0'):
         return 2
     else:
         return 1
@@ -203,15 +206,16 @@ def get_supported_protocol_versions():
     3.X -> 4, 3
     3.10 -> 5(beta),4,3
 `   """
-    if Version(CASSANDRA_VERSION) >= Version('3.10'):
+    version = Version(CASSANDRA_VERSION)
+    if version >= Version('3.10'):
         return (3, 4, 5)
-    elif Version(CASSANDRA_VERSION) >= Version('3.0'):
+    elif version >= Version('3.0'):
         return (3, 4)
-    elif Version(CASSANDRA_VERSION) >= Version('2.2'):
+    elif version >= Version('2.2'):
         return (1, 2, 3, 4)
-    elif Version(CASSANDRA_VERSION) >= Version('2.1'):
+    elif version >= Version('2.1'):
         return (1, 2, 3)
-    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
+    elif version >= Version('2.0'):
         return (1, 2)
     else:
         return (1)

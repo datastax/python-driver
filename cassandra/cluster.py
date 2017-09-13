@@ -2136,7 +2136,8 @@ class Session(object):
             message = ExecuteMessage(
                 prepared_statement.query_id, query.values, cl,
                 serial_cl, fetch_size,
-                timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata))
+                timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata),
+                result_metadata_id=prepared_statement.result_metadata_id)
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:
                 raise UnsupportedOperation(
@@ -2247,14 +2248,14 @@ class Session(object):
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            query_id, bind_metadata, pk_indexes, result_metadata = future.result()
+            query_id, bind_metadata, pk_indexes, result_metadata, result_metadata_id = future.result()
         except Exception:
             log.exception("Error preparing query:")
             raise
 
         prepared_statement = PreparedStatement.from_message(
             query_id, bind_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
-            self._protocol_version, result_metadata)
+            self._protocol_version, result_metadata, result_metadata_id)
         prepared_statement.custom_payload = future.custom_payload
 
         self.cluster.add_prepared(query_id, prepared_statement)
@@ -3739,8 +3740,11 @@ class ResponseFuture(object):
                 if self.prepared_statement:
                     # result metadata is the only thing that could have
                     # changed from an alter
-                    _, _, _, result_metadata = response.results
-                    self.prepared_statement.result_metadata = result_metadata
+                    (_, _, _,
+                     self.prepared_statement.result_metadata,
+                     new_metadata_id) = response.results
+                    if new_metadata_id is not None:
+                        self.prepared_statement.result_metadata_id = new_metadata_id
 
                 # use self._query to re-use the same host and
                 # at the same time properly borrow the connection

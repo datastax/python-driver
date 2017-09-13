@@ -392,12 +392,13 @@ class PreparedStatement(object):
     query_id = None
     query_string = None
     result_metadata = None
+    result_metadata_id = None
     routing_key_indexes = None
     _routing_key_index_set = None
     serial_consistency_level = None
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
-                 keyspace, protocol_version, result_metadata):
+                 keyspace, protocol_version, result_metadata, result_metadata_id):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
@@ -405,13 +406,16 @@ class PreparedStatement(object):
         self.keyspace = keyspace
         self.protocol_version = protocol_version
         self.result_metadata = result_metadata
+        assert result_metadata_id is not None
+        self.result_metadata_id = result_metadata_id
         self.is_idempotent = False
 
     @classmethod
     def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata,
-                     query, prepared_keyspace, protocol_version, result_metadata):
+                     query, prepared_keyspace, protocol_version, result_metadata,
+                     result_metadata_id):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version, result_metadata)
+            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version, result_metadata, result_metadata_id)
 
         if pk_indexes:
             routing_key_indexes = pk_indexes
@@ -436,7 +440,8 @@ class PreparedStatement(object):
                         pass          # statement; just leave routing_key_indexes as None
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes,
-                                 query, prepared_keyspace, protocol_version, result_metadata)
+                                 query, prepared_keyspace, protocol_version, result_metadata,
+                                 result_metadata_id)
 
     def bind(self, values):
         """
