@@ -668,15 +668,15 @@ class ResultMessage(_MessageType):
         flags = read_int(f)
         colcount = read_int(f)
 
-        if flags & 0x0008:
-            result_metadata_id = read_binary_string(f)
-        else:
-            result_metadata_id = None
-
         if flags & cls._HAS_MORE_PAGES_FLAG:
             paging_state = read_binary_longstring(f)
         else:
             paging_state = None
+
+        if flags & 0x0008:
+            result_metadata_id = read_binary_string(f)
+        else:
+            result_metadata_id = None
 
         no_meta = bool(flags & cls._NO_METADATA_FLAG)
         if no_meta:

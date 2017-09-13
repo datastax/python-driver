@@ -467,20 +467,19 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @jira_ticket PYTHON-808
         """
         prepared_statement = self.session.prepare("SELECT * from {}".format(self.table_name))
-        id_before = prepared_statement.query_id
+        id_before = prepared_statement.result_metadata_id
 
         prepared_statement.fetch_size = 2
         result = self.session.execute(prepared_statement.bind((None)))
-
 
         self.assertTrue(result.has_more_pages)
 
         self.session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
 
-        result_set = set(x for x in ((1, 1, 1),(2, 2, 2), (3, 3, None, 3), (4, 4, None, 4)))
+        result_set = set(x for x in ((1, 1, 1), (2, 2, 2), (3, 3, None, 3), (4, 4, None, 4)))
         expected_result_set = set(row for row in result)
 
-        id_after = prepared_statement.query_id
+        id_after = prepared_statement.result_metadata_id
 
         self.assertEqual(result_set, expected_result_set)
         self.assertNotEqual(id_before, id_after)
