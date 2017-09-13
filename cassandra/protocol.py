@@ -629,7 +629,7 @@ class ResultMessage(_MessageType):
         if kind == RESULT_KIND_VOID:
             results = None
         elif kind == RESULT_KIND_ROWS:
-            paging_state, col_types, results = cls.recv_results_rows(
+            paging_state, col_types, results, result_metadata_id = cls.recv_results_rows(
                 f, protocol_version, user_type_map, result_metadata)
         elif kind == RESULT_KIND_SET_KEYSPACE:
             ksname = read_string(f)
@@ -644,7 +644,7 @@ class ResultMessage(_MessageType):
 
     @classmethod
     def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-        paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
+        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
         column_metadata = column_metadata or result_metadata
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
@@ -664,13 +664,17 @@ class ResultMessage(_MessageType):
                         raise DriverException('Failed decoding result column "%s" of type %s: %s' % (colnames[i],
                                                                                                      coltypes[i].cql_parameterized_type(),
                                                                                                      str(e)))
-        return paging_state, coltypes, (colnames, parsed_rows)
+        return paging_state, coltypes, (colnames, parsed_rows), result_metadata_id
 
     @classmethod
     def recv_results_prepared(cls, f, protocol_version, user_type_map):
         query_id = read_binary_string(f)
-        bind_metadata, pk_indexes, result_metadata = cls.recv_prepared_metadata(f, protocol_version, user_type_map)
-        return query_id, bind_metadata, pk_indexes, result_metadata
+        if ProtocolVersion.uses_prepared_metadata(protocol_version):
+            result_metadata_id = read_binary_string(f)
+        else:
+            result_metadata_id = None
+        bind_metadata, pk_indexes, result_metadata, _ = cls.recv_prepared_metadata(f, protocol_version, user_type_map)
+        return query_id, bind_metadata, pk_indexes, result_metadata, result_metadata_id
 
     @classmethod
     def recv_results_metadata(cls, f, user_type_map):
@@ -682,9 +686,14 @@ class ResultMessage(_MessageType):
         else:
             paging_state = None
 
+        if flags & 0x0008:
+            result_metadata_id = read_binary_string(f)
+        else:
+            result_metadata_id = None
+
         no_meta = bool(flags & cls._NO_METADATA_FLAG)
         if no_meta:
-            return paging_state, []
+            return paging_state, [], result_metadata_id
 
         glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
         if glob_tblspec:
@@ -701,7 +710,7 @@ class ResultMessage(_MessageType):
             colname = read_string(f)
             coltype = cls.read_type(f, user_type_map)
             column_metadata.append((colksname, colcfname, colname, coltype))
-        return paging_state, column_metadata
+        return paging_state, column_metadata, result_metadata_id
 
     @classmethod
     def recv_prepared_metadata(cls, f, protocol_version, user_type_map):
@@ -729,10 +738,10 @@ class ResultMessage(_MessageType):
             bind_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
 
         if protocol_version >= 2:
-            _, result_metadata = cls.recv_results_metadata(f, user_type_map)
-            return bind_metadata, pk_indexes, result_metadata
+            _, result_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
+            return bind_metadata, pk_indexes, result_metadata, result_metadata_id
         else:
-            return bind_metadata, pk_indexes, None
+            return bind_metadata, pk_indexes, None, None
 
     @classmethod
     def recv_results_schema_change(cls, f, protocol_version):
@@ -820,7 +829,8 @@ class ExecuteMessage(_MessageType):
     name = 'EXECUTE'
     def __init__(self, query_id, query_params, consistency_level,
                  serial_consistency_level=None, fetch_size=None,
-                 paging_state=None, timestamp=None, skip_meta=False):
+                 paging_state=None, timestamp=None, skip_meta=False,
+                 result_metadata_id=None):
         self.query_id = query_id
         self.query_params = query_params
         self.consistency_level = consistency_level
@@ -829,9 +839,12 @@ class ExecuteMessage(_MessageType):
         self.paging_state = paging_state
         self.timestamp = timestamp
         self.skip_meta = skip_meta
+        self.result_metadata_id = result_metadata_id
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
+        if ProtocolVersion.uses_prepared_metadata(protocol_version):
+            write_string(f, self.result_metadata_id)
         if protocol_version == 1:
             if self.serial_consistency_level:
                 raise UnsupportedOperation(
