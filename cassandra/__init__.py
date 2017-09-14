@@ -204,6 +204,10 @@ class ProtocolVersion(object):
     def uses_error_code_map(cls, version):
         return version >= cls.V5
 
+    @classmethod
+    def uses_keyspace_flag(cls, version):
+        return version >= cls.V5
+
 
 class SchemaChangeType(object):
     DROPPED = 'DROPPED'

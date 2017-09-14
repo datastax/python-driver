@@ -507,6 +507,8 @@ _PAGE_SIZE_FLAG = 0x04
 _WITH_PAGING_STATE_FLAG = 0x08
 _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
 _PROTOCOL_TIMESTAMP = 0x20
+_WITH_KEYSPACE_FLAG = 0x80
+_PREPARED_WITH_KEYSPACE_FLAG = 0x01
 
 
 class QueryMessage(_MessageType):
@@ -514,13 +516,14 @@ class QueryMessage(_MessageType):
     name = 'QUERY'
 
     def __init__(self, query, consistency_level, serial_consistency_level=None,
-                 fetch_size=None, paging_state=None, timestamp=None):
+                 fetch_size=None, paging_state=None, timestamp=None, keyspace=None):
         self.query = query
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.fetch_size = fetch_size
         self.paging_state = paging_state
         self.timestamp = timestamp
+        self.keyspace = keyspace
         self._query_params = None  # only used internally. May be set to a list of native-encoded values to have them sent with the request.
 
     def send_body(self, f, protocol_version):
@@ -558,6 +561,14 @@ class QueryMessage(_MessageType):
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP
 
+        if self.keyspace is not None:
+            if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                flags |= _WITH_KEYSPACE_FLAG
+            else:
+                raise UnsupportedOperation(
+                    "Keyspaces may only be set on queries with protocol version "
+                    "5 or higher. Consider setting Cluster.protocol_version to 5.")
+
         if ProtocolVersion.uses_int_query_flags(protocol_version):
             write_uint(f, flags)
         else:
@@ -576,6 +587,8 @@ class QueryMessage(_MessageType):
             write_consistency_level(f, self.serial_consistency_level)
         if self.timestamp is not None:
             write_long(f, self.timestamp)
+        if self.keyspace is not None:
+            write_string(f, self.keyspace)
 
 
 CUSTOM_TYPE = object()
@@ -768,14 +781,38 @@ class PrepareMessage(_MessageType):
     opcode = 0x09
     name = 'PREPARE'
 
-    def __init__(self, query):
+    def __init__(self, query, keyspace=None):
         self.query = query
+        self.keyspace = keyspace
 
     def send_body(self, f, protocol_version):
         write_longstring(f, self.query)
+
+        flags = 0x00
+
+        if self.keyspace is not None:
+            if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                flags |= _PREPARED_WITH_KEYSPACE_FLAG
+            else:
+                raise UnsupportedOperation(
+                    "Keyspaces may only be set on queries with protocol version "
+                    "5 or higher. Consider setting Cluster.protocol_version to 5.")
+
         if ProtocolVersion.uses_prepare_flags(protocol_version):
-            # Write the flags byte; with 0 value for now, but this should change in PYTHON-678
-            write_uint(f, 0)
+            write_uint(f, flags)
+        else:
+            # checks above should prevent this, but just to be safe...
+            if flags:
+                raise UnsupportedOperation(
+                    "Attempted to set flags with value {flags:0=#8x} on"
+                    "protocol version {pv}, which doesn't support flags"
+                    "in prepared statements."
+                    "Consider setting Cluster.protocol_version to 5."
+                    "".format(flags=flags, pv=protocol_version))
+
+        if ProtocolVersion.uses_keyspace_flag(protocol_version):
+            if self.keyspace:
+                write_string(f, self.keyspace)
 
 
 class ExecuteMessage(_MessageType):
@@ -852,12 +889,14 @@ class BatchMessage(_MessageType):
     name = 'BATCH'
 
     def __init__(self, batch_type, queries, consistency_level,
-                 serial_consistency_level=None, timestamp=None):
+                 serial_consistency_level=None, timestamp=None,
+                 keyspace=None):
         self.batch_type = batch_type
         self.queries = queries
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.timestamp = timestamp
+        self.keyspace = keyspace
 
     def send_body(self, f, protocol_version):
         write_byte(f, self.batch_type.value)
@@ -881,6 +920,13 @@ class BatchMessage(_MessageType):
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
             if self.timestamp is not None:
                 flags |= _PROTOCOL_TIMESTAMP
+            if self.keyspace:
+                if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                    flags |= _WITH_KEYSPACE_FLAG
+                else:
+                    raise UnsupportedOperation(
+                        "Keyspaces may only be set on queries with protocol version "
+                        "5 or higher. Consider setting Cluster.protocol_version to 5.")
 
             if ProtocolVersion.uses_int_query_flags(protocol_version):
                 write_int(f, flags)
@@ -891,6 +937,10 @@ class BatchMessage(_MessageType):
                 write_consistency_level(f, self.serial_consistency_level)
             if self.timestamp is not None:
                 write_long(f, self.timestamp)
+
+            if ProtocolVersion.uses_keyspace_flag(protocol_version):
+                if self.keyspace is not None:
+                    write_string(f, self.keyspace)
 
 
 known_event_types = frozenset((

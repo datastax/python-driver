@@ -1,12 +1,15 @@
 3.12.0
 ======
 
+Features
+--------
+* Send keyspace in QUERY, PREPARE, and BATCH messages (PYTHON-678)
+
 Bug Fixes
 ---------
 * Both _set_final_exception/result called for the same ResponseFuture (PYTHON-630)
 * Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception (PYTHON-781)
 * Not create two sessions by default in CQLEngine (PYTHON-814)
-
 
 3.11.0
 ======
