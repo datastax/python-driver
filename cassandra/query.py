@@ -406,7 +406,6 @@ class PreparedStatement(object):
         self.keyspace = keyspace
         self.protocol_version = protocol_version
         self.result_metadata = result_metadata
-        assert result_metadata_id is not None
         self.result_metadata_id = result_metadata_id
         self.is_idempotent = False
 
