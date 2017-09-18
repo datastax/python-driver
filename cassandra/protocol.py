@@ -614,6 +614,7 @@ class ResultMessage(_MessageType):
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
     _HAS_MORE_PAGES_FLAG = 0x0002
     _NO_METADATA_FLAG = 0x0004
+    _METADATA_ID_FLAG = 0x0008
 
     def __init__(self, kind, results, paging_state=None, col_types=None):
         self.kind = kind
@@ -686,7 +687,7 @@ class ResultMessage(_MessageType):
         else:
             paging_state = None
 
-        if flags & 0x0008:
+        if flags & cls._METADATA_ID_FLAG:
             result_metadata_id = read_binary_string(f)
         else:
             result_metadata_id = None

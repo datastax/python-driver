@@ -40,9 +40,13 @@ class MessageTest(unittest.TestCase):
         self._check_calls(io, [(b'\x00\x01',), (b'1',), (b'\x00\x04',), (b'\x01',), (b'\x00\x00',)])
 
         io.reset_mock()
+        message.result_metadata_id = 'foo'
         message.send_body(io, 5)
 
-        self._check_calls(io, [(b'\x00\x01',), (b'1',), (b'\x00\x04',), (b'\x00\x00\x00\x01',), (b'\x00\x00',)])
+        self._check_calls(io, [(b'\x00\x01',), (b'1',),
+                               (b'\x00\x03',), (b'foo',),
+                               (b'\x00\x04',),
+                               (b'\x00\x00\x00\x01',), (b'\x00\x00',)])
 
     def test_query_message(self):
         """
