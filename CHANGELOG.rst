@@ -10,6 +10,7 @@ Bug Fixes
 * Both _set_final_exception/result called for the same ResponseFuture (PYTHON-630)
 * Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception (PYTHON-781)
 * Not create two sessions by default in CQLEngine (PYTHON-814)
+* Bug when subclassing AyncoreConnection (PYTHON-827)
 
 3.11.0
 ======
