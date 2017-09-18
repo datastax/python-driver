@@ -24,7 +24,7 @@ def make_recv_results_rows(ColumnParser colparser):
         Parse protocol data given as a BytesIO f into a set of columns (e.g. list of tuples)
         This is used as the recv_results_rows method of (Fast)ResultMessage
         """
-        paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
+        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
 
         column_metadata = column_metadata or result_metadata
 
@@ -45,6 +45,6 @@ def make_recv_results_rows(ColumnParser colparser):
             for i in range(rowcount):
                 rowparser.unpack_row(reader, desc)
 
-        return (paging_state, coltypes, (colnames, parsed_rows))
+        return (paging_state, coltypes, (colnames, parsed_rows), result_metadata_id)
 
     return recv_results_rows
