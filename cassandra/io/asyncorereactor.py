@@ -347,7 +347,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
             callback=partial(asyncore.dispatcher.__init__,
                              self, self._socket, _dispatcher_map)
         )
-        AsyncoreConnection._loop.add_timer(init_handler)
+        self._loop.add_timer(init_handler)
         init_handler.wait(kwargs["connect_timeout"])
 
         self._writable = True
