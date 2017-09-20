@@ -11,6 +11,7 @@ Bug Fixes
 * Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception (PYTHON-781)
 * Not create two sessions by default in CQLEngine (PYTHON-814)
 * Bug when subclassing AyncoreConnection (PYTHON-827)
+* Error at cleanup when closing the asyncore connections (PYTHON-829)
 
 3.11.0
 ======
