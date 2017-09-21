@@ -279,6 +279,9 @@ class AsyncoreLoop(object):
         if not self._thread:
             return
 
+        # The loop shouldn't be woken up from here onwards since it won't be running
+        self._loop_dispatcher._notified = True
+
         log.debug("Waiting for event loop thread to join...")
         self._thread.join(timeout=1.0)
         if self._thread.is_alive():
@@ -288,9 +291,12 @@ class AsyncoreLoop(object):
 
         log.debug("Event loop thread was joined")
 
-        # Ensure all connections are closed and  in-flight requests cancelled
+        # Ensure all connections are closed and in-flight requests cancelled
         for conn in tuple(_dispatcher_map.values()):
             conn.close()
+        # The event loop should be closed, so we call remaining asyncore.close
+        # callbacks from here
+        self._timers.service_timeouts()
 
         log.debug("Dispatchers were closed")
 
