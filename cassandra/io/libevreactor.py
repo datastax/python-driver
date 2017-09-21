@@ -63,6 +63,7 @@ class LibevLoop(object):
         self._started = False
         self._shutdown = False
         self._lock = Lock()
+        self._lock_thread = Lock()
 
         self._thread = None
 
@@ -94,9 +95,11 @@ class LibevLoop(object):
                 should_start = True
 
         if should_start:
-            self._thread = Thread(target=self._run_loop, name="event_loop")
-            self._thread.daemon = True
-            self._thread.start()
+            with self._lock_thread:
+                if not self._shutdown:
+                    self._thread = Thread(target=self._run_loop, name="event_loop")
+                    self._thread.daemon = True
+                    self._thread.start()
 
         self._notifier.send()
 
@@ -126,8 +129,11 @@ class LibevLoop(object):
                     watcher.stop()
 
         self.notify()  # wake the timer watcher
-        log.debug("Waiting for event loop thread to join...")
-        self._thread.join(timeout=1.0)
+
+        # PYTHON-752 Thread might have just been created and not started
+        with self._lock_thread:
+            self._thread.join(timeout=1.0)
+
         if self._thread.is_alive():
             log.warning(
                 "Event loop thread could not be joined, so shutdown may not be clean. "
