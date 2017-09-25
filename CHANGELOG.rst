@@ -12,6 +12,7 @@ Bug Fixes
 * Not create two sessions by default in CQLEngine (PYTHON-814)
 * Bug when subclassing AyncoreConnection (PYTHON-827)
 * Error at cleanup when closing the asyncore connections (PYTHON-829)
+* Fix sites where `sessions` can change during iteration (PYTHON-793)
 
 3.11.0
 ======
@@ -34,6 +35,7 @@ Bug Fixes
 * Fix murmur3 on big-endian systems (PYTHON-653)
 * Ensure unused connections are closed if a Session is deleted by the GC (PYTHON-774)
 * Fix .values_list by using db names internally (cqlengine) (PYTHON-785)
+
 
 Other
 -----
