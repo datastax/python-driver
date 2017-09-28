@@ -372,6 +372,9 @@ class Cluster(object):
     """
 
     allow_beta_protocol_version = False
+
+    no_compact = False
+
     """
     Setting true injects a flag in all messages that makes the server accept and use "beta" protocol version.
     Used for testing new protocol features incrementally before the new version is complete.
@@ -765,7 +768,8 @@ class Cluster(object):
                  execution_profiles=None,
                  allow_beta_protocol_version=False,
                  timestamp_generator=None,
-                 idle_heartbeat_timeout=30):
+                 idle_heartbeat_timeout=30,
+                 no_compact=False):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -802,6 +806,8 @@ class Cluster(object):
             self.protocol_version = protocol_version
             self._protocol_version_explicit = True
         self.allow_beta_protocol_version = allow_beta_protocol_version
+
+        self.no_compact = no_compact
 
         self.auth_provider = auth_provider
 
@@ -1147,6 +1153,7 @@ class Cluster(object):
         kwargs_dict.setdefault('protocol_version', self.protocol_version)
         kwargs_dict.setdefault('user_type_map', self._user_types)
         kwargs_dict.setdefault('allow_beta_protocol_version', self.allow_beta_protocol_version)
+        kwargs_dict.setdefault('no_compact', self.no_compact)
 
         return kwargs_dict
 
