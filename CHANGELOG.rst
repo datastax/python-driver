@@ -13,6 +13,7 @@ Bug Fixes
 * Bug when subclassing AyncoreConnection (PYTHON-827)
 * Error at cleanup when closing the asyncore connections (PYTHON-829)
 * Fix sites where `sessions` can change during iteration (PYTHON-793)
+* cqlengine: allow min_length=0 for Ascii and Text column types (PYTHON-735)
 
 3.11.0
 ======
