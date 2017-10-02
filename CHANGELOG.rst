@@ -15,6 +15,10 @@ Bug Fixes
 * Fix sites where `sessions` can change during iteration (PYTHON-793)
 * cqlengine: allow min_length=0 for Ascii and Text column types (PYTHON-735)
 
+Others
+------
+* Remove DeprecationWarning when using WhiteListRoundRobinPolicy (PYTHON-810)
+
 3.11.0
 ======
 July 24, 2017
