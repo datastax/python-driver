@@ -34,7 +34,7 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra.pool import Host
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
-
+from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
     get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP
@@ -476,6 +476,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     @local
+    @notwindows
     def test_refresh_schema_no_wait(self):
         contact_points = [CASSANDRA_IP]
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
