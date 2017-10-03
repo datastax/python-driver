@@ -529,7 +529,6 @@ class TestBigInt(BaseCassEngTestCase):
 
 
 class TestAscii(BaseCassEngTestCase):
-
     def test_min_length(self):
         """ Test arbitrary minimal lengths requirements. """
 

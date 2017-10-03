@@ -12,31 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-
-EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
-if "gevent" in EVENT_LOOP_MANAGER:
-    import gevent.monkey
-    gevent.monkey.patch_all()
-    from cassandra.io.geventreactor import GeventConnection
-    connection_class = GeventConnection
-elif "eventlet" in EVENT_LOOP_MANAGER:
-    from eventlet import monkey_patch
-    monkey_patch()
-
-    from cassandra.io.eventletreactor import EventletConnection
-    connection_class = EventletConnection
-elif "async" in EVENT_LOOP_MANAGER:
-    from cassandra.io.asyncorereactor import AsyncoreConnection
-    connection_class = AsyncoreConnection
-elif "twisted" in EVENT_LOOP_MANAGER:
-    from cassandra.io.twistedreactor import TwistedConnection
-    connection_class = TwistedConnection
-
-else:
-    from cassandra.io.libevreactor import LibevConnection
-    connection_class = LibevConnection
-
 from cassandra.cluster import Cluster
+
+from tests import connection_class, EVENT_LOOP_MANAGER
 Cluster.connection_class = connection_class
 
 try:
