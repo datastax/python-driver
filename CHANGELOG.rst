@@ -6,6 +6,7 @@ Features
 * Send keyspace in QUERY, PREPARE, and BATCH messages (PYTHON-678)
 * Add IPv4Address/IPv6Address support for inet types (PYTHON-751)
 * WriteType.CDC and VIEW missing (PYTHON-794)
+* Warn on Cluster init if contact points are specified but LBP isn't (PYTHON-812)
 
 Bug Fixes
 ---------

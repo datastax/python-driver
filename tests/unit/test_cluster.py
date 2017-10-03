@@ -363,3 +363,39 @@ class ExecutionProfileTest(unittest.TestCase):
 
         # cannot add a profile added dynamically
         self.assertRaises(ValueError, cluster.add_execution_profile, 'two', ExecutionProfile())
+
+    @mock_session_pools
+    def test_warning_on_no_lbp_with_contact_points(self):
+        """
+        Test that users are warned when they instantiate a Cluster object with
+        contact points but no load-balancing policy.
+
+        @since 3.12.0
+        @jira_ticket PYTHON-812
+        @expected_result logs
+
+        @test_category configuration
+        """
+        with patch('cassandra.cluster.log') as patched_logger:
+            Cluster(contact_points=['1'])
+        patched_logger.warn.assert_called_once()
+        warning_message = patched_logger.warn.call_args[0][0]
+        self.assertIn('no load_balancing_policy', warning_message)
+        self.assertIn("contact_points = ['1']", warning_message)
+        self.assertIn('lbp = None', warning_message)
+
+    @mock_session_pools
+    def test_no_warning_on_contact_points_with_lbp(self):
+        """
+        Test that users aren't warned when they instantiate a Cluster object
+        with contact points and a load-balancing policy.
+
+        @since 3.12.0
+        @jira_ticket PYTHON-812
+        @expected_result no logs
+
+        @test_category configuration
+        """
+        with patch('cassandra.cluster.log') as patched_logger:
+            Cluster(contact_points=['1'], load_balancing_policy=object())
+        patched_logger.warn.assert_not_called()
