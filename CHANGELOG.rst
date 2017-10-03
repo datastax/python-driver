@@ -15,6 +15,11 @@ Bug Fixes
 * Fix sites where `sessions` can change during iteration (PYTHON-793)
 * cqlengine: allow min_length=0 for Ascii and Text column types (PYTHON-735)
 
+Other
+-----
+
+* Bump Cython dependency version to 0.27 (PYTHON-833)
+
 3.11.0
 ======
 July 24, 2017
