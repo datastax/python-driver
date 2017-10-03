@@ -731,6 +731,18 @@ class WriteType(object):
     A lighweight-transaction write, such as "DELETE ... IF EXISTS".
     """
 
+    VIEW = 6
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete MV operations.
+    """
+
+    CDC = 7
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete CDC operations.
+    """
+
 
 WriteType.name_to_value = {
     'SIMPLE': WriteType.SIMPLE,
@@ -738,7 +750,9 @@ WriteType.name_to_value = {
     'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
     'COUNTER': WriteType.COUNTER,
     'BATCH_LOG': WriteType.BATCH_LOG,
-    'CAS': WriteType.CAS
+    'CAS': WriteType.CAS,
+    'VIEW': WriteType.VIEW,
+    'CDC': WriteType.CDC
 }
 
 

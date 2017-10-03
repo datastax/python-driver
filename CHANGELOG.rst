@@ -5,6 +5,7 @@ Features
 --------
 * Send keyspace in QUERY, PREPARE, and BATCH messages (PYTHON-678)
 * Add IPv4Address/IPv6Address support for inet types (PYTHON-751)
+* WriteType.CDC and VIEW missing (PYTHON-794)
 
 Bug Fixes
 ---------
