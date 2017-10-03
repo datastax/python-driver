@@ -1232,22 +1232,6 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
 
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
 
-    def test_deprecated(self):
-        import warnings
-
-        warnings.resetwarnings()  # in case we've instantiated one before
-
-        # set up warning filters to allow all, set up restore when this test is done
-        filters_backup, warnings.filters = warnings.filters, []
-        self.addCleanup(setattr, warnings, 'filters', filters_backup)
-
-        with warnings.catch_warnings(record=True) as caught_warnings:
-            WhiteListRoundRobinPolicy([])
-            self.assertEqual(len(caught_warnings), 1)
-            warning_message = caught_warnings[-1]
-            self.assertEqual(warning_message.category, DeprecationWarning)
-            self.assertIn('4.0', warning_message.message.args[0])
-
 
 class AddressTranslatorTest(unittest.TestCase):
 
