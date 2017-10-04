@@ -44,12 +44,19 @@ schedules:
     env_vars: |
       EVENT_LOOP_MANAGER='eventlet'
 
+  weekly_asyncio:
+    schedule: 0 22 * * 6
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='asyncio'
+
   weekly_async:
     schedule: 0 10 * * 7
     branches:
       include: [master]
     env_vars: |
-      EVENT_LOOP_MANAGER='async'
+      EVENT_LOOP_MANAGER='asyncore'
 
   weekly_twister:
     schedule: 0 14 * * 7

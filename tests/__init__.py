@@ -71,12 +71,15 @@ elif "eventlet" in EVENT_LOOP_MANAGER:
 
     from cassandra.io.eventletreactor import EventletConnection
     connection_class = EventletConnection
-elif "async" in EVENT_LOOP_MANAGER:
+elif "asyncore" in EVENT_LOOP_MANAGER:
     from cassandra.io.asyncorereactor import AsyncoreConnection
     connection_class = AsyncoreConnection
 elif "twisted" in EVENT_LOOP_MANAGER:
     from cassandra.io.twistedreactor import TwistedConnection
     connection_class = TwistedConnection
+elif "asyncio" in EVENT_LOOP_MANAGER:
+    from cassandra.io.asyncioreactor import AsyncioConnection
+    connection_class = AsyncioConnection
 
 else:
     try:
