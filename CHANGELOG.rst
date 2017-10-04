@@ -21,6 +21,11 @@ Others
 ------
 * Remove DeprecationWarning when using WhiteListRoundRobinPolicy (PYTHON-810)
 
+Other
+-----
+
+* Bump Cython dependency version to 0.27 (PYTHON-833)
+
 3.11.0
 ======
 July 24, 2017
