@@ -19,18 +19,18 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cluster import Cluster
-from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, \
-    SimpleConvictionPolicy
+from cassandra.cluster import Cluster, ExecutionProfile
+from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, WhiteListRoundRobinPolicy
 from cassandra.pool import Host
 
-from tests.integration import PROTOCOL_VERSION
-
+from tests.integration import PROTOCOL_VERSION, local
 
 from concurrent.futures import wait as wait_futures
 
+
 def setup_module():
     use_singledc()
+
 
 class HostFilterPolicyTests(unittest.TestCase):
 
@@ -74,3 +74,20 @@ class HostFilterPolicyTests(unittest.TestCase):
             response = session.execute("SELECT * from system.local")
             queried_hosts.update(response.response_future.attempted_hosts)
         self.assertEqual(queried_hosts, all_hosts)
+
+
+class WhiteListRoundRobinPolicyTests(unittest.TestCase):
+
+    @local
+    def test_only_connects_to_subset(self):
+        only_connect_hosts = {"127.0.0.1", "127.0.0.2"}
+        white_list = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(only_connect_hosts))
+        cluster = Cluster(execution_profiles={"white_list": white_list})
+        #cluster = Cluster(load_balancing_policy=WhiteListRoundRobinPolicy(only_connect_hosts))
+        session = cluster.connect(wait_for_all_pools=True)
+        queried_hosts = set()
+        for _ in range(10):
+            response = session.execute('SELECT * from system.local', execution_profile="white_list")
+            queried_hosts.update(response.response_future.attempted_hosts)
+        queried_hosts = set(host.address for host in queried_hosts)
+        self.assertEqual(queried_hosts, only_connect_hosts)

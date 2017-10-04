@@ -16,6 +16,10 @@ Bug Fixes
 * cqlengine: allow min_length=0 for Ascii and Text column types (PYTHON-735)
 * Rare exception when "sys.exit(0)" after query timeouts (PYTHON-752)
 
+Others
+------
+* Remove DeprecationWarning when using WhiteListRoundRobinPolicy (PYTHON-810)
+
 3.11.0
 ======
 July 24, 2017
