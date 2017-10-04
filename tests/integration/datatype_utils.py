@@ -15,6 +15,7 @@
 from decimal import Decimal
 from datetime import datetime, date, time
 from uuid import uuid1, uuid4
+import six
 
 from cassandra.util import OrderedMap, Date, Time, sortedset, Duration
 
@@ -90,7 +91,11 @@ def get_sample_data():
             sample_data[datatype] = 3.4028234663852886e+38
 
         elif datatype == 'inet':
-            sample_data[datatype] = '123.123.123.123'
+            sample_data[datatype] = ('123.123.123.123', '2001:db8:85a3:8d3:1319:8a2e:370:7348')
+            if six.PY3:
+                import ipaddress
+                sample_data[datatype] += (ipaddress.IPv4Address("123.123.123.123"),
+                                          ipaddress.IPv6Address('2001:db8:85a3:8d3:1319:8a2e:370:7348'))
 
         elif datatype == 'int':
             sample_data[datatype] = 2147483647
@@ -140,8 +145,18 @@ def get_sample(datatype):
     """
     Helper method to access created sample data for primitive types
     """
-
+    if isinstance(SAMPLE_DATA[datatype], tuple):
+        return SAMPLE_DATA[datatype][0]
     return SAMPLE_DATA[datatype]
+
+
+def get_all_samples(datatype):
+    """
+    Helper method to access created sample data for primitive types
+    """
+    if isinstance(SAMPLE_DATA[datatype], tuple):
+        return SAMPLE_DATA[datatype]
+    return SAMPLE_DATA[datatype],
 
 
 def get_collection_sample(collection_type, datatype):
