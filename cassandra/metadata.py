@@ -2178,8 +2178,8 @@ class SchemaParserV3(SchemaParserV22):
         'memtable_flush_period_in_ms',
         'min_index_interval',
         'read_repair_chance',
-        'speculative_retry',
-        'slow_query_log_timeout_in_ms')
+        'slow_query_log_timeout_in_ms',
+        'speculative_retry')
 
     def __init__(self, connection, timeout):
         super(SchemaParserV3, self).__init__(connection, timeout)

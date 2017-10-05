@@ -3,6 +3,7 @@
 
 Features
 --------
+* Add per-table slow_query_log_timeout_in_ms to control slow-query logging (PYTHON-835)
 * Send keyspace in QUERY, PREPARE, and BATCH messages (PYTHON-678)
 
 Bug Fixes
