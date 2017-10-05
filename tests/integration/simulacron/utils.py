@@ -17,6 +17,7 @@ import json
 from tests.integration import CASSANDRA_VERSION, SIMULACRON_JAR
 import subprocess
 import time
+import nose
 
 DEFAULT_CLUSTER = "python_simulacron_cluster"
 
@@ -280,7 +281,7 @@ def start_and_prime_singledc(cluster_name=DEFAULT_CLUSTER):
     :param cluster_name: name of the cluster to start and prime
     :return:
     """
-    start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, cluster_name=cluster_name)
+    return start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, cluster_name=cluster_name)
 
 
 def start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, version=None, cluster_name=DEFAULT_CLUSTER):
@@ -291,8 +292,10 @@ def start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, version=Non
     """
     start_simulacron()
     data_centers = ",".join([str(nodes_per_dc)] * number_of_dc)
-    prime_cluster(data_centers=data_centers, version=version, cluster_name=cluster_name)
+    simulacron_cluster = prime_cluster(data_centers=data_centers, version=version, cluster_name=cluster_name)
     prime_driver_defaults()
+
+    return simulacron_cluster
 
 
 default_column_types = {
@@ -316,6 +319,13 @@ def prime_query(query, rows=default_rows, column_types=default_column_types, whe
     Shortcut function for priming a query
     :return:
     """
+    # If then is set, then rows and column_types should not
+    if then:
+        nose.tools.assert_equal(rows, default_rows)
+        nose.tools.assert_equal(column_types, default_column_types)
+        rows=None
+        column_types=None
+
     query = PrimeQuery(query, rows=rows, column_types=column_types, when=when, then=then, cluster_name=cluster_name)
     response = prime_request(query)
     return response
