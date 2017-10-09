@@ -27,14 +27,15 @@ except ImportError:
     GeventConnection = None  # noqa
 
 
-@unittest.skipIf(GeventConnection is None, "Skpping the gevent tests because it's not installed")
+skip_condition = GeventConnection is None or MONKEY_PATCH_LOOP != "gevent"
+@unittest.skipIf(skip_condition, "Skipping the gevent tests because it's not installed")
 @notmonkeypatch
 class GeventTimerTest(unittest.TestCase, TimerConnectionTests):
     @classmethod
     def setUpClass(cls):
         # This is run even though the class is skipped, so we need
         # to make sure no monkey patching is happening
-        if not MONKEY_PATCH_LOOP:
+        if skip_condition:
             return
         gevent.monkey.patch_all()
         cls.connection_class = GeventConnection
