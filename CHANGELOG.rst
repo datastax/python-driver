@@ -37,6 +37,7 @@ Features
 --------
 * Add idle_heartbeat_timeout cluster option to tune how long to wait for heartbeat responses. (PYTHON-762)
 * Add HostFilterPolicy (PYTHON-761)
+* Add new exception type for CDC (PYTHON-837)
 
 Bug Fixes
 ---------
