@@ -179,12 +179,12 @@ class CustomResultMessageRaw(ResultMessage):
 
     @classmethod
     def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-            paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
+            paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
             rowcount = read_int(f)
             rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
             colnames = [c[2] for c in column_metadata]
             coltypes = [c[3] for c in column_metadata]
-            return paging_state, coltypes, (colnames, rows)
+            return paging_state, coltypes, (colnames, rows), result_metadata_id
 
 
 class CustomTestRawRowType(ProtocolHandler):
@@ -209,7 +209,7 @@ class CustomResultMessageTracked(ResultMessage):
 
     @classmethod
     def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-        paging_state, column_metadata = cls.recv_results_metadata(f, user_type_map)
+        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
         rowcount = read_int(f)
         rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         colnames = [c[2] for c in column_metadata]
@@ -219,7 +219,7 @@ class CustomResultMessageTracked(ResultMessage):
             tuple(ctype.from_binary(val, protocol_version)
                   for ctype, val in zip(coltypes, row))
             for row in rows]
-        return paging_state, coltypes, (colnames, parsed_rows)
+        return paging_state, coltypes, (colnames, parsed_rows), result_metadata_id
 
 
 class CustomProtocolHandlerResultMessageTracked(ProtocolHandler):

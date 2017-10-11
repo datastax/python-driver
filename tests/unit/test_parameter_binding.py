@@ -77,21 +77,21 @@ class ParamBindingTest(unittest.TestCase):
 
 class BoundStatementTestV1(unittest.TestCase):
 
-    protocol_version=1
+    protocol_version = 1
 
     @classmethod
     def setUpClass(cls):
-        cls.prepared = PreparedStatement(column_metadata=[
-                                             ColumnMetadata('keyspace', 'cf', 'rk0', Int32Type),
-                                             ColumnMetadata('keyspace', 'cf', 'rk1', Int32Type),
-                                             ColumnMetadata('keyspace', 'cf', 'ck0', Int32Type),
-                                             ColumnMetadata('keyspace', 'cf', 'v0', Int32Type)
-                                         ],
+        column_metadata = [ColumnMetadata('keyspace', 'cf', 'rk0', Int32Type),
+                           ColumnMetadata('keyspace', 'cf', 'rk1', Int32Type),
+                           ColumnMetadata('keyspace', 'cf', 'ck0', Int32Type),
+                           ColumnMetadata('keyspace', 'cf', 'v0', Int32Type)]
+        cls.prepared = PreparedStatement(column_metadata=column_metadata,
                                          query_id=None,
                                          routing_key_indexes=[1, 0],
                                          query=None,
                                          keyspace='keyspace',
-                                         protocol_version=cls.protocol_version, result_metadata=None)
+                                         protocol_version=cls.protocol_version, result_metadata=None,
+                                         result_metadata_id=None)
         cls.bound = BoundStatement(prepared_statement=cls.prepared)
 
     def test_invalid_argument_type(self):
@@ -131,7 +131,8 @@ class BoundStatementTestV1(unittest.TestCase):
                                                query=None,
                                                keyspace=keyspace,
                                                protocol_version=self.protocol_version,
-                                               result_metadata=None)
+                                               result_metadata=None,
+                                               result_metadata_id=None)
         prepared_statement.fetch_size = 1234
         bound_statement = BoundStatement(prepared_statement=prepared_statement)
         self.assertEqual(1234, bound_statement.fetch_size)
@@ -165,7 +166,8 @@ class BoundStatementTestV1(unittest.TestCase):
                                                query=None,
                                                keyspace='whatever',
                                                protocol_version=self.protocol_version,
-                                               result_metadata=None)
+                                               result_metadata=None,
+                                               result_metadata_id=None)
         bound = prepared_statement.bind(None)
         self.assertListEqual(bound.values, [])
 
@@ -184,15 +186,15 @@ class BoundStatementTestV1(unittest.TestCase):
 
 
 class BoundStatementTestV2(BoundStatementTestV1):
-    protocol_version=2
+    protocol_version = 2
 
 
 class BoundStatementTestV3(BoundStatementTestV1):
-    protocol_version=3
+    protocol_version = 3
 
 
 class BoundStatementTestV4(BoundStatementTestV1):
-    protocol_version=4
+    protocol_version = 4
 
     def test_dict_missing_routing_key(self):
         # in v4 it implicitly binds UNSET_VALUE for missing items,
@@ -214,6 +216,8 @@ class BoundStatementTestV4(BoundStatementTestV1):
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': UNSET_VALUE})
         self.assertEqual(self.bound.values[-1], UNSET_VALUE)
 
-        old_values = self.bound.values
         self.bound.bind((0, 0, 0, UNSET_VALUE))
         self.assertEqual(self.bound.values[-1], UNSET_VALUE)
+
+class BoundStatementTestV5(BoundStatementTestV4):
+    protocol_version = 5

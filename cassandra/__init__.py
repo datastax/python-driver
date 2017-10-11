@@ -201,6 +201,10 @@ class ProtocolVersion(object):
         return version >= cls.V5
 
     @classmethod
+    def uses_prepared_metadata(cls, version):
+        return version >= cls.V5
+
+    @classmethod
     def uses_error_code_map(cls, version):
         return version >= cls.V5
 

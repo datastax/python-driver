@@ -7,6 +7,7 @@ Features
 * Add IPv4Address/IPv6Address support for inet types (PYTHON-751)
 * WriteType.CDC and VIEW missing (PYTHON-794)
 * Warn on Cluster init if contact points are specified but LBP isn't (PYTHON-812)
+* Include hash of result set metadata in prepared stmt id (PYTHON-808)
 
 Bug Fixes
 ---------
