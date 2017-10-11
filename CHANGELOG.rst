@@ -7,6 +7,7 @@ Features
 * Add IPv4Address/IPv6Address support for inet types (PYTHON-751)
 * WriteType.CDC and VIEW missing (PYTHON-794)
 * Warn on Cluster init if contact points are specified but LBP isn't (PYTHON-812)
+* Create an utility function to fetch concurrently many keys from the same replica (PYTHON-647)
 
 Bug Fixes
 ---------

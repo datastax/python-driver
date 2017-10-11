@@ -377,11 +377,11 @@ class ExecutionProfileTest(unittest.TestCase):
         @test_category configuration
         """
         with patch('cassandra.cluster.log') as patched_logger:
-            Cluster(contact_points=['1'])
+            Cluster(contact_points=['127.0.0.1'])
         patched_logger.warn.assert_called_once()
         warning_message = patched_logger.warn.call_args[0][0]
         self.assertIn('no load_balancing_policy', warning_message)
-        self.assertIn("contact_points = ['1']", warning_message)
+        self.assertIn("contact_points = ['127.0.0.1']", warning_message)
         self.assertIn('lbp = None', warning_message)
 
     @mock_session_pools
@@ -397,5 +397,5 @@ class ExecutionProfileTest(unittest.TestCase):
         @test_category configuration
         """
         with patch('cassandra.cluster.log') as patched_logger:
-            Cluster(contact_points=['1'], load_balancing_policy=object())
+            Cluster(contact_points=['127.0.0.1'], load_balancing_policy=object())
         patched_logger.warn.assert_not_called()
