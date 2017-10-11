@@ -63,7 +63,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
     def make_connection(self):
-        c = AsyncoreConnection('1.2.3.4', cql_version='3.0.1')
+        c = AsyncoreConnection('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
         c.socket = Mock()
         c.socket.send.side_effect = lambda x: len(x)
         return c

@@ -43,6 +43,8 @@ import sys
 from uuid import UUID
 import warnings
 
+if six.PY3:
+    import ipaddress
 
 from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                uint16_pack, uint16_unpack, uint32_pack, uint32_unpack,
@@ -517,12 +519,17 @@ class InetAddressType(_CassandraType):
 
     @staticmethod
     def serialize(addr, protocol_version):
-        if ':' in addr:
-            return util.inet_pton(socket.AF_INET6, addr)
-        else:
-            # util.inet_pton could also handle, but this is faster
-            # since we've already determined the AF
-            return socket.inet_aton(addr)
+        try:
+            if ':' in addr:
+                return util.inet_pton(socket.AF_INET6, addr)
+            else:
+                # util.inet_pton could also handle, but this is faster
+                # since we've already determined the AF
+                return socket.inet_aton(addr)
+        except:
+            if six.PY3 and isinstance(addr, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+                return addr.packed
+            raise ValueError("can't interpret %r as an inet address" % (addr,))
 
 
 class CounterColumnType(LongType):

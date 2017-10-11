@@ -1,3 +1,33 @@
+3.12.0
+======
+
+Features
+--------
+* Send keyspace in QUERY, PREPARE, and BATCH messages (PYTHON-678)
+* Add IPv4Address/IPv6Address support for inet types (PYTHON-751)
+* WriteType.CDC and VIEW missing (PYTHON-794)
+* Warn on Cluster init if contact points are specified but LBP isn't (PYTHON-812)
+
+Bug Fixes
+---------
+* Both _set_final_exception/result called for the same ResponseFuture (PYTHON-630)
+* Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception (PYTHON-781)
+* Not create two sessions by default in CQLEngine (PYTHON-814)
+* Bug when subclassing AyncoreConnection (PYTHON-827)
+* Error at cleanup when closing the asyncore connections (PYTHON-829)
+* Fix sites where `sessions` can change during iteration (PYTHON-793)
+* cqlengine: allow min_length=0 for Ascii and Text column types (PYTHON-735)
+* Rare exception when "sys.exit(0)" after query timeouts (PYTHON-752)
+
+Others
+------
+* Remove DeprecationWarning when using WhiteListRoundRobinPolicy (PYTHON-810)
+
+Other
+-----
+
+* Bump Cython dependency version to 0.27 (PYTHON-833)
+
 3.11.0
 ======
 July 24, 2017
@@ -7,6 +37,7 @@ Features
 --------
 * Add idle_heartbeat_timeout cluster option to tune how long to wait for heartbeat responses. (PYTHON-762)
 * Add HostFilterPolicy (PYTHON-761)
+* Add new exception type for CDC (PYTHON-837)
 
 Bug Fixes
 ---------
@@ -19,6 +50,7 @@ Bug Fixes
 * Fix murmur3 on big-endian systems (PYTHON-653)
 * Ensure unused connections are closed if a Session is deleted by the GC (PYTHON-774)
 * Fix .values_list by using db names internally (cqlengine) (PYTHON-785)
+
 
 Other
 -----

@@ -17,7 +17,6 @@ import logging
 from random import randint, shuffle
 from threading import Lock
 import socket
-from warnings import warn
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 
@@ -397,10 +396,6 @@ class TokenAwarePolicy(LoadBalancingPolicy):
 
 class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     """
-    |wlrrp| **is deprecated. It will be removed in 4.0.** It can effectively be
-    reimplemented using :class:`.HostFilterPolicy`. For more information, see
-    PYTHON-758_.
-
     A subclass of :class:`.RoundRobinPolicy` which evenly
     distributes queries across all nodes in the cluster,
     regardless of what datacenter the nodes may be in, but
@@ -410,26 +405,13 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     https://datastax-oss.atlassian.net/browse/JAVA-145
     Where connection errors occur when connection
     attempts are made to private IP addresses remotely
-
-    .. |wlrrp| raw:: html
-
-       <b><code>WhiteListRoundRobinPolicy</code></b>
-
-    .. _PYTHON-758: https://datastax-oss.atlassian.net/browse/PYTHON-758
-
     """
+
     def __init__(self, hosts):
         """
         The `hosts` parameter should be a sequence of hosts to permit
         connections to.
         """
-        msg = ('WhiteListRoundRobinPolicy is deprecated. '
-               'It will be removed in 4.0. '
-               'It can effectively be reimplemented using HostFilterPolicy.')
-        warn(msg, DeprecationWarning)
-        # DeprecationWarnings are silent by default so we also log the message
-        log.warning(msg)
-
         self._allowed_hosts = hosts
         self._allowed_hosts_resolved = [endpoint[4][0] for a in self._allowed_hosts
                                         for endpoint in socket.getaddrinfo(a, None, socket.AF_UNSPEC, socket.SOCK_STREAM)]
@@ -749,6 +731,18 @@ class WriteType(object):
     A lighweight-transaction write, such as "DELETE ... IF EXISTS".
     """
 
+    VIEW = 6
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete MV operations.
+    """
+
+    CDC = 7
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete CDC operations.
+    """
+
 
 WriteType.name_to_value = {
     'SIMPLE': WriteType.SIMPLE,
@@ -756,7 +750,9 @@ WriteType.name_to_value = {
     'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
     'COUNTER': WriteType.COUNTER,
     'BATCH_LOG': WriteType.BATCH_LOG,
-    'CAS': WriteType.CAS
+    'CAS': WriteType.CAS,
+    'VIEW': WriteType.VIEW,
+    'CDC': WriteType.CDC
 }
 
 

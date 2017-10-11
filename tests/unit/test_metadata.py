@@ -33,7 +33,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 UserType, KeyspaceMetadata, get_schema_parser,
                                 _UnknownStrategy, ColumnMetadata, TableMetadata,
                                 IndexMetadata, Function, Aggregate,
-                                Metadata)
+                                Metadata, TokenMap)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
@@ -300,6 +300,42 @@ class NameEscapingTest(unittest.TestCase):
         invalid_keywords = cassandra.metadata.cql_keywords - cassandra.metadata.cql_keywords_unreserved
         for keyword in invalid_keywords:
             self.assertEqual(is_valid_name(keyword), False)
+
+
+class GetReplicasTest(unittest.TestCase):
+    def _get_replicas(self, token_klass):
+        tokens = [token_klass(i) for i in range(0, (2 ** 127 - 1), 2 ** 125)]
+        hosts = [Host("ip%d" % i, SimpleConvictionPolicy) for i in range(len(tokens))]
+        token_to_primary_replica = dict(zip(tokens, hosts))
+        keyspace = KeyspaceMetadata("ks", True, "SimpleStrategy", {"replication_factor": "1"})
+        metadata = Mock(spec=Metadata, keyspaces={'ks': keyspace})
+        token_map = TokenMap(token_klass, token_to_primary_replica, tokens, metadata)
+
+        # tokens match node tokens exactly
+        for i, token in enumerate(tokens):
+            expected_host = hosts[(i + 1) % len(hosts)]
+            replicas = token_map.get_replicas("ks", token)
+            self.assertEqual(set(replicas), {expected_host})
+
+        # shift the tokens back by one
+        for token, expected_host in zip(tokens, hosts):
+            replicas = token_map.get_replicas("ks", token_klass(token.value - 1))
+            self.assertEqual(set(replicas), {expected_host})
+
+        # shift the tokens forward by one
+        for i, token in enumerate(tokens):
+            replicas = token_map.get_replicas("ks", token_klass(token.value + 1))
+            expected_host = hosts[(i + 1) % len(hosts)]
+            self.assertEqual(set(replicas), {expected_host})
+
+    def test_murmur3_tokens(self):
+        self._get_replicas(Murmur3Token)
+
+    def test_md5_tokens(self):
+        self._get_replicas(MD5Token)
+
+    def test_bytes_tokens(self):
+        self._get_replicas(BytesToken)
 
 
 class Murmur3TokensTest(unittest.TestCase):

@@ -20,7 +20,7 @@ except ImportError:
 from mock import Mock, MagicMock, ANY
 
 from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType
-from cassandra.cluster import Session, ResponseFuture, NoHostAvailable
+from cassandra.cluster import Session, ResponseFuture, NoHostAvailable, ProtocolVersion
 from cassandra.connection import Connection, ConnectionException
 from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                 UnavailableErrorMessage, ResultMessage, QueryMessage,
@@ -476,6 +476,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
+        session.cluster.protocol_version = ProtocolVersion.V4
         session.cluster._prepared_statements = MagicMock(dict)
         prepared_statement = session.cluster._prepared_statements.__getitem__.return_value
         prepared_statement.query_string = "SELECT * FROM foobar"
@@ -500,6 +501,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
+        session.cluster.protocol_version = ProtocolVersion.V4
         session.cluster._prepared_statements = MagicMock(dict)
         prepared_statement = session.cluster._prepared_statements.__getitem__.return_value
         prepared_statement.query_string = "SELECT * FROM foobar"

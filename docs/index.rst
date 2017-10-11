@@ -10,6 +10,8 @@ This driver is open source under the
 `Apache v2 License <http://www.apache.org/licenses/LICENSE-2.0.html>`_.
 The source code for this driver can be found on `GitHub <http://github.com/datastax/python-driver>`_.
 
+**Note:** DataStax products do not support big-endian systems.
+
 Contents
 --------
 :doc:`installation`

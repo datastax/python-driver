@@ -27,11 +27,7 @@ from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, \
 from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
 from cassandra.pool import Host
 from tests.unit.utils import mock_session_pools
-
-try:
-    from cassandra.io.libevreactor import LibevConnection
-except ImportError:
-    LibevConnection = None  # noqa
+from tests import connection_class
 
 
 class ExceptionTypeTest(unittest.TestCase):
@@ -129,9 +125,9 @@ class SchedulerTest(unittest.TestCase):
 
 class SessionTest(unittest.TestCase):
     def setUp(self):
-        if LibevConnection is None:
+        if connection_class is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
-        LibevConnection.initialize_reactor()
+        connection_class.initialize_reactor()
 
     # TODO: this suite could be expanded; for now just adding a test covering a PR
     @mock_session_pools
@@ -164,9 +160,9 @@ class SessionTest(unittest.TestCase):
 
 class ExecutionProfileTest(unittest.TestCase):
     def setUp(self):
-        if LibevConnection is None:
+        if connection_class is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
-        LibevConnection.initialize_reactor()
+        connection_class.initialize_reactor()
 
     def _verify_response_future_profile(self, rf, prof):
         self.assertEqual(rf._load_balancer, prof.load_balancing_policy)
@@ -367,3 +363,39 @@ class ExecutionProfileTest(unittest.TestCase):
 
         # cannot add a profile added dynamically
         self.assertRaises(ValueError, cluster.add_execution_profile, 'two', ExecutionProfile())
+
+    @mock_session_pools
+    def test_warning_on_no_lbp_with_contact_points(self):
+        """
+        Test that users are warned when they instantiate a Cluster object with
+        contact points but no load-balancing policy.
+
+        @since 3.12.0
+        @jira_ticket PYTHON-812
+        @expected_result logs
+
+        @test_category configuration
+        """
+        with patch('cassandra.cluster.log') as patched_logger:
+            Cluster(contact_points=['1'])
+        patched_logger.warn.assert_called_once()
+        warning_message = patched_logger.warn.call_args[0][0]
+        self.assertIn('no load_balancing_policy', warning_message)
+        self.assertIn("contact_points = ['1']", warning_message)
+        self.assertIn('lbp = None', warning_message)
+
+    @mock_session_pools
+    def test_no_warning_on_contact_points_with_lbp(self):
+        """
+        Test that users aren't warned when they instantiate a Cluster object
+        with contact points and a load-balancing policy.
+
+        @since 3.12.0
+        @jira_ticket PYTHON-812
+        @expected_result no logs
+
+        @test_category configuration
+        """
+        with patch('cassandra.cluster.log') as patched_logger:
+            Cluster(contact_points=['1'], load_balancing_policy=object())
+        patched_logger.warn.assert_not_called()

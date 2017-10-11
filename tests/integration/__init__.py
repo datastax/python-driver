@@ -12,31 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-
-EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
-if "gevent" in EVENT_LOOP_MANAGER:
-    import gevent.monkey
-    gevent.monkey.patch_all()
-    from cassandra.io.geventreactor import GeventConnection
-    connection_class = GeventConnection
-elif "eventlet" in EVENT_LOOP_MANAGER:
-    from eventlet import monkey_patch
-    monkey_patch()
-
-    from cassandra.io.eventletreactor import EventletConnection
-    connection_class = EventletConnection
-elif "async" in EVENT_LOOP_MANAGER:
-    from cassandra.io.asyncorereactor import AsyncoreConnection
-    connection_class = AsyncoreConnection
-elif "twisted" in EVENT_LOOP_MANAGER:
-    from cassandra.io.twistedreactor import TwistedConnection
-    connection_class = TwistedConnection
-
-else:
-    from cassandra.io.libevreactor import LibevConnection
-    connection_class = LibevConnection
-
 from cassandra.cluster import Cluster
+
+from tests import connection_class, EVENT_LOOP_MANAGER
 Cluster.connection_class = connection_class
 
 try:
@@ -114,7 +92,7 @@ def _tuple_version(version_string):
 
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
-
+SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 
 # If set to to true this will force the Cython tests to run regardless of whether they are installed
 cython_env = os.getenv('VERIFY_CYTHON', "False")
@@ -182,8 +160,19 @@ def set_default_cass_ip():
         Cluster.__init__.__func__.__defaults__ = tuple(defaults)
 
 
-def get_default_protocol():
+def set_default_beta_flag_true():
+    defaults = list(Cluster.__init__.__defaults__)
+    defaults = defaults[:-3] + [True] + defaults[-2:]
+    try:
+        Cluster.__init__.__defaults__ = tuple(defaults)
+    except:
+        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
 
+
+def get_default_protocol():
+    if Version(CASSANDRA_VERSION) >= Version('4.0'):
+        set_default_beta_flag_true()
+        return 5
     if Version(CASSANDRA_VERSION) >= Version('2.2'):
         return 4
     elif Version(CASSANDRA_VERSION) >= Version('2.1'):
@@ -261,10 +250,14 @@ greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cass
 greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cassandra version 3.6 or greater required')
 greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'Cassandra version 3.10 or greater required')
+greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
+requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "async" in EVENT_LOOP_MANAGER,
+                                               "This test is not suitible for environments with large clock granularity")
+requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None, "Simulacron jar hasn't been specified")
 
 
 def wait_for_node_socket(node, timeout):
@@ -687,7 +680,7 @@ class BasicSharedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
 class BasicSharedKeyspaceUnitTestCaseRF1(BasicSharedKeyspaceUnitTestCase):
     """
     This is basic unit test case that can be leveraged to scope a keyspace to a specific test class.
-    creates a keyspace named after the testclass with a rf of 1, and a table named after the class
+    creates a keyspace named after the testclass with a rf of 1
     """
     @classmethod
     def setUpClass(self):

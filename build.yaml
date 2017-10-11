@@ -72,7 +72,7 @@ cassandra:
   - '2.1'
   - '2.2'
   - '3.0'
-  - '3.10'
+  - '3.11'
 
 env:
   CYTHON:
@@ -103,14 +103,33 @@ build:
         python setup.py build_ext --inplace --no-cython
       fi
 
+      echo "Installing simulacron"
+      pushd ~
+      git clone git@github.com:datastax/simulacron.git
+      cd simulacron
+      git clone git@github.com:datastax/native-protocol.git
+      cd native-protocol
+      mvn clean install
+      cd ..
+      mvn clean install -DskipTests=true
+      ls standalone/target
+      SIMULACRON_JAR=`find \`pwd\` -name "simulacron-standalone-*.jar"`
+      echo "SIMULACRON_JAR: $SIMULACRON_JAR"
+
+      popd
+
       # Run the unit tests, this is not done in travis because
       # it takes too much time for the whole matrix to build with cython
       if [[ $CYTHON == 'CYTHON' ]]; then
-        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/unit/ || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/unit/io/test_eventletreactor.py || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/unit/io/test_geventreactor.py || true
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml tests/unit/ || true
+        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
+        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
 
       fi
+
+      echo "Running with event loop manager: $EVENT_LOOP_MANAGER"
+      echo "==========RUNNING SIMULACRON TESTS=========="
+      SIMULACRON_JAR=$SIMULACRON_JAR EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_DIR=$CCM_INSTALL_DIR DSE_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=simulacron_results.xml tests/integration/simulacron/ || true
 
       echo "Running with event loop manager: $EVENT_LOOP_MANAGER"
       echo "==========RUNNING CQLENGINE TESTS=========="

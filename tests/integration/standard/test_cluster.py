@@ -30,11 +30,12 @@ from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 AddressTranslator, TokenAwarePolicy, HostFilterPolicy)
+from cassandra import ConsistencyLevel
 
 from cassandra.pool import Host
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 
-
+from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
     get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP
@@ -476,6 +477,7 @@ class ClusterTests(unittest.TestCase):
         cluster.shutdown()
 
     @local
+    @notwindows
     def test_refresh_schema_no_wait(self):
         contact_points = [CASSANDRA_IP]
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
@@ -559,20 +561,13 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
-        def check_trace(trace):
-            self.assertIsNotNone(trace.request_type)
-            self.assertIsNotNone(trace.duration)
-            self.assertIsNotNone(trace.started_at)
-            self.assertIsNotNone(trace.coordinator)
-            self.assertIsNotNone(trace.events)
-
         result = session.execute( "SELECT * FROM system.local", trace=True)
-        check_trace(result.get_query_trace())
+        self._check_trace(result.get_query_trace())
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
         result = session.execute(statement, trace=True)
-        check_trace(result.get_query_trace())
+        self._check_trace(result.get_query_trace())
 
         query = "SELECT * FROM system.local"
         statement = SimpleStatement(query)
@@ -582,7 +577,7 @@ class ClusterTests(unittest.TestCase):
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2, trace=True)
         future.result()
-        check_trace(future.get_query_trace())
+        self._check_trace(future.get_query_trace())
 
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2)
@@ -592,7 +587,7 @@ class ClusterTests(unittest.TestCase):
         prepared = session.prepare("SELECT * FROM system.local")
         future = session.execute_async(prepared, parameters=(), trace=True)
         future.result()
-        check_trace(future.get_query_trace())
+        self._check_trace(future.get_query_trace())
         cluster.shutdown()
 
     def test_trace_unavailable(self):
@@ -623,7 +618,7 @@ class ClusterTests(unittest.TestCase):
             try:
                 result = future.get_query_trace(-1.0)
                 # In case the result has time to come back before this timeout due to a race condition
-                self.check_trace(result)
+                self._check_trace(result)
             except TraceUnavailable:
                 break
         else:
@@ -635,7 +630,7 @@ class ClusterTests(unittest.TestCase):
             try:
                 result = future.get_query_trace(max_wait=120)
                 # In case the result has been set check the trace
-                self.check_trace(result)
+                self._check_trace(result)
             except TraceUnavailable:
                 break
         else:
@@ -823,6 +818,18 @@ class ClusterTests(unittest.TestCase):
 
             # make sure original profile is not impacted
             self.assertTrue(session.execute(query, execution_profile='node1')[0].release_version)
+
+    def test_setting_lbp_legacy(self):
+        cluster = Cluster()
+        self.addCleanup(cluster.shutdown)
+        cluster.load_balancing_policy = RoundRobinPolicy()
+        self.assertEqual(
+            list(cluster.load_balancing_policy.make_query_plan()), []
+        )
+        cluster.connect()
+        self.assertNotEqual(
+            list(cluster.load_balancing_policy.make_query_plan()), []
+        )
 
     def test_profile_lb_swap(self):
         """
@@ -1020,7 +1027,7 @@ class ClusterTests(unittest.TestCase):
         queried_hosts = set()
         with Cluster(protocol_version=PROTOCOL_VERSION,
                      load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy())) as cluster:
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             session.execute('''
                     CREATE TABLE test1rf.table_with_big_key (
                         k1 int,
@@ -1032,22 +1039,26 @@ class ClusterTests(unittest.TestCase):
                                           WHERE k1 = ? AND k2 = ? AND k3 = ? AND k4 = ?""")
             for i in range(10):
                 result = session.execute(prepared, (i, i, i, i), trace=True)
-                queried_hosts = self._assert_replica_queried(result.get_query_trace(), only_replicas=True)
+                trace = result.response_future.get_query_trace(query_cl=ConsistencyLevel.ALL)
+                queried_hosts = self._assert_replica_queried(trace, only_replicas=True)
                 last_i = i
 
         only_replica = queried_hosts.pop()
+        log = logging.getLogger(__name__)
+        log.info("The only replica found was: {}".format(only_replica))
         available_hosts = [host for host in ["127.0.0.1", "127.0.0.2", "127.0.0.3"] if host != only_replica]
         with Cluster(contact_points=available_hosts,
                      protocol_version=PROTOCOL_VERSION,
                      load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
                      predicate=lambda host: host.address != only_replica)) as cluster:
 
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             prepared = session.prepare("""SELECT * from test1rf.table_with_big_key
                                           WHERE k1 = ? AND k2 = ? AND k3 = ? AND k4 = ?""")
             for _ in range(10):
                 result = session.execute(prepared, (last_i, last_i, last_i, last_i), trace=True)
-                self._assert_replica_queried(result.get_query_trace(), only_replicas=False)
+                trace = result.response_future.get_query_trace(query_cl=ConsistencyLevel.ALL)
+                self._assert_replica_queried(trace, only_replicas=False)
 
             session.execute('''DROP TABLE test1rf.table_with_big_key''')
 
@@ -1060,6 +1071,13 @@ class ClusterTests(unittest.TestCase):
         else:
             self.assertGreater(len(queried_hosts), 1, "The host queried was {}".format(queried_hosts))
         return queried_hosts
+
+    def _check_trace(self, trace):
+        self.assertIsNotNone(trace.request_type)
+        self.assertIsNotNone(trace.duration)
+        self.assertIsNotNone(trace.started_at)
+        self.assertIsNotNone(trace.coordinator)
+        self.assertIsNotNone(trace.events)
 
 
 class LocalHostAdressTranslator(AddressTranslator):

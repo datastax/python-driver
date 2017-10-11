@@ -586,17 +586,22 @@ class Connection(object):
 
     @defunct_on_error
     def process_msg(self, header, body):
+        self.msg_received = True
         stream_id = header.stream
         if stream_id < 0:
             callback = None
             decoder = ProtocolHandler.decode_message
             result_metadata = None
         else:
-            callback, decoder, result_metadata = self._requests.pop(stream_id)
+            try:
+                callback, decoder, result_metadata = self._requests.pop(stream_id)
+            # This can only happen if the stream_id was
+            # removed due to an OperationTimedOut
+            except KeyError:
+                return
+
             with self.lock:
                 self.request_ids.append(stream_id)
-
-        self.msg_received = True
 
         try:
             response = decoder(header.version, self.user_type_map, stream_id,

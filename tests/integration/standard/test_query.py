@@ -24,24 +24,28 @@ from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
-from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.policies import HostDistance, RoundRobinPolicy
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile
+from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
-    greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace
+    greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
+    USE_CASS_EXTERNAL, greaterthanorequalcass40
 from tests import notwindows
+from tests.integration import greaterthanorequalcass30, get_node
 
 import time
 import re
 
 def setup_module():
-    use_singledc(start=False)
-    ccm_cluster = get_cluster()
-    ccm_cluster.clear()
-    # This is necessary because test_too_many_statements may
-    # timeout otherwise
-    config_options = {'write_request_timeout_in_ms': '20000'}
-    ccm_cluster.set_configuration_options(config_options)
-    ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+    if not USE_CASS_EXTERNAL:
+        use_singledc(start=False)
+        ccm_cluster = get_cluster()
+        ccm_cluster.clear()
+        # This is necessary because test_too_many_statements may
+        # timeout otherwise
+        config_options = {'write_request_timeout_in_ms': '20000'}
+        ccm_cluster.set_configuration_options(config_options)
+        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+
     setup_keyspace()
     global CASS_SERVER_VERSION
     CASS_SERVER_VERSION = get_server_versions()[0]
@@ -313,6 +317,16 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertIsNotNone(result_set.column_types)
 
         self.assertEqual(result_set.column_names, [u'user', u'game', u'year', u'month', u'day', u'score'])
+
+    @greaterthanorequalcass30
+    def test_basic_json_query(self):
+        insert_query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)", consistency_level = ConsistencyLevel.QUORUM)
+        json_query = SimpleStatement("SELECT JSON * FROM test3rf.test where k=1", consistency_level = ConsistencyLevel.QUORUM)
+
+        self.session.execute(insert_query)
+        results = self.session.execute(json_query)
+        self.assertEqual(results.column_names, ["[json]"])
+        self.assertEqual(results[0][0], '{"k": 1, "v": 1}')
 
 
 class PreparedStatementTests(unittest.TestCase):
@@ -1026,6 +1040,11 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(create_mv_monthlyhigh)
         self.session.execute(create_mv_filtereduserhigh)
 
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.alltimehigh".format(self.keyspace_name))
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.dailyhigh".format(self.keyspace_name))
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.monthlyhigh".format(self.keyspace_name))
+        self.addCleanup(self.session.execute, "DROP MATERIALIZED VIEW {0}.filtereduserhigh".format(self.keyspace_name))
+
         prepared_insert = self.session.prepare("""INSERT INTO {0}.scores (user, game, year, month, day, score) VALUES  (?, ?, ? ,? ,?, ?)""".format(self.keyspace_name))
 
         bound = prepared_insert.bind(('pcmanus', 'Coup', 2015, 5, 1, 4000))
@@ -1159,3 +1178,304 @@ class UnicodeQueryTest(BasicSharedKeyspaceUnitTestCase):
         self.session.execute(bound)
 
 
+class BaseKeyspaceTests():
+    @classmethod
+    def setUpClass(cls):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.session = cls.cluster.connect(wait_for_all_pools=True)
+        cls.ks_name = cls.__name__.lower()
+
+        cls.alternative_ks = "alternative_keyspace"
+        cls.table_name = "table_query_keyspace_tests"
+
+        ddl = """CREATE KEYSPACE {0} WITH replication =
+                        {{'class': 'SimpleStrategy',
+                        'replication_factor': '{1}'}}""".format(cls.ks_name, 1)
+        cls.session.execute(ddl)
+
+        ddl = """CREATE KEYSPACE {0} WITH replication =
+                                {{'class': 'SimpleStrategy',
+                                'replication_factor': '{1}'}}""".format(cls.alternative_ks, 1)
+        cls.session.execute(ddl)
+
+        ddl = '''
+                CREATE TABLE {0}.{1} (
+                    k int PRIMARY KEY,
+                    v int )'''.format(cls.ks_name, cls.table_name)
+        cls.session.execute(ddl)
+        ddl = '''
+                CREATE TABLE {0}.{1} (
+                    k int PRIMARY KEY,
+                    v int )'''.format(cls.alternative_ks, cls.table_name)
+        cls.session.execute(ddl)
+
+        cls.session.execute("INSERT INTO {}.{} (k, v) VALUES (1, 1)".format(cls.ks_name, cls.table_name))
+        cls.session.execute("INSERT INTO {}.{} (k, v) VALUES (2, 2)".format(cls.alternative_ks, cls.table_name))
+
+    @classmethod
+    def tearDownClass(cls):
+        ddl = "DROP KEYSPACE {}".format(cls.alternative_ks)
+        cls.session.execute(ddl)
+        ddl = "DROP KEYSPACE {}".format(cls.ks_name)
+        cls.session.execute(ddl)
+        cls.cluster.shutdown()
+
+class QueryKeyspaceTests(BaseKeyspaceTests):
+
+    def test_setting_keyspace(self):
+        """
+        Test the basic functionality of PYTHON-678, the keyspace can be set
+        independently of the query and read the results
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the query is executed and the results retrieved
+
+        @test_category query
+        """
+        self._check_set_keyspace_in_statement(self.session)
+
+    def test_setting_keyspace_and_session(self):
+        """
+        Test we can still send the keyspace independently even the session
+        connects to a keyspace when it's created
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the query is executed and the results retrieved
+
+        @test_category query
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        session = cluster.connect(self.alternative_ks)
+        self.addCleanup(cluster.shutdown)
+
+        self._check_set_keyspace_in_statement(session)
+
+    def test_setting_keyspace_and_session_after_created(self):
+        """
+        Test we can still send the keyspace independently even the session
+        connects to a different keyspace after being created
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the query is executed and the results retrieved
+
+        @test_category query
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+
+        session.set_keyspace(self.alternative_ks)
+        self._check_set_keyspace_in_statement(session)
+
+    def test_setting_keyspace_and_same_session(self):
+        """
+        Test we can still send the keyspace independently even if the session
+        is connected to the sent keyspace
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the query is executed and the results retrieved
+
+        @test_category query
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        session = cluster.connect(self.ks_name)
+        self.addCleanup(cluster.shutdown)
+
+        self._check_set_keyspace_in_statement(session)
+
+
+@greaterthanorequalcass40
+class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
+    @unittest.skip
+    def test_lower_protocol(self):
+        cluster = Cluster(protocol_version=ProtocolVersion.V4)
+        session = cluster.connect(self.ks_name)
+        self.addCleanup(cluster.shutdown)
+
+        simple_stmt = SimpleStatement("SELECT * from {}".format(self.table_name), keyspace=self.ks_name)
+        # This raises cassandra.cluster.NoHostAvailable: ('Unable to complete the operation against
+        # any hosts', {<Host: 127.0.0.3 datacenter1>: UnsupportedOperation('Keyspaces may only be
+        # set on queries with protocol version 5 or higher. Consider setting Cluster.protocol_version to 5.',),
+        # <Host: 127.0.0.2 datacenter1>: ConnectionException('Host has been marked down or removed',),
+        # <Host: 127.0.0.1 datacenter1>: ConnectionException('Host has been marked down or removed',)})
+        with self.assertRaises(NoHostAvailable):
+            session.execute(simple_stmt)
+            
+    def _check_set_keyspace_in_statement(self, session):
+        simple_stmt = SimpleStatement("SELECT * from {}".format(self.table_name), keyspace=self.ks_name)
+        results = session.execute(simple_stmt)
+        self.assertEqual(results[0], (1, 1))
+
+        simple_stmt = SimpleStatement("SELECT * from {}".format(self.table_name))
+        simple_stmt.keyspace = self.ks_name
+        results = session.execute(simple_stmt)
+        self.assertEqual(results[0], (1, 1))
+
+
+@greaterthanorequalcass40
+class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
+    def _check_set_keyspace_in_statement(self, session):
+        batch_stmt = BatchStatement()
+        for i in range(10):
+            batch_stmt.add("INSERT INTO {} (k, v) VALUES (%s, %s)".format(self.table_name), (i, i))
+
+        batch_stmt.keyspace = self.ks_name
+        session.execute(batch_stmt)
+        self.confirm_results()
+
+    def confirm_results(self):
+        keys = set()
+        values = set()
+        # Assuming the test data is inserted at default CL.ONE, we need ALL here to guarantee we see
+        # everything inserted
+        results = self.session.execute(SimpleStatement("SELECT * FROM {}.{}".format(self.ks_name, self.table_name),
+                                                       consistency_level=ConsistencyLevel.ALL))
+        for result in results:
+            keys.add(result.k)
+            values.add(result.v)
+
+        self.assertEqual(set(range(10)), keys, msg=results)
+        self.assertEqual(set(range(10)), values, msg=results)
+
+
+@greaterthanorequalcass40
+class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
+
+    def setUp(self):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_beta_protocol_version=True)
+        self.session = self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_prepared_with_keyspace_explicit(self):
+        """
+        Test the basic functionality of PYTHON-678, the keyspace can be set
+        independently of the query and read the results
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the query is executed and the results retrieved
+
+        @test_category query
+        """
+        query = "SELECT * from {} WHERE k = ?".format(self.table_name)
+        prepared_statement = self.session.prepare(query, keyspace=self.ks_name)
+
+        results = self.session.execute(prepared_statement, (1, ))
+        self.assertEqual(results[0], (1, 1))
+
+        prepared_statement_alternative = self.session.prepare(query, keyspace=self.alternative_ks)
+
+        self.assertNotEqual(prepared_statement.query_id, prepared_statement_alternative.query_id)
+
+        results = self.session.execute(prepared_statement_alternative, (2,))
+        self.assertEqual(results[0], (2, 2))
+
+    def test_reprepare_after_host_is_down(self):
+        """
+        Test that Cluster._prepare_all_queries is called and the
+        when a node comes up and the queries succeed later
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the query is executed and the results retrieved
+
+        @test_category query
+        """
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cluster.__name__)
+        logger.addHandler(mock_handler)
+        get_node(1).stop(wait=True, gently=True, wait_other_notice=True)
+
+        only_first = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(["127.0.0.1"]))
+        self.cluster.add_execution_profile("only_first", only_first)
+
+        query = "SELECT v from {} WHERE k = ?".format(self.table_name)
+        prepared_statement = self.session.prepare(query, keyspace=self.ks_name)
+        prepared_statement_alternative = self.session.prepare(query, keyspace=self.alternative_ks)
+
+        get_node(1).start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        # We wait for cluster._prepare_all_queries to be called
+        time.sleep(5)
+        self.assertEqual(1, mock_handler.get_message_count('debug', 'Preparing all known prepared statements'))
+        results = self.session.execute(prepared_statement, (1,), execution_profile="only_first")
+        self.assertEqual(results[0], (1, ))
+
+        results = self.session.execute(prepared_statement_alternative, (2,), execution_profile="only_first")
+        self.assertEqual(results[0], (2, ))
+
+    def test_prepared_not_found(self):
+        """
+        Test to if a query fails on a node that didn't have
+        the query prepared, it is re-prepared as expected and then
+        the query is executed
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the query is executed and the results retrieved
+
+        @test_category query
+        """
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_beta_protocol_version=True)
+        session = self.cluster.connect("system")
+        self.addCleanup(cluster.shutdown)
+
+        cluster.prepare_on_all_hosts = False
+        query = "SELECT k from {} WHERE k = ?".format(self.table_name)
+        prepared_statement = session.prepare(query, keyspace=self.ks_name)
+
+        for _ in range(10):
+            results = session.execute(prepared_statement, (1, ))
+            self.assertEqual(results[0], (1,))
+
+    def test_prepared_in_query_keyspace(self):
+        """
+        Test to the the keyspace can be set in the query
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the results are retrieved correctly
+
+        @test_category query
+        """
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_beta_protocol_version=True)
+        session = self.cluster.connect()
+        self.addCleanup(cluster.shutdown)
+
+        query = "SELECT k from {}.{} WHERE k = ?".format(self.ks_name, self.table_name)
+        prepared_statement = session.prepare(query)
+        results = session.execute(prepared_statement, (1,))
+        self.assertEqual(results[0], (1,))
+
+        query = "SELECT k from {}.{} WHERE k = ?".format(self.alternative_ks, self.table_name)
+        prepared_statement = session.prepare(query)
+        results = session.execute(prepared_statement, (2,))
+        self.assertEqual(results[0], (2,))
+
+    def test_prepared_in_query_keyspace_and_explicit(self):
+        """
+        Test to the the keyspace set explicitly is ignored if it is
+        specified as well in the query
+
+        @since 3.12
+        @jira_ticket PYTHON-678
+        @expected_result the keyspace set explicitly is ignored and
+        the results are retrieved correctly
+
+        @test_category query
+        """
+        query = "SELECT k from {}.{} WHERE k = ?".format(self.ks_name, self.table_name)
+        prepared_statement = self.session.prepare(query, keyspace="system")
+        results = self.session.execute(prepared_statement, (1,))
+        self.assertEqual(results[0], (1,))
+
+        query = "SELECT k from {}.{} WHERE k = ?".format(self.ks_name, self.table_name)
+        prepared_statement = self.session.prepare(query, keyspace=self.alternative_ks)
+        results = self.session.execute(prepared_statement, (1,))
+        self.assertEqual(results[0], (1,))

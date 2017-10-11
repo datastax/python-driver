@@ -20,7 +20,8 @@ from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_P
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node
+from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node, \
+    requiresmallclockgranularity
 from mock import Mock
 
 try:
@@ -318,6 +319,7 @@ class ClientExceptionTests(unittest.TestCase):
             """, consistency_level=ConsistencyLevel.ALL, expected_exception=None)
 
 
+@requiresmallclockgranularity
 class TimeoutTimerTest(unittest.TestCase):
     def setUp(self):
         """

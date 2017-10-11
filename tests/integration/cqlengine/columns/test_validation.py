@@ -529,10 +529,12 @@ class TestBigInt(BaseCassEngTestCase):
 
 
 class TestAscii(BaseCassEngTestCase):
-
     def test_min_length(self):
         """ Test arbitrary minimal lengths requirements. """
+
         Ascii(min_length=0).validate('')
+        Ascii(min_length=0, required=True).validate('')
+
         Ascii(min_length=0).validate(None)
         Ascii(min_length=0).validate('kevin')
 
@@ -656,7 +658,10 @@ class TestText(BaseCassEngTestCase):
 
     def test_min_length(self):
         """ Test arbitrary minimal lengths requirements. """
+
         Text(min_length=0).validate('')
+        Text(min_length=0, required=True).validate('')
+
         Text(min_length=0).validate(None)
         Text(min_length=0).validate('blake')
 

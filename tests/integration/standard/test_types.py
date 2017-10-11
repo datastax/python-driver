@@ -33,7 +33,7 @@ from tests.unit.cython.utils import cythontest
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
     BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequalcass3_10
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
-    get_sample, get_collection_sample
+    get_sample, get_all_samples, get_collection_sample
 
 
 def setup_module():
@@ -161,8 +161,30 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         for expected, actual in zip(params, results):
             self.assertEqual(actual, expected)
 
+        # try the same thing sending one insert at the time
+        s.execute("TRUNCATE alltypes;")
+        for i, datatype in enumerate(PRIMITIVE_DATATYPES):
+            single_col_name = chr(start_index + i)
+            single_col_names = ["zz", single_col_name]
+            placeholders = ','.join(["%s"] * len(single_col_names))
+            single_columns_string = ', '.join(single_col_names)
+            for j, data_sample in enumerate(get_all_samples(datatype)):
+                key = i + 1000 * j
+                single_params = (key, data_sample)
+                s.execute("INSERT INTO alltypes ({0}) VALUES ({1})".format(single_columns_string, placeholders),
+                          single_params)
+                # verify data
+                result = s.execute("SELECT {0} FROM alltypes WHERE zz=%s".format(single_columns_string), (key,))[0][1]
+                compare_value = data_sample
+                if six.PY3:
+                    import ipaddress
+                    if isinstance(data_sample, ipaddress.IPv4Address) or isinstance(data_sample, ipaddress.IPv6Address):
+                        compare_value = str(data_sample)
+                self.assertEqual(result, compare_value)
+
         # try the same thing with a prepared statement
         placeholders = ','.join(["?"] * len(col_names))
+        s.execute("TRUNCATE alltypes;")
         insert = s.prepare("INSERT INTO alltypes ({0}) VALUES ({1})".format(columns_string, placeholders))
         s.execute(insert.bind(params))
 

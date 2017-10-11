@@ -204,6 +204,10 @@ class ProtocolVersion(object):
     def uses_error_code_map(cls, version):
         return version >= cls.V5
 
+    @classmethod
+    def uses_keyspace_flag(cls, version):
+        return version >= cls.V5
+
 
 class SchemaChangeType(object):
     DROPPED = 'DROPPED'
@@ -381,6 +385,14 @@ class WriteTimeout(Timeout):
     def __init__(self, message, write_type=None, **kwargs):
         Timeout.__init__(self, message, **kwargs)
         self.write_type = write_type
+
+
+class CDCWriteFailure(RequestExecutionException):
+    """
+    Hit limit on data in CDC folder, writes are rejected
+    """
+    def __init__(self, message):
+        Exception.__init__(self, message)
 
 
 class CoordinationFailure(RequestExecutionException):

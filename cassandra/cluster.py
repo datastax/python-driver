@@ -312,6 +312,8 @@ class _ConfigMode(object):
     PROFILES = 2
 
 
+_UNSET_ARG = object()
+
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -733,7 +735,7 @@ class Cluster(object):
     _listener_lock = None
 
     def __init__(self,
-                 contact_points=["127.0.0.1"],
+                 contact_points=_UNSET_ARG,
                  port=9042,
                  compression=True,
                  auth_provider=None,
@@ -770,7 +772,18 @@ class Cluster(object):
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
+        if contact_points is not _UNSET_ARG and load_balancing_policy is None:
+            log.warn('Cluster.__init__ called with contact_points specified, '
+                     'but no load_balancing_policy. In the next major '
+                     'version, this will raise an error; please specify a '
+                     'load balancing policy. '
+                     '(contact_points = {cp}, lbp = {lbp}'
+                     ''.format(cp=contact_points, lbp=load_balancing_policy))
+
         if contact_points is not None:
+            if contact_points is _UNSET_ARG:
+                contact_points = ['127.0.0.1']
+
             if isinstance(contact_points, six.string_types):
                 raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
 
@@ -964,7 +977,7 @@ class Cluster(object):
                         "be returned when reading type %s.%s.", self.protocol_version, keyspace, user_type)
 
         self._user_types[keyspace][user_type] = klass
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.user_type_registered(keyspace, user_type, klass)
         UserType.evict_udt_class(keyspace, user_type)
 
@@ -994,7 +1007,7 @@ class Cluster(object):
         for host in filter(lambda h: h.is_up, self.metadata.all_hosts()):
             profile.load_balancing_policy.on_up(host)
         futures = set()
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             futures.update(session.update_created_pools())
         _, not_done = wait_futures(futures, pool_wait_timeout)
         if not_done:
@@ -1175,6 +1188,9 @@ class Cluster(object):
 
                 self.profile_manager.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
+                self.load_balancing_policy.populate(
+                    weakref.proxy(self), self.metadata.all_hosts()
+                )
 
                 try:
                     self.control_connection.connect()
@@ -1209,7 +1225,7 @@ class Cluster(object):
 
     def get_connection_holders(self):
         holders = []
-        for s in self.sessions:
+        for s in tuple(self.sessions):
             holders.extend(s.get_pools())
         holders.append(self.control_connection)
         return holders
@@ -1235,7 +1251,7 @@ class Cluster(object):
 
         self.control_connection.shutdown()
 
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.shutdown()
 
         self.executor.shutdown()
@@ -1262,7 +1278,7 @@ class Cluster(object):
     def _cleanup_failed_on_up_handling(self, host):
         self.profile_manager.on_down(host)
         self.control_connection.on_down(host)
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.remove_pool(host)
 
         self._start_reconnector(host, is_host_addition=False)
@@ -1301,7 +1317,7 @@ class Cluster(object):
                 host._currently_handling_node_up = False
 
         # see if there are any pools to add or remove now that the host is marked up
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.update_created_pools()
 
     def on_up(self, host):
@@ -1338,7 +1354,7 @@ class Cluster(object):
                 self._prepare_all_queries(host)
                 log.debug("Done preparing all queries for host %s, ", host)
 
-            for session in self.sessions:
+            for session in tuple(self.sessions):
                 session.remove_pool(host)
 
             log.debug("Signalling to load balancing policies that host %s is up", host)
@@ -1351,7 +1367,7 @@ class Cluster(object):
             futures_lock = Lock()
             futures_results = []
             callback = partial(self._on_up_future_completed, host, futures, futures_results, futures_lock)
-            for session in self.sessions:
+            for session in tuple(self.sessions):
                 future = session.add_or_renew_pool(host, is_host_addition=False)
                 if future is not None:
                     have_future = True
@@ -1415,7 +1431,7 @@ class Cluster(object):
             # this is to avoid closing pools when a control connection host became isolated
             if self._discount_down_events and self.profile_manager.distance(host) != HostDistance.IGNORED:
                 connected = False
-                for session in self.sessions:
+                for session in tuple(self.sessions):
                     pool_states = session.get_pool_state()
                     pool_state = pool_states.get(host)
                     if pool_state:
@@ -1431,7 +1447,7 @@ class Cluster(object):
 
         self.profile_manager.on_down(host)
         self.control_connection.on_down(host)
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.on_down(host)
 
         for listener in self.listeners:
@@ -1488,7 +1504,7 @@ class Cluster(object):
             self._finalize_add(host)
 
         have_future = False
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             future = session.add_or_renew_pool(host, is_host_addition=True)
             if future is not None:
                 have_future = True
@@ -1506,7 +1522,7 @@ class Cluster(object):
             listener.on_add(host)
 
         # see if there are any pools to add or remove now that the host is marked up
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.update_created_pools()
 
     def on_remove(self, host):
@@ -1516,7 +1532,7 @@ class Cluster(object):
         log.debug("Removing host %s", host)
         host.set_down()
         self.profile_manager.on_remove(host)
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             session.on_remove(host)
         for listener in self.listeners:
             listener.on_remove(host)
@@ -1576,7 +1592,7 @@ class Cluster(object):
         If any host has fewer than the configured number of core connections
         open, attempt to open connections until that number is met.
         """
-        for session in self.sessions:
+        for session in tuple(self.sessions):
             for pool in tuple(session._pools.values()):
                 pool.ensure_core_connections()
 
@@ -1718,6 +1734,19 @@ class Cluster(object):
         self.schema_metadata_enabled = enabled
         self.token_metadata_enabled = enabled
 
+    @classmethod
+    def _send_chunks(cls, connection, host, chunks, set_keyspace=False):
+        for ks_chunk in chunks:
+            messages = [PrepareMessage(query=s.query_string,
+                                       keyspace=s.keyspace if set_keyspace else None)
+                        for s in ks_chunk]
+            # TODO: make this timeout configurable somehow?
+            responses = connection.wait_for_responses(*messages, timeout=5.0, fail_on_error=False)
+            for success, response in responses:
+                if not success:
+                    log.debug("Got unexpected response when preparing "
+                              "statement on host %s: %r", host, response)
+
     def _prepare_all_queries(self, host):
         if not self._prepared_statements or not self.reprepare_on_up:
             return
@@ -1727,24 +1756,23 @@ class Cluster(object):
         try:
             connection = self.connection_factory(host.address)
             statements = self._prepared_statements.values()
-            for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
-                if keyspace is not None:
-                    connection.set_keyspace_blocking(keyspace)
-
-                # prepare 10 statements at a time
-                ks_statements = list(ks_statements)
+            if ProtocolVersion.uses_keyspace_flag(self.protocol_version):
+                # V5 protocol and higher, no need to set the keyspace
                 chunks = []
-                for i in range(0, len(ks_statements), 10):
-                    chunks.append(ks_statements[i:i + 10])
+                for i in range(0, len(statements), 10):
+                    chunks.append(statements[i:i + 10])
+                    self._send_chunks(connection, host, chunks, True)
+            else:
+                for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
+                    if keyspace is not None:
+                        connection.set_keyspace_blocking(keyspace)
 
-                for ks_chunk in chunks:
-                    messages = [PrepareMessage(query=s.query_string) for s in ks_chunk]
-                    # TODO: make this timeout configurable somehow?
-                    responses = connection.wait_for_responses(*messages, timeout=5.0, fail_on_error=False)
-                    for success, response in responses:
-                        if not success:
-                            log.debug("Got unexpected response when preparing "
-                                      "statement on host %s: %r", host, response)
+                    # prepare 10 statements at a time
+                    ks_statements = list(ks_statements)
+                    chunks = []
+                    for i in range(0, len(ks_statements), 10):
+                        chunks.append(ks_statements[i:i + 10])
+                    self._send_chunks(connection, host, chunks)
 
             log.debug("Done preparing all known prepared statements against host %s", host)
         except OperationTimedOut as timeout:
@@ -2123,11 +2151,13 @@ class Session(object):
 
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
+            statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
             if parameters:
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
                 query_string, cl, serial_cl,
-                fetch_size, timestamp=timestamp)
+                fetch_size, timestamp=timestamp,
+                keyspace=statement_keyspace)
         elif isinstance(query, BoundStatement):
             prepared_statement = query.prepared_statement
             message = ExecuteMessage(
@@ -2140,9 +2170,10 @@ class Session(object):
                     "BatchStatement execution is only supported with protocol version "
                     "2 or higher (supported in Cassandra 2.0 and higher).  Consider "
                     "setting Cluster.protocol_version to 2 to support this operation.")
+            statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
             message = BatchMessage(
                 query.batch_type, query._statements_and_parameters, cl,
-                serial_cl, timestamp)
+                serial_cl, timestamp, statement_keyspace)
 
         message.tracing = trace
 
@@ -2211,7 +2242,7 @@ class Session(object):
         for fn, args, kwargs in self._request_init_callbacks:
             fn(response_future, *args, **kwargs)
 
-    def prepare(self, query, custom_payload=None):
+    def prepare(self, query, custom_payload=None, keyspace=None):
         """
         Prepares a query string, returning a :class:`~cassandra.query.PreparedStatement`
         instance which can be used as follows::
@@ -2234,13 +2265,24 @@ class Session(object):
             ...     bound = prepared.bind((user.id, user.name, user.age))
             ...     session.execute(bound)
 
+        Alternatively, if :attr:`~.Cluster.protocol_version` is 5 or higher
+        (requires Cassandra 4.0+), the keyspace can be specified as a
+        parameter. This will allow you to avoid specifying the keyspace in the
+        query without specifying a keyspace in :meth:`~.Cluster.connect`. It
+        even will let you prepare and use statements against a keyspace other
+        than the one originally specified on connection:
+
+            >>> analyticskeyspace_prepared = session.prepare(
+            ...     "INSERT INTO user_activity id, last_activity VALUES (?, ?)",
+            ...     keyspace="analyticskeyspace")  # note the different keyspace
+
         **Important**: PreparedStatements should be prepared only once.
         Preparing the same query more than once will likely affect performance.
 
         `custom_payload` is a key value map to be passed along with the prepare
         message. See :ref:`custom_payload`.
         """
-        message = PrepareMessage(query=query)
+        message = PrepareMessage(query=query, keyspace=keyspace)
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
@@ -2249,8 +2291,9 @@ class Session(object):
             log.exception("Error preparing query:")
             raise
 
+        prepared_keyspace = keyspace if keyspace else self.keyspace
         prepared_statement = PreparedStatement.from_message(
-            query_id, bind_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
+            query_id, bind_metadata, pk_indexes, self.cluster.metadata, query, prepared_keyspace,
             self._protocol_version, result_metadata)
         prepared_statement.custom_payload = future.custom_payload
 
@@ -2259,13 +2302,13 @@ class Session(object):
         if self.cluster.prepare_on_all_hosts:
             host = future._current_host
             try:
-                self.prepare_on_all_hosts(prepared_statement.query_string, host)
+                self.prepare_on_all_hosts(prepared_statement.query_string, host, prepared_keyspace)
             except Exception:
                 log.exception("Error preparing query on all hosts:")
 
         return prepared_statement
 
-    def prepare_on_all_hosts(self, query, excluded_host):
+    def prepare_on_all_hosts(self, query, excluded_host, keyspace=None):
         """
         Prepare the given query on all hosts, excluding ``excluded_host``.
         Intended for internal use only.
@@ -2273,7 +2316,8 @@ class Session(object):
         futures = []
         for host in tuple(self._pools.keys()):
             if host != excluded_host and host.is_up:
-                future = ResponseFuture(self, PrepareMessage(query=query), None, self.default_timeout)
+                future = ResponseFuture(self, PrepareMessage(query=query, keyspace=keyspace),
+                                            None, self.default_timeout)
 
                 # we don't care about errors preparing against specific hosts,
                 # since we can always prepare them as needed when the prepared
@@ -2661,7 +2705,13 @@ class ControlConnection(object):
         a connection to that host.
         """
         errors = {}
-        for host in self._cluster._default_load_balancing_policy.make_query_plan():
+        lbp = (
+            self._cluster.load_balancing_policy
+            if self._cluster._config_mode == _ConfigMode.LEGACY else
+            self._cluster._default_load_balancing_policy
+        )
+
+        for host in lbp.make_query_plan():
             try:
                 return self._try_connect(host)
             except ConnectionException as exc:
@@ -3370,6 +3420,22 @@ class ResponseFuture(object):
             self._timer.cancel()
 
     def _on_timeout(self):
+
+        try:
+            self._connection._requests.pop(self._req_id)
+        # This prevents the race condition of the
+        # event loop thread just receiving the waited message
+        # If it arrives after this, it will be ignored
+        except KeyError:
+            return
+
+        pool = self.session._pools.get(self._current_host)
+        if pool and not pool.is_shutdown:
+            with self._connection.lock:
+                self._connection.request_ids.append(self._req_id)
+
+            pool.return_connection(self._connection)
+
         errors = self._errors
         if not errors:
             if self.is_schema_agreed:
@@ -3634,7 +3700,8 @@ class ResponseFuture(object):
 
                     current_keyspace = self._connection.keyspace
                     prepared_keyspace = prepared_statement.keyspace
-                    if prepared_keyspace and current_keyspace != prepared_keyspace:
+                    if not ProtocolVersion.uses_keyspace_flag(self.session.cluster.protocol_version) \
+                            and prepared_keyspace  and current_keyspace != prepared_keyspace:
                         self._set_final_exception(
                             ValueError("The Session's current keyspace (%s) does "
                                        "not match the keyspace the statement was "
@@ -3644,7 +3711,10 @@ class ResponseFuture(object):
 
                     log.debug("Re-preparing unrecognized prepared statement against host %s: %s",
                               host, prepared_statement.query_string)
-                    prepare_message = PrepareMessage(query=prepared_statement.query_string)
+                    prepared_keyspace = prepared_statement.keyspace \
+                        if ProtocolVersion.uses_keyspace_flag(self.session.cluster.protocol_version) else None
+                    prepare_message = PrepareMessage(query=prepared_statement.query_string,
+                                                     keyspace=prepared_keyspace)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
                     self.session.submit(self._reprepare, prepare_message, host, connection, pool)

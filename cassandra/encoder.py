@@ -29,6 +29,9 @@ import types
 from uuid import UUID
 import six
 
+if six.PY3:
+    import ipaddress
+
 from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
                             sortedset, Time, Date)
 
@@ -103,6 +106,8 @@ class Encoder(object):
                 memoryview: self.cql_encode_bytes,
                 bytes: self.cql_encode_bytes,
                 type(None): self.cql_encode_none,
+                ipaddress.IPv4Address: self.cql_encode_ipaddress,
+                ipaddress.IPv6Address: self.cql_encode_ipaddress
             })
 
     def cql_encode_none(self, val):
@@ -225,3 +230,11 @@ class Encoder(object):
         if :attr:`~Encoder.mapping` does not contain an entry for the type.
         """
         return self.mapping.get(type(val), self.cql_encode_object)(val)
+
+    if six.PY3:
+        def cql_encode_ipaddress(self, val):
+            """
+            Converts an ipaddress (IPV4Address, IPV6Address) to a CQL string. This
+            is suitable for ``inet`` type columns.
+            """
+            return "'%s'" % val.compressed
