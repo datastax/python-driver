@@ -20,8 +20,11 @@ import six
 from six.moves import xrange, zip
 from threading import Condition
 import sys
+from collections import defaultdict
 
 from cassandra.cluster import ResultSet
+from cassandra.pool import HostDistance
+from cassandra.cqltypes import _cqltypes
 
 import logging
 log = logging.getLogger(__name__)
@@ -220,7 +223,6 @@ class ConcurrentExecutorListResults(_ConcurrentExecutor):
         return [r[1] for r in sorted(self._results_queue)]
 
 
-
 def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs):
     """
     Like :meth:`~cassandra.concurrent.execute_concurrent()`, but takes a single
@@ -234,3 +236,64 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
         execute_concurrent_with_args(session, statement, parameters, concurrency=50)
     """
     return execute_concurrent(session, zip(cycle((statement,)), parameters), *args, **kwargs)
+
+
+def query_by_keys(session, keyspace, table, select_fields, keys):
+    """
+    Executes a few SELECT statements using the IN clause with several partition keys
+    and targeted at the replica with those keys. The alternative to this would be several
+    SELECT statements with the WHERE clause key=value.
+
+    The target table can only have one partition key
+    Example usage::
+        result = query_per_range(session, "system", "peers",
+                ("peer", "data_center"), ("127.0.0.1", "127.0.0.2"))
+    """
+    select_query = "SELECT " + ",".join(select_fields) + " FROM {}.{} WHERE ".format(keyspace, table)
+    cluster = session.cluster
+
+    partition_keys = cluster.metadata.keyspaces[keyspace].tables[table].partition_key
+    assert len(partition_keys) == 1
+
+    serializer = _cqltypes[partition_keys[0].cql_type]
+    partition_key_name = partition_keys[0].name
+    no_valid_replica = object()
+    keys_per_host = defaultdict(list)
+    for key in keys:
+        serialized_key = serializer.serialize(key, cluster.protocol_version)
+        all_replicas = cluster.metadata.get_replicas(keyspace, serialized_key)
+        # First check if there are local replicas
+        valid_replicas = list(host for host in all_replicas if
+                    host.is_up and cluster._default_load_balancing_policy.distance(host) == HostDistance.LOCAL)
+        if not valid_replicas:
+            valid_replicas = list(host for host in all_replicas if host.is_up)
+            if not valid_replicas:
+                # We will group under this statement all the keys for which
+                # we haven't found a valid replica
+                keys_per_host[no_valid_replica].append(key)
+        else:
+            for replica in valid_replicas:
+                if replica in keys_per_host:
+                    keys_per_host[replica].append(key)
+                    break
+            else:
+                keys_per_host[valid_replicas.pop()].append(key)
+
+    response_futures = []
+    for host, keys_in_host in six.iteritems(keys_per_host):
+        primary_keys_query = partition_key_name + " IN "
+        params_query = "(" + ",".join(["%s"] * len(keys_in_host)) + ")"
+
+        statement = select_query + primary_keys_query + params_query
+        response_future = session._create_response_future(statement, keys_in_host, trace=False,
+                                                custom_payload=None, timeout=session.default_timeout)
+        if host is no_valid_replica:
+            response_future.send_request()
+        else:
+            response_future._query(host)
+        response_futures.append(response_future)
+
+    for response_future in response_futures:
+        results = response_future.result()
+        for row in results:
+            yield row
