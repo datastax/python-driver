@@ -65,20 +65,12 @@ class ClientExceptionTests(unittest.TestCase):
         """
         Test is skipped if run with native protocol version <4
         """
-        self.support_v5 = True
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest(
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
-        try:
-            self.cluster = Cluster(protocol_version=ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=True)
-            self.session = self.cluster.connect()
-        except NoHostAvailable:
-            log.info("Protocol Version 5 not supported,")
-            self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-            self.session = self.cluster.connect()
-            self.support_v5 = False
-
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.session = self.cluster.connect()
         self.nodes_currently_failing = []
         self.node1, self.node2, self.node3 = get_cluster().nodes.values()
 
@@ -157,10 +149,10 @@ class ClientExceptionTests(unittest.TestCase):
         else:
             with self.assertRaises(expected_exception) as cm:
                 self.execute_helper(session, statement)
-            if self.support_v5 and (isinstance(cm.exception, WriteFailure) or isinstance(cm.exception, ReadFailure)):
+            if ProtocolVersion.uses_error_code_map(PROTOCOL_VERSION):
                 if isinstance(cm.exception, ReadFailure):
                     self.assertEqual(list(cm.exception.error_code_map.values())[0], 1)
-                else:
+                if isinstance(cm.exception, WriteFailure):
                     self.assertEqual(list(cm.exception.error_code_map.values())[0], 0)
 
     def test_write_failures_from_coordinator(self):

@@ -194,8 +194,10 @@ def get_supported_protocol_versions():
     3.10 -> 5(beta),4,3
 `   """
     version = Version(CASSANDRA_VERSION)
-    if version >= Version('3.10'):
+    if version >= Version('4.0'):
         return (3, 4, 5)
+    elif version >= Version('3.10'):
+        return (3, 4)
     elif version >= Version('3.0'):
         return (3, 4)
     elif version >= Version('2.2'):
