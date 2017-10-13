@@ -42,7 +42,8 @@ except ImportError:
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
-                       SchemaTargetType, DriverException, ProtocolVersion)
+                       SchemaTargetType, DriverException, ProtocolVersion,
+                       InvalidRequest)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -1275,13 +1276,16 @@ class Cluster(object):
             for udt_name, klass in six.iteritems(type_map):
                 session.user_type_registered(keyspace, udt_name, klass)
 
-    def _cleanup_failed_on_up_handling(self, host):
+    def _cleanup_failed_on_up_handling(self, host, set_keyspace_failed=False):
         self.profile_manager.on_down(host)
         self.control_connection.on_down(host)
+        keyspaces = []
         for session in tuple(self.sessions):
             session.remove_pool(host)
+            if set_keyspace_failed and session.keyspace:
+                keyspaces.append(session.keyspace)
 
-        self._start_reconnector(host, is_host_addition=False)
+        self._start_reconnector(host, is_host_addition=False, keyspaces=keyspaces)
 
     def _on_up_future_completed(self, host, futures, results, lock, finished_future):
         with lock:
@@ -1299,7 +1303,10 @@ class Cluster(object):
             # all futures have completed at this point
             for exc in [f for f in results if isinstance(f, Exception)]:
                 log.error("Unexpected failure while marking node %s up:", host, exc_info=exc)
-                self._cleanup_failed_on_up_handling(host)
+                set_keyspace_failed = False
+                if isinstance(exc, InvalidRequest):
+                    set_keyspace_failed = True
+                self._cleanup_failed_on_up_handling(host, set_keyspace_failed=set_keyspace_failed)
                 return
 
             if not all(results):
@@ -1392,7 +1399,7 @@ class Cluster(object):
         # for testing purposes
         return futures
 
-    def _start_reconnector(self, host, is_host_addition):
+    def _start_reconnector(self, host, is_host_addition, keyspaces):
         if self.profile_manager.distance(host) == HostDistance.IGNORED:
             return
 
@@ -1405,7 +1412,7 @@ class Cluster(object):
 
         reconnector = _HostReconnectionHandler(
             host, conn_factory, is_host_addition, self.on_add, self.on_up,
-            self.scheduler, schedule, host.get_and_set_reconnection_handler,
+            keyspaces, self.scheduler, schedule, host.get_and_set_reconnection_handler,
             new_handler=None)
 
         old_reconnector = host.get_and_set_reconnection_handler(reconnector)
@@ -1453,7 +1460,7 @@ class Cluster(object):
         for listener in self.listeners:
             listener.on_down(host)
 
-        self._start_reconnector(host, is_host_addition)
+        self._start_reconnector(host, is_host_addition, None)
 
     def on_add(self, host, refresh_nodes=True):
         if self.is_shutdown:
@@ -1765,7 +1772,12 @@ class Cluster(object):
             else:
                 for keyspace, ks_statements in groupby(statements, lambda s: s.keyspace):
                     if keyspace is not None:
-                        connection.set_keyspace_blocking(keyspace)
+                        try:
+                            connection.set_keyspace_blocking(keyspace)
+                        except InvalidRequest:
+                            log.warning("Error trying to prepare statements on "
+                                            "host %s, keyspace % s doesn't exist", host, keyspace)
+                            continue
 
                     # prepare 10 statements at a time
                     ks_statements = list(ks_statements)
@@ -2012,10 +2024,10 @@ class Session(object):
                 self._initial_connect_futures.add(future)
 
         futures = wait_futures(self._initial_connect_futures, return_when=FIRST_COMPLETED)
-        while futures.not_done and not any(f.result() for f in futures.done):
+        while futures.not_done and not any(f.result() for f in futures.done if not f.exception()):
             futures = wait_futures(futures.not_done, return_when=FIRST_COMPLETED)
 
-        if not any(f.result() for f in self._initial_connect_futures):
+        if not any(f.result() for f in self._initial_connect_futures if not f.exception()):
             msg = "Unable to connect to any servers"
             if self.keyspace:
                 msg += " using keyspace '%s'" % self.keyspace
@@ -2391,7 +2403,7 @@ class Session(object):
             except AuthenticationFailed as auth_exc:
                 conn_exc = ConnectionException(str(auth_exc), host=host)
                 self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
-                return False
+                raise
             except Exception as conn_exc:
                 log.warning("Failed to create connection pool for new host %s:",
                             host, exc_info=conn_exc)
@@ -2399,7 +2411,7 @@ class Session(object):
                 # a special flag to make sure the reconnector is created
                 self.cluster.signal_connection_failure(
                     host, conn_exc, is_host_addition, expect_host_to_be_down=True)
-                return False
+                raise
 
             previous = self._pools.get(host)
             with self._lock:
@@ -2411,15 +2423,18 @@ class Session(object):
                     def callback(pool, errors):
                         errors_returned.extend(errors)
                         set_keyspace_event.set()
-
-                    new_pool._set_keyspace_for_all_conns(self.keyspace, callback)
+                    try:
+                        new_pool._set_keyspace_for_all_conns(self.keyspace, callback)
+                    except ConnectionShutdown:
+                        self._lock.acquire()
+                        raise
                     set_keyspace_event.wait(self.cluster.connect_timeout)
                     if not set_keyspace_event.is_set() or errors_returned:
                         log.warning("Failed setting keyspace for pool after keyspace changed during connect: %s", errors_returned)
                         self.cluster.on_down(host, is_host_addition)
                         new_pool.shutdown()
                         self._lock.acquire()
-                        return False
+                        raise errors_returned
                     self._lock.acquire()
                 self._pools[host] = new_pool
 

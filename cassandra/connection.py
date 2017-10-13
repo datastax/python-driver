@@ -37,7 +37,7 @@ if 'gevent.monkey' in sys.modules:
 else:
     from six.moves.queue import Queue, Empty  # noqa
 
-from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
+from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, InvalidRequest, ProtocolVersion
 from cassandra.marshal import int32_pack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage, CredentialsMessage,
@@ -515,6 +515,8 @@ class Connection(object):
             return waiter.deliver(timeout)
         except OperationTimedOut:
             raise
+        except InvalidRequest:
+            raise
         except Exception as exc:
             self.defunct(exc)
             raise
@@ -799,9 +801,9 @@ class Connection(object):
                              consistency_level=ConsistencyLevel.ONE)
         try:
             result = self.wait_for_response(query)
-        except InvalidRequestException as ire:
+        except InvalidRequest as ire:
             # the keyspace probably doesn't exist
-            raise ire.to_exception()
+            raise ire
         except Exception as exc:
             conn_exc = ConnectionException(
                 "Problem while setting keyspace: %r" % (exc,), self.host)

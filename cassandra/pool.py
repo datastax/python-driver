@@ -27,7 +27,7 @@ try:
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
-from cassandra import AuthenticationFailed
+from cassandra import AuthenticationFailed, InvalidRequest
 from cassandra.connection import ConnectionException
 from cassandra.policies import HostDistance
 
@@ -267,16 +267,21 @@ class _ReconnectionHandler(object):
 
 class _HostReconnectionHandler(_ReconnectionHandler):
 
-    def __init__(self, host, connection_factory, is_host_addition, on_add, on_up, *args, **kwargs):
+    def __init__(self, host, connection_factory, is_host_addition, on_add, on_up, keyspaces, *args, **kwargs):
         _ReconnectionHandler.__init__(self, *args, **kwargs)
         self.is_host_addition = is_host_addition
         self.on_add = on_add
         self.on_up = on_up
         self.host = host
         self.connection_factory = connection_factory
+        self.keyspaces = keyspaces
 
     def try_reconnect(self):
-        return self.connection_factory()
+        conn = self.connection_factory()
+        if self.keyspaces:
+            for keyspace in self.keyspaces:
+                conn.set_keyspace_blocking(keyspace)
+        return conn
 
     def on_reconnection(self, connection):
         log.info("Successful reconnection to %s, marking node up if it isn't already", self.host)
