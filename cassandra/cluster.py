@@ -312,8 +312,6 @@ class _ConfigMode(object):
     PROFILES = 2
 
 
-_UNSET_ARG = object()
-
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -735,7 +733,7 @@ class Cluster(object):
     _listener_lock = None
 
     def __init__(self,
-                 contact_points=_UNSET_ARG,
+                 contact_points=_NOT_SET,
                  port=9042,
                  compression=True,
                  auth_provider=None,
@@ -772,7 +770,7 @@ class Cluster(object):
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
-        if contact_points is not _UNSET_ARG and load_balancing_policy is None:
+        if contact_points is not _NOT_SET and load_balancing_policy is None:
             log.warn('Cluster.__init__ called with contact_points specified, '
                      'but no load_balancing_policy. In the next major '
                      'version, this will raise an error; please specify a '
