@@ -31,9 +31,11 @@ import platform
 from threading import Event
 from subprocess import call
 from itertools import groupby
+import six
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
     InvalidRequest
+from cassandra.cluster import NoHostAvailable
 
 from cassandra.protocol import ConfigurationException
 
@@ -339,8 +341,13 @@ def is_current_cluster(cluster_name, node_counts):
     return False
 
 
-def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
+def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
+                configuration_options={}):
     set_default_cass_ip()
+
+    if ccm_options is None:
+        ccm_options = CCM_KWARGS
+    cassandra_version = ccm_options.get('version', CASSANDRA_VERSION)
 
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
@@ -348,7 +355,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             log.debug("Using external CCM cluster {0}".format(CCM_CLUSTER.name))
         else:
             log.debug("Using unnamed external cluster")
-        setup_keyspace(ipformat=ipformat, wait=False)
+        if set_keyspace and start:
+            setup_keyspace(ipformat=ipformat, wait=False)
         return
 
     if is_current_cluster(cluster_name, nodes):
@@ -362,27 +370,26 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             CCM_CLUSTER = CCMClusterFactory.load(path, cluster_name)
             log.debug("Found existing CCM cluster, {0}; clearing.".format(cluster_name))
             CCM_CLUSTER.clear()
-            CCM_CLUSTER.set_install_dir(**CCM_KWARGS)
+            CCM_CLUSTER.set_install_dir(**ccm_options)
+            CCM_CLUSTER.set_configuration_options(configuration_options)
         except Exception:
             ex_type, ex, tb = sys.exc_info()
             log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
 
-            log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, CCM_KWARGS))
+            log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
             if DSE_VERSION:
                 log.error("creating dse cluster")
-                CCM_CLUSTER = DseCluster(path, cluster_name, **CCM_KWARGS)
+                CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
             else:
-                CCM_CLUSTER = CCMCluster(path, cluster_name, **CCM_KWARGS)
+                CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
             CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-            if CASSANDRA_VERSION >= '2.2':
+            if cassandra_version >= '2.2':
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                if CASSANDRA_VERSION >= '3.0':
+                if cassandra_version >= '3.0':
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-            if 'spark' in workloads:
-                config_options = {"initial_spark_worker_resources": 0.1}
-                CCM_CLUSTER.set_dse_configuration_options(config_options)
             common.switch_cluster(path, cluster_name)
+            CCM_CLUSTER.set_configuration_options(configuration_options)
             CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
         jvm_args = []
@@ -400,18 +407,20 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             # Added to wait for slow nodes to start up
             for node in CCM_CLUSTER.nodes.values():
                 wait_for_node_socket(node, 120)
-            setup_keyspace(ipformat=ipformat)
+            if set_keyspace:
+                setup_keyspace(ipformat=ipformat)
     except Exception:
         log.exception("Failed to start CCM cluster; removing cluster.")
 
         if os.name == "nt":
             if CCM_CLUSTER:
-                for node in CCM_CLUSTER.nodes.itervalues():
+                for node in six.itervalues(CCM_CLUSTER.nodes):
                     os.system("taskkill /F /PID " + str(node.pid))
         else:
             call(["pkill", "-9", "-f", ".ccm"])
         remove_cluster()
         raise
+    return CCM_CLUSTER
 
 
 def teardown_package():
