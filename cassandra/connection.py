@@ -260,7 +260,7 @@ class Connection(object):
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
-                 no_compact=False, user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False):
+                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False):
         self.host = host
         self.port = port
         self.authenticator = authenticator
