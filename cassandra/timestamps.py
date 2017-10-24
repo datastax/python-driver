@@ -70,7 +70,7 @@ class MonotonicTimestampGenerator(object):
         call an instantiated ``MonotonicTimestampGenerator`` object.
 
         :param int now: an integer to be used as the current time, typically
-            representing the current time in seconds since the UNIX epoch
+            representing the current time in microseconds since the UNIX epoch
         :param int last: an integer representing the last timestamp returned by
             this object
         """
