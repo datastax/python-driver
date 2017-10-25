@@ -242,10 +242,19 @@ class ExecutionProfile(object):
     Defaults to :class:`.NoSpeculativeExecutionPolicy` if not specified
     """
 
-    def __init__(self, load_balancing_policy=None, retry_policy=None,
+    # indicates if lbp was set explicitly or uses default values
+    _load_balancing_policy_explicit = False
+
+    def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
                  consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
                  request_timeout=10.0, row_factory=named_tuple_factory, speculative_execution_policy=None):
-        self.load_balancing_policy = load_balancing_policy or default_lbp_factory()
+
+        if load_balancing_policy is _NOT_SET:
+            self._load_balancing_policy_explicit = False
+            self.load_balancing_policy = default_lbp_factory()
+        else:
+            self._load_balancing_policy_explicit = True
+            self.load_balancing_policy = load_balancing_policy
         self.retry_policy = retry_policy or RetryPolicy()
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
@@ -258,6 +267,15 @@ class ProfileManager(object):
 
     def __init__(self):
         self.profiles = dict()
+
+    def _profiles_without_explicit_lbps(self):
+        names = (profile_name for
+                 profile_name, profile in self.profiles.items()
+                 if not profile._load_balancing_policy_explicit)
+        return tuple(
+            'EXEC_PROFILE_DEFAULT' if n is EXEC_PROFILE_DEFAULT else n
+            for n in names
+        )
 
     def distance(self, host):
         distances = set(p.load_balancing_policy.distance(host) for p in self.profiles.values())
@@ -312,8 +330,6 @@ class _ConfigMode(object):
     PROFILES = 2
 
 
-_UNSET_ARG = object()
-
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -343,7 +359,14 @@ class Cluster(object):
     local_dc set (as is the default), the DC is chosen from an arbitrary
     host in contact_points. In this case, contact_points should contain
     only nodes from a single, local DC.
+
+    Note: In the next major version, if you specify contact points, you will
+    also be required to also explicitly specify a load-balancing policy. This
+    change will help prevent cases where users had hard-to-debug issues
+    surrounding unintuitive default load-balancing policy behavior.
     """
+    # tracks if contact_points was set explicitly or with default values
+    _contact_points_explicit = None
 
     port = 9042
     """
@@ -735,7 +758,7 @@ class Cluster(object):
     _listener_lock = None
 
     def __init__(self,
-                 contact_points=_UNSET_ARG,
+                 contact_points=_NOT_SET,
                  port=9042,
                  compression=True,
                  auth_provider=None,
@@ -772,17 +795,12 @@ class Cluster(object):
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
-        if contact_points is not _UNSET_ARG and load_balancing_policy is None:
-            log.warn('Cluster.__init__ called with contact_points specified, '
-                     'but no load_balancing_policy. In the next major '
-                     'version, this will raise an error; please specify a '
-                     'load balancing policy. '
-                     '(contact_points = {cp}, lbp = {lbp}'
-                     ''.format(cp=contact_points, lbp=load_balancing_policy))
-
         if contact_points is not None:
-            if contact_points is _UNSET_ARG:
+            if contact_points is _NOT_SET:
+                self._contact_points_explicit = False
                 contact_points = ['127.0.0.1']
+            else:
+                self._contact_points_explicit = True
 
             if isinstance(contact_points, six.string_types):
                 raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
@@ -855,10 +873,34 @@ class Cluster(object):
                 raise ValueError("Clusters constructed with execution_profiles should not specify legacy parameters "
                                  "load_balancing_policy or default_retry_policy. Configure this in a profile instead.")
             self._config_mode = _ConfigMode.LEGACY
+
         else:
             if execution_profiles:
                 self.profile_manager.profiles.update(execution_profiles)
                 self._config_mode = _ConfigMode.PROFILES
+
+        if self._contact_points_explicit:
+            if self._config_mode is _ConfigMode.PROFILES:
+                default_lbp_profiles = self.profile_manager._profiles_without_explicit_lbps()
+                if default_lbp_profiles:
+                    log.warn(
+                        'Cluster.__init__ called with contact_points '
+                        'specified, but load-balancing policies are not '
+                        'specified in some ExecutionProfiles. In the next '
+                        'major version, this will raise an error; please '
+                        'specify a load-balancing policy. '
+                        '(contact_points = {cp}, '
+                        'EPs without explicit LBPs = {eps})'
+                        ''.format(cp=contact_points, eps=default_lbp_profiles))
+            else:
+                if load_balancing_policy is None:
+                    log.warn(
+                        'Cluster.__init__ called with contact_points '
+                        'specified, but no load_balancing_policy. In the next '
+                        'major version, this will raise an error; please '
+                        'specify a load-balancing policy. '
+                        '(contact_points = {cp}, lbp = {lbp})'
+                        ''.format(cp=contact_points, lbp=load_balancing_policy))
 
         self.metrics_enabled = metrics_enabled
         self.ssl_options = ssl_options
@@ -1001,6 +1043,21 @@ class Cluster(object):
             raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly.")
         if name in self.profile_manager.profiles:
             raise ValueError("Profile %s already exists")
+        contact_points_but_no_lbp = (
+            self._contact_points_explicit and not
+            profile._load_balancing_policy_explicit)
+        if contact_points_but_no_lbp:
+            log.warn(
+                'Tried to add an ExecutionProfile with name {name}. '
+                '{self} was explicitly configured with contact_points, but '
+                '{ep} was not explicitly configured with a '
+                'load_balancing_policy. In the next major version, trying to '
+                'add an ExecutionProfile without an explicitly configured LBP '
+                'to a cluster with explicitly configured contact_points will '
+                'raise an exception; please specify a load-balancing policy '
+                'in the ExecutionProfile.'
+                ''.format(name=repr(name), self=self, ep=profile))
+
         self.profile_manager.profiles[name] = profile
         profile.load_balancing_policy.populate(self, self.metadata.all_hosts())
         # on_up after populate allows things like DCA LBP to choose default local dc
