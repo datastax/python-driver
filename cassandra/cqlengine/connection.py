@@ -322,8 +322,7 @@ def setup(
                         retry_connect=retry_connect, cluster_options=kwargs, default=True)
 
 
-def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connection=None):
-
+def execute_async(query, params=None, consistency_level=None, timeout=NOT_SET, connection=None):
     conn = get_connection(connection)
 
     if not conn.session:
@@ -338,9 +337,11 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connect
         query = SimpleStatement(query, consistency_level=consistency_level)
     log.debug(format_log_context(query.query_string, connection=connection))
 
-    result = conn.session.execute(query, params, timeout=timeout)
+    return conn.session.execute_async(query, params, timeout=timeout)
 
-    return result
+
+def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connection=None):
+    return execute_async(query, params, consistency_level, timeout, connection).result()
 
 
 def get_session(connection=None):

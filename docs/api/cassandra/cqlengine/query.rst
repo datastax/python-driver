@@ -18,6 +18,8 @@ The methods here are used to filter, order, and constrain results.
 
     .. automethod:: count
 
+    .. automethod:: count_async
+
     .. method:: len(queryset)
 
        Returns the number of rows matched by this query. This function uses :meth:`~.cassandra.cqlengine.query.ModelQuerySet.count` internally.
@@ -29,6 +31,12 @@ The methods here are used to filter, order, and constrain results.
     .. automethod:: filter
 
     .. automethod:: get
+
+    .. automethod:: get_async
+
+    .. automethod:: get_all
+
+    .. automethod:: get_all_async
 
     .. automethod:: limit
 
@@ -55,6 +63,8 @@ The methods here are used to filter, order, and constrain results.
     .. _blind_updates:
 
     .. automethod:: update
+
+    .. automethod:: update_async
 
 .. autoclass:: BatchQuery
    :members:

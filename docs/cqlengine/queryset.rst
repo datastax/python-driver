@@ -8,6 +8,12 @@ Retrieving objects
 ==================
     Once you've populated Cassandra with data, you'll probably want to retrieve some of it. This is accomplished with QuerySet objects. This section will describe how to use QuerySet objects to retrieve the data you're looking for.
 
+Retrieving objects asynchronously
+---------------------------------
+
+This documentation describes how to use QuerySet objects synchronously. Note that you can also work with their asynchronous equivalents: get_async, get_all_async(), save_async, delete_async etc.
+
+
 Retrieving all objects
 ----------------------
     The simplest query you can make is to return all objects from a table.

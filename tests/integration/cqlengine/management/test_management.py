@@ -16,7 +16,6 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import mock
 import logging
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
@@ -27,6 +26,7 @@ from cassandra.cqlengine import columns
 
 from tests.integration import PROTOCOL_VERSION, MockLoggingHandler, CASSANDRA_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import mock_execute_async
 from tests.integration.cqlengine.query.test_queryset import TestModel
 from cassandra.cqlengine.usertype import UserType
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
@@ -457,19 +457,17 @@ class StaticColumnTests(BaseCassEngTestCase):
 
         drop_table(StaticModel)
 
-        session = get_session()
-
-        with mock.patch.object(session, "execute", wraps=session.execute) as m:
+        with mock_execute_async(wraps=True) as m:
             sync_table(StaticModel)
 
         self.assertGreater(m.call_count, 0)
-        statement = m.call_args[0][0].query_string
+        statement = m.call_args[0][0]
         self.assertIn('"name" text static', statement)
 
         # if we sync again, we should not apply an alter w/ a static
         sync_table(StaticModel)
 
-        with mock.patch.object(session, "execute", wraps=session.execute) as m2:
+        with mock_execute_async(wraps=True) as m2:
             sync_table(StaticModel)
 
         self.assertEqual(len(m2.call_args_list), 0)

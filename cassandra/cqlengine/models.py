@@ -23,6 +23,7 @@ from cassandra.cqlengine import connection
 from cassandra.cqlengine import query
 from cassandra.cqlengine.query import DoesNotExist as _DoesNotExist
 from cassandra.cqlengine.query import MultipleObjectsReturned as _MultipleObjectsReturned
+from cassandra.cqlengine.concurrent import CQLEngineFuture
 from cassandra.metadata import protect_name
 from cassandra.util import OrderedDict
 
@@ -657,6 +658,20 @@ class BaseModel(object):
         return values
 
     @classmethod
+    def create_async(cls, **kwargs):
+        """
+        Asynchronous version of `create()`.
+
+        See :meth:`Model.create` for parameter definitions.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        extra_columns = set(kwargs.keys()) - set(cls._columns.keys())
+        if extra_columns:
+            raise ValidationError("Incorrect columns passed: {0}".format(extra_columns))
+        return cls.objects.create_async(**kwargs)
+
+    @classmethod
     def create(cls, **kwargs):
         """
         Create an instance of this model in the database.
@@ -666,10 +681,7 @@ class BaseModel(object):
 
         Returns the instance.
         """
-        extra_columns = set(kwargs.keys()) - set(cls._columns.keys())
-        if extra_columns:
-            raise ValidationError("Incorrect columns passed: {0}".format(extra_columns))
-        return cls.objects.create(**kwargs)
+        return cls.create_async(**kwargs).result()
 
     @classmethod
     def all(cls):
@@ -690,6 +702,17 @@ class BaseModel(object):
         return cls.objects.filter(*args, **kwargs)
 
     @classmethod
+    def get_async(cls, *args, **kwargs):
+        """
+        Asynchronous version of `get()`.
+
+        See :meth:`Model.get` for parameter definitions.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        return cls.objects.get_async(*args, **kwargs)
+
+    @classmethod
     def get(cls, *args, **kwargs):
         """
         Returns a single object based on the passed filter constraints.
@@ -697,6 +720,23 @@ class BaseModel(object):
         This is a pass-through to the model objects().:method:`~cqlengine.queries.get`.
         """
         return cls.objects.get(*args, **kwargs)
+
+    @classmethod
+    def get_all_async(cls):
+        """
+        Asynchronous version of `get_all()`.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        return cls.objects.get_all_async()
+
+    @classmethod
+    def get_all(cls):
+        """
+        Returns all rows matching this query. Unlike the `all()` function, `get_all` fetches rows
+        immediately from the server.
+        """
+        return cls.objects.get_all()
 
     def timeout(self, timeout):
         """
@@ -706,6 +746,40 @@ class BaseModel(object):
         assert self._batch is None, 'Setting both timeout and batch is not supported'
         self._timeout = timeout
         return self
+
+    def save_async(self):
+        """
+        Asynchronous version of `save()`.
+
+        See :meth:`Model.save_async` for parameter definitions.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        # handle polymorphic models
+        if self._is_polymorphic:
+            if self._is_polymorphic_base:
+                raise PolymorphicModelException('cannot save polymorphic base model')
+            else:
+                setattr(self, self._discriminator_column_name, self.__discriminator_value__)
+
+        self.validate()
+        future = self.__dmlquery__(self.__class__, self,
+                                   batch=self._batch,
+                                   ttl=self._ttl,
+                                   timestamp=self._timestamp,
+                                   consistency=self.__consistency__,
+                                   if_not_exists=self._if_not_exists,
+                                   conditional=self._conditional,
+                                   timeout=self._timeout,
+                                   if_exists=self._if_exists).save_async()
+
+        def post_processing(results):
+            query.check_applied(results)
+            self._set_persisted()
+            self._timestamp = None
+            return self
+
+        return CQLEngineFuture(future, post_processing=post_processing)
 
     def save(self):
         """
@@ -718,42 +792,17 @@ class BaseModel(object):
             #saves it to Cassandra
             person.save()
         """
+        return self.save_async().result()
 
-        # handle polymorphic models
-        if self._is_polymorphic:
-            if self._is_polymorphic_base:
-                raise PolymorphicModelException('cannot save polymorphic base model')
-            else:
-                setattr(self, self._discriminator_column_name, self.__discriminator_value__)
-
-        self.validate()
-        self.__dmlquery__(self.__class__, self,
-                          batch=self._batch,
-                          ttl=self._ttl,
-                          timestamp=self._timestamp,
-                          consistency=self.__consistency__,
-                          if_not_exists=self._if_not_exists,
-                          conditional=self._conditional,
-                          timeout=self._timeout,
-                          if_exists=self._if_exists).save()
-
-        self._set_persisted()
-
-        self._timestamp = None
-
-        return self
-
-    def update(self, **values):
+    def update_async(self, **values):
         """
-        Performs an update on the model instance. You can pass in values to set on the model
-        for updating, or you can call without values to execute an update against any modified
-        fields. If no fields on the model have been modified since loading, no query will be
-        performed. Model validation is performed normally. Setting a value to `None` is
-        equivalent to running a CQL `DELETE` on that column.
+        Asynchronous version of `update()`.
 
-        It is possible to do a blind update, that is, to update a field without having first selected the object out of the database.
-        See :ref:`Blind Updates <blind_updates>`
+        See :meth:`Model.update` for parameter definitions.
+
+        Returns a `concurrent.futures.Future`.
         """
+
         for column_id, v in values.items():
             col = self._columns.get(column_id)
 
@@ -781,32 +830,55 @@ class BaseModel(object):
                 setattr(self, self._discriminator_column_name, self.__discriminator_value__)
 
         self.validate()
-        self.__dmlquery__(self.__class__, self,
-                          batch=self._batch,
-                          ttl=self._ttl,
-                          timestamp=self._timestamp,
-                          consistency=self.__consistency__,
-                          conditional=self._conditional,
-                          timeout=self._timeout,
-                          if_exists=self._if_exists).update()
+        future = self.__dmlquery__(self.__class__, self,
+                                   batch=self._batch,
+                                   ttl=self._ttl,
+                                   timestamp=self._timestamp,
+                                   consistency=self.__consistency__,
+                                   conditional=self._conditional,
+                                   timeout=self._timeout,
+                                   if_exists=self._if_exists).update_async()
 
-        self._set_persisted()
+        def post_processing(results):
+            query.check_applied(results)
+            self._set_persisted()
+            self._timestamp = None
+            return self
 
-        self._timestamp = None
+        return CQLEngineFuture(future, post_processing=post_processing)
 
-        return self
+    def update(self, **values):
+        """
+        Performs an update on the model instance. You can pass in values to set on the model
+        for updating, or you can call without values to execute an update against any modified
+        fields. If no fields on the model have been modified since loading, no query will be
+        performed. Model validation is performed normally. Setting a value to `None` is
+        equivalent to running a CQL `DELETE` on that column.
+
+        It is possible to do a blind update, that is, to update a field without having first selected the object out of the database.
+        See :ref:`Blind Updates <blind_updates>`
+        """
+        return self.update_async(**values).result()
+
+    def delete_async(self):
+        """
+        Asynchronous version of `delete()`.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        return self.__dmlquery__(self.__class__, self,
+                                 batch=self._batch,
+                                 timestamp=self._timestamp,
+                                 consistency=self.__consistency__,
+                                 timeout=self._timeout,
+                                 conditional=self._conditional,
+                                 if_exists=self._if_exists).delete_async()
 
     def delete(self):
         """
         Deletes the object from the database
         """
-        self.__dmlquery__(self.__class__, self,
-                          batch=self._batch,
-                          timestamp=self._timestamp,
-                          consistency=self.__consistency__,
-                          timeout=self._timeout,
-                          conditional=self._conditional,
-                          if_exists=self._if_exists).delete()
+        return self.delete_async().result()
 
     def get_changed_columns(self):
         """
@@ -839,7 +911,19 @@ class BaseModel(object):
 
 class ModelMetaClass(type):
 
+    _warned_overridden_methods = ['save', 'update', 'delete', 'create', 'get', 'get_all']
+
     def __new__(cls, name, bases, attrs):
+        # warn the users if he tries to override synchronous methods in his models
+        overridden_synchronous_methods = [m for m in cls._warned_overridden_methods if m in attrs]
+        if overridden_synchronous_methods:
+            warn(("{subclass} overrides the following synchronous methods: "
+                  "{ms}. Some Model methods (e.g. create) rely on the "
+                  "async equivalents and will not use your overridden method. "
+                  "Consider overriding the async equivalent instead.".format(
+                      subclass=name, ms=overridden_synchronous_methods
+                  )))
+
         # move column definitions into columns dict
         # and set default column names
         column_dict = OrderedDict()

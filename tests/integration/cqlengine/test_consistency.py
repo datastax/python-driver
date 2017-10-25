@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
 from uuid import uuid4
 
 from cassandra import ConsistencyLevel as CL, ConsistencyLevel
@@ -24,6 +23,7 @@ from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import mock_execute_async
 
 class TestConsistencyModel(Model):
 
@@ -48,7 +48,7 @@ class TestConsistency(BaseConsistencyTest):
     def test_create_uses_consistency(self):
 
         qs = TestConsistencyModel.consistency(CL.ALL)
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             qs.create(text="i am not fault tolerant this way")
 
         args = m.call_args
@@ -62,7 +62,7 @@ class TestConsistency(BaseConsistencyTest):
         t = TestConsistencyModel.create(text="bacon and eggs")
         t.text = "ham sandwich"
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             t.consistency(CL.ALL).save()
 
         args = m.call_args
@@ -70,27 +70,27 @@ class TestConsistency(BaseConsistencyTest):
 
     def test_batch_consistency(self):
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             with BatchQuery(consistency=CL.ALL) as b:
                 TestConsistencyModel.batch(b).create(text="monkey")
 
         args = m.call_args
 
-        self.assertEqual(CL.ALL, args[0][0].consistency_level)
+        self.assertEqual(CL.ALL, args[0][2])
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             with BatchQuery() as b:
                 TestConsistencyModel.batch(b).create(text="monkey")
 
         args = m.call_args
-        self.assertNotEqual(CL.ALL, args[0][0].consistency_level)
+        self.assertNotEqual(CL.ALL, args[0][2])
 
     def test_blind_update(self):
         t = TestConsistencyModel.create(text="bacon and eggs")
         t.text = "ham sandwich"
         uid = t.id
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             TestConsistencyModel.objects(id=uid).consistency(CL.ALL).update(text="grilled cheese")
 
         args = m.call_args
@@ -102,10 +102,10 @@ class TestConsistency(BaseConsistencyTest):
         t.text = "ham and cheese sandwich"
         uid = t.id
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             t.consistency(CL.ALL).delete()
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             TestConsistencyModel.objects(id=uid).consistency(CL.ALL).delete()
 
         args = m.call_args
