@@ -162,7 +162,7 @@ def set_default_cass_ip():
 
 def set_default_beta_flag_true():
     defaults = list(Cluster.__init__.__defaults__)
-    defaults = defaults[:-3] + [True] + defaults[-2:]
+    defaults = (defaults[:28] + [True] + defaults[29:])
     try:
         Cluster.__init__.__defaults__ = tuple(defaults)
     except:
@@ -255,6 +255,7 @@ greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cass
 greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
+lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
