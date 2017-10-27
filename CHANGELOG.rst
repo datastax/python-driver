@@ -9,6 +9,7 @@ Features
 * Warn on Cluster init if contact points are specified but LBP isn't (legacy mode) (PYTHON-812)
 * Warn on Cluster init if contact points are specified but LBP isn't (exection profile mode) (PYTHON-838)
 * Include hash of result set metadata in prepared stmt id (PYTHON-808)
+* Add NO_COMPACT startup option (PYTHON-839)
 
 Bug Fixes
 ---------
