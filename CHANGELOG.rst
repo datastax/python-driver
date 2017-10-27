@@ -21,6 +21,7 @@ Bug Fixes
 * Fix sites where `sessions` can change during iteration (PYTHON-793)
 * cqlengine: allow min_length=0 for Ascii and Text column types (PYTHON-735)
 * Rare exception when "sys.exit(0)" after query timeouts (PYTHON-752)
+* Dont set the session keyspace when preparing statements (PYTHON-843)
 
 Others
 ------

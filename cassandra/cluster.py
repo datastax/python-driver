@@ -2356,7 +2356,7 @@ class Session(object):
             log.exception("Error preparing query:")
             raise
 
-        prepared_keyspace = keyspace if keyspace else self.keyspace
+        prepared_keyspace = keyspace if keyspace else None
         prepared_statement = PreparedStatement.from_message(
             query_id, bind_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
             self._protocol_version, result_metadata, result_metadata_id)
