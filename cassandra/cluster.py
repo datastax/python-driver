@@ -2004,7 +2004,7 @@ class Session(object):
     increasing timestamps across clusters, or set it to to ``lambda:
     int(time.time() * 1e6)`` if losing records over clock inconsistencies is
     acceptable for the application. Custom :attr:`timestamp_generator` s should
-    be callable, and calling them should return an integer representing seconds
+    be callable, and calling them should return an integer representing microseconds
     since some point in time, typically UNIX epoch.
 
     .. versionadded:: 3.8.0
