@@ -37,7 +37,7 @@ def setup_module():
     remove_cluster()
 
 
-UPGRADE_CLUSTER = "upgrade_cluster"
+UPGRADE_CLUSTER_NAME = "upgrade_cluster"
 UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_version', 'configuration_options'))
 
 log = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class UpgradeBase(unittest.TestCase):
         to the variable UPGRADE_PATH.
         """
         remove_cluster()
-        self.cluster = use_cluster(UPGRADE_CLUSTER + self.UPGRADE_PATH.name, [3],
+        self.cluster = use_cluster(UPGRADE_CLUSTER_NAME + self.UPGRADE_PATH.name, [3],
                                    ccm_options=self.UPGRADE_PATH.starting_version,
                                    configuration_options=self.UPGRADE_PATH.configuration_options)
         self.nodes = self.cluster.nodelist()
