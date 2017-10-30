@@ -21,6 +21,7 @@ from cassandra import cluster
 
 from collections import namedtuple
 from functools import wraps
+import logging
 from threading import Thread, Event
 from ccmlib.node import TimeoutError
 import time
@@ -39,6 +40,8 @@ def setup_module():
 UPGRADE_CLUSTER = "upgrade_cluster"
 UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_version', 'configuration_options'))
 
+log = logging.getLogger(__name__)
+
 
 class upgrade_paths(object):
     """
@@ -52,9 +55,11 @@ class upgrade_paths(object):
         def wrapper(*args, **kwargs):
             for path in self.paths:
                 self_from_decorated = args[0]
+                log.debug('setting up {path}'.format(path=path))
                 self_from_decorated.UPGRADE_PATH = path
                 self_from_decorated._setUp()
                 method(*args, **kwargs)
+                log.debug('tearing down {path}'.format(path=path))
                 self_from_decorated._tearDown()
         return wrapper
 
@@ -114,6 +119,7 @@ class UpgradeBase(unittest.TestCase):
         """
         Starts the upgrade in a different thread
         """
+        log.debug('Starting upgrade in new thread')
         self.upgrade_thread = Thread(target=self._upgrade, args=(time_node_upgrade,))
         self.upgrade_thread.start()
 
@@ -155,6 +161,7 @@ class UpgradeBase(unittest.TestCase):
             self.last_node_upgraded += 1
             node_to_upgrade = self.nodes[self.last_node_upgraded]
 
+        log.debug('Upgrading node {}'.format(node_to_upgrade))
         node_to_upgrade.drain()
         node_to_upgrade.stop(gently=True)
 
