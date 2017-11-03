@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from cassandra.connection import HEADER_DIRECTION_TO_CLIENT
+from cassandra.marshal import uint8_pack
+from cassandra.protocol import write_stringmultimap
+
+import six
+from mock import Mock
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -139,3 +146,31 @@ class TimerConnectionTests(object):
         self.assertFalse(timer_manager._queue)
         self.assertFalse(timer_manager._new_timers)
         self.assertFalse(callback.was_invoked())
+
+
+class ReactorTestMixin(object):
+
+    connection_class = socket_attr_name = None
+
+    def make_header_prefix(self, message_class, version=2, stream_id=0):
+        return six.binary_type().join(map(uint8_pack, [
+            0xff & (HEADER_DIRECTION_TO_CLIENT | version),
+            0,  # flags (compression)
+            stream_id,
+            message_class.opcode  # opcode
+        ]))
+
+    def make_connection(self):
+        c = self.connection_class('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
+        mocket = Mock()
+        mocket.send.side_effect = lambda x: len(x)
+        setattr(c, self.socket_attr_name, mocket)
+        return c
+
+    def make_options_body(self):
+        options_buf = six.BytesIO()
+        write_stringmultimap(options_buf, {
+            'CQL_VERSION': ['3.0.1'],
+            'COMPRESSION': []
+        })
+        return options_buf.getvalue()
