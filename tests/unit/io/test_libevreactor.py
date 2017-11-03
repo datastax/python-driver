@@ -18,26 +18,25 @@ except ImportError:
 
 import errno
 import math
-from mock import patch, Mock
+from mock import patch
 import os
 import weakref
 import six
 from six import BytesIO
 from socket import error as socket_error
 
-from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
-                                  ConnectionException, ProtocolError)
-
+from cassandra.connection import ConnectionException, ProtocolError
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
+from cassandra.marshal import uint32_pack, int32_pack
 
 from tests import is_monkey_patched
+from tests.unit.io.utils import ReactorTestMixin
 
 
 try:
     from cassandra.io.libevreactor import _cleanup as libev__cleanup
-    from cassandra.io.libevreactor import LibevConnection, LibevLoop
+    from cassandra.io.libevreactor import LibevConnection
 except ImportError:
     LibevConnection = None  # noqa
 
@@ -47,7 +46,9 @@ except ImportError:
 @patch('cassandra.io.libevwrapper.Prepare')
 @patch('cassandra.io.libevwrapper.Async')
 @patch('cassandra.io.libevreactor.LibevLoop.maybe_start')
-class LibevConnectionTest(unittest.TestCase):
+class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
+
+    connection_class = LibevConnection
 
     def setUp(self):
         if is_monkey_patched():
@@ -55,20 +56,6 @@ class LibevConnectionTest(unittest.TestCase):
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()
-
-    def make_connection(self):
-        c = LibevConnection('1.2.3.4', cql_version='3.0.1')
-        c._socket = Mock()
-        c._socket.send.side_effect = lambda x: len(x)
-        return c
-
-    def make_header_prefix(self, message_class, version=2, stream_id=0):
-        return six.binary_type().join(map(uint8_pack, [
-            0xff & (HEADER_DIRECTION_TO_CLIENT | version),
-            0,  # flags (compression)
-            stream_id,
-            message_class.opcode  # opcode
-        ]))
 
     def make_options_body(self):
         options_buf = BytesIO()

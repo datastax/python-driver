@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import six
 
 try:
@@ -22,22 +21,23 @@ except ImportError:
 import errno
 import math
 import time
-from mock import patch, Mock
+from mock import patch
 import os
 from six import BytesIO
 import socket
 from socket import error as socket_error
-from cassandra.connection import (HEADER_DIRECTION_TO_CLIENT,
-                                  ConnectionException, ProtocolError,Timer)
+from cassandra.connection import ConnectionException, ProtocolError
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
+from cassandra.marshal import uint32_pack, int32_pack
 from tests import is_monkey_patched
-from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
+from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback, ReactorTestMixin
 
 
-class AsyncoreConnectionTest(unittest.TestCase):
+class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
+
+    connection_classs = AsyncoreConnection
 
     @classmethod
     def setUpClass(cls):
@@ -61,20 +61,6 @@ class AsyncoreConnectionTest(unittest.TestCase):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
-
-    def make_connection(self):
-        c = AsyncoreConnection('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
-        c.socket = Mock()
-        c.socket.send.side_effect = lambda x: len(x)
-        return c
-
-    def make_header_prefix(self, message_class, version=2, stream_id=0):
-        return six.binary_type().join(map(uint8_pack, [
-            0xff & (HEADER_DIRECTION_TO_CLIENT | version),
-            0,  # flags (compression)
-            stream_id,
-            message_class.opcode  # opcode
-        ]))
 
     def make_options_body(self):
         options_buf = BytesIO()
@@ -305,7 +291,7 @@ class AsyncoreConnectionTest(unittest.TestCase):
         """
         Verify that timer timeouts are honored appropriately
         """
-        c = self.make_connection()
+        self.make_connection()
         # Tests timers submitted in order at various timeouts
         submit_and_wait_for_completion(self, AsyncoreConnection, 0, 100, 1, 100)
         # Tests timers submitted in reverse order at various timeouts
@@ -331,6 +317,3 @@ class AsyncoreConnectionTest(unittest.TestCase):
         self.assertFalse(timer_manager._queue)
         self.assertFalse(timer_manager._new_timers)
         self.assertFalse(callback.was_invoked())
-
-
-
