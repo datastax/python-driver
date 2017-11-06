@@ -14,7 +14,7 @@ prebuilds:
   - python setup.py build_ext --inplace --force --no-murmur3 --no-cython
 versions:
   - name: '3.12'
-    ref: '72a0935d'
+    ref: '43b9c995'
   - name: '3.11'
     ref: '3.11.0'
   - name: '3.10'
