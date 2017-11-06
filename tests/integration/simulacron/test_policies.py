@@ -16,10 +16,10 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra import OperationTimedOut
+from cassandra import OperationTimedOut, WriteTimeout
 from cassandra.cluster import Cluster, ExecutionProfile
 from cassandra.query import SimpleStatement
-from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy
+from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy, RetryPolicy, WriteType
 
 from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimulacron, SIMULACRON_JAR
 from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, \
@@ -139,8 +139,6 @@ class SpecExecTest(unittest.TestCase):
         result = self.session.execute(prepared_statement, ("0",), execution_profile='spec_ep_brr')
         self.assertLess(1, len(result.response_future.attempted_hosts))
 
-
-
     def test_speculative_and_timeout(self):
         """
         Test to ensure the timeout is honored when using speculative execution
@@ -166,3 +164,69 @@ class SpecExecTest(unittest.TestCase):
 
         # This is because 14 / 4 + 1 = 4
         self.assertEqual(len(response_future.attempted_hosts), 4)
+
+
+class CustomRetryPolicy(RetryPolicy):
+    def on_write_timeout(self, query, consistency, write_type,
+                         required_responses, received_responses, retry_num):
+        if retry_num != 0:
+            return self.RETHROW, None
+        elif write_type == WriteType.SIMPLE:
+            return self.RETHROW, None
+        elif write_type == WriteType.CDC:
+            return self.IGNORE, None
+
+
+@requiressimulacron
+class RetryPolicyTets(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if SIMULACRON_JAR is None:
+            return
+        start_and_prime_singledc()
+
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
+                              default_retry_policy=CustomRetryPolicy())
+        cls.session = cls.cluster.connect(wait_for_all_pools=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        if SIMULACRON_JAR is None:
+            return
+        cls.cluster.shutdown()
+        stop_simulacron()
+
+    def tearDown(self):
+        clear_queries()
+
+    def test_retry_policy_ignores_and_rethrows(self):
+        """
+        Test to verify :class:`~cassandra.protocol.WriteTimeoutErrorMessage` is decoded correctly and that
+        :attr:`.~cassandra.policies.RetryPolicy.RETHROW` and
+        :attr:`.~cassandra.policies.RetryPolicy.IGNORE` are respected
+        to localhost
+
+        @since 3.12
+        @jira_ticket PYTHON-812
+        @expected_result the retry policy functions as expected
+
+        @test_category connection
+        """
+        query_to_prime_simple = "SELECT * from simulacron_keyspace.simple"
+        query_to_prime_cdc = "SELECT * from simulacron_keyspace.cdc"
+        then = {
+            "result": "write_timeout",
+            "delay_in_ms": 0,
+            "consistency_level": "LOCAL_QUORUM",
+            "received": 1,
+            "block_for": 2,
+            "write_type": "SIMPLE"
+          }
+        prime_query(query_to_prime_simple, then=then)
+        then["write_type"] = "CDC"
+        prime_query(query_to_prime_cdc, then=then)
+
+        with self.assertRaises(WriteTimeout):
+            self.session.execute(query_to_prime_simple)
+        #CDC should be ignored
+        self.session.execute(query_to_prime_cdc)

@@ -162,7 +162,7 @@ def set_default_cass_ip():
 
 def set_default_beta_flag_true():
     defaults = list(Cluster.__init__.__defaults__)
-    defaults = defaults[:-3] + [True] + defaults[-2:]
+    defaults = (defaults[:28] + [True] + defaults[29:])
     try:
         Cluster.__init__.__defaults__ = tuple(defaults)
     except:
@@ -170,14 +170,15 @@ def set_default_beta_flag_true():
 
 
 def get_default_protocol():
-    if Version(CASSANDRA_VERSION) >= Version('4.0'):
+    version = Version(CASSANDRA_VERSION)
+    if version >= Version('4.0'):
         set_default_beta_flag_true()
         return 5
-    if Version(CASSANDRA_VERSION) >= Version('2.2'):
+    elif version >= Version('2.2'):
         return 4
-    elif Version(CASSANDRA_VERSION) >= Version('2.1'):
+    elif version >= Version('2.1'):
         return 3
-    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
+    elif version >= Version('2.0'):
         return 2
     else:
         return 1
@@ -192,15 +193,18 @@ def get_supported_protocol_versions():
     3.X -> 4, 3
     3.10 -> 5(beta),4,3
 `   """
-    if Version(CASSANDRA_VERSION) >= Version('3.10'):
+    version = Version(CASSANDRA_VERSION)
+    if version >= Version('4.0'):
         return (3, 4, 5)
-    elif Version(CASSANDRA_VERSION) >= Version('3.0'):
+    elif version >= Version('3.10'):
         return (3, 4)
-    elif Version(CASSANDRA_VERSION) >= Version('2.2'):
+    elif version >= Version('3.0'):
+        return (3, 4)
+    elif version >= Version('2.2'):
         return (1, 2, 3, 4)
-    elif Version(CASSANDRA_VERSION) >= Version('2.1'):
+    elif version >= Version('2.1'):
         return (1, 2, 3)
-    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
+    elif version >= Version('2.0'):
         return (1, 2)
     else:
         return (1)
@@ -251,6 +255,7 @@ greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cass
 greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
+lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
 dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")

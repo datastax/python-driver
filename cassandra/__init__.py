@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 11, 0, 'post0')
+__version_info__ = (3, 12, 0)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -198,6 +198,10 @@ class ProtocolVersion(object):
 
     @classmethod
     def uses_prepare_flags(cls, version):
+        return version >= cls.V5
+
+    @classmethod
+    def uses_prepared_metadata(cls, version):
         return version >= cls.V5
 
     @classmethod

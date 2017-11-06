@@ -38,7 +38,7 @@ from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
-    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP
+    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40
 from tests.integration.util import assert_quiescent_pool_state
 import sys
 
@@ -1062,6 +1062,63 @@ class ClusterTests(unittest.TestCase):
 
             session.execute('''DROP TABLE test1rf.table_with_big_key''')
 
+    @unittest.skip
+    @greaterthanorequalcass30
+    @lessthanorequalcass40
+    def test_compact_option(self):
+        """
+        Test the driver can connect with the no_compact option and the results
+        are as expected. This test is very similar to the corresponding dtest
+
+        @since 3.12
+        @jira_ticket PYTHON-366
+        @expected_result only one hosts' metadata will be populated
+
+        @test_category connection
+        """
+        nc_cluster = Cluster(protocol_version=PROTOCOL_VERSION, no_compact=True)
+        nc_session = nc_cluster.connect()
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, no_compact=False)
+        session = cluster.connect()
+
+        self.addCleanup(cluster.shutdown)
+        self.addCleanup(nc_cluster.shutdown)
+
+        nc_session.set_keyspace("test3rf")
+        session.set_keyspace("test3rf")
+
+        nc_session.execute(
+            "CREATE TABLE IF NOT EXISTS compact_table (k int PRIMARY KEY, v1 int, v2 int) WITH COMPACT STORAGE;")
+
+        for i in range(1, 5):
+            nc_session.execute(
+                "INSERT INTO compact_table (k, column1, v1, v2, value) VALUES "
+                "({i}, 'a{i}', {i}, {i}, textAsBlob('b{i}'))".format(i=i))
+            nc_session.execute(
+                "INSERT INTO compact_table (k, column1, v1, v2, value) VALUES "
+                "({i}, 'a{i}{i}', {i}{i}, {i}{i}, textAsBlob('b{i}{i}'))".format(i=i))
+
+        nc_results = nc_session.execute("SELECT * FROM compact_table")
+        self.assertEqual(
+            set(nc_results.current_rows),
+            {(1, u'a1', 11, 11, 'b1'),
+             (1, u'a11', 11, 11, 'b11'),
+             (2, u'a2', 22, 22, 'b2'),
+             (2, u'a22', 22, 22, 'b22'),
+             (3, u'a3', 33, 33, 'b3'),
+             (3, u'a33', 33, 33, 'b33'),
+             (4, u'a4', 44, 44, 'b4'),
+             (4, u'a44', 44, 44, 'b44')})
+
+        results = session.execute("SELECT * FROM compact_table")
+        self.assertEqual(
+            set(results.current_rows),
+            {(1, 11, 11),
+             (2, 22, 22),
+             (3, 33, 33),
+             (4, 44, 44)})
+
     def _assert_replica_queried(self, trace, only_replicas=True):
         queried_hosts = set()
         for row in trace.events:
@@ -1255,6 +1312,7 @@ class HostStateTest(unittest.TestCase):
                 time.sleep(.01)
             self.assertTrue(was_marked_down)
 
+
 @local
 class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
     ignored_addresses = ['127.0.0.3']
@@ -1291,6 +1349,7 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         for c in cluster.connection_factory.mock_calls:
             self.assertEqual(call(unignored_address), c)
         cluster.shutdown()
+
 
 @local
 class DuplicateRpcTest(unittest.TestCase):
@@ -1329,7 +1388,6 @@ class DuplicateRpcTest(unittest.TestCase):
         self.assertTrue('multiple' in warnings[0])
         logger.removeHandler(mock_handler)
         test_cluster.shutdown()
-
 
 
 @protocolv5

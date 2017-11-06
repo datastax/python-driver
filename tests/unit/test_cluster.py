@@ -16,7 +16,9 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from mock import patch
+import logging
+
+from mock import patch, Mock
 
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException
@@ -29,6 +31,8 @@ from cassandra.pool import Host
 from tests.unit.utils import mock_session_pools
 from tests import connection_class
 
+
+log = logging.getLogger(__name__)
 
 class ExceptionTypeTest(unittest.TestCase):
 
@@ -364,11 +368,10 @@ class ExecutionProfileTest(unittest.TestCase):
         # cannot add a profile added dynamically
         self.assertRaises(ValueError, cluster.add_execution_profile, 'two', ExecutionProfile())
 
-    @mock_session_pools
-    def test_warning_on_no_lbp_with_contact_points(self):
+    def test_warning_on_no_lbp_with_contact_points_legacy_mode(self):
         """
-        Test that users are warned when they instantiate a Cluster object with
-        contact points but no load-balancing policy.
+        Test that users are warned when they instantiate a Cluster object in
+        legacy mode with contact points but no load-balancing policy.
 
         @since 3.12.0
         @jira_ticket PYTHON-812
@@ -376,16 +379,74 @@ class ExecutionProfileTest(unittest.TestCase):
 
         @test_category configuration
         """
-        with patch('cassandra.cluster.log') as patched_logger:
-            Cluster(contact_points=['1'])
-        patched_logger.warn.assert_called_once()
-        warning_message = patched_logger.warn.call_args[0][0]
-        self.assertIn('no load_balancing_policy', warning_message)
-        self.assertIn("contact_points = ['1']", warning_message)
-        self.assertIn('lbp = None', warning_message)
+        self._check_warning_on_no_lbp_with_contact_points(
+            cluster_kwargs={'contact_points': ['127.0.0.1']}
+        )
+
+    def test_warning_on_no_lbp_with_contact_points_profile_mode(self):
+        """
+        Test that users are warned when they instantiate a Cluster object in
+        execution profile mode with contact points but no load-balancing
+        policy.
+
+        @since 3.12.0
+        @jira_ticket PYTHON-812
+        @expected_result logs
+
+        @test_category configuration
+        """
+        self._check_warning_on_no_lbp_with_contact_points(cluster_kwargs={
+            'contact_points': ['127.0.0.1'],
+            'execution_profiles': {EXEC_PROFILE_DEFAULT: ExecutionProfile()}
+        })
 
     @mock_session_pools
-    def test_no_warning_on_contact_points_with_lbp(self):
+    def _check_warning_on_no_lbp_with_contact_points(self, cluster_kwargs):
+        with patch('cassandra.cluster.log') as patched_logger:
+            Cluster(**cluster_kwargs)
+        patched_logger.warn.assert_called_once()
+        warning_message = patched_logger.warn.call_args[0][0]
+        self.assertIn('please specify a load-balancing policy', warning_message)
+        self.assertIn("contact_points = ['127.0.0.1']", warning_message)
+
+    def test_no_warning_on_contact_points_with_lbp_legacy_mode(self):
+        """
+        Test that users aren't warned when they instantiate a Cluster object
+        with contact points and a load-balancing policy in legacy mode.
+
+        @since 3.12.0
+        @jira_ticket PYTHON-812
+        @expected_result no logs
+
+        @test_category configuration
+        """
+        self._check_no_warning_on_contact_points_with_lbp({
+            'contact_points': ['127.0.0.1'],
+            'load_balancing_policy': object()
+        })
+
+    def test_no_warning_on_contact_points_with_lbp_profiles_mode(self):
+        """
+        Test that users aren't warned when they instantiate a Cluster object
+        with contact points and a load-balancing policy in execution profile
+        mode.
+
+        @since 3.12.0
+        @jira_ticket PYTHON-812
+        @expected_result no logs
+
+        @test_category configuration
+        """
+        ep_with_lbp = ExecutionProfile(load_balancing_policy=object())
+        self._check_no_warning_on_contact_points_with_lbp(cluster_kwargs={
+            'contact_points': ['127.0.0.1'],
+            'execution_profiles': {
+                EXEC_PROFILE_DEFAULT: ep_with_lbp
+            }
+        })
+
+    @mock_session_pools
+    def _check_no_warning_on_contact_points_with_lbp(self, cluster_kwargs):
         """
         Test that users aren't warned when they instantiate a Cluster object
         with contact points and a load-balancing policy.
@@ -397,5 +458,37 @@ class ExecutionProfileTest(unittest.TestCase):
         @test_category configuration
         """
         with patch('cassandra.cluster.log') as patched_logger:
-            Cluster(contact_points=['1'], load_balancing_policy=object())
+            Cluster(**cluster_kwargs)
+        patched_logger.warn.assert_not_called()
+
+    @mock_session_pools
+    def test_warning_adding_no_lbp_ep_to_cluster_with_contact_points(self):
+        ep_with_lbp = ExecutionProfile(load_balancing_policy=object())
+        cluster = Cluster(
+            contact_points=['127.0.0.1'],
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep_with_lbp})
+        with patch('cassandra.cluster.log') as patched_logger:
+            cluster.add_execution_profile(
+                name='no_lbp',
+                profile=ExecutionProfile()
+            )
+
+        patched_logger.warn.assert_called_once()
+        warning_message = patched_logger.warn.call_args[0][0]
+        self.assertIn('no_lbp', warning_message)
+        self.assertIn('trying to add', warning_message)
+        self.assertIn('please specify a load-balancing policy', warning_message)
+
+    @mock_session_pools
+    def test_no_warning_adding_lbp_ep_to_cluster_with_contact_points(self):
+        ep_with_lbp = ExecutionProfile(load_balancing_policy=object())
+        cluster = Cluster(
+            contact_points=['127.0.0.1'],
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep_with_lbp})
+        with patch('cassandra.cluster.log') as patched_logger:
+            cluster.add_execution_profile(
+                name='with_lbp',
+                profile=ExecutionProfile(load_balancing_policy=Mock(name='lbp'))
+            )
+
         patched_logger.warn.assert_not_called()

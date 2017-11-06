@@ -1,12 +1,17 @@
 3.12.0
 ======
+November 6, 2017
 
 Features
 --------
 * Send keyspace in QUERY, PREPARE, and BATCH messages (PYTHON-678)
 * Add IPv4Address/IPv6Address support for inet types (PYTHON-751)
 * WriteType.CDC and VIEW missing (PYTHON-794)
-* Warn on Cluster init if contact points are specified but LBP isn't (PYTHON-812)
+* Warn on Cluster init if contact points are specified but LBP isn't (legacy mode) (PYTHON-812)
+* Warn on Cluster init if contact points are specified but LBP isn't (exection profile mode) (PYTHON-838)
+* Include hash of result set metadata in prepared stmt id (PYTHON-808)
+* Add NO_COMPACT startup option (PYTHON-839)
+* Add new exception type for CDC (PYTHON-837)
 
 Bug Fixes
 ---------
@@ -18,14 +23,12 @@ Bug Fixes
 * Fix sites where `sessions` can change during iteration (PYTHON-793)
 * cqlengine: allow min_length=0 for Ascii and Text column types (PYTHON-735)
 * Rare exception when "sys.exit(0)" after query timeouts (PYTHON-752)
-
-Others
-------
-* Remove DeprecationWarning when using WhiteListRoundRobinPolicy (PYTHON-810)
+* Dont set the session keyspace when preparing statements (PYTHON-843)
+* Use of DCAwareRoundRobinPolicy raises NoHostAvailable exception	(PYTHON-781)
 
 Other
------
-
+------
+* Remove DeprecationWarning when using WhiteListRoundRobinPolicy (PYTHON-810)
 * Bump Cython dependency version to 0.27 (PYTHON-833)
 
 3.11.0
@@ -37,7 +40,6 @@ Features
 --------
 * Add idle_heartbeat_timeout cluster option to tune how long to wait for heartbeat responses. (PYTHON-762)
 * Add HostFilterPolicy (PYTHON-761)
-* Add new exception type for CDC (PYTHON-837)
 
 Bug Fixes
 ---------

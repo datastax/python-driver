@@ -517,7 +517,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
 
         response = Mock(spec=ResultMessage, kind=RESULT_KIND_PREPARED)
-        response.results = (None, None, None, None)
+        response.results = (None, None, None, None, None)
 
         rf._query = Mock(return_value=True)
         rf._execute_after_prepare('host', None, None, response)

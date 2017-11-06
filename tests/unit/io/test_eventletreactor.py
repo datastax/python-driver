@@ -28,16 +28,17 @@ try:
 except ImportError:
     EventletConnection = None  # noqa
 
+skip_condition = EventletConnection is None or MONKEY_PATCH_LOOP != "eventlet"
 # There are some issues with some versions of pypy and eventlet
 @notpypy
-@unittest.skipIf(EventletConnection is None, "Skpping the eventlet tests because it's not installed")
+@unittest.skipIf(skip_condition, "Skipping the eventlet tests because it's not installed")
 @notmonkeypatch
 class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
     @classmethod
     def setUpClass(cls):
         # This is run even though the class is skipped, so we need
         # to make sure no monkey patching is happening
-        if not MONKEY_PATCH_LOOP:
+        if skip_condition:
             return
 
         # This is being added temporarily due to a bug in eventlet:
