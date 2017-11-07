@@ -26,8 +26,8 @@ from six import BytesIO
 from socket import error as socket_error
 
 from cassandra.connection import ConnectionException, ProtocolError
-from cassandra.protocol import (write_stringmultimap, write_int, write_string,
-                                SupportedMessage, ReadyMessage, ServerError)
+from cassandra.protocol import (write_int, write_string, SupportedMessage,
+                                ReadyMessage, ServerError)
 from cassandra.marshal import uint32_pack, int32_pack
 
 from tests import is_monkey_patched
@@ -49,6 +49,7 @@ except ImportError:
 class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
     connection_class = LibevConnection
+    socket_attr_name = '_socket'
 
     def setUp(self):
         if is_monkey_patched():
@@ -56,14 +57,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()
-
-    def make_options_body(self):
-        options_buf = BytesIO()
-        write_stringmultimap(options_buf, {
-            'CQL_VERSION': ['3.0.1'],
-            'COMPRESSION': []
-        })
-        return options_buf.getvalue()
 
     def make_error_body(self, code, msg):
         buf = BytesIO()

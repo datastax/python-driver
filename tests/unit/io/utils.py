@@ -14,6 +14,7 @@
 
 from cassandra.connection import HEADER_DIRECTION_TO_CLIENT
 from cassandra.marshal import uint8_pack
+from cassandra.protocol import write_stringmultimap
 
 import six
 from mock import Mock
@@ -149,7 +150,7 @@ class TimerConnectionTests(object):
 
 class ReactorTestMixin(object):
 
-    connection_class = None
+    connection_class = socket_attr_name = None
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
         return six.binary_type().join(map(uint8_pack, [
@@ -160,7 +161,16 @@ class ReactorTestMixin(object):
         ]))
 
     def make_connection(self):
-        c = self.connection_class('1.2.3.4', cql_version='3.0.1')
-        c._socket = Mock()
-        c._socket.send.side_effect = lambda x: len(x)
+        c = self.connection_class('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
+        mocket = Mock()
+        mocket.send.side_effect = lambda x: len(x)
+        setattr(c, self.socket_attr_name, mocket)
         return c
+
+    def make_options_body(self):
+        options_buf = six.BytesIO()
+        write_stringmultimap(options_buf, {
+            'CQL_VERSION': ['3.0.1'],
+            'COMPRESSION': []
+        })
+        return options_buf.getvalue()
