@@ -23,6 +23,7 @@ from six import binary_type, BytesIO
 from mock import Mock
 
 import errno
+import math
 import os
 from socket import error as socket_error
 
@@ -321,3 +322,21 @@ class ReactorTestMixin(object):
         c.handle_write(*self.null_handle_function_args)
         self.assertFalse(c.is_defunct)
         self.assertTrue(self.get_socket(c).send.call_args is not None)
+
+    def test_partial_send(self):
+        c = self.make_connection()
+
+        # only write the first four bytes of the OptionsMessage
+        write_size = 4
+        self.get_socket(c).send.side_effect = None
+        self.get_socket(c).send.return_value = write_size
+        c.handle_write(*self.null_handle_function_args)
+
+        msg_size = 9  # v3+ frame header
+        expected_writes = int(math.ceil(float(msg_size) / write_size))
+        size_mod = msg_size % write_size
+        last_write_size = size_mod if size_mod else write_size
+        self.assertFalse(c.is_defunct)
+        self.assertEqual(expected_writes, self.get_socket(c).send.call_count)
+        self.assertEqual(last_write_size,
+                         len(self.get_socket(c).send.call_args[0][0]))
