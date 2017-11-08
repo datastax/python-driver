@@ -43,7 +43,7 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
     connection_class = LibevConnection
     socket_attr_name = '_socket'
-    null_handle_write_args = None, 0
+    null_handle_function_args = None, 0
 
     def setUp(self):
         if is_monkey_patched():

@@ -152,7 +152,7 @@ class TimerConnectionTests(object):
 class ReactorTestMixin(object):
 
     connection_class = socket_attr_name = None
-    null_handle_write_args = ()
+    null_handle_function_args = ()
 
     def get_socket(self, connection):
         return getattr(connection, self.socket_attr_name)
@@ -196,20 +196,20 @@ class ReactorTestMixin(object):
         c = self.make_connection()
 
         # let it write the OptionsMessage
-        c.handle_write(*self.null_handle_write_args)
+        c.handle_write(*self.null_handle_function_args)
 
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
         options = self.make_options_body()
         self.get_socket(c).recv.return_value = self.make_msg(header, options)
-        c.handle_read(*self.null_handle_write_args)
+        c.handle_read(*self.null_handle_function_args)
 
         # let it write out a StartupMessage
-        c.handle_write(*self.null_handle_write_args)
+        c.handle_write(*self.null_handle_function_args)
 
         header = self.make_header_prefix(ReadyMessage, stream_id=1)
         self.get_socket(c).recv.return_value = self.make_msg(header)
-        c.handle_read(*self.null_handle_write_args)
+        c.handle_read(*self.null_handle_function_args)
 
         self.assertTrue(c.connected_event.is_set())
         return c
