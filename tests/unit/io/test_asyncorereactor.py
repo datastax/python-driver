@@ -23,13 +23,11 @@ import math
 import time
 from mock import patch
 import os
-from six import BytesIO
 import socket
 from socket import error as socket_error
 from cassandra.connection import ConnectionException, ProtocolError
 from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.protocol import (write_int, write_string, SupportedMessage,
-                                ReadyMessage, ServerError)
+from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint32_pack, int32_pack
 from tests import is_monkey_patched
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback, ReactorTestMixin
@@ -62,12 +60,6 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
-
-    def make_error_body(self, code, msg):
-        buf = BytesIO()
-        write_int(buf, code)
-        write_string(buf, msg)
-        return buf.getvalue()
 
     def make_msg(self, header, body=six.binary_type()):
         return header + uint32_pack(len(body)) + body

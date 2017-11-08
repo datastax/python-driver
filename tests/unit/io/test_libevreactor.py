@@ -22,12 +22,10 @@ from mock import patch
 import os
 import weakref
 import six
-from six import BytesIO
 from socket import error as socket_error
 
 from cassandra.connection import ConnectionException, ProtocolError
-from cassandra.protocol import (write_int, write_string, SupportedMessage,
-                                ReadyMessage, ServerError)
+from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
 from cassandra.marshal import uint32_pack, int32_pack
 
 from tests import is_monkey_patched
@@ -57,12 +55,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()
-
-    def make_error_body(self, code, msg):
-        buf = BytesIO()
-        write_int(buf, code)
-        write_string(buf, msg)
-        return buf.getvalue()
 
     def make_msg(self, header, body=six.binary_type()):
         return header + uint32_pack(len(body)) + body
