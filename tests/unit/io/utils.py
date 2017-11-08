@@ -305,3 +305,19 @@ class ReactorTestMixin(object):
         self.assertTrue(c.is_defunct)
         self.assertIsInstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
+
+    def test_blocking_on_write(self):
+        c = self.make_connection()
+
+        # make the OptionsMessage write block
+        self.get_socket(c).send.side_effect = socket_error(errno.EAGAIN,
+                                                           "socket busy")
+        c.handle_write(*self.null_handle_function_args)
+
+        self.assertFalse(c.is_defunct)
+
+        # try again with normal behavior
+        self.get_socket(c).send.side_effect = lambda x: len(x)
+        c.handle_write(*self.null_handle_function_args)
+        self.assertFalse(c.is_defunct)
+        self.assertTrue(self.get_socket(c).send.call_args is not None)

@@ -58,21 +58,6 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
-    def test_blocking_on_write(self):
-        c = self.make_connection()
-
-        # make the OptionsMessage write block
-        c.socket.send.side_effect = socket_error(errno.EAGAIN, "socket busy")
-        c.handle_write()
-
-        self.assertFalse(c.is_defunct)
-
-        # try again with normal behavior
-        c.socket.send.side_effect = lambda x: len(x)
-        c.handle_write()
-        self.assertFalse(c.is_defunct)
-        self.assertTrue(c.socket.send.call_args is not None)
-
     def test_partial_send(self):
         c = self.make_connection()
 
