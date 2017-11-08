@@ -23,7 +23,7 @@ import weakref
 import six
 from socket import error as socket_error
 
-from cassandra.connection import ConnectionException, ProtocolError
+from cassandra.connection import ConnectionException
 from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
 
 from tests import is_monkey_patched
@@ -62,23 +62,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             self.addCleanup(p.stop)
         for p in patchers:
             p.start()
-
-    def test_protocol_error(self):
-        c = self.make_connection()
-
-        # let it write the OptionsMessage
-        c.handle_write(None, 0)
-
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage, version=0xa4)
-        options = self.make_options_body()
-        c._socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read(None, 0)
-
-        # make sure it errored correctly
-        self.assertTrue(c.is_defunct)
-        self.assertTrue(c.connected_event.is_set())
-        self.assertIsInstance(c.last_error, ProtocolError)
 
     def test_error_message_on_startup(self):
         c = self.make_connection()
