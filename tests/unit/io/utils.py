@@ -219,7 +219,7 @@ class ReactorTestMixin(object):
         self.assertTrue(c.connected_event.is_set())
         return c
 
-    def test_egain_on_buffer_size(self):
+    def test_eagain_on_buffer_size(self):
         c = self.test_successful_connection()
 
         header = six.b('\x00\x00\x00\x00') + int32_pack(20000)
