@@ -28,7 +28,7 @@ from socket import error as socket_error
 from cassandra.connection import ConnectionException, ProtocolError
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import uint32_pack, int32_pack
+from cassandra.marshal import int32_pack
 from tests import is_monkey_patched
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback, ReactorTestMixin
 
@@ -61,10 +61,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
-    def make_msg(self, header, body=six.binary_type()):
-        return header + uint32_pack(len(body)) + body
-
-    def test_successful_connection(self, *args):
+    def test_successful_connection(self):
         c = self.make_connection()
 
         # let it write the OptionsMessage
@@ -86,7 +83,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertTrue(c.connected_event.is_set())
         return c
 
-    def test_egain_on_buffer_size(self, *args):
+    def test_egain_on_buffer_size(self):
         # get a connection that's already fully started
         c = self.test_successful_connection()
 
@@ -119,7 +116,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         pos = c._iobuf.tell()
         self.assertEqual(pos, 4096 + 4096 + 100)
 
-    def test_protocol_error(self, *args):
+    def test_protocol_error(self):
         c = self.make_connection()
 
         # let it write the OptionsMessage
@@ -136,7 +133,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertTrue(c.connected_event.is_set())
         self.assertIsInstance(c.last_error, ProtocolError)
 
-    def test_error_message_on_startup(self, *args):
+    def test_error_message_on_startup(self):
         c = self.make_connection()
 
         # let it write the OptionsMessage
@@ -161,7 +158,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertIsInstance(c.last_error, ConnectionException)
         self.assertTrue(c.connected_event.is_set())
 
-    def test_socket_error_on_write(self, *args):
+    def test_socket_error_on_write(self):
         c = self.make_connection()
 
         # make the OptionsMessage write fail
@@ -173,7 +170,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertIsInstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
 
-    def test_blocking_on_write(self, *args):
+    def test_blocking_on_write(self):
         c = self.make_connection()
 
         # make the OptionsMessage write block
@@ -188,7 +185,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertFalse(c.is_defunct)
         self.assertTrue(c.socket.send.call_args is not None)
 
-    def test_partial_send(self, *args):
+    def test_partial_send(self):
         c = self.make_connection()
 
         # only write the first four bytes of the OptionsMessage
@@ -205,7 +202,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertEqual(expected_writes, c.socket.send.call_count)
         self.assertEqual(last_write_size, len(c.socket.send.call_args[0][0]))
 
-    def test_socket_error_on_read(self, *args):
+    def test_socket_error_on_read(self):
         c = self.make_connection()
 
         # let it write the OptionsMessage
@@ -220,7 +217,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertIsInstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
 
-    def test_partial_header_read(self, *args):
+    def test_partial_header_read(self):
         c = self.make_connection()
 
         header = self.make_header_prefix(SupportedMessage)
@@ -245,7 +242,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
 
-    def test_partial_message_read(self, *args):
+    def test_partial_message_read(self):
         c = self.make_connection()
 
         header = self.make_header_prefix(SupportedMessage)
@@ -272,7 +269,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
 
-    def test_multi_timer_validation(self, *args):
+    def test_multi_timer_validation(self):
         """
         Verify that timer timeouts are honored appropriately
         """
