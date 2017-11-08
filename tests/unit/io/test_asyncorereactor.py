@@ -61,28 +61,6 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
-    def test_successful_connection(self):
-        c = self.make_connection()
-
-        # let it write the OptionsMessage
-        c.handle_write()
-
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        c.socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read()
-
-        # let it write out a StartupMessage
-        c.handle_write()
-
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
-        c.socket.recv.return_value = self.make_msg(header)
-        c.handle_read()
-
-        self.assertTrue(c.connected_event.is_set())
-        return c
-
     def test_egain_on_buffer_size(self):
         # get a connection that's already fully started
         c = self.test_successful_connection()
