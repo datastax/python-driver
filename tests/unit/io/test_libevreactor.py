@@ -62,18 +62,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         for p in patchers:
             p.start()
 
-    def test_socket_error_on_write(self):
-        c = self.make_connection()
-
-        # make the OptionsMessage write fail
-        c._socket.send.side_effect = socket_error(errno.EIO, "bad stuff!")
-        c.handle_write(None, 0)
-
-        # make sure it errored correctly
-        self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, socket_error)
-        self.assertTrue(c.connected_event.is_set())
-
     def test_blocking_on_write(self):
         c = self.make_connection()
 
