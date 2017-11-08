@@ -293,3 +293,15 @@ class ReactorTestMixin(object):
         self.assertTrue(c.is_defunct)
         self.assertIsInstance(c.last_error, ConnectionException)
         self.assertTrue(c.connected_event.is_set())
+
+    def test_socket_error_on_write(self):
+        c = self.make_connection()
+
+        # make the OptionsMessage write fail
+        self.get_socket(c).send.side_effect = socket_error(errno.EIO, "bad stuff!")
+        c.handle_write(*self.null_handle_function_args)
+
+        # make sure it errored correctly
+        self.assertTrue(c.is_defunct)
+        self.assertIsInstance(c.last_error, socket_error)
+        self.assertTrue(c.connected_event.is_set())
