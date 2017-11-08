@@ -43,6 +43,7 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
     connection_class = LibevConnection
     socket_attr_name = '_socket'
+    null_handle_function_args = None, 0
 
     def setUp(self):
         if is_monkey_patched():
@@ -63,28 +64,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             self.addCleanup(p.stop)
         for p in patchers:
             p.start()
-
-    def test_successful_connection(self):
-        c = self.make_connection()
-
-        # let it write the OptionsMessage
-        c.handle_write(None, 0)
-
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        c._socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read(None, 0)
-
-        # let it write out a StartupMessage
-        c.handle_write(None, 0)
-
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
-        c._socket.recv.return_value = self.make_msg(header)
-        c.handle_read(None, 0)
-
-        self.assertTrue(c.connected_event.is_set())
-        return c
 
     def test_egain_on_buffer_size(self):
         # get a connection that's already fully started

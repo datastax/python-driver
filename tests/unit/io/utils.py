@@ -14,7 +14,8 @@
 
 from cassandra.connection import HEADER_DIRECTION_TO_CLIENT
 from cassandra.marshal import uint8_pack, uint32_pack
-from cassandra.protocol import write_stringmultimap, write_int, write_string
+from cassandra.protocol import (write_stringmultimap, write_int, write_string,
+                                SupportedMessage, ReadyMessage)
 
 from six import binary_type, BytesIO
 from mock import Mock
@@ -151,6 +152,13 @@ class TimerConnectionTests(object):
 class ReactorTestMixin(object):
 
     connection_class = socket_attr_name = None
+    null_handle_function_args = ()
+
+    def get_socket(self, connection):
+        return getattr(connection, self.socket_attr_name)
+
+    def set_socket(self, connection, obj):
+        return setattr(connection, self.socket_attr_name, obj)
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
         return binary_type().join(map(uint8_pack, [
@@ -164,7 +172,7 @@ class ReactorTestMixin(object):
         c = self.connection_class('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
         mocket = Mock()
         mocket.send.side_effect = lambda x: len(x)
-        setattr(c, self.socket_attr_name, mocket)
+        self.set_socket(c, mocket)
         return c
 
     def make_options_body(self):
@@ -183,3 +191,25 @@ class ReactorTestMixin(object):
 
     def make_msg(self, header, body=binary_type()):
         return header + uint32_pack(len(body)) + body
+
+    def test_successful_connection(self):
+        c = self.make_connection()
+
+        # let it write the OptionsMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage)
+        options = self.make_options_body()
+        self.get_socket(c).recv.return_value = self.make_msg(header, options)
+        c.handle_read(*self.null_handle_function_args)
+
+        # let it write out a StartupMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        self.get_socket(c).recv.return_value = self.make_msg(header)
+        c.handle_read(*self.null_handle_function_args)
+
+        self.assertTrue(c.connected_event.is_set())
+        return c
