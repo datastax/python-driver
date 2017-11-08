@@ -19,14 +19,12 @@ except ImportError:
 import errno
 import math
 from mock import patch
-import os
 import weakref
 import six
 from socket import error as socket_error
 
 from cassandra.connection import ConnectionException, ProtocolError
 from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import int32_pack
 
 from tests import is_monkey_patched
 from tests.unit.io.utils import ReactorTestMixin
@@ -64,39 +62,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             self.addCleanup(p.stop)
         for p in patchers:
             p.start()
-
-    def test_egain_on_buffer_size(self):
-        # get a connection that's already fully started
-        c = self.test_successful_connection()
-
-        header = six.b('\x00\x00\x00\x00') + int32_pack(20000)
-        responses = [
-            header + (six.b('a') * (4096 - len(header))),
-            six.b('a') * 4096,
-            socket_error(errno.EAGAIN),
-            six.b('a') * 100,
-            socket_error(errno.EAGAIN)]
-
-        def side_effect(*args):
-            response = responses.pop(0)
-            if isinstance(response, socket_error):
-                raise response
-            else:
-                return response
-
-        c._socket.recv.side_effect = side_effect
-        c.handle_read(None, 0)
-        self.assertEqual(c._current_frame.end_pos, 20000 + len(header))
-        # the EAGAIN prevents it from reading the last 100 bytes
-        c._iobuf.seek(0, os.SEEK_END)
-        pos = c._iobuf.tell()
-        self.assertEqual(pos, 4096 + 4096)
-
-        # now tell it to read the last 100 bytes
-        c.handle_read(None, 0)
-        c._iobuf.seek(0, os.SEEK_END)
-        pos = c._iobuf.tell()
-        self.assertEqual(pos, 4096 + 4096 + 100)
 
     def test_protocol_error(self):
         c = self.make_connection()
