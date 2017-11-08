@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.connection import HEADER_DIRECTION_TO_CLIENT
+from cassandra.connection import ProtocolError, HEADER_DIRECTION_TO_CLIENT
 from cassandra.marshal import int32_pack, uint8_pack, uint32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage)
@@ -250,3 +250,20 @@ class ReactorTestMixin(object):
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
         self.assertEqual(pos, 4096 + 4096 + 100)
+
+    def test_protocol_error(self):
+        c = self.make_connection()
+
+        # let it write the OptionsMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage, version=0xa4)
+        options = self.make_options_body()
+        self.get_socket(c).recv.return_value = self.make_msg(header, options)
+        c.handle_read(*self.null_handle_function_args)
+
+        # make sure it errored correctly
+        self.assertTrue(c.is_defunct)
+        self.assertTrue(c.connected_event.is_set())
+        self.assertIsInstance(c.last_error, ProtocolError)
