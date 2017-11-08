@@ -62,23 +62,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         for p in patchers:
             p.start()
 
-    def test_partial_send(self):
-        c = self.make_connection()
-
-        # only write the first four bytes of the OptionsMessage
-        write_size = 4
-        c._socket.send.side_effect = None
-        c._socket.send.return_value = write_size
-        c.handle_write(None, 0)
-
-        msg_size = 9  # v3+ frame header
-        expected_writes = int(math.ceil(float(msg_size) / write_size))
-        size_mod = msg_size % write_size
-        last_write_size = size_mod if size_mod else write_size
-        self.assertFalse(c.is_defunct)
-        self.assertEqual(expected_writes, c._socket.send.call_count)
-        self.assertEqual(last_write_size, len(c._socket.send.call_args[0][0]))
-
     def test_socket_error_on_read(self):
         c = self.make_connection()
 

@@ -58,23 +58,6 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
-    def test_partial_send(self):
-        c = self.make_connection()
-
-        # only write the first four bytes of the OptionsMessage
-        write_size = 4
-        c.socket.send.side_effect = None
-        c.socket.send.return_value = write_size
-        c.handle_write()
-
-        msg_size = 9  # v3+ frame header
-        expected_writes = int(math.ceil(float(msg_size) / write_size))
-        size_mod = msg_size % write_size
-        last_write_size = size_mod if size_mod else write_size
-        self.assertFalse(c.is_defunct)
-        self.assertEqual(expected_writes, c.socket.send.call_count)
-        self.assertEqual(last_write_size, len(c.socket.send.call_args[0][0]))
-
     def test_socket_error_on_read(self):
         c = self.make_connection()
 
