@@ -14,9 +14,9 @@
 
 from cassandra.connection import HEADER_DIRECTION_TO_CLIENT
 from cassandra.marshal import uint8_pack
-from cassandra.protocol import write_stringmultimap
+from cassandra.protocol import write_stringmultimap, write_int, write_string
 
-import six
+from six import binary_type, BytesIO
 from mock import Mock
 
 try:
@@ -153,7 +153,7 @@ class ReactorTestMixin(object):
     connection_class = socket_attr_name = None
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
-        return six.binary_type().join(map(uint8_pack, [
+        return binary_type().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
             stream_id,
@@ -168,9 +168,15 @@ class ReactorTestMixin(object):
         return c
 
     def make_options_body(self):
-        options_buf = six.BytesIO()
+        options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['3.0.1'],
             'COMPRESSION': []
         })
         return options_buf.getvalue()
+
+    def make_error_body(self, code, msg):
+        buf = BytesIO()
+        write_int(buf, code)
+        write_string(buf, msg)
+        return buf.getvalue()
