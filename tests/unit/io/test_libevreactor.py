@@ -23,8 +23,7 @@ import weakref
 import six
 from socket import error as socket_error
 
-from cassandra.connection import ConnectionException
-from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
+from cassandra.protocol import SupportedMessage, ReadyMessage
 
 from tests import is_monkey_patched
 from tests.unit.io.utils import ReactorTestMixin
@@ -62,31 +61,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             self.addCleanup(p.stop)
         for p in patchers:
             p.start()
-
-    def test_error_message_on_startup(self):
-        c = self.make_connection()
-
-        # let it write the OptionsMessage
-        c.handle_write(None, 0)
-
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        c._socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read(None, 0)
-
-        # let it write out a StartupMessage
-        c.handle_write(None, 0)
-
-        header = self.make_header_prefix(ServerError, stream_id=1)
-        body = self.make_error_body(ServerError.error_code, ServerError.summary)
-        c._socket.recv.return_value = self.make_msg(header, body)
-        c.handle_read(None, 0)
-
-        # make sure it errored correctly
-        self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, ConnectionException)
-        self.assertTrue(c.connected_event.is_set())
 
     def test_socket_error_on_write(self):
         c = self.make_connection()

@@ -24,9 +24,8 @@ import time
 from mock import patch
 import socket
 from socket import error as socket_error
-from cassandra.connection import ConnectionException
 from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
+from cassandra.protocol import SupportedMessage, ReadyMessage
 from tests import is_monkey_patched
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback, ReactorTestMixin
 
@@ -58,31 +57,6 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
-
-    def test_error_message_on_startup(self):
-        c = self.make_connection()
-
-        # let it write the OptionsMessage
-        c.handle_write()
-
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        c.socket.recv.return_value = self.make_msg(header, options)
-        c.handle_read()
-
-        # let it write out a StartupMessage
-        c.handle_write()
-
-        header = self.make_header_prefix(ServerError, stream_id=1)
-        body = self.make_error_body(ServerError.error_code, ServerError.summary)
-        c.socket.recv.return_value = self.make_msg(header, body)
-        c.handle_read()
-
-        # make sure it errored correctly
-        self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, ConnectionException)
-        self.assertTrue(c.connected_event.is_set())
 
     def test_socket_error_on_write(self):
         c = self.make_connection()

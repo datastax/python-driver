@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.connection import ProtocolError, HEADER_DIRECTION_TO_CLIENT
+from cassandra.connection import (ConnectionException, ProtocolError,
+                                  HEADER_DIRECTION_TO_CLIENT)
 from cassandra.marshal import int32_pack, uint8_pack, uint32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
-                                SupportedMessage, ReadyMessage)
+                                SupportedMessage, ReadyMessage, ServerError)
 
 import six
 from six import binary_type, BytesIO
@@ -267,3 +268,28 @@ class ReactorTestMixin(object):
         self.assertTrue(c.is_defunct)
         self.assertTrue(c.connected_event.is_set())
         self.assertIsInstance(c.last_error, ProtocolError)
+
+    def test_error_message_on_startup(self):
+        c = self.make_connection()
+
+        # let it write the OptionsMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        # read in a SupportedMessage response
+        header = self.make_header_prefix(SupportedMessage)
+        options = self.make_options_body()
+        self.get_socket(c).recv.return_value = self.make_msg(header, options)
+        c.handle_read(*self.null_handle_function_args)
+
+        # let it write out a StartupMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        header = self.make_header_prefix(ServerError, stream_id=1)
+        body = self.make_error_body(ServerError.error_code, ServerError.summary)
+        self.get_socket(c).recv.return_value = self.make_msg(header, body)
+        c.handle_read(*self.null_handle_function_args)
+
+        # make sure it errored correctly
+        self.assertTrue(c.is_defunct)
+        self.assertIsInstance(c.last_error, ConnectionException)
+        self.assertTrue(c.connected_event.is_set())
