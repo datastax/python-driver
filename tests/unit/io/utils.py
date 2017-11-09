@@ -356,3 +356,55 @@ class ReactorTestMixin(object):
         self.assertTrue(c.is_defunct)
         self.assertIsInstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
+
+    def test_partial_header_read(self):
+        c = self.make_connection()
+
+        header = self.make_header_prefix(SupportedMessage)
+        options = self.make_options_body()
+        message = self.make_msg(header, options)
+
+        self.get_socket(c).recv.return_value = message[0:1]
+        c.handle_read(*self.null_handle_function_args)
+        self.assertEqual(c._iobuf.getvalue(), message[0:1])
+
+        self.get_socket(c).recv.return_value = message[1:]
+        c.handle_read(*self.null_handle_function_args)
+        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
+
+        # let it write out a StartupMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        self.get_socket(c).recv.return_value = self.make_msg(header)
+        c.handle_read(*self.null_handle_function_args)
+
+        self.assertTrue(c.connected_event.is_set())
+        self.assertFalse(c.is_defunct)
+
+    def test_partial_message_read(self):
+        c = self.make_connection()
+
+        header = self.make_header_prefix(SupportedMessage)
+        options = self.make_options_body()
+        message = self.make_msg(header, options)
+
+        # read in the first nine bytes
+        self.get_socket(c).recv.return_value = message[:9]
+        c.handle_read(*self.null_handle_function_args)
+        self.assertEqual(c._iobuf.getvalue(), message[:9])
+
+        # ... then read in the rest
+        self.get_socket(c).recv.return_value = message[9:]
+        c.handle_read(*self.null_handle_function_args)
+        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
+
+        # let it write out a StartupMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        header = self.make_header_prefix(ReadyMessage, stream_id=1)
+        self.get_socket(c).recv.return_value = self.make_msg(header)
+        c.handle_read(*self.null_handle_function_args)
+
+        self.assertTrue(c.connected_event.is_set())
+        self.assertFalse(c.is_defunct)
