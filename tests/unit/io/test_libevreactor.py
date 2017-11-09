@@ -34,6 +34,7 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
     connection_class = LibevConnection
     socket_attr_name = '_socket'
+    loop_attr_name = '_libevloop'
     null_handle_function_args = None, 0
 
     def setUp(self):
@@ -48,9 +49,10 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         patchers = [patch(obj) for obj in
                     ('socket.socket',
                      'cassandra.io.libevwrapper.IO',
-                     'cassandra.io.libevwrapper.Prepare',
-                     'cassandra.io.libevwrapper.Async',
-                     'cassandra.io.libevreactor.LibevLoop.maybe_start')]
+                     # 'cassandra.io.libevwrapper.Prepare',
+                     # 'cassandra.io.libevwrapper.Async',
+                     'cassandra.io.libevreactor.LibevLoop.maybe_start'
+                     )]
         for p in patchers:
             self.addCleanup(p.stop)
         for p in patchers:
@@ -71,8 +73,8 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
         @test_category connection
         """
-        with (patch.object(LibevConnection._libevloop, "_thread"),
-              patch.object(LibevConnection._libevloop, "notify")):
+        with patch.object(LibevConnection._libevloop, "_thread"),\
+             patch.object(LibevConnection._libevloop, "notify"):
 
             self.make_connection()
 
@@ -85,7 +87,7 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             # be called
             libev__cleanup(weakref.ref(LibevConnection._libevloop))
             for conn in live_connections:
-                for watcher in (conn._write_watcher, conn._read_watcher):
-                    self.assertTrue(watcher.stop.mock_calls)
+                self.assertTrue(conn._write_watcher.stop.mock_calls)
+                self.assertTrue(conn._read_watcher.stop.mock_calls)
 
         LibevConnection._libevloop._shutdown = False

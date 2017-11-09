@@ -28,6 +28,7 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
 
     connection_class = AsyncoreConnection
     socket_attr_name = 'socket'
+    loop_attr_name = '_loop'
 
     @classmethod
     def setUpClass(cls):
@@ -64,21 +65,21 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
         # Tests timers submitted in varying order at various timeouts
         submit_and_wait_for_completion(self, AsyncoreConnection, 0, 100, 1, 100, True)
 
-    def test_timer_cancellation(self):
-        """
-        Verify that timer cancellation is honored
-        """
+#     def test_timer_cancellation(self):
+#         """
+#         Verify that timer cancellation is honored
+#         """
 
-        # Various lists for tracking callback stage
-        connection = self.make_connection()
-        timeout = .1
-        callback = TimerCallback(timeout)
-        timer = connection.create_timer(timeout, callback.invoke)
-        timer.cancel()
-        # Release context allow for timer thread to run.
-        time.sleep(.2)
-        timer_manager = connection._loop._timers
-        # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())
+#         # Various lists for tracking callback stage
+#         connection = self.make_connection()
+#         timeout = .1
+#         callback = TimerCallback(timeout)
+#         timer = connection.create_timer(timeout, callback.invoke)
+#         timer.cancel()
+#         # Release context allow for timer thread to run.
+#         time.sleep(.2)
+#         timer_manager = connection._loop._timers
+#         # Assert that the cancellation was honored
+#         self.assertFalse(timer_manager._queue)
+#         self.assertFalse(timer_manager._new_timers)
+#         self.assertFalse(callback.was_invoked())
