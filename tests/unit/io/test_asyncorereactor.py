@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import six
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -22,7 +20,6 @@ import time
 from mock import patch
 import socket
 from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.protocol import SupportedMessage, ReadyMessage
 from tests import is_monkey_patched
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback, ReactorTestMixin
 
@@ -54,58 +51,6 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
-
-    def test_partial_header_read(self):
-        c = self.make_connection()
-
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        message = self.make_msg(header, options)
-
-        c.socket.recv.return_value = message[0:1]
-        c.handle_read()
-        self.assertEqual(c._iobuf.getvalue(), message[0:1])
-
-        c.socket.recv.return_value = message[1:]
-        c.handle_read()
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
-
-        # let it write out a StartupMessage
-        c.handle_write()
-
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
-        c.socket.recv.return_value = self.make_msg(header)
-        c.handle_read()
-
-        self.assertTrue(c.connected_event.is_set())
-        self.assertFalse(c.is_defunct)
-
-    def test_partial_message_read(self):
-        c = self.make_connection()
-
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        message = self.make_msg(header, options)
-
-        # read in the first nine bytes
-        c.socket.recv.return_value = message[:9]
-        c.handle_read()
-        self.assertEqual(c._iobuf.getvalue(), message[:9])
-
-        # ... then read in the rest
-        c.socket.recv.return_value = message[9:]
-        c.handle_read()
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
-
-        # let it write out a StartupMessage
-        c.handle_write()
-
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
-        c.socket.recv.return_value = self.make_msg(header)
-        c.handle_read()
-
-        self.assertTrue(c.connected_event.is_set())
-        self.assertFalse(c.is_defunct)
 
     def test_multi_timer_validation(self):
         """

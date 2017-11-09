@@ -18,9 +18,6 @@ except ImportError:
 
 from mock import patch
 import weakref
-import six
-
-from cassandra.protocol import SupportedMessage, ReadyMessage
 
 from tests import is_monkey_patched
 from tests.unit.io.utils import ReactorTestMixin
@@ -58,59 +55,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             self.addCleanup(p.stop)
         for p in patchers:
             p.start()
-
-    def test_partial_header_read(self):
-        c = self.make_connection()
-
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        message = self.make_msg(header, options)
-
-        # read in the first byte
-        c._socket.recv.return_value = message[0:1]
-        c.handle_read(None, 0)
-        self.assertEqual(c._iobuf.getvalue(), message[0:1])
-
-        c._socket.recv.return_value = message[1:]
-        c.handle_read(None, 0)
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
-
-        # let it write out a StartupMessage
-        c.handle_write(None, 0)
-
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
-        c._socket.recv.return_value = self.make_msg(header)
-        c.handle_read(None, 0)
-
-        self.assertTrue(c.connected_event.is_set())
-        self.assertFalse(c.is_defunct)
-
-    def test_partial_message_read(self):
-        c = self.make_connection()
-
-        header = self.make_header_prefix(SupportedMessage)
-        options = self.make_options_body()
-        message = self.make_msg(header, options)
-
-        # read in the first nine bytes
-        c._socket.recv.return_value = message[:9]
-        c.handle_read(None, 0)
-        self.assertEqual(c._iobuf.getvalue(), message[:9])
-
-        # ... then read in the rest
-        c._socket.recv.return_value = message[9:]
-        c.handle_read(None, 0)
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
-
-        # let it write out a StartupMessage
-        c.handle_write(None, 0)
-
-        header = self.make_header_prefix(ReadyMessage, stream_id=1)
-        c._socket.recv.return_value = self.make_msg(header)
-        c.handle_read(None, 0)
-
-        self.assertTrue(c.connected_event.is_set())
-        self.assertFalse(c.is_defunct)
 
     def test_watchers_are_finished(self):
         """
