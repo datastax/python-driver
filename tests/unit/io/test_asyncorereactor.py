@@ -18,12 +18,9 @@ try:
 except ImportError:
     import unittest # noqa
 
-import errno
-import math
 import time
 from mock import patch
 import socket
-from socket import error as socket_error
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import SupportedMessage, ReadyMessage
 from tests import is_monkey_patched
@@ -57,21 +54,6 @@ class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
-
-    def test_socket_error_on_read(self):
-        c = self.make_connection()
-
-        # let it write the OptionsMessage
-        c.handle_write()
-
-        # read in a SupportedMessage response
-        c.socket.recv.side_effect = socket_error(errno.EIO, "busy socket")
-        c.handle_read()
-
-        # make sure it errored correctly
-        self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, socket_error)
-        self.assertTrue(c.connected_event.is_set())
 
     def test_partial_header_read(self):
         c = self.make_connection()
