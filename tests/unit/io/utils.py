@@ -340,3 +340,19 @@ class ReactorTestMixin(object):
         self.assertEqual(expected_writes, self.get_socket(c).send.call_count)
         self.assertEqual(last_write_size,
                          len(self.get_socket(c).send.call_args[0][0]))
+
+    def test_socket_error_on_read(self):
+        c = self.make_connection()
+
+        # let it write the OptionsMessage
+        c.handle_write(*self.null_handle_function_args)
+
+        # read in a SupportedMessage response
+        self.get_socket(c).recv.side_effect = socket_error(errno.EIO,
+                                                           "busy socket")
+        c.handle_read(*self.null_handle_function_args)
+
+        # make sure it errored correctly
+        self.assertTrue(c.is_defunct)
+        self.assertIsInstance(c.last_error, socket_error)
+        self.assertTrue(c.connected_event.is_set())

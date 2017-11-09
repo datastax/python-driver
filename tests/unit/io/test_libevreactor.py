@@ -16,12 +16,9 @@ try:
 except ImportError:
     import unittest # noqa
 
-import errno
-import math
 from mock import patch
 import weakref
 import six
-from socket import error as socket_error
 
 from cassandra.protocol import SupportedMessage, ReadyMessage
 
@@ -61,21 +58,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             self.addCleanup(p.stop)
         for p in patchers:
             p.start()
-
-    def test_socket_error_on_read(self):
-        c = self.make_connection()
-
-        # let it write the OptionsMessage
-        c.handle_write(None, 0)
-
-        # read in a SupportedMessage response
-        c._socket.recv.side_effect = socket_error(errno.EIO, "busy socket")
-        c.handle_read(None, 0)
-
-        # make sure it errored correctly
-        self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, socket_error)
-        self.assertTrue(c.connected_event.is_set())
 
     def test_partial_header_read(self):
         c = self.make_connection()
