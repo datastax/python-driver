@@ -71,8 +71,8 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
         @test_category connection
         """
-        with patch.object(LibevConnection._libevloop, "_thread"), \
-             patch.object(LibevConnection._libevloop, "notify"):
+        with (patch.object(LibevConnection._libevloop, "_thread"),
+              patch.object(LibevConnection._libevloop, "notify")):
 
             self.make_connection()
 
