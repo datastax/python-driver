@@ -17,7 +17,9 @@ from cassandra.connection import (ConnectionException, ProtocolError,
 from cassandra.marshal import int32_pack, uint8_pack, uint32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
+from tests import is_monkey_patched
 
+from functools import wraps
 import six
 from six import binary_type, BytesIO
 from mock import Mock
@@ -88,7 +90,7 @@ def get_timeout(gross_time, start, end, precision, split_range):
     return timeout
 
 
-def submit_and_wait_for_completion(unit_test, connection, start, end, increment, precision, split_range=False):
+def submit_and_wait_for_completion(unit_test, create_timer, start, end, increment, precision, split_range=False):
     """
    This will submit a number of timers to the provided connection. It will then ensure that the corresponding
    callback is invoked in the appropriate amount of time.
@@ -109,7 +111,7 @@ def submit_and_wait_for_completion(unit_test, connection, start, end, increment,
     for gross_time in range(start, end, increment):
         timeout = get_timeout(gross_time, start, end, precision, split_range)
         callback = TimerCallback(timeout)
-        connection.create_timer(timeout, callback.invoke)
+        create_timer(timeout, callback.invoke)
         pending_callbacks.append(callback)
 
     # wait for all the callbacks associated with the timers to be invoked
@@ -125,17 +127,40 @@ def submit_and_wait_for_completion(unit_test, connection, start, end, increment,
         unit_test.assertAlmostEqual(callback.expected_wait, callback.get_wait_time(), delta=.15)
 
 
-class TimerConnectionTests(object):
+def noop_if_monkey_patched(f):
+    if is_monkey_patched():
+        @wraps(f)
+        def noop(*args, **kwargs):
+            return
+        return noop
+
+    return f
+
+
+class TimerTestMixin(object):
+
+    connection_class = connection = None
+    # replace with property returning the connection's create_timer and _timers
+    create_timer = _timers = None
+
+    def setUp(self):
+        self.connection = self.connection_class(
+            connect_timeout=5
+        )
+
+    def tearDown(self):
+        self.connection.close()
+
     def test_multi_timer_validation(self):
         """
         Verify that timer timeouts are honored appropriately
         """
         # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, self.connection_class, 0, 100, 1, 100)
+        submit_and_wait_for_completion(self, self.create_timer, 0, 100, 1, 100)
         # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, self.connection_class, 100, 0, -1, 100)
+        submit_and_wait_for_completion(self, self.create_timer, 100, 0, -1, 100)
         # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, self.connection_class, 0, 100, 1, 100, True),
+        submit_and_wait_for_completion(self, self.create_timer, 0, 100, 1, 100, True),
 
     def test_timer_cancellation(self):
         """
@@ -145,11 +170,11 @@ class TimerConnectionTests(object):
         # Various lists for tracking callback stage
         timeout = .1
         callback = TimerCallback(timeout)
-        timer = self.connection_class.create_timer(timeout, callback.invoke)
+        timer = self.create_timer(timeout, callback.invoke)
         timer.cancel()
         # Release context allow for timer thread to run.
         time.sleep(.2)
-        timer_manager = self.connection_class._timers
+        timer_manager = self._timers
         # Assert that the cancellation was honored
         self.assertFalse(timer_manager._queue)
         self.assertFalse(timer_manager._new_timers)
@@ -158,7 +183,7 @@ class TimerConnectionTests(object):
 
 class ReactorTestMixin(object):
 
-    connection_class = socket_attr_name = None
+    connection_class = loop_attr_name = socket_attr_name = None
     null_handle_function_args = ()
 
     def get_socket(self, connection):
@@ -166,6 +191,9 @@ class ReactorTestMixin(object):
 
     def set_socket(self, connection, obj):
         return setattr(connection, self.socket_attr_name, obj)
+
+    def get_loop(self, connection):
+        return getattr(connection, self.loop_attr_name)
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
         return binary_type().join(map(uint8_pack, [

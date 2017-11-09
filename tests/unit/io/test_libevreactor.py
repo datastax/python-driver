@@ -16,11 +16,12 @@ try:
 except ImportError:
     import unittest # noqa
 
-from mock import patch
+from mock import patch, Mock
 import weakref
+import socket
 
 from tests import is_monkey_patched
-from tests.unit.io.utils import ReactorTestMixin
+from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
 
 
 try:
@@ -30,10 +31,11 @@ except ImportError:
     LibevConnection = None  # noqa
 
 
-class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
+class LibevConnectionTest(ReactorTestMixin, unittest.TestCase):
 
     connection_class = LibevConnection
     socket_attr_name = '_socket'
+    loop_attr_name = '_libevloop'
     null_handle_function_args = None, 0
 
     def setUp(self):
@@ -48,9 +50,8 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         patchers = [patch(obj) for obj in
                     ('socket.socket',
                      'cassandra.io.libevwrapper.IO',
-                     'cassandra.io.libevwrapper.Prepare',
-                     'cassandra.io.libevwrapper.Async',
-                     'cassandra.io.libevreactor.LibevLoop.maybe_start')]
+                     'cassandra.io.libevreactor.LibevLoop.maybe_start'
+                     )]
         for p in patchers:
             self.addCleanup(p.stop)
         for p in patchers:
@@ -71,7 +72,7 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
         @test_category connection
         """
-        with patch.object(LibevConnection._libevloop, "_thread"), \
+        with patch.object(LibevConnection._libevloop, "_thread"),\
              patch.object(LibevConnection._libevloop, "notify"):
 
             self.make_connection()
@@ -85,7 +86,56 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             # be called
             libev__cleanup(weakref.ref(LibevConnection._libevloop))
             for conn in live_connections:
-                for watcher in (conn._write_watcher, conn._read_watcher):
-                    self.assertTrue(watcher.stop.mock_calls)
+                self.assertTrue(conn._write_watcher.stop.mock_calls)
+                self.assertTrue(conn._read_watcher.stop.mock_calls)
 
         LibevConnection._libevloop._shutdown = False
+
+
+class LibevTimerPatcher(unittest.TestCase):
+
+    @classmethod
+    @noop_if_monkey_patched
+    def setUpClass(cls):
+        cls.patchers = [
+            patch('socket.socket', spec=socket.socket),
+            patch('cassandra.io.libevwrapper.IO')
+        ]
+        for p in cls.patchers:
+            p.start()
+
+    @classmethod
+    @noop_if_monkey_patched
+    def tearDownClass(cls):
+        for p in cls.patchers:
+            try:
+                p.stop()
+            except:
+                pass
+
+
+class LibevTimerTest(TimerTestMixin, LibevTimerPatcher):
+    connection_class = LibevConnection
+
+    @property
+    def create_timer(self):
+        return self.connection.create_timer
+
+    @property
+    def _timers(self):
+        return self.connection._libevloop._timers
+
+    def make_connection(self):
+        c = LibevConnection('1.2.3.4', cql_version='3.0.1')
+        c._socket_impl = Mock()
+        c._socket.return_value.send.side_effect = lambda x: len(x)
+        return c
+
+    def setUp(self):
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test libev with monkey patching.")
+        if LibevConnection is None:
+            raise unittest.SkipTest('libev does not appear to be installed correctly')
+
+        LibevConnection.initialize_reactor()
+        super(LibevTimerTest, self).setUp()
