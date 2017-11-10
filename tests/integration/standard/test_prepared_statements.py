@@ -563,7 +563,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         first_id = prepared_statement.result_metadata_id
         self.assertEqual(prepared_statement.result_metadata, [])
 
-        # Sucessfull conditional update
+        # Successful conditional update
         result = session.execute(prepared_statement, (value, value, value))
         self.assertEqual(result[0], (True,))
         second_id = prepared_statement.result_metadata_id
