@@ -28,6 +28,10 @@ from tests.integration import (get_server_versions, greaterthanorequalcass40,
                                set_default_beta_flag_true,
                                BasicSharedKeyspaceUnitTestCase)
 
+import logging
+
+
+LOG = logging.getLogger(__name__)
 
 def setup_module():
     use_singledc()
@@ -561,27 +565,27 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
             "INSERT INTO {}(a, b, d) VALUES "
             "(?, ? , ?) IF NOT EXISTS".format(self.table_name))
         first_id = prepared_statement.result_metadata_id
-        self.assertEqual(prepared_statement.result_metadata, [])
+        LOG.debug('initial result_metadata_id: {}'.format(first_id))
+
+        def check_metadata_state(stmt):
+            self.assertEqual(stmt.result_metadata_id, first_id)
+            self.assertEqual(stmt.result_metadata, [])
+
+        check_metadata_state(prepared_statement)
 
         # Successful conditional update
         result = session.execute(prepared_statement, (value, value, value))
         self.assertEqual(result[0], (True,))
-        second_id = prepared_statement.result_metadata_id
-        self.assertEqual(first_id, second_id)
-        self.assertEqual(prepared_statement.result_metadata, [])
+        check_metadata_state(prepared_statement)
 
         # Failed conditional update
         result = session.execute(prepared_statement, (value, value, value))
         self.assertEqual(result[0], (False, value, value, value))
-        third_id = prepared_statement.result_metadata_id
-        self.assertEqual(first_id, third_id)
-        self.assertEqual(prepared_statement.result_metadata, [])
+        check_metadata_state(prepared_statement)
 
         session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
 
         # Failed conditional update
         result = session.execute(prepared_statement, (value, value, value))
         self.assertEqual(result[0], (False, value, value, None, value))
-        fourth_id = prepared_statement.result_metadata_id
-        self.assertEqual(first_id, fourth_id)
-        self.assertEqual(prepared_statement.result_metadata, [])
+        check_metadata_state(prepared_statement)
