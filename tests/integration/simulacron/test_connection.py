@@ -194,7 +194,7 @@ class ConnectionTests(SimulacronBase):
                 "scope": "connection"
             }
 
-            prime_query(query_to_prime, then=then)
+            prime_query(query_to_prime, then=then, rows=None, column_types=None)
             self.assertRaises(NoHostAvailable, session.execute, query_to_prime)
 
     def test_retry_after_defunct(self):

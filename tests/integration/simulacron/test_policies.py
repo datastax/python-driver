@@ -222,9 +222,9 @@ class RetryPolicyTets(unittest.TestCase):
             "block_for": 2,
             "write_type": "SIMPLE"
           }
-        prime_query(query_to_prime_simple, then=then)
+        prime_query(query_to_prime_simple, then=then, rows=None, column_types=None)
         then["write_type"] = "CDC"
-        prime_query(query_to_prime_cdc, then=then)
+        prime_query(query_to_prime_cdc, then=then, rows=None, column_types=None)
 
         with self.assertRaises(WriteTimeout):
             self.session.execute(query_to_prime_simple)
