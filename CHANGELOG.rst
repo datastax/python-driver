@@ -1,3 +1,10 @@
+4.0.0
+=====
+
+Features
+--------
+* Cassandra 2.0 support removal (PYTHON-716)
+
 3.12.0
 ======
 November 6, 2017
