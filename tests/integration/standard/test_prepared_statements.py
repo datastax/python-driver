@@ -557,14 +557,15 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         self._test_updated_conditional(session, 10)
 
     def _test_updated_conditional(self, session, value):
-        prepared_statement = session.prepare("INSERT INTO {}(a, b, d) VALUES "
-                                                  "(?, ? , ?) IF NOT EXISTS".format(self.table_name))
+        prepared_statement = session.prepare(
+            "INSERT INTO {}(a, b, d) VALUES "
+            "(?, ? , ?) IF NOT EXISTS".format(self.table_name))
         first_id = prepared_statement.result_metadata_id
         self.assertEqual(prepared_statement.result_metadata, [])
 
         # Sucessfull conditional update
         result = session.execute(prepared_statement, (value, value, value))
-        self.assertEqual(result[0], (True, ))
+        self.assertEqual(result[0], (True,))
         second_id = prepared_statement.result_metadata_id
         self.assertEqual(first_id, second_id)
 
