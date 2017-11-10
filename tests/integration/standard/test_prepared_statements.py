@@ -567,31 +567,21 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         first_id = prepared_statement.result_metadata_id
         LOG.debug('initial result_metadata_id: {}'.format(first_id))
 
-        def check_metadata_state(stmt):
-            self.assertEqual(stmt.result_metadata_id, first_id)
-            self.assertEqual(stmt.result_metadata, [])
-
-        check_metadata_state(prepared_statement)
+        def check_result_and_metadata(expected):
+            self.assertEqual(
+                session.execute(prepared_statement, (value, value, value))[0],
+                expected
+            )
+            self.assertEqual(prepared_statement.result_metadata_id, first_id)
+            self.assertEqual(prepared_statement.result_metadata, [])
 
         # Successful conditional update
-        self.assertEqual(
-            session.execute(prepared_statement, (value, value, value))[0],
-            (True,)
-        )
-        check_metadata_state(prepared_statement)
+        check_result_and_metadata((True,))
 
         # Failed conditional update
-        self.assertEqual(
-            session.execute(prepared_statement, (value, value, value))[0],
-            (False, value, value, value)
-        )
-        check_metadata_state(prepared_statement)
+        check_result_and_metadata((False, value, value, value))
 
         session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
 
         # Failed conditional update
-        self.assertEqual(
-            session.execute(prepared_statement, (value, value, value))[0],
-            (False, value, value, None, value)
-        )
-        check_metadata_state(prepared_statement)
+        check_result_and_metadata((False, value, value, None, value))
