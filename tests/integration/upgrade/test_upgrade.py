@@ -18,7 +18,7 @@ from itertools import count
 from cassandra.auth import PlainTextAuthProvider, SaslAuthProvider
 from cassandra.cluster import ConsistencyLevel, Cluster, DriverException, ExecutionProfile
 from cassandra.policies import ConstantSpeculativeExecutionPolicy
-from tests.integration.long.upgrade import UpgradeBase, UpgradeBaseAuth, UpgradePath, upgrade_paths
+from tests.integration.upgrade import UpgradeBase, UpgradeBaseAuth, UpgradePath, upgrade_paths
 
 try:
     import unittest2 as unittest
@@ -140,7 +140,9 @@ class UpgradeTestsMetadata(UpgradeBase):
                 self.cluster_driver.refresh_schema_metadata(max_schema_agreement_wait=10)
 
         self.upgrade_node(nodes[0])
-        self.cluster_driver.refresh_schema_metadata(max_schema_agreement_wait=20)
+        # Wait for the control connection to reconnect
+        time.sleep(20)
+        self.cluster_driver.refresh_schema_metadata(max_schema_agreement_wait=40)
         self.assertNotEqual(original_meta, self.cluster_driver.metadata.keyspaces)
 
     @two_to_three_path

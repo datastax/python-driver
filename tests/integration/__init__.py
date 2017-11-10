@@ -263,7 +263,7 @@ pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is 
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
 requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "async" in EVENT_LOOP_MANAGER,
                                                "This test is not suitible for environments with large clock granularity")
-requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None, "Simulacron jar hasn't been specified")
+requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1", "Simulacron jar hasn't been specified or C* version is 2.0")
 
 
 def wait_for_node_socket(node, timeout):
