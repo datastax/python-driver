@@ -574,18 +574,24 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         check_metadata_state(prepared_statement)
 
         # Successful conditional update
-        result = session.execute(prepared_statement, (value, value, value))
-        self.assertEqual(result[0], (True,))
+        self.assertEqual(
+            session.execute(prepared_statement, (value, value, value))[0],
+            (True,)
+        )
         check_metadata_state(prepared_statement)
 
         # Failed conditional update
-        result = session.execute(prepared_statement, (value, value, value))
-        self.assertEqual(result[0], (False, value, value, value))
+        self.assertEqual(
+            session.execute(prepared_statement, (value, value, value))[0],
+            (False, value, value, value)
+        )
         check_metadata_state(prepared_statement)
 
         session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
 
         # Failed conditional update
-        result = session.execute(prepared_statement, (value, value, value))
-        self.assertEqual(result[0], (False, value, value, None, value))
+        self.assertEqual(
+            session.execute(prepared_statement, (value, value, value))[0],
+            (False, value, value, None, value)
+        )
         check_metadata_state(prepared_statement)
