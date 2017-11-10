@@ -28,6 +28,10 @@ from tests.integration import (get_server_versions, greaterthanorequalcass40,
                                set_default_beta_flag_true,
                                BasicSharedKeyspaceUnitTestCase)
 
+import logging
+
+
+LOG = logging.getLogger(__name__)
 
 def setup_module():
     use_singledc()
@@ -557,29 +561,27 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         self._test_updated_conditional(session, 10)
 
     def _test_updated_conditional(self, session, value):
-        prepared_statement = session.prepare("INSERT INTO {}(a, b, d) VALUES "
-                                                  "(?, ? , ?) IF NOT EXISTS".format(self.table_name))
+        prepared_statement = session.prepare(
+            "INSERT INTO {}(a, b, d) VALUES "
+            "(?, ? , ?) IF NOT EXISTS".format(self.table_name))
         first_id = prepared_statement.result_metadata_id
-        self.assertEqual(prepared_statement.result_metadata, [])
+        LOG.debug('initial result_metadata_id: {}'.format(first_id))
 
-        # Sucessfull conditional update
-        result = session.execute(prepared_statement, (value, value, value))
-        self.assertEqual(result[0], (True, ))
-        second_id = prepared_statement.result_metadata_id
-        self.assertEqual(first_id, second_id)
+        def check_result_and_metadata(expected):
+            self.assertEqual(
+                session.execute(prepared_statement, (value, value, value))[0],
+                expected
+            )
+            self.assertEqual(prepared_statement.result_metadata_id, first_id)
+            self.assertEqual(prepared_statement.result_metadata, [])
+
+        # Successful conditional update
+        check_result_and_metadata((True,))
 
         # Failed conditional update
-        result = session.execute(prepared_statement, (value, value, value))
-        self.assertEqual(result[0], (False, value, value, value))
-        third_id = prepared_statement.result_metadata_id
-        self.assertEqual(first_id, third_id)
-        self.assertEqual(prepared_statement.result_metadata, [])
+        check_result_and_metadata((False, value, value, value))
 
         session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
 
         # Failed conditional update
-        result = session.execute(prepared_statement, (value, value, value))
-        self.assertEqual(result[0], (False, value, value, None, value))
-        fourth_id = prepared_statement.result_metadata_id
-        self.assertEqual(first_id, fourth_id)
-        self.assertEqual(prepared_statement.result_metadata, [])
+        check_result_and_metadata((False, value, value, None, value))
