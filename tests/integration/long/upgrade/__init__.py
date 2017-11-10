@@ -21,6 +21,7 @@ from cassandra import cluster
 
 from collections import namedtuple
 from functools import wraps
+import logging
 from threading import Thread, Event
 from ccmlib.node import TimeoutError
 import time
@@ -36,8 +37,10 @@ def setup_module():
     remove_cluster()
 
 
-UPGRADE_CLUSTER = "upgrade_cluster"
+UPGRADE_CLUSTER_NAME = "upgrade_cluster"
 UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_version', 'configuration_options'))
+
+log = logging.getLogger(__name__)
 
 
 class upgrade_paths(object):
@@ -52,9 +55,11 @@ class upgrade_paths(object):
         def wrapper(*args, **kwargs):
             for path in self.paths:
                 self_from_decorated = args[0]
+                log.debug('setting up {path}'.format(path=path))
                 self_from_decorated.UPGRADE_PATH = path
                 self_from_decorated._upgrade_step_setup()
                 method(*args, **kwargs)
+                log.debug('tearing down {path}'.format(path=path))
                 self_from_decorated._upgrade_step_teardown()
         return wrapper
 
@@ -85,7 +90,7 @@ class UpgradeBase(unittest.TestCase):
         to the variable UPGRADE_PATH.
         """
         remove_cluster()
-        self.cluster = use_cluster(UPGRADE_CLUSTER + self.UPGRADE_PATH.name, [3],
+        self.cluster = use_cluster(UPGRADE_CLUSTER_NAME + self.UPGRADE_PATH.name, [3],
                                    ccm_options=self.UPGRADE_PATH.starting_version, set_keyspace=self.set_keyspace,
                                    configuration_options=self.UPGRADE_PATH.configuration_options)
         self.nodes = self.cluster.nodelist()
@@ -115,6 +120,7 @@ class UpgradeBase(unittest.TestCase):
         """
         Starts the upgrade in a different thread
         """
+        log.debug('Starting upgrade in new thread')
         self.upgrade_thread = Thread(target=self._upgrade, args=(time_node_upgrade,))
         self.upgrade_thread.start()
 

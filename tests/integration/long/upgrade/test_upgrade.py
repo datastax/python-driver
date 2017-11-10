@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import time
 from itertools import count
 
@@ -28,8 +27,8 @@ except ImportError:
 
 
 two_to_three_path = upgrade_paths([
-        UpgradePath("2.2.9-3.11", {"version": "2.2.9"}, {"version": "3.11"}, {}),
-    ])
+    UpgradePath("2.2.9-3.11", {"version": "2.2.9"}, {"version": "3.11"}, {}),
+])
 class UpgradeTests(UpgradeBase):
     @two_to_three_path
     def test_can_write(self):
@@ -113,6 +112,7 @@ class UpgradeTestsMetadata(UpgradeBase):
 
         self.session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
         self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
+
     @two_to_three_path
     def test_schema_metadata_gets_refreshed(self):
         """
@@ -130,7 +130,6 @@ class UpgradeTestsMetadata(UpgradeBase):
         """
         original_meta = self.cluster_driver.metadata.keyspaces
         number_of_nodes = len(self.cluster.nodelist())
-
         nodes = self.nodes
         for node in nodes[1:]:
             self.upgrade_node(node)
@@ -175,10 +174,10 @@ class UpgradeTestsMetadata(UpgradeBase):
 
 
 two_to_three_with_auth_path = upgrade_paths([
-        UpgradePath("2.2.9-3.11-auth", {"version": "2.2.9"}, {"version": "3.11"},
-                    {'authenticator': 'PasswordAuthenticator',
-                     'authorizer': 'CassandraAuthorizer'}),
-    ])
+    UpgradePath("2.2.9-3.11-auth", {"version": "2.2.9"}, {"version": "3.11"},
+                {'authenticator': 'PasswordAuthenticator',
+                 'authorizer': 'CassandraAuthorizer'}),
+])
 class UpgradeTestsAuthentication(UpgradeBaseAuth):
     @two_to_three_with_auth_path
     def test_can_connect_auth_plain(self):
@@ -193,9 +192,9 @@ class UpgradeTestsAuthentication(UpgradeBaseAuth):
         @test_category upgrade
         """
         auth_provider = PlainTextAuthProvider(
-                                  username="cassandra",
-                                  password="cassandra"
-                              )
+            username="cassandra",
+            password="cassandra"
+        )
         self.connect_and_shutdown(auth_provider)
         for node in self.nodes:
             self.upgrade_node(node)

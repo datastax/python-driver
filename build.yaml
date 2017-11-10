@@ -103,6 +103,7 @@ build:
 
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
+      pip install nose-exclude
       FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
         FORCE_CYTHON=True
@@ -159,6 +160,6 @@ build:
       EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
       echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
   - xunit:
     - "*_results.xml"
