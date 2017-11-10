@@ -103,7 +103,7 @@ Specifying a Cassandra Version for Integration Tests
 ----------------------------------------------------
 You can specify a cassandra version with the ``CASSANDRA_VERSION`` environment variable::
 
-    CASSANDRA_VERSION=2.0.9 python setup.py nosetests -w tests/integration/standard
+    CASSANDRA_VERSION=3.11 python setup.py nosetests -w tests/integration/standard
 
 You can also specify a cassandra directory (to test unreleased versions)::
 

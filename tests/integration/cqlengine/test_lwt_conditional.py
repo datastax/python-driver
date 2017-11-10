@@ -27,7 +27,6 @@ from cassandra.cqlengine.query import BatchQuery, LWTException
 from cassandra.cqlengine.statements import ConditionalClause
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
-from tests.integration import CASSANDRA_VERSION
 
 
 class TestConditionalModel(Model):
@@ -36,7 +35,6 @@ class TestConditionalModel(Model):
     text = columns.Text(required=False)
 
 
-@unittest.skipUnless(CASSANDRA_VERSION >= '2.0.0', "conditionals only supported on cassandra 2.0 or higher")
 class TestConditional(BaseCassEngTestCase):
 
     @classmethod
