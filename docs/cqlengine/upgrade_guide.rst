@@ -1,14 +1,17 @@
-========================
+=============
+Upgrade Guide
+=============
+
 Upgrade Guide 3.x to 4.x
 ========================
 
-The cqlengine query execution has been rewritten to support async queries. The synchronous
-execution is now underlying on the main asynchronous one. This can have some impacts if you
-are using a custom DMLQuery or override some model functions, like save, update, delete.
-You should now override the *asynchronous* function to make sure your code will be called. See
-the example below.
+* The cqlengine query execution has been rewritten to support async queries. The synchronous
+  execution is now underlying on the main asynchronous one. This can have some impacts if you
+  are using a custom DMLQuery or override some model functions, like save, update, delete.
+  You should now override the *asynchronous* function to make sure your code will be called. See
+  the example below.
 
-Before::
+  Before::
 
     class Pet(Model):
         owner_id = UUID(primary_key=True)
@@ -26,7 +29,7 @@ Before::
         Pet.create(owner_id=ownder_uuid, pet_id=pet_uuid, pet_type='cat', name='rambo')
 
 
-After::
+  After::
 
     class Pet(Model):
         owner_id = UUID(primary_key=True)
@@ -43,9 +46,9 @@ After::
         # The creation will fail properly due to our pre-check in Pet.save_async()
         Pet.create(owner_id=ownder_uuid, pet_id=pet_uuid, pet_type='cat', name='rambo')
 
+* Model.__table_name__ is now case sensitive
+* Model.__table_name_case_sensitive__ has been removed
 
-
-==============================================
 Upgrade Guide cqlengine to cassandra.cqlengine
 ==============================================
 
@@ -56,7 +59,8 @@ conversion to this package will still require certain minimal updates (namely, i
 **THERE IS ONE FUNCTIONAL CHANGE**, described in the first section below.
 
 Functional Changes
-==================
+~~~~~~~~~~~~~~~~~~
+
 List Prepend Reversing
 ----------------------
 Legacy cqlengine included a workaround for a Cassandra bug in which prepended list segments were
@@ -73,7 +77,7 @@ Users of the legacy functionality should convert models to use :class:`~.columns
 uses ``timestamp`` internally), and use the build-in ``datetime.date`` for input values.
 
 Remove cqlengine
-================
+~~~~~~~~~~~~~~~~
 To avoid confusion or mistakes using the legacy package in your application, it
 is prudent to remove the cqlengine package when upgrading to the integrated version.
 
@@ -81,7 +85,7 @@ The driver setup script will warn if the legacy package is detected during insta
 but it will not prevent side-by-side installation.
 
 Organization
-============
+~~~~~~~~~~~~
 Imports
 -------
 cqlengine is now integrated as a sub-package of the driver base package 'cassandra'.
@@ -131,7 +135,7 @@ to a single definition in the cqlengine package init file. This is not technical
 the API, but noted here for completeness.
 
 API Deprecations
-================
+~~~~~~~~~~~~~~~~
 This upgrade served as a good juncture to deprecate certain API features and invite users to upgrade
 to new ones. The first released version does not change functionality -- only introduces deprecation
 warnings. Future releases will remove these features in favor of the alternatives.
