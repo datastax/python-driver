@@ -74,7 +74,6 @@ class BaseIfNotExistsWithCounterTest(BaseCassEngTestCase):
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
-    @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_insert_if_not_exists(self):
         """ tests that insertion with if_not_exists work as expected """
 
@@ -102,7 +101,6 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         self.assertEqual(tm.count, 8)
         self.assertEqual(tm.text, '123456789')
 
-    @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_insert_if_not_exists(self):
         """ tests that batch insertion with if_not_exists work as expected """
 

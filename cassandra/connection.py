@@ -40,7 +40,7 @@ else:
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
 from cassandra.marshal import int32_pack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
-                                StartupMessage, ErrorMessage, CredentialsMessage,
+                                StartupMessage, ErrorMessage,
                                 QueryMessage, ResultMessage, ProtocolHandler,
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
@@ -101,7 +101,6 @@ HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
 
-frame_header_v1_v2 = struct.Struct('>BbBi')
 frame_header_v3 = struct.Struct('>BhBi')
 
 
@@ -219,14 +218,14 @@ class Connection(object):
     in_flight = 0
 
     # Max concurrent requests allowed per connection. This is set optimistically high, allowing
-    # all request ids to be used in protocol version 3+. Normally concurrency would be controlled
+    # all request ids to be used. Normally concurrency would be controlled
     # at a higher level by the application or concurrent.execute_concurrent. This attribute
     # is for lower-level integrations that want some upper bound without reimplementing.
     max_in_flight = 2 ** 15
 
-    # A set of available request IDs.  When using the v3 protocol or higher,
-    # this will not initially include all request IDs in order to save memory,
-    # but the set will grow if it is exhausted.
+    # A set of available request IDs.  This will not initially include all
+    # request IDs in order to save memory, but the set will grow if it is
+    # exhausted.
     request_ids = None
 
     # Tracks the highest used request ID in order to help with growing the
@@ -285,17 +284,12 @@ class Connection(object):
                     raise RuntimeError("ssl_options specify 'check_hostname', but ssl.match_hostname is not provided. "
                                        "Patch or upgrade Python to use this option.")
 
-        if protocol_version >= 3:
-            self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
-            # Don't fill the deque with 2**15 items right away. Start with some and add
-            # more if needed.
-            initial_size = min(300, self.max_in_flight)
-            self.request_ids = deque(range(initial_size))
-            self.highest_request_id = initial_size - 1
-        else:
-            self.max_request_id = min(self.max_in_flight, (2 ** 7) - 1)
-            self.request_ids = deque(range(self.max_request_id + 1))
-            self.highest_request_id = self.max_request_id
+        self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
+        # Don't fill the deque with 2**15 items right away. Start with some and add
+        # more if needed.
+        initial_size = min(300, self.max_in_flight)
+        self.request_ids = deque(range(initial_size))
+        self.highest_request_id = initial_size - 1
 
         self.lock = RLock()
         self.connected_event = Event()
@@ -552,7 +546,7 @@ class Connection(object):
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
             if version > ProtocolVersion.MAX_SUPPORTED:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
-            frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
+            frame_header = frame_header_v3
             # this frame header struct is everything after the version byte
             header_size = frame_header.size + 1
             if pos >= header_size:
@@ -735,17 +729,11 @@ class Connection(object):
             if self.authenticator is None:
                 raise AuthenticationFailed('Remote end requires authentication.')
 
-            if isinstance(self.authenticator, dict):
-                log.debug("Sending credentials-based auth response on %s", self)
-                cm = CredentialsMessage(creds=self.authenticator)
-                callback = partial(self._handle_startup_response, did_authenticate=True)
-                self.send_msg(cm, self.get_request_id(), cb=callback)
-            else:
-                log.debug("Sending SASL-based auth response on %s", self)
-                self.authenticator.server_authenticator_class = startup_response.authenticator
-                initial_response = self.authenticator.initial_response()
-                initial_response = "" if initial_response is None else initial_response
-                self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
+            log.debug("Sending SASL-based auth response on %s", self)
+            self.authenticator.server_authenticator_class = startup_response.authenticator
+            initial_response = self.authenticator.initial_response()
+            initial_response = "" if initial_response is None else initial_response
+            self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.host, startup_response.summary_msg())

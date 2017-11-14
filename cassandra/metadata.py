@@ -132,12 +132,7 @@ class Metadata(object):
             meta = parse_method(self.keyspaces, **kwargs)
             if meta:
                 update_method = getattr(self, '_update_' + tt_lower)
-                if tt_lower == 'keyspace' and connection.protocol_version < 3:
-                    # we didn't have 'type' target in legacy protocol versions, so we need to query those too
-                    user_types = parser.get_types_map(self.keyspaces, **kwargs)
-                    self._update_keyspace(meta, user_types)
-                else:
-                    update_method(meta)
+                update_method(meta)
             else:
                 drop_method = getattr(self, '_drop_' + tt_lower)
                 drop_method(**kwargs)

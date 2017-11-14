@@ -35,7 +35,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 IndexMetadata, Function, Aggregate,
                                 Metadata, TokenMap)
 from cassandra.policies import SimpleConvictionPolicy
-from cassandra.pool import Host
+from cassandra.hosts import Host
 
 
 class StrategiesTest(unittest.TestCase):

@@ -212,15 +212,10 @@ cdef class _DesSingleParamType(_DesParameterizedType):
 
 cdef class DesListType(_DesSingleParamType):
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        cdef uint16_t v2_and_below = 2
-        cdef int32_t v3_and_above = 3
+        cdef int32_t dummy_protocol_version = 3
 
-        if protocol_version >= 3:
-            result = _deserialize_list_or_set[int32_t](
-                v3_and_above, buf, protocol_version, self.deserializer)
-        else:
-            result = _deserialize_list_or_set[uint16_t](
-                v2_and_below, buf, protocol_version, self.deserializer)
+        result = _deserialize_list_or_set[int32_t](
+            dummy_protocol_version, buf, protocol_version, self.deserializer)
 
         return result
 
@@ -230,7 +225,6 @@ cdef class DesSetType(DesListType):
 
 
 ctypedef fused itemlen_t:
-    uint16_t # protocol <= v2
     int32_t  # protocol >= v3
 
 cdef list _deserialize_list_or_set(itemlen_t dummy_version,
@@ -251,7 +245,6 @@ cdef list _deserialize_list_or_set(itemlen_t dummy_version,
 
     _unpack_len[itemlen_t](buf, 0, &numelements)
     offset = sizeof(itemlen_t)
-    protocol_version = max(3, protocol_version)
     for _ in range(numelements):
         subelem[itemlen_t](buf, &elem_buf, &offset, dummy_version)
         result.append(from_binary(deserializer, &elem_buf, protocol_version))
@@ -299,20 +292,13 @@ cdef class DesMapType(_DesParameterizedType):
         self.val_deserializer = self.deserializers[1]
 
     cdef deserialize(self, Buffer *buf, int protocol_version):
-        cdef uint16_t v2_and_below = 0
-        cdef int32_t v3_and_above = 0
+        cdef int32_t dummy_protocol_version = 0
         key_type, val_type = self.cqltype.subtypes
 
-        if protocol_version >= 3:
-            result = _deserialize_map[int32_t](
-                v3_and_above, buf, protocol_version,
-                self.key_deserializer, self.val_deserializer,
-                key_type, val_type)
-        else:
-            result = _deserialize_map[uint16_t](
-                v2_and_below, buf, protocol_version,
-                self.key_deserializer, self.val_deserializer,
-                key_type, val_type)
+        result = _deserialize_map[int32_t](
+            dummy_protocol_version, buf, protocol_version,
+            self.key_deserializer, self.val_deserializer,
+            key_type, val_type)
 
         return result
 
@@ -331,7 +317,6 @@ cdef _deserialize_map(itemlen_t dummy_version,
     _unpack_len[itemlen_t](buf, 0, &numelements)
     offset = sizeof(itemlen_t)
     themap = util.OrderedMapSerializedKey(key_type, protocol_version)
-    protocol_version = max(3, protocol_version)
     for _ in range(numelements):
         subelem[itemlen_t](buf, &key_buf, &offset, dummy_version)
         subelem[itemlen_t](buf, &val_buf, &offset, numelements)
@@ -354,10 +339,6 @@ cdef class DesTupleType(_DesParameterizedType):
         cdef Buffer item_buf
         cdef Buffer itemlen_buf
         cdef Deserializer deserializer
-
-        # collections inside UDTs are always encoded with at least the
-        # version 3 format
-        protocol_version = max(3, protocol_version)
 
         p = 0
         values = []

@@ -14,7 +14,7 @@ from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
-from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, VERIFY_CYTHON, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass21
+from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, VERIFY_CYTHON, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass21
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -58,7 +58,6 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         """
         verify_iterator_data(self.assertEqual, get_data(LazyProtocolHandler))
 
-    @notprotocolv1
     @numpytest
     def test_cython_lazy_results_paged(self):
         """
@@ -80,7 +79,6 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
         cluster.shutdown()
 
-    @notprotocolv1
     @numpytest
     def test_numpy_parser(self):
         """
@@ -91,7 +89,6 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         self.assertFalse(result.has_more_pages)
         self._verify_numpy_page(result[0])
 
-    @notprotocolv1
     @numpytest
     def test_numpy_results_paged(self):
         """

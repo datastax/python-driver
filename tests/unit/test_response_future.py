@@ -30,7 +30,7 @@ from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessag
                                 RESULT_KIND_SCHEMA_CHANGE, RESULT_KIND_PREPARED,
                                 ProtocolHandler)
 from cassandra.policies import RetryPolicy
-from cassandra.pool import NoConnectionsAvailable
+from cassandra.hosts import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
 
 

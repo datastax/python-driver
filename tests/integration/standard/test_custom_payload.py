@@ -28,6 +28,7 @@ from tests.integration import use_singledc, PROTOCOL_VERSION, local
 def setup_module():
     use_singledc()
 
+
 #These test rely on the custom payload being returned but by default C*
 #ignores all the payloads.
 @local

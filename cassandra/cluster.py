@@ -41,8 +41,8 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
-                       OperationTimedOut, UnsupportedOperation,
-                       SchemaTargetType, DriverException, ProtocolVersion)
+                       OperationTimedOut, SchemaTargetType,
+                       DriverException, ProtocolVersion)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -63,9 +63,8 @@ from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, Simpl
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy, IdentityTranslator, NoSpeculativeExecutionPlan,
                                 NoSpeculativeExecutionPolicy)
-from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
-                            HostConnectionPool, HostConnection,
-                            NoConnectionsAvailable)
+from cassandra.hosts import (Host, _ReconnectionHandler, _HostReconnectionHandler, HostConnection,
+                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
@@ -105,17 +104,6 @@ else:
 "".encode('utf8')
 
 log = logging.getLogger(__name__)
-
-
-DEFAULT_MIN_REQUESTS = 5
-DEFAULT_MAX_REQUESTS = 100
-
-DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST = 2
-DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST = 8
-
-DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST = 1
-DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
-
 
 _NOT_SET = object()
 
@@ -422,13 +410,8 @@ class Cluster(object):
     @property
     def auth_provider(self):
         """
-        When :attr:`~.Cluster.protocol_version` is 2 or higher, this should
-        be an instance of a subclass of :class:`~cassandra.auth.AuthProvider`,
+        This should be an instance of a subclass of :class:`~cassandra.auth.AuthProvider`,
         such as :class:`~.PlainTextAuthProvider`.
-
-        When :attr:`~.Cluster.protocol_version` is 1, this should be
-        a function that accepts one argument, the IP address of a node,
-        and returns a dict of credentials for that node.
 
         When not using authentication, this should be left as :const:`None`.
         """
@@ -443,12 +426,7 @@ class Cluster(object):
         try:
             self._auth_provider_callable = value.new_authenticator
         except AttributeError:
-            if self.protocol_version > 1:
-                raise TypeError("auth_provider must implement the cassandra.auth.AuthProvider "
-                                "interface when protocol_version >= 2")
-            elif not callable(value):
-                raise TypeError("auth_provider must be callable when protocol_version == 1")
-            self._auth_provider_callable = value
+            raise TypeError("auth_provider must implement the cassandra.auth.AuthProvider interface")
 
         self._auth_provider = value
 
@@ -936,26 +914,6 @@ class Cluster(object):
 
         self._user_types = defaultdict(dict)
 
-        self._min_requests_per_connection = {
-            HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
-            HostDistance.REMOTE: DEFAULT_MIN_REQUESTS
-        }
-
-        self._max_requests_per_connection = {
-            HostDistance.LOCAL: DEFAULT_MAX_REQUESTS,
-            HostDistance.REMOTE: DEFAULT_MAX_REQUESTS
-        }
-
-        self._core_connections_per_host = {
-            HostDistance.LOCAL: DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST,
-            HostDistance.REMOTE: DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST
-        }
-
-        self._max_connections_per_host = {
-            HostDistance.LOCAL: DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST,
-            HostDistance.REMOTE: DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST
-        }
-
         self.executor = ThreadPoolExecutor(max_workers=executor_threads)
         self.scheduler = _Scheduler(self.executor)
 
@@ -1019,10 +977,6 @@ class Cluster(object):
             print row.id, row.location.street, row.location.zipcode
 
         """
-        if self.protocol_version < 3:
-            log.warning("User Type serialization is only supported in native protocol version 3+ (%d in use). "
-                        "CQL encoding for simple statements will still work, but named tuples will "
-                        "be returned when reading type %s.%s.", self.protocol_version, keyspace, user_type)
 
         self._user_types[keyspace][user_type] = klass
         for session in tuple(self.sessions):
@@ -1075,116 +1029,6 @@ class Cluster(object):
         _, not_done = wait_futures(futures, pool_wait_timeout)
         if not_done:
             raise OperationTimedOut("Failed to create all new connection pools in the %ss timeout.")
-
-
-    def get_min_requests_per_connection(self, host_distance):
-        return self._min_requests_per_connection[host_distance]
-
-    def set_min_requests_per_connection(self, host_distance, min_requests):
-        """
-        Sets a threshold for concurrent requests per connection, below which
-        connections will be considered for disposal (down to core connections;
-        see :meth:`~Cluster.set_core_connections_per_host`).
-
-        Pertains to connection pool management in protocol versions {1,2}.
-        """
-        if self.protocol_version >= 3:
-            raise UnsupportedOperation(
-                "Cluster.set_min_requests_per_connection() only has an effect "
-                "when using protocol_version 1 or 2.")
-        if min_requests < 0 or min_requests > 126 or \
-           min_requests >= self._max_requests_per_connection[host_distance]:
-            raise ValueError("min_requests must be 0-126 and less than the max_requests for this host_distance (%d)" %
-                             (self._min_requests_per_connection[host_distance],))
-        self._min_requests_per_connection[host_distance] = min_requests
-
-    def get_max_requests_per_connection(self, host_distance):
-        return self._max_requests_per_connection[host_distance]
-
-    def set_max_requests_per_connection(self, host_distance, max_requests):
-        """
-        Sets a threshold for concurrent requests per connection, above which new
-        connections will be created to a host (up to max connections;
-        see :meth:`~Cluster.set_max_connections_per_host`).
-
-        Pertains to connection pool management in protocol versions {1,2}.
-        """
-        if self.protocol_version >= 3:
-            raise UnsupportedOperation(
-                "Cluster.set_max_requests_per_connection() only has an effect "
-                "when using protocol_version 1 or 2.")
-        if max_requests < 1 or max_requests > 127 or \
-           max_requests <= self._min_requests_per_connection[host_distance]:
-            raise ValueError("max_requests must be 1-127 and greater than the min_requests for this host_distance (%d)" %
-                             (self._min_requests_per_connection[host_distance],))
-        self._max_requests_per_connection[host_distance] = max_requests
-
-    def get_core_connections_per_host(self, host_distance):
-        """
-        Gets the minimum number of connections per Session that will be opened
-        for each host with :class:`~.HostDistance` equal to `host_distance`.
-        The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
-        :attr:`~HostDistance.REMOTE`.
-
-        This property is ignored if :attr:`~.Cluster.protocol_version` is
-        3 or higher.
-        """
-        return self._core_connections_per_host[host_distance]
-
-    def set_core_connections_per_host(self, host_distance, core_connections):
-        """
-        Sets the minimum number of connections per Session that will be opened
-        for each host with :class:`~.HostDistance` equal to `host_distance`.
-        The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
-        :attr:`~HostDistance.REMOTE`.
-
-        Protocol version 1 and 2 are limited in the number of concurrent
-        requests they can send per connection. The driver implements connection
-        pooling to support higher levels of concurrency.
-
-        If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
-        is not supported (there is always one connection per host, unless
-        the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
-        """
-        if self.protocol_version >= 3:
-            raise UnsupportedOperation(
-                "Cluster.set_core_connections_per_host() only has an effect "
-                "when using protocol_version 1 or 2.")
-        old = self._core_connections_per_host[host_distance]
-        self._core_connections_per_host[host_distance] = core_connections
-        if old < core_connections:
-            self._ensure_core_connections()
-
-    def get_max_connections_per_host(self, host_distance):
-        """
-        Gets the maximum number of connections per Session that will be opened
-        for each host with :class:`~.HostDistance` equal to `host_distance`.
-        The default is 8 for :attr:`~HostDistance.LOCAL` and 2 for
-        :attr:`~HostDistance.REMOTE`.
-
-        This property is ignored if :attr:`~.Cluster.protocol_version` is
-        3 or higher.
-        """
-        return self._max_connections_per_host[host_distance]
-
-    def set_max_connections_per_host(self, host_distance, max_connections):
-        """
-        Sets the maximum number of connections per Session that will be opened
-        for each host with :class:`~.HostDistance` equal to `host_distance`.
-        The default is 2 for :attr:`~HostDistance.LOCAL` and 1 for
-        :attr:`~HostDistance.REMOTE`.
-
-        If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
-        is not supported (there is always one connection per host, unless
-        the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
-        """
-        if self.protocol_version >= 3:
-            raise UnsupportedOperation(
-                "Cluster.set_max_connections_per_host() only has an effect "
-                "when using protocol_version 1 or 2.")
-        self._max_connections_per_host[host_distance] = max_connections
 
     def connection_factory(self, address, *args, **kwargs):
         """
@@ -1948,8 +1792,6 @@ class Session(object):
         The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
         this session.  This default may be overridden by setting the
         :attr:`~.Statement.serial_consistency_level` on individual statements.
-
-        Only valid for ``protocol_version >= 2``.
         """
         return self._default_serial_consistency_level
 
@@ -1974,18 +1816,16 @@ class Session(object):
     results.  The fetch size can be also specified per-query through
     :attr:`.Statement.fetch_size`.
 
-    This only takes effect when protocol version 2 or higher is used.
-    See :attr:`.Cluster.protocol_version` for details.
-
     .. versionadded:: 2.0.0
     """
 
     use_client_timestamp = True
     """
-    When using protocol version 3 or higher, write timestamps may be supplied
-    client-side at the protocol level.  (Normally they are generated
-    server-side by the coordinator node.)  Note that timestamps specified
-    within a CQL query will override this timestamp.
+    Clients provide write timestamps by default.  Note that timestamps
+    specified within a CQL query will override this timestamp.
+
+    If client timestamps are disabled, the coordinator node will provide the
+    timestamp server-side.
 
     .. versionadded:: 2.1.0
     """
@@ -2202,13 +2042,11 @@ class Session(object):
 
 
         fetch_size = query.fetch_size
-        if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
+        if fetch_size is FETCH_SIZE_UNSET:
             fetch_size = self.default_fetch_size
-        elif self._protocol_version == 1:
-            fetch_size = None
 
         start_time = time.time()
-        if self._protocol_version >= 3 and self.use_client_timestamp:
+        if self.use_client_timestamp:
             timestamp = self.cluster.timestamp_generator()
         else:
             timestamp = None
@@ -2230,11 +2068,6 @@ class Session(object):
                 timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata),
                 result_metadata_id=prepared_statement.result_metadata_id)
         elif isinstance(query, BatchStatement):
-            if self._protocol_version < 2:
-                raise UnsupportedOperation(
-                    "BatchStatement execution is only supported with protocol version "
-                    "2 or higher (supported in Cassandra 2.0 and higher).  Consider "
-                    "setting Cluster.protocol_version to 2 to support this operation.")
             statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
             message = BatchMessage(
                 query.batch_type, query._statements_and_parameters, cl,
@@ -2448,10 +2281,7 @@ class Session(object):
 
         def run_add_or_renew_pool():
             try:
-                if self._protocol_version >= 3:
-                    new_pool = HostConnection(host, distance, self)
-                else:
-                    new_pool = HostConnectionPool(host, distance, self)
+                new_pool = HostConnection(host, distance, self)
             except AuthenticationFailed as auth_exc:
                 conn_exc = ConnectionException(str(auth_exc), host=host)
                 self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)

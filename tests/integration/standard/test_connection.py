@@ -30,11 +30,11 @@ from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateListener
-from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDRA_IP, local, \
-    requiresmallclockgranularity, greaterthancass20
+    requiresmallclockgranularity
+
 try:
     from cassandra.io.libevreactor import LibevConnection
 except ImportError:
@@ -115,7 +115,6 @@ class HeartbeatTest(unittest.TestCase):
         self.cluster.shutdown()
 
     @local
-    @greaterthancass20
     def test_heart_beat_timeout(self):
         # Setup a host listener to ensure the nodes don't go down
         test_listener = TestHostListener()
@@ -158,12 +157,8 @@ class HeartbeatTest(unittest.TestCase):
         holders = cluster.get_connection_holders()
         for conn in holders:
             if host == str(getattr(conn, 'host', '')):
-                if isinstance(conn, HostConnectionPool):
-                    if conn._connections is not None and len(conn._connections) > 0:
-                        connections.append(conn._connections)
-                else:
-                    if conn._connection is not None:
-                        connections.append(conn._connection)
+                if conn._connection is not None:
+                    connections.append(conn._connection)
         return connections
 
     def wait_for_connections(self, host, cluster):

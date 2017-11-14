@@ -188,9 +188,6 @@ class Statement(object):
     How many rows will be fetched at a time.  This overrides the default
     of :attr:`.Session.default_fetch_size`
 
-    This only takes effect when protocol version 2 or higher is used.
-    See :attr:`.Cluster.protocol_version` for details.
-
     .. versionadded:: 2.0.0
     """
 
@@ -317,9 +314,6 @@ class Statement(object):
         The serial consistency level is ignored for any query that is not a
         conditional update. Serial reads should use the regular
         :attr:`consistency_level`.
-
-        Serial consistency levels may only be used against Cassandra 2.0+
-        and the :attr:`~.Cluster.protocol_version` must be set to 2 or higher.
 
         See :doc:`/lwt` for a discussion on how to work with results returned from
         conditional statements.
@@ -673,8 +667,7 @@ class BatchStatement(Statement):
 
     serial_consistency_level = None
     """
-    The same as :attr:`.Statement.serial_consistency_level`, but is only
-    supported when using protocol version 3 or higher.
+    The same as :attr:`.Statement.serial_consistency_level`.
     """
 
     _statements_and_parameters = None

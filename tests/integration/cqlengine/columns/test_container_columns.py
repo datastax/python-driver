@@ -29,7 +29,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration import CASSANDRA_IP
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
-from tests.integration import greaterthancass20, CASSANDRA_VERSION
+from tests.integration import CASSANDRA_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -553,7 +553,6 @@ class TestTupleModel(Model):
     mixed_tuple = columns.Tuple(columns.Text, columns.Integer, columns.Text, required=False)
 
 
-@greaterthancass20
 class TestTupleColumn(BaseCassEngTestCase):
 
     @classmethod
@@ -753,7 +752,6 @@ class TestNestedModel(Model):
     set_tuple = columns.Set(columns.Tuple(columns.Integer, columns.Integer), required=False)
 
 
-@greaterthancass20
 class TestNestedType(BaseCassEngTestCase):
 
     @classmethod

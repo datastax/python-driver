@@ -8,8 +8,7 @@ Python driver are Authentication and SSL.
 Authentication
 --------------
 Versions 2.0 and higher of the driver support a SASL-based
-authentication mechanism when :attr:`~.Cluster.protocol_version`
-is set to 2 or higher.  To use this authentication, set
+authentication mechanism.  To use this authentication, set
 :attr:`~.Cluster.auth_provider` to an instance of a subclass
 of :class:`~cassandra.auth.AuthProvider`.  When working
 with Cassandra's ``PasswordAuthenticator``, you can use
@@ -24,12 +23,8 @@ For example, suppose Cassandra is setup with its default
     from cassandra.auth import PlainTextAuthProvider
 
     auth_provider = PlainTextAuthProvider(username='cassandra', password='cassandra')
-    cluster = Cluster(auth_provider=auth_provider, protocol_version=2)
+    cluster = Cluster(auth_provider=auth_provider, protocol_version=3)
 
-
-When working with version 2 or higher of the driver, the protocol
-version is set to 2 by default, but we've included it in the example
-to be explicit.
 
 Custom Authenticators
 ^^^^^^^^^^^^^^^^^^^^^
@@ -39,23 +34,6 @@ utilizing the ``pure-sasl`` package.
 If these do not suit your needs, you may need to create your own subclasses of
 :class:`~.AuthProvider` and :class:`~.Authenticator`.  You can use the Sasl classes
 as example implementations.
-
-Protocol v1 Authentication
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-When working with Cassandra 1.2 (or a higher version with
-:attr:`~.Cluster.protocol_version` set to ``1``), you will not pass in
-an :class:`~.AuthProvider` instance.  Instead, you should pass in a
-function that takes one argument, the IP address of a host, and returns
-a dict of credentials with a ``username`` and ``password`` key:
-
-.. code-block:: python
-
-    from cassandra.cluster import Cluster
-
-    def get_credentials(host_address):
-        return {'username': 'joe', 'password': '1234'}
-
-    cluster = Cluster(auth_provider=get_credentials, protocol_version=1)
 
 SSL
 ---

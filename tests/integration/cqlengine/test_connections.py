@@ -23,7 +23,7 @@ from cassandra.cqlengine.query import ContextQuery, BatchQuery, ModelQuerySet
 from tests.integration.cqlengine import setup_connection, DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query import test_queryset
-from tests.integration import local, CASSANDRA_IP
+from tests.integration import CASSANDRA_IP
 
 
 class TestModel(Model):

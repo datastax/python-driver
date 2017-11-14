@@ -18,7 +18,7 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6]
-        - cassandra: ['2.0', '2.1', '3.0']
+        - cassandra: ['2.1', '3.0']
 
   weekly_libev:
     schedule: 0 10 * * 6
@@ -68,7 +68,6 @@ os:
   - ubuntu/trusty64
 
 cassandra:
-  - '2.0'
   - '2.1'
   - '2.2'
   - '3.0'

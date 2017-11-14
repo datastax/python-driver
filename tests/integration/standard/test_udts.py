@@ -27,7 +27,7 @@ from cassandra.query import dict_factory
 from cassandra.util import OrderedMap
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, BasicSegregatedKeyspaceUnitTestCase, \
-    greaterthancass20, greaterthanorequalcass36, lessthancass30
+    lessthancass30, greaterthanorequalcass36
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, PRIMITIVE_DATATYPES_KEYS, \
     COLLECTION_TYPES, get_sample, get_collection_sample
 
@@ -40,7 +40,6 @@ def setup_module():
     update_datatypes()
 
 
-@greaterthancass20
 class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
     @property
@@ -757,4 +756,3 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         for result in results:
             self.assertTrue(hasattr(result.typetoalter, 'a'))
             self.assertTrue(hasattr(result.typetoalter, 'b'))
-

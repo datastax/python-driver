@@ -129,17 +129,6 @@ class ProtocolVersion(object):
     """
     Defines native protocol versions supported by this driver.
     """
-    V1 = 1
-    """
-    v1, supported in Cassandra 1.2-->2.2
-    """
-
-    V2 = 2
-    """
-    v2, supported in Cassandra 2.0-->2.2;
-    added support for lightweight transactions, batch operations, and automatic query paging.
-    """
-
     V3 = 3
     """
     v3, supported in Cassandra 2.1-->3.x+;
@@ -159,7 +148,7 @@ class ProtocolVersion(object):
     v5, in beta from 3.x+
     """
 
-    SUPPORTED_VERSIONS = (V5, V4, V3, V2, V1)
+    SUPPORTED_VERSIONS = (V5, V4, V3)
     """
     A tuple of all supported protocol versions
     """

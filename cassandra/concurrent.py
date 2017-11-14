@@ -35,13 +35,7 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
     ``parameters`` item must be a sequence or :const:`None`.
 
     The `concurrency` parameter controls how many statements will be executed
-    concurrently.  When :attr:`.Cluster.protocol_version` is set to 1 or 2,
-    it is recommended that this be kept below 100 times the number of
-    core connections per host times the number of connected hosts (see
-    :meth:`.Cluster.set_core_connections_per_host`).  If that amount is exceeded,
-    the event loop thread may attempt to block on new connection creation,
-    substantially impacting throughput.  If :attr:`~.Cluster.protocol_version`
-    is 3 or higher, you can safely experiment with higher levels of concurrency.
+    concurrently. You can experiment with higher levels of concurrency.
 
     If `raise_on_first_error` is left as :const:`True`, execution will stop
     after the first failed statement and the corresponding exception will be

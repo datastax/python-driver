@@ -21,7 +21,7 @@ except ImportError:
 
 from cassandra.cluster import Cluster, ExecutionProfile
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, WhiteListRoundRobinPolicy
-from cassandra.pool import Host
+from cassandra.hosts import Host
 
 from tests.integration import PROTOCOL_VERSION, local
 

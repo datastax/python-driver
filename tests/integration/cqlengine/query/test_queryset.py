@@ -41,7 +41,7 @@ from cassandra.cqlengine import statements
 from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
-from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass21
 from tests.integration.cqlengine import execute_count
 
 
@@ -708,7 +708,6 @@ class TestQuerySetValidation(BaseQuerySetUsage):
             q = TestModel.objects(test_id__gt=0)
             list([i for i in q])
 
-    @greaterthancass20
     @execute_count(7)
     def test_indexed_field_can_be_queried(self):
         """
@@ -953,7 +952,6 @@ class TestInOperator(BaseQuerySetUsage):
         self.assertEqual(len(list(bool_model2.objects(k__in=(True, False)))), 2)
 
 
-@greaterthancass20
 class TestContainsOperator(BaseQuerySetUsage):
 
     @execute_count(6)
@@ -1042,8 +1040,6 @@ class TestObjectsProperty(BaseQuerySetUsage):
 class PageQueryTests(BaseCassEngTestCase):
     @execute_count(3)
     def test_paged_result_handling(self):
-        if PROTOCOL_VERSION < 2:
-            raise unittest.SkipTest("Paging requires native protocol 2+, currently using: {0}".format(PROTOCOL_VERSION))
 
         # addresses #225
         class PagingTest(Model):
