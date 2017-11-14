@@ -12,7 +12,7 @@ schedules:
   commit_branches:
     schedule: per_commit
     branches:
-      include: [/python.*/]
+      include: [/python.*/, '4.x']
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
     matrix:
