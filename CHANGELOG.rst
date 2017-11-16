@@ -3,6 +3,10 @@
 
 Features
 --------
+* Asynchronous execution support in CQLEngine (PYTHON-605)
+
+Other
+-----
 * Cassandra 2.0 support removal (PYTHON-716)
 
 3.12.0

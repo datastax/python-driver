@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import uuid
-import mock
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import models
 from cassandra.cqlengine.connection import get_session
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import mock_execute_async
 from cassandra.cqlengine import management
 
 
@@ -147,7 +147,7 @@ class TestInheritanceModel(BaseCassEngTestCase):
     def test_delete_on_subclass_does_not_include_disc_value(self):
         p1 = Inherit1.create()
         session = get_session()
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             Inherit1.objects(partition=p1.partition).delete()
 
         # make sure our discriminator value isn't in the CQL

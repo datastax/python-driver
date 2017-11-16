@@ -29,6 +29,7 @@ from cassandra.cqlengine.operators import (InOperator, EqualsOperator, GreaterTh
 from cassandra.cqlengine.statements import (WhereClause, SelectStatement, DeleteStatement,
                                             UpdateStatement, InsertStatement,
                                             BaseCQLStatement, MapDeleteClause, ConditionalClause)
+from cassandra.cqlengine.concurrent import CQLEngineFuture, CQLEngineFutureWaiter
 
 
 class QueryException(CQLEngineException):
@@ -70,7 +71,7 @@ def check_applied(result):
     Raises LWTException if it looks like a failed LWT request.
     """
     try:
-        applied = result.was_applied
+        applied = result[0]['[applied]']
     except Exception:
         applied = True  # result was not LWT form
     if not applied:
@@ -211,7 +212,7 @@ class BatchQuery(object):
             raise ValueError("Value for argument 'fn' is {0} and is not a callable object.".format(type(fn)))
         self._callbacks.append((fn, args, kwargs))
 
-    def execute(self):
+    def execute_async(self):
         if self._executed and self.warn_multiple_exec:
             msg = "Batch executed multiple times."
             if self._context_entered:
@@ -223,7 +224,7 @@ class BatchQuery(object):
             # Empty batch is a no-op
             # except for callbacks
             self._execute_callbacks()
-            return
+            return CQLEngineFuture()
 
         opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
@@ -252,11 +253,18 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        tmp = conn.execute('\n'.join(query_list), parameters, self._consistency, self._timeout, connection=self._connection)
-        check_applied(tmp)
+        future = conn.execute_async('\n'.join(query_list), parameters, self._consistency,
+                                    timeout=self._timeout, connection=self._connection)
 
-        self.queries = []
-        self._execute_callbacks()
+        def post_processing(results):
+            check_applied(results)
+            self.queries = []
+            self._execute_callbacks()
+
+        return CQLEngineFuture(future, post_processing=post_processing)
+
+    def execute(self):
+        return self.execute_async().result()
 
     def __enter__(self):
         self._context_entered = True
@@ -393,15 +401,20 @@ class AbstractQuerySet(object):
     def column_family_name(self):
         return self.model.column_family_name()
 
+    def _execute_async(self, statement, post_processing=None):
+        if self._batch:
+            return CQLEngineFuture(result=self._batch.add_query(statement))
+        else:
+            connection = self._connection or self.model._get_connection()
+            return _execute_statement_async(self.model, statement, self._consistency,
+                                            self._timeout, connection=connection,
+                                            post_processing=post_processing)
+
     def _execute(self, statement):
         if self._batch:
             return self._batch.add_query(statement)
         else:
-            connection = self._connection or self.model._get_connection()
-            result = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=connection)
-            if self._if_not_exists or self._if_exists or self._conditional:
-                check_applied(result)
-            return result
+            return self._execute_async(statement).result()
 
     def __unicode__(self):
         return six.text_type(self._select_query())
@@ -462,18 +475,34 @@ class AbstractQuerySet(object):
 
     # ----Reads------
 
-    def _execute_query(self):
+    def _execute_query_async(self, post_processing=None):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
-        if self._result_cache is None:
-            self._result_generator = (i for i in self._execute(self._select_query()))
-            self._result_cache = []
-            self._construct_result = self._maybe_inject_deferred(self._get_result_constructor())
 
-            # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
-            # len() and count() working with DISTINCT queries
-            if self._materialize_results or self._distinct_fields:
-                self._fill_result_cache()
+        if self._result_cache is not None:
+            return CQLEngineFuture(result=self._result_cache)
+        else:
+            def fill_cache(results):
+                self._result_generator = (i for i in results)
+                self._result_cache = []
+                self._construct_result = self._maybe_inject_deferred(self._get_result_constructor())
+
+                # "DISTINCT COUNT()" is not supported in C* < 2.2, so we need to materialize all results to get
+                # len() and count() working with DISTINCT queries
+                if self._materialize_results or self._distinct_fields:
+                    self._fill_result_cache()
+
+                return self._result_cache
+
+            def _post_processing(results):
+                results = fill_cache(results)
+                if post_processing:
+                    return post_processing(results)
+
+            return self._execute_async(self._select_query(), post_processing=_post_processing)
+
+    def _execute_query(self):
+        return self._execute_query_async().result()
 
     def _fill_result_cache(self):
         """
@@ -732,6 +761,34 @@ class AbstractQuerySet(object):
 
         return clone
 
+    def get_async(self, *args, **kwargs):
+        """
+        Asynchronous version of `get()`.
+
+        See :meth:`ModelQuerySet.get` for parameter definitions.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        if args or kwargs:
+            return self.filter(*args, **kwargs).get_async()
+
+        def check_multiple_object(_):
+            # Check that the resultset only contains one element, avoiding sending a COUNT query
+            try:
+                self[1]
+                raise self.model.MultipleObjectsReturned('Multiple objects found')
+            except IndexError:
+                pass
+
+            try:
+                obj = self[0]
+            except IndexError:
+                raise self.model.DoesNotExist
+
+            return obj
+
+        return self._execute_query_async(post_processing=check_multiple_object)
+
     def get(self, *args, **kwargs):
         """
         Returns a single instance matching this query, optionally with additional filter kwargs.
@@ -748,24 +805,27 @@ class AbstractQuerySet(object):
 
         If more than one object is found, a :class:`~.MultipleObjectsReturned` exception is raised.
         """
+
+        # This is important to preserve a track of the instance, even if we delegate the work to get_async.
         if args or kwargs:
             return self.filter(*args, **kwargs).get()
 
-        self._execute_query()
+        return self.get_async(*args, **kwargs).result()
 
-        # Check that the resultset only contains one element, avoiding sending a COUNT query
-        try:
-            self[1]
-            raise self.model.MultipleObjectsReturned('Multiple objects found')
-        except IndexError:
-            pass
+    def get_all_async(self):
+        """
+        Asynchronous version of `get_all()`.
 
-        try:
-            obj = self[0]
-        except IndexError:
-            raise self.model.DoesNotExist
+        Returns a `concurrent.futures.Future`.
+        """
+        return self._execute_query_async()
 
-        return obj
+    def get_all(self):
+        """
+        Returns all rows matching this query. Unlike the `all()` function, `get_all` fetches rows
+        immediately from the server.
+        """
+        return self.get_all_async().result()
 
     def _get_ordering_condition(self, colname):
         order_type = 'DESC' if colname.startswith('-') else 'ASC'
@@ -817,6 +877,27 @@ class AbstractQuerySet(object):
         clone._order.extend(conditions)
         return clone
 
+    def count_async(self):
+        """
+        Asynchronous version of `count()`.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        if self._batch:
+            raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
+
+        if self._count is not None:
+            return CQLEngineFuture(result=self._count)
+
+        def post_processing(result):
+            count_row = result[0].popitem()
+            self._count = count_row[1]
+            return self._count
+
+        query = self._select_query()
+        query.count = True
+        return self._execute_async(query, post_processing=post_processing)
+
     def count(self):
         """
         Returns the number of rows matched by this query.
@@ -826,13 +907,7 @@ class AbstractQuerySet(object):
         if self._batch:
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
 
-        if self._count is None:
-            query = self._select_query()
-            query.count = True
-            result = self._execute(query)
-            count_row = result[0].popitem()
-            self._count = count_row[1]
-        return self._count
+        return self.count_async().result()
 
     def distinct(self, distinct_fields=None):
         """
@@ -966,7 +1041,14 @@ class AbstractQuerySet(object):
         """ Don't load these fields for the returned query """
         return self._only_or_defer('defer', fields)
 
-    def create(self, **kwargs):
+    def create_async(self, **kwargs):
+        """
+        Asynchronous version of `create()`.
+
+        See :meth:`ModelQuerySet.create` for parameter definitions.
+
+        Returns a `concurrent.futures.Future`.
+        """
         return self.model(**kwargs) \
             .batch(self._batch) \
             .ttl(self._ttl) \
@@ -975,11 +1057,16 @@ class AbstractQuerySet(object):
             .timestamp(self._timestamp) \
             .if_exists(self._if_exists) \
             .using(connection=self._connection) \
-            .save()
+            .save_async()
 
-    def delete(self):
+    def create(self, **kwargs):
+        return self.create_async(**kwargs).result()
+
+    def delete_async(self):
         """
-        Deletes the contents of a query
+        Asynchronous version of `delete()`.
+
+        Returns a `concurrent.futures.Future`.
         """
         # validate where clause
         partition_keys = set(x.db_field_name for x in self.model._partition_keys.values())
@@ -993,7 +1080,13 @@ class AbstractQuerySet(object):
             conditionals=self._conditional,
             if_exists=self._if_exists
         )
-        self._execute(dq)
+        return self._execute_async(dq)
+
+    def delete(self):
+        """
+        Deletes the contents of a query
+        """
+        return self.delete_async().result()
 
     def __eq__(self, q):
         if len(self._where) == len(q._where):
@@ -1174,6 +1267,60 @@ class ModelQuerySet(AbstractQuerySet):
         clone._if_exists = True
         return clone
 
+    def update_async(self, **values):
+        """
+        Asynchronous version of `update()`.
+
+        See :meth:`ModelQuerySet.update` for parameter definitions.
+
+        Returns a `concurrent.futures.Future`.
+        """
+        if not values:
+            return
+
+        nulled_columns = set()
+        updated_columns = set()
+        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
+                             timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
+        for name, val in values.items():
+            col_name, col_op = self._parse_filter_arg(name)
+            col = self.model._columns.get(col_name)
+            # check for nonexistant columns
+            if col is None:
+                raise ValidationError("{0}.{1} has no column named: {2}".format(self.__module__, self.model.__name__, col_name))
+            # check for primary key update attempts
+            if col.is_primary_key:
+                raise ValidationError("Cannot apply update to primary key '{0}' for {1}.{2}".format(col_name, self.__module__, self.model.__name__))
+
+            if col_op == 'remove' and isinstance(col, columns.Map):
+                if not isinstance(val, set):
+                    raise ValidationError(
+                        "Cannot apply update operation '{0}' on column '{1}' with value '{2}'. A set is required.".format(col_op, col_name, val))
+                val = {v: None for v in val}
+            else:
+                # we should not provide default values in this use case.
+                val = col.validate(val)
+
+            if val is None:
+                nulled_columns.add(col_name)
+                continue
+
+            us.add_update(col, val, operation=col_op)
+            updated_columns.add(col_name)
+
+        futures = []
+        if us.assignments:
+            futures.append(self._execute_async(us))
+
+        if nulled_columns:
+            delete_conditional = [condition for condition in self._conditional
+                                  if condition.field not in updated_columns] if self._conditional else None
+            ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
+                                 where=self._where, conditionals=delete_conditional, if_exists=self._if_exists)
+            futures.append(self._execute_async(ds))
+
+        return CQLEngineFutureWaiter(futures)
+
     def update(self, **values):
         """
         Performs an update on the row selected by the queryset. Include values to update in the
@@ -1264,48 +1411,7 @@ class ModelQuerySet(AbstractQuerySet):
             # remove items from a map
             Row.objects(row_id=5).update(map_column__remove={1, 2})
         """
-        if not values:
-            return
-
-        nulled_columns = set()
-        updated_columns = set()
-        us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
-                             timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
-        for name, val in values.items():
-            col_name, col_op = self._parse_filter_arg(name)
-            col = self.model._columns.get(col_name)
-            # check for nonexistant columns
-            if col is None:
-                raise ValidationError("{0}.{1} has no column named: {2}".format(self.__module__, self.model.__name__, col_name))
-            # check for primary key update attempts
-            if col.is_primary_key:
-                raise ValidationError("Cannot apply update to primary key '{0}' for {1}.{2}".format(col_name, self.__module__, self.model.__name__))
-
-            if col_op == 'remove' and isinstance(col, columns.Map):
-                if not isinstance(val, set):
-                    raise ValidationError(
-                        "Cannot apply update operation '{0}' on column '{1}' with value '{2}'. A set is required.".format(col_op, col_name, val))
-                val = {v: None for v in val}
-            else:
-                # we should not provide default values in this use case.
-                val = col.validate(val)
-
-            if val is None:
-                nulled_columns.add(col_name)
-                continue
-
-            us.add_update(col, val, operation=col_op)
-            updated_columns.add(col_name)
-
-        if us.assignments:
-            self._execute(us)
-
-        if nulled_columns:
-            delete_conditional = [condition for condition in self._conditional
-                                  if condition.field not in updated_columns] if self._conditional else None
-            ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
-                                 where=self._where, conditionals=delete_conditional, if_exists=self._if_exists)
-            self._execute(ds)
+        return self.update_async(**values).result()
 
 
 class DMLQuery(object):
@@ -1336,22 +1442,25 @@ class DMLQuery(object):
         self._conditional = conditional
         self._timeout = timeout
 
-    def _execute(self, statement):
-        connection = self.instance._get_connection() if self.instance else self.model._get_connection()
+    def _execute_async(self, statement, post_processing=None):
         if self._batch:
+            connection = self.instance._get_connection() if self.instance else self.model._get_connection()
             if self._batch._connection:
                 if not self._batch._connection_explicit and connection and \
-                        connection != self._batch._connection:
-                            raise CQLEngineException('BatchQuery queries must be executed on the same connection')
+                                connection != self._batch._connection:
+                    raise CQLEngineException('BatchQuery queries must be executed on the same connection')
             else:
                 # set the BatchQuery connection from the model
                 self._batch._connection = connection
-            return self._batch.add_query(statement)
+            return CQLEngineFuture(result=self._batch.add_query(statement))
         else:
-            results = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=connection)
-            if self._if_not_exists or self._if_exists or self._conditional:
-                check_applied(results)
-            return results
+            connection = self.instance._get_connection() if self.instance else self.model._get_connection()
+            return _execute_statement_async(self.model, statement, self._consistency,
+                                            self._timeout, connection=connection,
+                                            post_processing=post_processing)
+
+    def _execute(self, statement):
+        return self._execute_async(statement).result()
 
     def batch(self, batch_obj):
         if batch_obj is not None and not isinstance(batch_obj, BatchQuery):
@@ -1359,7 +1468,7 @@ class DMLQuery(object):
         self._batch = batch_obj
         return self
 
-    def _delete_null_columns(self, conditionals=None):
+    def _delete_null_columns_async(self, conditionals=None):
         """
         executes a delete query to remove columns that have changed to null
         """
@@ -1383,14 +1492,21 @@ class DMLQuery(object):
             keys = self.model._partition_keys if static_only else self.model._primary_keys
             for name, col in keys.items():
                 ds.add_where(col, EqualsOperator(), getattr(self.instance, name))
-            self._execute(ds)
+            return self._execute_async(ds)
+        else:
+            return CQLEngineFuture()
 
-    def update(self):
+    def _delete_null_columns(self, conditionals=None):
         """
-        updates a row.
-        This is a blind update call.
-        All validation and cleaning needs to happen
-        prior to calling this.
+        executes a delete query to remove columns that have changed to null
+        """
+        return self._delete_null_columns_async(conditionals=conditionals).result()
+
+    def update_async(self):
+        """
+        Asynchronous version of `update()`.
+
+        Returns a `concurrent.futures.Future`.
         """
         if self.instance is None:
             raise CQLEngineException("DML Query intance attribute is None")
@@ -1422,26 +1538,38 @@ class DMLQuery(object):
                 statement.add_update(col, val, previous=val_mgr.previous_value)
                 updated_columns.add(col.db_field_name)
 
+        futures = []
+
         if statement.assignments:
             for name, col in self.model._primary_keys.items():
                 # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
                 if (null_clustering_key or static_changed_only) and (not col.partition_key):
                     continue
                 statement.add_where(col, EqualsOperator(), getattr(self.instance, name))
-            self._execute(statement)
+            futures.append(self._execute_async(statement))
 
         if not null_clustering_key:
             # remove conditions on fields that have been updated
             delete_conditionals = [condition for condition in self._conditional
                                    if condition.field not in updated_columns] if self._conditional else None
-            self._delete_null_columns(delete_conditionals)
+            futures.append(self._delete_null_columns_async(delete_conditionals))
 
-    def save(self):
+        return CQLEngineFutureWaiter(futures)
+
+    def update(self):
         """
-        Creates / updates a row.
-        This is a blind insert call.
+        updates a row.
+        This is a blind update call.
         All validation and cleaning needs to happen
         prior to calling this.
+        """
+        return self.update_async().result()
+
+    def save_async(self):
+        """
+        Asynchronous version of `save()`.
+
+        Returns a `concurrent.futures.Future`.
         """
         if self.instance is None:
             raise CQLEngineException("DML Query intance attribute is None")
@@ -1451,7 +1579,7 @@ class DMLQuery(object):
         if self.instance._has_counter or self.instance._can_update():
             if self.instance._has_counter:
                 warn("'create' and 'save' actions on Counters are deprecated. A future version will disallow this. Use the 'update' mechanism instead.")
-            return self.update()
+            return self.update_async()
         else:
             insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists)
             static_save_only = False if len(self.instance._clustering_keys) == 0 else True
@@ -1472,14 +1600,34 @@ class DMLQuery(object):
 
         # skip query execution if it's empty
         # caused by pointless update queries
+        if insert.is_empty and static_save_only:
+            return CQLEngineFuture()
+
+        futures = []
         if not insert.is_empty:
-            self._execute(insert)
+            futures.append(self._execute_async(insert))
         # delete any nulled columns
         if not static_save_only:
-            self._delete_null_columns()
+            futures.append(self._delete_null_columns_async())
 
-    def delete(self):
-        """ Deletes one instance """
+        return CQLEngineFutureWaiter(futures)
+
+    def save(self):
+        """
+        Creates / updates a row.
+        This is a blind insert call.
+        All validation and cleaning needs to happen
+        prior to calling this.
+        """
+        return self.save_async().result()
+
+    def delete_async(self):
+        """
+        Asynchronous version of `delete()`.
+
+        Returns a `concurrent.futures.Future`.
+        """
+
         if self.instance is None:
             raise CQLEngineException("DML Query instance attribute is None")
 
@@ -1489,10 +1637,14 @@ class DMLQuery(object):
             if val is None and not col.partition_key:
                 continue
             ds.add_where(col, EqualsOperator(), val)
-        self._execute(ds)
+        return self._execute_async(ds)
+
+    def delete(self):
+        """ Deletes one instance """
+        return self.delete_async().result()
 
 
-def _execute_statement(model, statement, consistency_level, timeout, connection=None):
+def _execute_statement_async(model, statement, consistency_level, timeout, connection=None, post_processing=None):
     params = statement.get_context()
     s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=statement.fetch_size)
     if model._partition_key_index:
@@ -1502,4 +1654,15 @@ def _execute_statement(model, statement, consistency_level, timeout, connection=
             s.routing_key = parts
             s.keyspace = model._get_keyspace()
     connection = connection or model._get_connection()
-    return conn.execute(s, params, timeout=timeout, connection=connection)
+    response_future = conn.execute_async(s, params, timeout=timeout, connection=connection)
+
+    def _post_processing(results):
+        check_applied(results)
+        if post_processing:
+            return post_processing(results)
+
+    return CQLEngineFuture(response_future, post_processing=_post_processing)
+
+
+def _execute_statement(model, statement, consistency_level, timeout, connection=None):
+    return _execute_statement_async(model, statement, consistency_level, timeout, connection).result()

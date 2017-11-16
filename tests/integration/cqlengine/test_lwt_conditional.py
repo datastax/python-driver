@@ -16,7 +16,6 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import mock
 import six
 from uuid import uuid4
 
@@ -27,6 +26,7 @@ from cassandra.cqlengine.query import BatchQuery, LWTException
 from cassandra.cqlengine.statements import ConditionalClause
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import mock_execute_async
 
 
 class TestConditionalModel(Model):
@@ -50,7 +50,7 @@ class TestConditional(BaseCassEngTestCase):
     def test_update_using_conditional(self):
         t = TestConditionalModel.create(text='blah blah')
         t.text = 'new blah'
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             t.iff(text='blah blah').save()
 
         args = m.call_args
@@ -84,7 +84,7 @@ class TestConditional(BaseCassEngTestCase):
         t.text = 'something else'
         uid = t.id
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             TestConditionalModel.objects(id=uid).iff(text='blah blah').update(text='oh hey der')
 
         args = m.call_args

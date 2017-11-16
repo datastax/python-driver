@@ -21,10 +21,10 @@ except ImportError:
 from cassandra import InvalidRequest
 from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine import mock_execute_async
 from cassandra.cqlengine.models import Model
 from uuid import uuid4
 from cassandra.cqlengine import columns
-import mock
 from cassandra.cqlengine.connection import get_session
 from tests.integration import CASSANDRA_VERSION
 
@@ -87,7 +87,7 @@ class TTLModelTests(BaseTTLTest):
         """ tests that ttls on models work as expected """
         session = get_session()
 
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             TestTTLModel.ttl(60).create(text="hello blake")
 
         query = m.call_args[0][0].query_string
@@ -106,7 +106,7 @@ class TTLInstanceUpdateTest(BaseTTLTest):
         session = get_session()
 
         model = TestTTLModel.create(text="goodbye blake")
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             model.ttl(60).update(text="goodbye forever")
 
         query = m.call_args[0][0].query_string
@@ -136,7 +136,7 @@ class TTLInstanceTest(BaseTTLTest):
         o.text = "new stuff"
         o = o.ttl(60)
 
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             o.save()
 
         query = m.call_args[0][0].query_string
@@ -150,7 +150,7 @@ class TTLBlindUpdateTest(BaseTTLTest):
         o = TestTTLModel.create(text="whatever")
         tid = o.id
 
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             TestTTLModel.objects(id=tid).ttl(60).update(text="bacon")
 
         query = m.call_args[0][0].query_string
@@ -180,7 +180,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         default_ttl = self.get_default_ttl('test_ttlmodel')
         self.assertEqual(default_ttl, 0)
 
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             TestTTLModel.objects(id=tid).update(text="aligators")
 
         query = m.call_args[0][0].query_string
@@ -198,7 +198,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         default_ttl = self.get_default_ttl('test_default_ttlmodel')
         self.assertEqual(default_ttl, 20)
 
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             TestTTLModel.objects(id=tid).update(text="aligators expired")
 
         # Should not be set either
@@ -229,7 +229,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         o.ttl(3600)
         self.assertEqual(o._ttl, 3600)
 
-        with mock.patch.object(session, 'execute') as m:
+        with mock_execute_async() as m:
             TestDefaultTTLModel.objects(id=tid).ttl(None).update(text="aligators expired")
 
         query = m.call_args[0][0].query_string

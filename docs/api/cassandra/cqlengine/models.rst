@@ -90,6 +90,8 @@ Model
 
     .. automethod:: create
 
+    .. automethod:: create_async
+
     .. method:: if_not_exists()
 
         Check the existence of an object before insertion. The existence of an
@@ -128,7 +130,11 @@ Model
 
     .. automethod:: save
 
+    .. automethod:: save_async
+
     .. automethod:: update
+
+    .. automethod:: update_async
 
     .. method:: iff(**values)
 
@@ -149,11 +155,19 @@ Model
 
     .. automethod:: get
 
+    .. automethod:: get_async
+
+    .. automethod:: get_all
+
+    .. automethod:: get_all_async
+
     .. automethod:: filter
 
     .. automethod:: all
 
     .. automethod:: delete
+
+    .. automethod:: delete_async
 
     .. method:: batch(batch_object)
 

@@ -386,7 +386,7 @@ class TestCustomQuerySet(BaseCassEngTestCase):
     def test_overriding_queryset(self):
 
         class QSet(ModelQuerySet):
-            def create(iself, **kwargs):
+            def create_async(iself, **kwargs):
                 raise self.TestException
 
         class CQModel(Model):
@@ -401,7 +401,7 @@ class TestCustomQuerySet(BaseCassEngTestCase):
     def test_overriding_dmlqueryset(self):
 
         class DMLQ(DMLQuery):
-            def save(iself):
+            def save_async(iself):
                 raise self.TestException
 
         class CDQModel(Model):

@@ -16,14 +16,14 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import mock
 from uuid import uuid4
 
-from cassandra.cqlengine import columns
+from cassandra.cqlengine import columns, connection
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery, BatchType, LWTException, IfExistsWithCounterColumn
 
+from tests.integration.cqlengine import mock_execute_async
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import PROTOCOL_VERSION
 
@@ -54,7 +54,7 @@ class BaseIfExistsTest(BaseCassEngTestCase):
     def setUpClass(cls):
         super(BaseIfExistsTest, cls).setUpClass()
         sync_table(TestIfExistsModel)
-        sync_table(TestIfExistsModel2)
+        sync_table(TestIfExistsModel2)        
 
     @classmethod
     def tearDownClass(cls):
@@ -267,7 +267,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
 
     def test_if_exists_included_on_queryset_update(self):
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             TestIfExistsModel.objects(id=uuid4()).if_exists().update(count=42)
 
         query = m.call_args[0][0].query_string
@@ -276,7 +276,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
     def test_if_exists_included_on_update(self):
         """ tests that if_exists on models update works as expected """
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             TestIfExistsModel(id=uuid4()).if_exists().update(count=8)
 
         query = m.call_args[0][0].query_string
@@ -285,7 +285,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
     def test_if_exists_included_on_delete(self):
         """ tests that if_exists on models delete works as expected """
 
-        with mock.patch.object(self.session, 'execute') as m:
+        with mock_execute_async() as m:
             TestIfExistsModel(id=uuid4()).if_exists().delete()
 
         query = m.call_args[0][0].query_string
