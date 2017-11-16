@@ -26,9 +26,8 @@ from cassandra.query import SimpleStatement
 from tests.integration import PROTOCOL_VERSION, local
 from tests.integration import use_singledc
 
-from unittest.mock import patch
+from mock import patch
 from concurrent.futures import wait as wait_futures
-from itertools import count
 
 def setup_module():
     use_singledc()
