@@ -33,7 +33,6 @@ from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggrega
 from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
-                               BasicExistingSegregatedKeyspaceUnitTestCase, dseonly, DSE_VERSION,
                                get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30, local)
 
 from tests.integration import greaterthancass21
@@ -134,7 +133,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         no_schema.shutdown()
         no_token.shutdown()
 
-    def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None, compact=False):
+    def make_create_statement(self, partition_cols, clustering_cols=None, other_cols=None):
         clustering_cols = clustering_cols or []
         other_cols = other_cols or []
 
@@ -162,8 +161,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             statement += ")"
 
         statement += ")"
-        if compact:
-            statement += " WITH COMPACT STORAGE"
 
         return statement
 
@@ -278,8 +275,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     def test_compound_primary_keys_compact(self):
-        create_statement = self.make_create_statement(["a"], ["b"], ["c"], compact=True)
-        create_statement += " AND CLUSTERING ORDER BY (b ASC)"
+        create_statement = self.make_create_statement(["a"], ["b"], ["c"])
+        create_statement += " WITH CLUSTERING ORDER BY (b ASC)"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
 
@@ -302,8 +299,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
 
-        create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"], compact=True)
-        create_statement += " AND CLUSTERING ORDER BY (b ASC, c DESC)"
+        create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"])
+        create_statement += " WITH CLUSTERING ORDER BY (b ASC, c DESC)"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
         b_column = tablemeta.columns['b']
@@ -312,8 +309,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertTrue(c_column.is_reversed)
 
     def test_compound_primary_keys_more_columns_compact(self):
-        create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"], compact=True)
-        create_statement += " AND CLUSTERING ORDER BY (b ASC, c ASC)"
+        create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"])
+        create_statement += " WITH CLUSTERING ORDER BY (b ASC, c ASC)"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
 
@@ -324,7 +321,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     def test_composite_primary_key_compact(self):
-        create_statement = self.make_create_statement(["a", "b"], [], ["c"], compact=True)
+        create_statement = self.make_create_statement(["a", "b"], [], ["c"])
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
 
@@ -335,8 +332,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     def test_composite_in_compound_primary_key_compact(self):
-        create_statement = self.make_create_statement(["a", "b"], ["c"], ["d"], compact=True)
-        create_statement += " AND CLUSTERING ORDER BY (c ASC)"
+        create_statement = self.make_create_statement(["a", "b"], ["c"], ["d"])
+        create_statement += " WITH CLUSTERING ORDER BY (c ASC)"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
 
@@ -352,7 +349,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         # having more than one non-PK column is okay if there aren't any
         # clustering columns
-        create_statement = self.make_create_statement(["a"], [], ["b", "c", "d"], compact=True)
+        create_statement = self.make_create_statement(["a"], [], ["b", "c", "d"])
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
 
@@ -362,12 +359,12 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         self.assertTrue(tablemeta.is_cql_compatible)
 
-        # ... but if there are clustering columns, it's not CQL compatible.
-        # This is a hacky way to simulate having clustering columns.
+        # It will be cql compatible after CASSANDRA-10857
+        # since compact storage is being dropped
         tablemeta.clustering_key = ["foo", "bar"]
         tablemeta.columns["foo"] = None
         tablemeta.columns["bar"] = None
-        self.assertFalse(tablemeta.is_cql_compatible)
+        self.assertTrue(tablemeta.is_cql_compatible)
 
     def test_compound_primary_keys_ordering(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
@@ -1297,8 +1294,7 @@ CREATE TABLE legacy.composite_comp_with_col (
     "b@6869746d65776974686d75736963" blob,
     "b@6d616d6d616a616d6d61" blob,
     PRIMARY KEY (key, column1)
-) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC)
+) WITH CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -1320,8 +1316,7 @@ CREATE TABLE legacy.nested_composite_key (
     key2 bigint,
     full_name text,
     PRIMARY KEY ((key, key2))
-) WITH COMPACT STORAGE
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+) WITH caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
@@ -1339,8 +1334,7 @@ CREATE TABLE legacy.composite_partition_with_col (
     key2 text,
     col_with_meta text,
     PRIMARY KEY ((key, key2))
-) WITH COMPACT STORAGE
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+) WITH caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
@@ -1359,8 +1353,7 @@ CREATE TABLE legacy.composite_partition_no_col (
     column1 text,
     value text,
     PRIMARY KEY ((key, key2), column1)
-) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC)
+) WITH CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
@@ -1377,8 +1370,7 @@ CREATE TABLE legacy.composite_partition_no_col (
 CREATE TABLE legacy.simple_with_col (
     key uuid PRIMARY KEY,
     col_with_meta text
-) WITH COMPACT STORAGE
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+) WITH caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
@@ -1396,8 +1388,7 @@ CREATE TABLE legacy.simple_no_col (
     column1 text,
     value text,
     PRIMARY KEY (key, column1)
-) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC)
+) WITH CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = ''
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
@@ -1416,8 +1407,7 @@ CREATE TABLE legacy.composite_comp_no_col (
     column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
     value blob,
     PRIMARY KEY (key, column1)
-) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (column1 ASC)
+) WITH CLUSTERING ORDER BY (column1 ASC)
     AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
     AND comment = 'Stores file meta data'
     AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
@@ -2571,21 +2561,3 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
         self.assertEqual(value_column.name, 'the Value')
-
-
-@dseonly
-class DSEMetadataTest(BasicExistingSegregatedKeyspaceUnitTestCase):
-
-    def test_dse_specific_meta(self):
-        """
-        Test to ensure DSE metadata is populated appropriately.
-        @since 3.4
-        @jira_ticket PYTHON-555
-        @expected_result metadata for dse_version, and dse_workload should be populated on dse clusters
-
-        @test_category metadata
-        """
-        for host in self.cluster.metadata.all_hosts():
-            self.assertIsNotNone(host.dse_version, "Dse version not populated as expected")
-            self.assertEqual(host.dse_version, DSE_VERSION)
-            self.assertTrue("Cassandra" in host.dse_workload)
