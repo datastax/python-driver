@@ -18,26 +18,11 @@ except ImportError:
 
 from uuid import uuid4
 
-from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
-from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery, LWTException, IfNotExistsWithCounterColumn
 
 from tests.integration.cqlengine import mock_execute_async
-from tests.integration.cqlengine.base import BaseCassEngTestCase
-from tests.integration import PROTOCOL_VERSION
-
-class TestIfNotExistsModel(Model):
-
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
-    count   = columns.Integer()
-    text    = columns.Text(required=False)
-
-
-class TestIfNotExistsWithCounterModel(Model):
-
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
-    likes   = columns.Counter()
+from tests.integration.cqlengine.base import BaseCassEngTestCase, UUID_int_text_model, WithCounterModel
 
 
 class BaseIfNotExistsTest(BaseCassEngTestCase):
@@ -51,12 +36,12 @@ class BaseIfNotExistsTest(BaseCassEngTestCase):
         is 3 and one node only. Therefore I have create a new keyspace with
         replica_factor:1.
         """
-        sync_table(TestIfNotExistsModel)
+        sync_table(UUID_int_text_model)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseIfNotExistsTest, cls).tearDownClass()
-        drop_table(TestIfNotExistsModel)
+        drop_table(UUID_int_text_model)
 
 
 class BaseIfNotExistsWithCounterTest(BaseCassEngTestCase):
@@ -64,12 +49,12 @@ class BaseIfNotExistsWithCounterTest(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseIfNotExistsWithCounterTest, cls).setUpClass()
-        sync_table(TestIfNotExistsWithCounterModel)
+        sync_table(WithCounterModel)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseIfNotExistsWithCounterTest, cls).tearDownClass()
-        drop_table(TestIfNotExistsWithCounterModel)
+        drop_table(WithCounterModel)
 
 
 class IfNotExistsInsertTests(BaseIfNotExistsTest):
@@ -79,13 +64,13 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
         id = uuid4()
 
-        TestIfNotExistsModel.create(id=id, count=8, text='123456789')
+        UUID_int_text_model.create(id=id, count=8, text='123456789')
 
         with self.assertRaises(LWTException) as assertion:
-            TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
+            UUID_int_text_model.if_not_exists().create(id=id, count=9, text='111111111111')
         return
         with self.assertRaises(LWTException) as assertion:
-            TestIfNotExistsModel.objects(count=9, text='111111111111').if_not_exists().create(id=id)
+            UUID_int_text_model.objects(count=9, text='111111111111').if_not_exists().create(id=id)
 
         self.assertEqual(assertion.exception.existing, {
             'count': 8,
@@ -94,7 +79,7 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
             '[applied]': False,
         })
 
-        q = TestIfNotExistsModel.objects(id=id)
+        q = UUID_int_text_model.objects(id=id)
         self.assertEqual(len(q), 1)
 
         tm = q.first()
@@ -107,10 +92,10 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         id = uuid4()
 
         with BatchQuery() as b:
-            TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=8, text='123456789')
+            UUID_int_text_model.batch(b).if_not_exists().create(id=id, count=8, text='123456789')
 
         b = BatchQuery()
-        TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
+        UUID_int_text_model.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
         with self.assertRaises(LWTException) as assertion:
             b.execute()
 
@@ -121,7 +106,7 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
             '[applied]': False,
         })
 
-        q = TestIfNotExistsModel.objects(id=id)
+        q = UUID_int_text_model.objects(id=id)
         self.assertEqual(len(q), 1)
 
         tm = q.first()
@@ -135,7 +120,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
         """ tests that if_not_exists on models works as expected """
 
         with mock_execute_async() as m:
-            TestIfNotExistsModel.if_not_exists().create(count=8)
+            UUID_int_text_model.if_not_exists().create(count=8)
 
         query = m.call_args[0][0].query_string
         self.assertIn("IF NOT EXISTS", query)
@@ -144,7 +129,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
         """ tests if we correctly put 'IF NOT EXISTS' for insert statement """
 
         with mock_execute_async() as m:
-            tm = TestIfNotExistsModel(count=8)
+            tm = UUID_int_text_model(count=8)
             tm.if_not_exists().save()
 
         query = m.call_args[0][0].query_string
@@ -152,14 +137,14 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
 
     def test_queryset_is_returned_on_class(self):
         """ ensure we get a queryset description back """
-        qs = TestIfNotExistsModel.if_not_exists()
-        self.assertTrue(isinstance(qs, TestIfNotExistsModel.__queryset__), type(qs))
+        qs = UUID_int_text_model.if_not_exists()
+        self.assertTrue(isinstance(qs, UUID_int_text_model.__queryset__), type(qs))
 
     def test_batch_if_not_exists(self):
         """ ensure 'IF NOT EXISTS' exists in statement when in batch """
         with mock_execute_async() as m:
             with BatchQuery() as b:
-                TestIfNotExistsModel.batch(b).if_not_exists().create(count=8)
+                UUID_int_text_model.batch(b).if_not_exists().create(count=8)
             
         self.assertIn("IF NOT EXISTS", m.call_args[0][0])
 
@@ -171,7 +156,7 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
         ensures that we properly handle the instance.if_not_exists().save()
         scenario
         """
-        o = TestIfNotExistsModel.create(text="whatever")
+        o = UUID_int_text_model.create(text="whatever")
         o.text = "new stuff"
         o = o.if_not_exists()
         self.assertEqual(True, o._if_not_exists)
@@ -180,7 +165,7 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
         """
         make sure we don't put 'IF NOT EXIST' in update statements
         """
-        o = TestIfNotExistsModel.create(text="whatever")
+        o = UUID_int_text_model.create(text="whatever")
         o.text = "new stuff"
         o = o.if_not_exists()
 
@@ -199,5 +184,5 @@ class IfNotExistWithCounterTest(BaseIfNotExistsWithCounterTest):
         """
         id = uuid4()
         with self.assertRaises(IfNotExistsWithCounterColumn):
-            TestIfNotExistsWithCounterModel.if_not_exists()
+            WithCounterModel.if_not_exists()
 

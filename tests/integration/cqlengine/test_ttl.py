@@ -20,7 +20,7 @@ except ImportError:
 
 from cassandra import InvalidRequest
 from cassandra.cqlengine.management import sync_table, drop_table
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, UUID_int_text_model
 from tests.integration.cqlengine import mock_execute_async
 from cassandra.cqlengine.models import Model
 from uuid import uuid4
@@ -29,23 +29,17 @@ from cassandra.cqlengine.connection import get_session
 from tests.integration import CASSANDRA_VERSION
 
 
-class TestTTLModel(Model):
-    id = columns.UUID(primary_key=True, default=lambda: uuid4())
-    count = columns.Integer()
-    text = columns.Text(required=False)
-
-
 class BaseTTLTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
         super(BaseTTLTest, cls).setUpClass()
-        sync_table(TestTTLModel)
+        sync_table(UUID_int_text_model)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseTTLTest, cls).tearDownClass()
-        drop_table(TestTTLModel)
+        drop_table(UUID_int_text_model)
 
 
 class TestDefaultTTLModel(Model):
@@ -62,14 +56,14 @@ class BaseDefaultTTLTest(BaseCassEngTestCase):
         if CASSANDRA_VERSION >= '2.0':
             super(BaseDefaultTTLTest, cls).setUpClass()
             sync_table(TestDefaultTTLModel)
-            sync_table(TestTTLModel)
+            sync_table(UUID_int_text_model)
 
     @classmethod
     def tearDownClass(cls):
         if CASSANDRA_VERSION >= '2.0':
             super(BaseDefaultTTLTest, cls).tearDownClass()
             drop_table(TestDefaultTTLModel)
-            drop_table(TestTTLModel)
+            drop_table(UUID_int_text_model)
 
 
 class TTLQueryTests(BaseTTLTest):
@@ -88,7 +82,7 @@ class TTLModelTests(BaseTTLTest):
         session = get_session()
 
         with mock_execute_async() as m:
-            TestTTLModel.ttl(60).create(text="hello blake")
+            UUID_int_text_model.ttl(60).create(text="hello blake")
 
         query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
@@ -97,15 +91,15 @@ class TTLModelTests(BaseTTLTest):
         """
         ensures we get a queryset descriptor back
         """
-        qs = TestTTLModel.ttl(60)
-        self.assertTrue(isinstance(qs, TestTTLModel.__queryset__), type(qs))
+        qs = UUID_int_text_model.ttl(60)
+        self.assertTrue(isinstance(qs, UUID_int_text_model.__queryset__), type(qs))
 
 
 class TTLInstanceUpdateTest(BaseTTLTest):
     def test_update_includes_ttl(self):
         session = get_session()
 
-        model = TestTTLModel.create(text="goodbye blake")
+        model = UUID_int_text_model.create(text="goodbye blake")
         with mock_execute_async() as m:
             model.ttl(60).update(text="goodbye forever")
 
@@ -114,7 +108,7 @@ class TTLInstanceUpdateTest(BaseTTLTest):
 
     def test_update_syntax_valid(self):
         # sanity test that ensures the TTL syntax is accepted by cassandra
-        model = TestTTLModel.create(text="goodbye blake")
+        model = UUID_int_text_model.create(text="goodbye blake")
         model.ttl(60).update(text="goodbye forever")
 
 
@@ -124,7 +118,7 @@ class TTLInstanceTest(BaseTTLTest):
         ensures that we properly handle the instance.ttl(60).save() scenario
         :return:
         """
-        o = TestTTLModel.create(text="whatever")
+        o = UUID_int_text_model.create(text="whatever")
         o.text = "new stuff"
         o = o.ttl(60)
         self.assertEqual(60, o._ttl)
@@ -132,7 +126,7 @@ class TTLInstanceTest(BaseTTLTest):
     def test_ttl_is_include_with_query_on_update(self):
         session = get_session()
 
-        o = TestTTLModel.create(text="whatever")
+        o = UUID_int_text_model.create(text="whatever")
         o.text = "new stuff"
         o = o.ttl(60)
 
@@ -147,11 +141,11 @@ class TTLBlindUpdateTest(BaseTTLTest):
     def test_ttl_included_with_blind_update(self):
         session = get_session()
 
-        o = TestTTLModel.create(text="whatever")
+        o = UUID_int_text_model.create(text="whatever")
         tid = o.id
 
         with mock_execute_async() as m:
-            TestTTLModel.objects(id=tid).ttl(60).update(text="bacon")
+            UUID_int_text_model.objects(id=tid).ttl(60).update(text="bacon")
 
         query = m.call_args[0][0].query_string
         self.assertIn("USING TTL", query)
@@ -172,16 +166,16 @@ class TTLDefaultTest(BaseDefaultTTLTest):
     def test_default_ttl_not_set(self):
         session = get_session()
 
-        o = TestTTLModel.create(text="some text")
+        o = UUID_int_text_model.create(text="some text")
         tid = o.id
 
         self.assertIsNone(o._ttl)
 
-        default_ttl = self.get_default_ttl('test_ttlmodel')
+        default_ttl = self.get_default_ttl('uuid_int_text_model')
         self.assertEqual(default_ttl, 0)
 
         with mock_execute_async() as m:
-            TestTTLModel.objects(id=tid).update(text="aligators")
+            UUID_int_text_model.objects(id=tid).update(text="aligators")
 
         query = m.call_args[0][0].query_string
         self.assertNotIn("USING TTL", query)
@@ -199,7 +193,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         self.assertEqual(default_ttl, 20)
 
         with mock_execute_async() as m:
-            TestTTLModel.objects(id=tid).update(text="aligators expired")
+            UUID_int_text_model.objects(id=tid).update(text="aligators expired")
 
         # Should not be set either
         query = m.call_args[0][0].query_string

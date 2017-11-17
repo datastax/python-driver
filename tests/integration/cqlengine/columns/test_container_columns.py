@@ -21,6 +21,7 @@ import traceback
 from uuid import uuid4
 
 from cassandra import WriteTimeout, OperationTimedOut
+
 import cassandra.cqlengine.columns as columns
 from cassandra.cqlengine.functions import get_total_seconds
 from cassandra.cqlengine.models import Model, ValidationError
@@ -28,16 +29,12 @@ from cassandra.cqlengine.management import sync_table, drop_table
 
 from tests.integration import CASSANDRA_IP
 from tests.integration.cqlengine import is_prepend_reversed
+from tests.integration.cqlengine.base import TestSetModel, TestListModel, TestNestedModel, \
+    TestTupleModel, TestMapModel, TestCamelMapModel
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import CASSANDRA_VERSION
 
 log = logging.getLogger(__name__)
-
-
-class TestSetModel(Model):
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    int_set = columns.Set(columns.Integer, required=False)
-    text_set = columns.Set(columns.Text, required=False)
 
 
 class JsonTestColumn(columns.Column):
@@ -192,15 +189,7 @@ class TestSetColumn(BaseCassEngTestCase):
         self.assertEqual(m.int_set, set((3, 4)))
 
 
-class TestListModel(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    int_list = columns.List(columns.Integer, required=False)
-    text_list = columns.List(columns.Text, required=False)
-
-
 class TestListColumn(BaseCassEngTestCase):
-
     @classmethod
     def setUpClass(cls):
         drop_table(TestListModel)
@@ -344,12 +333,6 @@ class TestListColumn(BaseCassEngTestCase):
 
         m3 = TestListModel.get(partition=m.partition)
         self.assertEqual(m3.int_list, [])
-
-
-class TestMapModel(Model):
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    int_map = columns.Map(columns.Integer, columns.UUID, required=False)
-    text_map = columns.Map(columns.Text, columns.DateTime, required=False)
 
 
 class TestMapColumn(BaseCassEngTestCase):
@@ -524,12 +507,6 @@ class TestMapColumn(BaseCassEngTestCase):
         self.assertEqual(m.int_map, tmap)
 
 
-class TestCamelMapModel(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    camelMap = columns.Map(columns.Text, columns.Integer, required=False)
-
-
 class TestCamelMapColumn(BaseCassEngTestCase):
 
     @classmethod
@@ -543,14 +520,6 @@ class TestCamelMapColumn(BaseCassEngTestCase):
 
     def test_camelcase_column(self):
         TestCamelMapModel.create(camelMap={'blah': 1})
-
-
-class TestTupleModel(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    int_tuple = columns.Tuple(columns.Integer, columns.Integer, columns.Integer, required=False)
-    text_tuple = columns.Tuple(columns.Text, columns.Text, required=False)
-    mixed_tuple = columns.Tuple(columns.Text, columns.Integer, columns.Text, required=False)
 
 
 class TestTupleColumn(BaseCassEngTestCase):
@@ -742,14 +711,6 @@ class TestTupleColumn(BaseCassEngTestCase):
 
         m3 = TestTupleModel.get(partition=m.partition)
         self.assertEqual(m3.int_tuple, None)
-
-
-class TestNestedModel(Model):
-
-    partition = columns.UUID(primary_key=True, default=uuid4)
-    list_list = columns.List(columns.List(columns.Integer), required=False)
-    map_list = columns.Map(columns.Text, columns.List(columns.Text), required=False)
-    set_tuple = columns.Set(columns.Tuple(columns.Integer, columns.Integer), required=False)
 
 
 class TestNestedType(BaseCassEngTestCase):
