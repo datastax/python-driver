@@ -1,3 +1,10 @@
+3.13.0
+======
+
+Bug Fixes
+---------
+* Support retry_policy in PreparedStatement (PYTHON-861)
+
 3.12.0
 ======
 November 6, 2017
