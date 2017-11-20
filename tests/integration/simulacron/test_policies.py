@@ -26,6 +26,8 @@ from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimul
 from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, \
     stop_simulacron, NO_THEN, clear_queries
 
+from itertools import count
+
 
 class BadRoundRobinPolicy(RoundRobinPolicy):
 
@@ -178,23 +180,45 @@ class CustomRetryPolicy(RetryPolicy):
             return self.IGNORE, None
 
 
+class CounterRetryPolicy(RetryPolicy):
+    def __init__(self):
+        self.write_timeout = count()
+        self.read_timeout = count()
+        self.unavailable = count()
+
+    def on_read_timeout(self, query, consistency, required_responses,
+                        received_responses, data_retrieved, retry_num):
+        next(self.read_timeout)
+        return self.IGNORE, None
+
+    def on_write_timeout(self, query, consistency, write_type,
+                         required_responses, received_responses, retry_num):
+        print("counter on_write_timeout")
+        next(self.write_timeout)
+        return self.IGNORE, None
+
+    def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
+        next(self.unavailable)
+        return self.IGNORE, None
+
+    def reset_counters(self):
+        self.write_timeout = count()
+        self.read_timeout = count()
+        self.unavailable = count()
+
+
 @requiressimulacron
-class RetryPolicyTets(unittest.TestCase):
+class RetryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
             return
         start_and_prime_singledc()
 
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
-                              default_retry_policy=CustomRetryPolicy())
-        cls.session = cls.cluster.connect(wait_for_all_pools=True)
-
     @classmethod
     def tearDownClass(cls):
         if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
             return
-        cls.cluster.shutdown()
         stop_simulacron()
 
     def tearDown(self):
@@ -213,6 +237,7 @@ class RetryPolicyTets(unittest.TestCase):
 
         @test_category connection
         """
+        self.set_cluster(CustomRetryPolicy())
         query_to_prime_simple = "SELECT * from simulacron_keyspace.simple"
         query_to_prime_cdc = "SELECT * from simulacron_keyspace.cdc"
         then = {
@@ -221,7 +246,8 @@ class RetryPolicyTets(unittest.TestCase):
             "consistency_level": "LOCAL_QUORUM",
             "received": 1,
             "block_for": 2,
-            "write_type": "SIMPLE"
+            "write_type": "SIMPLE",
+            "ignore_on_prepare": True
           }
         prime_query(query_to_prime_simple, then=then, rows=None, column_types=None)
         then["write_type"] = "CDC"
@@ -231,3 +257,90 @@ class RetryPolicyTets(unittest.TestCase):
             self.session.execute(query_to_prime_simple)
         #CDC should be ignored
         self.session.execute(query_to_prime_cdc)
+
+    def test_retry_policy_with_prepared(self):
+        """
+        Test to verify that the retry policy is called as expected
+        for bound and prepared statements when set at the cluster level
+
+        @since 3.13
+        @jira_ticket PYTHON-861
+        @expected_result the appropriate retry policy is called
+
+        @test_category connection
+        """
+        counter_policy = CounterRetryPolicy()
+        self.set_cluster(counter_policy)
+        query_to_prime = "SELECT * from simulacron_keyspace.simulacron_table"
+        then = {
+            "result": "write_timeout",
+            "delay_in_ms": 0,
+            "consistency_level": "LOCAL_QUORUM",
+            "received": 1,
+            "block_for": 2,
+            "write_type": "SIMPLE",
+            "ignore_on_prepare": True
+          }
+        prime_query(query_to_prime, then=then, rows=None, column_types=None)
+        self.session.execute(query_to_prime)
+        self.assertEqual(next(counter_policy.write_timeout), 1)
+        counter_policy.reset_counters()
+
+        query_to_prime_prepared = "SELECT * from simulacron_keyspace.simulacron_table WHERE key = :key"
+        when = {"params": {"key": "0"}, "param_types": {"key": "ascii"}}
+
+        prime_query(query_to_prime_prepared, when=when, then=then, rows=None, column_types=None)
+
+        prepared_stmt = self.session.prepare(query_to_prime_prepared)
+
+        bound_stm = prepared_stmt.bind({"key": "0"})
+        self.session.execute(bound_stm)
+        self.assertEqual(next(counter_policy.write_timeout), 1)
+
+        counter_policy.reset_counters()
+        self.session.execute(prepared_stmt, ("0",))
+        self.assertEqual(next(counter_policy.write_timeout), 1)
+
+    def test_setting_retry_policy_to_statement(self):
+        """
+        Test to verify that the retry policy is called as expected
+        for bound and prepared statements when set to the prepared statement
+
+        @since 3.13
+        @jira_ticket PYTHON-861
+        @expected_result the appropriate retry policy is called
+
+        @test_category connection
+        """
+        retry_policy = RetryPolicy()
+        self.set_cluster(retry_policy)
+        then = {
+            "result": "write_timeout",
+            "delay_in_ms": 0,
+            "consistency_level": "LOCAL_QUORUM",
+            "received": 1,
+            "block_for": 2,
+            "write_type": "SIMPLE",
+            "ignore_on_prepare": True
+        }
+        query_to_prime_prepared = "SELECT * from simulacron_keyspace.simulacron_table WHERE key = :key"
+        when = {"params": {"key": "0"}, "param_types": {"key": "ascii"}}
+        prime_query(query_to_prime_prepared, when=when, then=then, rows=None, column_types=None)
+
+        counter_policy = CounterRetryPolicy()
+        prepared_stmt = self.session.prepare(query_to_prime_prepared)
+        prepared_stmt.retry_policy = counter_policy
+        self.session.execute(prepared_stmt, ("0",))
+        self.assertEqual(next(counter_policy.write_timeout), 1)
+
+        counter_policy.reset_counters()
+        bound_stmt = prepared_stmt.bind({"key": "0"})
+        bound_stmt.retry_policy = counter_policy
+        self.session.execute(bound_stmt)
+        self.assertEqual(next(counter_policy.write_timeout), 1)
+
+    def set_cluster(self, retry_policy):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
+                          default_retry_policy=retry_policy)
+        self.session = self.cluster.connect(wait_for_all_pools=True)
+        self.addCleanup(self.cluster.shutdown)
