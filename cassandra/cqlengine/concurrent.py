@@ -14,6 +14,7 @@
 
 from __future__ import absolute_import
 from concurrent.futures import Future
+from threading import Lock
 
 __all__ = ['CQLEngineFuture', 'CQLEngineFutureWaiter']
 
@@ -104,6 +105,7 @@ class CQLEngineFutureWaiter(Future):
 
     _count = 0
     _futures = None
+    _counter_lock = Lock()
 
     def __init__(self, futures):
         super(CQLEngineFutureWaiter, self).__init__()
@@ -117,11 +119,13 @@ class CQLEngineFutureWaiter(Future):
             self.set_result(None)
 
     def _set_if_done(self, _):
-        self._count -= 1
-        if self._count == 0:
-            for future in self._futures:
-                if future.exception() is not None:
-                    self.set_exception(future.exception())
-                    break
-            self.set_result(None)  # No result, it's just a waiter
+        with self._counter_lock:
+            self._count -= 1
+            if self._count == 0:
+                for future in self._futures:
+                    if future.exception() is not None:
+                        self.set_exception(future.exception())
+                        break
+                else:
+                    self.set_result(None)  # No result, it's just a waiter
 

@@ -12,14 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
+
 from uuid import uuid4
 import warnings
 
+from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.models import Model, ModelException, ModelDefinitionException, ColumnQueryEvaluator
 from cassandra.cqlengine.query import ModelQuerySet, DMLQuery
 
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestMultiKeyModel
 
 
 class TestModelClassFunction(BaseCassEngTestCase):
@@ -423,3 +429,62 @@ class TestCachedLengthIsNotCarriedToSubclasses(BaseCassEngTestCase):
             new_field = columns.Integer()
 
         self.assertGreater(len(AlreadyLoadedTest()), length)
+
+
+class OverrideAsyncMethodsTest(unittest.TestCase):
+    text_to_write = 'write this text'
+
+    def test_inheritance(self):
+        """
+        The test verifies the appropriate method is correctly called when subclassing
+        the asynchronous methods.
+
+        @since 3.13
+        @jira_ticket PYTHON-605
+        @expected_result The subclassed method is called.
+
+        @test_category object_mapper
+        """
+        def raise_(self):
+            raise(ValueError())
+        saveClass = type("saveClass", (TestMultiKeyModel,),
+             {"save_async": raise_})
+
+        sync_table(saveClass)
+        self.addCleanup(drop_table, saveClass)
+
+        with self.assertRaises(ValueError):
+            saveClass.create_async(partition=0, cluster=0, count=5, text=self.text_to_write)
+
+        with self.assertRaises(ValueError):
+            saveClass.create(partition=0, cluster=0, count=5, text=self.text_to_write)
+
+        updateClass = type("updateClass", (TestMultiKeyModel,),
+                 {"update_async": raise_})
+        sync_table(updateClass)
+        self.addCleanup(drop_table, updateClass)
+
+        m = updateClass.create( partition=0, cluster=0, count=5, text=self.text_to_write)
+        m.partition = 0
+        m.cluster = 0
+        m.count = 5
+        m.text = self.text_to_write
+        with self.assertRaises(ValueError):
+            m.update_async().result()
+
+        m = updateClass.create(partition=0, cluster=0, count=5, text=self.text_to_write)
+        m.partition = 0
+        m.cluster = 0
+        m.count = 5
+        m.text = self.text_to_write
+        with self.assertRaises(ValueError):
+            m.update()
+
+        deleteClass = type("deleteClass", (TestMultiKeyModel,),
+                      {"delete_async": raise_})
+
+        sync_table(deleteClass)
+        self.addCleanup(drop_table, deleteClass)
+        m = deleteClass.create(partition=0, cluster=0, count=5, text=self.text_to_write)
+        with self.assertRaises(ValueError):
+            m.delete()

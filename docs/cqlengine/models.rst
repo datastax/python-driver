@@ -166,7 +166,7 @@ as either a cat or dog.
 
 To setup a model structure with inheritance, follow these steps
 
-1.  Create a base model with a column set as the distriminator (``distriminator_column=True`` in the column definition)
+1.  Create a base model with a column set as the discriminator (``discriminator_column=True`` in the column definition)
 2.  Create subclass models, and define a unique ``__discriminator_value__`` value on each
 3.  Run ``sync_table`` on each of the sub tables
 

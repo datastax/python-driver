@@ -96,7 +96,7 @@ build:
         pip install cython
         pip install numpy
         # Install the driver & compile C extensions
-        python setup.py build_ext --inplace
+        CASS_DRIVER_BUILD_CONCURRENCY=4 python setup.py build_ext --inplace
       else
         # Install the driver & compile C extensions with no cython
         python setup.py build_ext --inplace --no-cython

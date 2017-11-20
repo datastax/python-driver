@@ -498,6 +498,7 @@ class AbstractQuerySet(object):
                 results = fill_cache(results)
                 if post_processing:
                     return post_processing(results)
+                return results
 
             return self._execute_async(self._select_query(), post_processing=_post_processing)
 

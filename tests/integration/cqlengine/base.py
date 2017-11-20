@@ -18,6 +18,7 @@ except ImportError:
 
 import sys
 
+from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.connection import get_session
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
@@ -43,6 +44,18 @@ class BaseCassEngTestCase(unittest.TestCase):
     if sys.version_info > (3, 0):
         def assertItemsEqual(self, first, second, msg=None):
             return self.assertCountEqual(first, second, msg)
+
+
+class BaseCassEngTestCaseWithTable(BaseCassEngTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super(BaseCassEngTestCaseWithTable, cls).setUpClass()
+        sync_table(TestMultiKeyModel)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(BaseCassEngTestCaseWithTable, cls).tearDownClass()
+        drop_table(TestMultiKeyModel)
 
 
 class CollectionsModel(Model):
