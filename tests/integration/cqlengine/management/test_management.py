@@ -304,7 +304,6 @@ class IndexModel(Model):
 class IndexCaseSensitiveModel(Model):
 
     __table_name__ = 'IndexModel'
-    __table_name_case_sensitive__ = True
     first_key = columns.UUID(primary_key=True)
     second_key = columns.Text(index=True)
 
@@ -320,7 +319,6 @@ class BaseInconsistent(Model):
 class ChangedInconsistent(Model):
 
     __table_name__ = 'inconsistent'
-    __table_name_case_sensitive__ = True
     first_key = columns.UUID(primary_key=True)
     second_key = columns.Text(index=True)
 

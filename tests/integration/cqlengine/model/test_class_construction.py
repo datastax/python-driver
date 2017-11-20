@@ -248,50 +248,26 @@ class TestManualTableNaming(BaseCassEngTestCase):
         id = columns.UUID(primary_key=True)
         data = columns.Text()
 
+    class RenamedCaseSensitiveTest(Model):
+        __keyspace__ = 'whatever'
+        __table_name__ = 'Manual_Name'
+
+        id = columns.UUID(primary_key=True)
+
     def test_proper_table_naming(self):
         assert self.RenamedTest.column_family_name(include_keyspace=False) == 'manual_name'
         assert self.RenamedTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'
 
-
-class TestManualTableNamingCaseSensitive(BaseCassEngTestCase):
-
-    class RenamedCaseInsensitiveTest(Model):
-        __keyspace__ = 'whatever'
-        __table_name__ = 'Manual_Name'
-
-        id = columns.UUID(primary_key=True)
-
-    class RenamedCaseSensitiveTest(Model):
-        __keyspace__ = 'whatever'
-        __table_name__ = 'Manual_Name'
-        __table_name_case_sensitive__ = True
-
-        id = columns.UUID(primary_key=True)
-
-    def test_proper_table_naming_case_insensitive(self):
-        """
-        Test to ensure case senstivity is not honored by default honored
-
-        @since 3.1
-        @jira_ticket PYTHON-337
-        @expected_result table_names arel lowercase
-
-        @test_category object_mapper
-        """
-        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=False), 'manual_name')
-        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=True), 'whatever.manual_name')
-
     def test_proper_table_naming_case_sensitive(self):
         """
-        Test to ensure case is honored when the flag is correctly set.
+        Test to ensure case sensitivity is honored by default
 
-        @since 3.1
-        @jira_ticket PYTHON-337
-        @expected_result table_name case is honored.
+        @since 4.0
+        @jira_ticket PYTHON-855
+        @expected_result table_names are case sensitive
 
         @test_category object_mapper
         """
-
         self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=False), '"Manual_Name"')
         self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True), 'whatever."Manual_Name"')
 

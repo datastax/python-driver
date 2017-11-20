@@ -360,8 +360,6 @@ class BaseModel(object):
 
     __table_name__ = None
 
-    __table_name_case_sensitive__ = False
-
     __keyspace__ = None
 
     __connection__ = None
@@ -567,14 +565,7 @@ class BaseModel(object):
     def _raw_column_family_name(cls):
         if not cls._table_name:
             if cls.__table_name__:
-                if cls.__table_name_case_sensitive__:
-                    cls._table_name = cls.__table_name__
-                else:
-                    table_name = cls.__table_name__.lower()
-                    if cls.__table_name__ != table_name:
-                        warn(("Model __table_name__ will be case sensitive by default in 4.0. "
-                        "You should fix the __table_name__ value of the '{0}' model.").format(cls.__name__))
-                    cls._table_name = table_name
+                cls._table_name = cls.__table_name__
             else:
                 if cls._is_polymorphic and not cls._is_polymorphic_base:
                     cls._table_name = cls._polymorphic_base._raw_column_family_name()
@@ -1135,12 +1126,7 @@ class Model(BaseModel):
 
     __table_name__ = None
     """
-    *Optional.* Sets the name of the CQL table for this model. If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
-    """
-
-    __table_name_case_sensitive__ = False
-    """
-    *Optional.* By default, __table_name__ is case insensitive. Set this to True if you want to preserve the case sensitivity.
+    *Optional.* Sets the name of the CQL table for this model (case sensitive). If left blank, the table name will be the name of the model, with it's module name as it's prefix. Manually defined table names are not inherited.
     """
 
     __keyspace__ = None

@@ -130,17 +130,16 @@ class TestModel(unittest.TestCase):
 
     def test_column_family_case_sensitive(self):
         """
-        Test to ensure case sensitivity is honored when __table_name_case_sensitive__ flag is set
+        Test to ensure case sensitivity is honored
 
-        @since 3.1
-        @jira_ticket PYTHON-337
+        @since 4.0
+        @jira_ticket PYTHON-855
         @expected_result table_name case is respected
 
         @test_category object_mapper
         """
         class TestModel(Model):
             __table_name__ = 'TestModel'
-            __table_name_case_sensitive__ = True
 
             k = columns.Integer(primary_key=True)
 

@@ -3,7 +3,8 @@
 
 Features
 --------
-* Asynchronous execution support in CQLEngine (PYTHON-605)
+* cqlengine: asynchronous execution support (PYTHON-605)
+* cqlengine: Makes Model._table_name_ case sensitive (PYTHON-855)
 
 Other
 -----
