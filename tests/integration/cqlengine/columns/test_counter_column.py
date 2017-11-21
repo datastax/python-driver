@@ -14,7 +14,7 @@
 
 from uuid import uuid4
 
-from cassandra.cqlengine import columns
+from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model, ModelDefinitionException
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -75,25 +75,36 @@ class TestCounterColumn(BaseCassEngTestCase):
     def tearDownClass(cls):
         drop_table(TestCounterModel)
 
+    def test_cannot_use_create(self):
+        """ Tests that counter cannot use create """
+        with self.assertRaises(CQLEngineException):
+            instance = TestCounterModel.create()
+
+    def test_cannot_use_save(self):
+        """ Tests that counter cannot use save """
+        with self.assertRaises(CQLEngineException):
+            instance = TestCounterModel()
+            instance.save()
+
     def test_updates(self):
         """ Tests that counter updates work as intended """
-        instance = TestCounterModel.create()
+        instance = TestCounterModel()
         instance.counter += 5
-        instance.save()
+        instance.update()
 
         actual = TestCounterModel.get(partition=instance.partition)
         assert actual.counter == 5
 
     def test_concurrent_updates(self):
         """ Tests updates from multiple queries reaches the correct value """
-        instance = TestCounterModel.create()
+        instance = TestCounterModel().update()
         new1 = TestCounterModel.get(partition=instance.partition)
         new2 = TestCounterModel.get(partition=instance.partition)
 
         new1.counter += 5
-        new1.save()
+        new1.update()
         new2.counter += 5
-        new2.save()
+        new2.update()
 
         actual = TestCounterModel.get(partition=instance.partition)
         assert actual.counter == 10
@@ -102,7 +113,7 @@ class TestCounterColumn(BaseCassEngTestCase):
         """ Tests that updating from None uses a create statement """
         instance = TestCounterModel()
         instance.counter += 1
-        instance.save()
+        instance.update()
 
         new = TestCounterModel.get(partition=instance.partition)
         assert new.counter == 1
@@ -114,7 +125,7 @@ class TestCounterColumn(BaseCassEngTestCase):
 
     def test_save_after_no_update(self):
         expected_value = 15
-        instance = TestCounterModel.create()
+        instance = TestCounterModel()
         instance.update(counter=expected_value)
 
         # read back
@@ -122,7 +133,7 @@ class TestCounterColumn(BaseCassEngTestCase):
         self.assertEqual(instance.counter, expected_value)
 
         # save after doing nothing
-        instance.save()
+        instance.update()
         self.assertEqual(instance.counter, expected_value)
 
         # make sure there was no increment

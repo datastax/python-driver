@@ -48,6 +48,21 @@ Upgrade Guide 3.x to 4.x
 
 * Model.__table_name__ is now case sensitive
 * Model.__table_name_case_sensitive__ has been removed
+* Model with counters cannot use `create` or `save` anymore. You have to use the `update` mechanism::
+
+    class VideoRating(Model):
+      videoid = columns.UUID(primary_key=True)
+      rating_counter = columns.Counter()
+      rating_total = columns.Counter()
+    sync_table(VideoRating)
+
+    # Create a new entry and update counters.
+    VideoRating(videoid=uid).update(rating_counter=2, rating_total=8)
+
+    # or..
+    v = VideoRating(videoid=uid)
+    v.rating_counter += 1
+    v.update()
 
 Upgrade Guide cqlengine to cassandra.cqlengine
 ==============================================
