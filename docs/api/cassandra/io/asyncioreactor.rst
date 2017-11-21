@@ -1,4 +1,4 @@
-``cassandra.io.asyncioreactor`` - ``asyncio``-compatible Connection
+``cassandra.io.asyncioreactor`` - ``asyncio`` Event Loop
 =====================================================================
 
 .. module:: cassandra.io.asyncioreactor

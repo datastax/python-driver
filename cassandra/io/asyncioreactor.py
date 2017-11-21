@@ -10,6 +10,12 @@ from threading import Lock, Thread
 log = logging.getLogger(__name__)
 
 
+# This module uses ``yield from`` and ``@asyncio.coroutine`` over ``await`` and
+# ``async def`` for pre-Python-3.5 compatibility, so keep in mind that the
+# managed coroutines are generator-based, not native coroutines. See PEP 492:
+# https://www.python.org/dev/peps/pep-0492/#coroutine-objects
+
+
 class AsyncioTimer(object):
     """
     An ``asyncioreactor``-specific Timer. Similar to :class:`.connection.Timer,
@@ -51,6 +57,10 @@ class AsyncioTimer(object):
 
 
 class AsyncioConnection(Connection):
+    """
+    An implementation of :class:`.Connection` that uses the ``asyncio`` module
+    in the Python standard library for its event loop.
+    """
 
     _loop = None
     _pid = os.getpid()
