@@ -30,8 +30,9 @@ class AsyncioTimer(object):
         self._handle = asyncio.run_coroutine_threadsafe(delayed, loop=loop)
 
     @staticmethod
-    async def _call_delayed_coro(timeout, callback, loop):
-        await asyncio.sleep(timeout, loop=loop)
+    @asyncio.coroutine
+    def _call_delayed_coro(timeout, callback, loop):
+        yield from asyncio.sleep(timeout, loop=loop)
         return callback()
 
     def __lt__(self, other):
@@ -123,21 +124,23 @@ class AsyncioConnection(Connection):
                          timeout=None,
                          loop=self._loop)
 
-    async def handle_write(self):
+    @asyncio.coroutine
+    def handle_write(self):
         while True:
             try:
-                next_msg = await self._write_queue.get()
+                next_msg = yield from self._write_queue.get()
                 if next_msg:
-                    await self._loop.sock_sendall(self._socket, next_msg)
+                    yield from self._loop.sock_sendall(self._socket, next_msg)
             except socket.error as err:
                 log.debug("Exception in send for %s: %s", self, err)
                 self.defunct(err)
                 return
 
-    async def handle_read(self):
+    @asyncio.coroutine
+    def handle_read(self):
         while True:
             try:
-                buf = await self._loop.sock_recv(self._socket, self.in_buffer_size)
+                buf = yield from self._loop.sock_recv(self._socket, self.in_buffer_size)
                 self._iobuf.write(buf)
             except socket.error as err:
                 log.debug("Exception during socket recv for %s: %s",
