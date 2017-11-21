@@ -20,6 +20,7 @@ Core Driver
    cassandra/concurrent
    cassandra/connection
    cassandra/util
+   cassandra/io/asyncioreactor
    cassandra/io/asyncorereactor
    cassandra/io/eventletreactor
    cassandra/io/libevreactor
