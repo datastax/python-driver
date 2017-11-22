@@ -186,11 +186,11 @@ release:
             yum install -y libev libev-devel
 
             mkdir wheelhouse
-            EXCLUDED_PY_VERS=( cp26 cp33 cp34 cp35 cp27 cpython-2.6 )
+            EXCLUDED_PY_VERS=( cp26 cpython-2.6 )
 
             ls /opt/python/
             # Compile wheels
-            for PYBIN in /opt/python/cp36-cp36m/bin; do
+            for PYBIN in /opt/python/*/bin; do
               for PY_VER in "${EXCLUDED_PY_VERS[@]}"; do
                 if [[ "${PYBIN}" == *"$PY_VER"* ]]; then
                   echo "In excluded python version. Skipping $PY_VER"
@@ -212,13 +212,6 @@ release:
 
             # Downloading and running verification script
             rm -rf cassandra/
-            echo $USER
-            pip --version
-            python --version
-            pip install --upgrade pip
-            pip --version
             pip install wheelhouse/*cassandra_driver*cp36*.whl
-            pip --version
-            pip list
             python verify_driver_installation.py
 
