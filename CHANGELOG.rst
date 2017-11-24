@@ -10,6 +10,10 @@ Bug Fixes
 * Support retry_policy in PreparedStatement (PYTHON-861)
 * __del__ method in Session is throwing an exception (PYTHON-813)
 
+Other
+-----
+* cqlengine: avoid warning when unregistering connection on shutdown (PYTHON-865)
+
 3.12.0
 ======
 November 6, 2017
