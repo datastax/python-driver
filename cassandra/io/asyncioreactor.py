@@ -53,7 +53,8 @@ class AsyncioTimer(object):
     def finish(self):
         # connection.Timer method not implemented here because we can't inspect
         # the Handle returned from call_later
-        raise RuntimeError('finish method not implemented for asyncio reactor')
+        raise NotImplementedError('{} is not compatible with TimerManager and '
+                                  'does not implement .finish()')
 
 
 class AsyncioConnection(Connection):
