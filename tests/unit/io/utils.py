@@ -88,7 +88,7 @@ def get_timeout(gross_time, start, end, precision, split_range):
     return timeout
 
 
-def submit_and_wait_for_completion(unit_test, connection, start, end, increment, precision, split_range=False):
+def submit_and_wait_for_completion(unit_test, create_timer, start, end, increment, precision, split_range=False):
     """
    This will submit a number of timers to the provided connection. It will then ensure that the corresponding
    callback is invoked in the appropriate amount of time.
@@ -109,7 +109,7 @@ def submit_and_wait_for_completion(unit_test, connection, start, end, increment,
     for gross_time in range(start, end, increment):
         timeout = get_timeout(gross_time, start, end, precision, split_range)
         callback = TimerCallback(timeout)
-        connection.create_timer(timeout, callback.invoke)
+        create_timer(timeout, callback.invoke)
         pending_callbacks.append(callback)
 
     # wait for all the callbacks associated with the timers to be invoked
@@ -125,17 +125,29 @@ def submit_and_wait_for_completion(unit_test, connection, start, end, increment,
         unit_test.assertAlmostEqual(callback.expected_wait, callback.get_wait_time(), delta=.15)
 
 
-class TimerConnectionTests(object):
+class TimerTestMixin(object):
+
+    __test__ = False
+
+    connection_class = connection = None
+    # replace with property returning the connection's create_timer and _timers
+    create_timer = _timers = None
+
+    def setUp(self):
+        self.connection = self.connection_class(
+            connect_timeout=5
+        )
+
     def test_multi_timer_validation(self):
         """
         Verify that timer timeouts are honored appropriately
         """
         # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, self.connection_class, 0, 100, 1, 100)
+        submit_and_wait_for_completion(self, self.create_timer, 0, 100, 1, 100)
         # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, self.connection_class, 100, 0, -1, 100)
+        submit_and_wait_for_completion(self, self.create_timer, 100, 0, -1, 100)
         # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, self.connection_class, 0, 100, 1, 100, True),
+        submit_and_wait_for_completion(self, self.create_timer, 0, 100, 1, 100, True),
 
     def test_timer_cancellation(self):
         """
@@ -145,11 +157,11 @@ class TimerConnectionTests(object):
         # Various lists for tracking callback stage
         timeout = .1
         callback = TimerCallback(timeout)
-        timer = self.connection_class.create_timer(timeout, callback.invoke)
+        timer = self.create_timer(timeout, callback.invoke)
         timer.cancel()
         # Release context allow for timer thread to run.
         time.sleep(.2)
-        timer_manager = self.connection_class._timers
+        timer_manager = self._timers
         # Assert that the cancellation was honored
         self.assertFalse(timer_manager._queue)
         self.assertFalse(timer_manager._new_timers)
@@ -411,22 +423,3 @@ class ReactorTestMixin(object):
 
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
-
-    def test_timer_cancellation(self):
-        """
-        Verify that timer cancellation is honored
-        """
-
-        # Various lists for tracking callback stage
-        connection = self.make_connection()
-        timeout = .1
-        callback = TimerCallback(timeout)
-        timer = connection.create_timer(timeout, callback.invoke)
-        timer.cancel()
-        # Release context allow for timer thread to run.
-        time.sleep(.2)
-        timer_manager = self.get_loop(connection)._timers
-        # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())

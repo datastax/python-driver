@@ -62,6 +62,7 @@ class LibevTimerTest(unittest.TestCase):
         # Tests timers submitted in varying order at various timeouts
         submit_and_wait_for_completion(self, c, 0, 100, 1, 100, True)
 
+    @unittest.skip
     def test_timer_cancellation(self, *args):
         """
         Verify that timer cancellation is honored
