@@ -1575,10 +1575,11 @@ class DMLQuery(object):
             raise CQLEngineException("DML Query intance attribute is None")
         assert type(self.instance) == self.model
 
+        if self.instance._has_counter:
+            raise CQLEngineException("Counters can only be updated. Use the 'update' mechanism instead.")
+
         nulled_fields = set()
-        if self.instance._has_counter or self.instance._can_update():
-            if self.instance._has_counter:
-                warn("'create' and 'save' actions on Counters are deprecated. A future version will disallow this. Use the 'update' mechanism instead.")
+        if self.instance._can_update():
             return self.update_async()
         else:
             insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists)
