@@ -1,3 +1,11 @@
+3.13.0
+======
+
+Features
+--------
+
+* cqlengine: LIKE filter operator (PYTHON-512)
+
 3.12.0
 ======
 November 6, 2017
