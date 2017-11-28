@@ -48,5 +48,3 @@ class TestWhereOperators(TestCase):
         self.assertEqual("<=", six.text_type(LessThanOrEqualOperator()))
         self.assertEqual("CONTAINS", six.text_type(ContainsOperator()))
         self.assertEqual("LIKE", six.text_type(LikeOperator()))
-
-
