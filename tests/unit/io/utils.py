@@ -127,8 +127,6 @@ def submit_and_wait_for_completion(unit_test, create_timer, start, end, incremen
 
 class TimerTestMixin(object):
 
-    __test__ = False
-
     connection_class = connection = None
     # replace with property returning the connection's create_timer and _timers
     create_timer = _timers = None

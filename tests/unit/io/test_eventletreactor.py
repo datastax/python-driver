@@ -18,7 +18,7 @@ try:
 except ImportError:
     import unittest # noqa
 
-from tests.unit.io.utils import TimerConnectionTests
+from tests.unit.io.utils import TimerTestMixin
 from tests import notpypy, MONKEY_PATCH_LOOP, notmonkeypatch
 
 from eventlet import monkey_patch
@@ -33,7 +33,7 @@ skip_condition = EventletConnection is None or MONKEY_PATCH_LOOP != "eventlet"
 @notpypy
 @unittest.skipIf(skip_condition, "Skipping the eventlet tests because it's not installed")
 @notmonkeypatch
-class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
+class EventletTimerTest(unittest.TestCase, TimerTestMixin):
     @classmethod
     def setUpClass(cls):
         # This is run even though the class is skipped, so we need
