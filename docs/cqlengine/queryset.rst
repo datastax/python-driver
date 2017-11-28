@@ -193,15 +193,18 @@ Filtering Operators
 
     :attr:`LIKE (__like) <query.QueryOperator.LikeOperator>`
 
-        The LIKE operator is available for columns that have a SASI index.
+        The LIKE operator is available for text columns that have a SASI secondary index.
 
         .. code-block:: python
 
             q = Automobile.objects.filter(model__like='%Civic%').allow_filtering()
 
-        Limitation: Currently, only secondary indexes are supported in cqlengine. So you need to create
-        the SASI index manually using the core driver and use allow_filtering() since the *model* column
-        has no index. Note that the server will use the SASI index properly when executing the query.
+        Limitations:
+        - Currently, cqlengine does not support SASI index creation. To use this feature,
+          you need to create the SASI index using the core driver.
+        - Queries using LIKE must use allow_filtering() since the *model* column has no
+          standard secondary index. Note that the server will use the SASI index properly
+          when executing the query.
 
 TimeUUID Functions
 ==================
