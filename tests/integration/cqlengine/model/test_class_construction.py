@@ -15,11 +15,15 @@
 from uuid import uuid4
 import warnings
 
+from cassandra.cluster import Cluster
 from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.models import Model, ModelException, ModelDefinitionException, ColumnQueryEvaluator
 from cassandra.cqlengine.query import ModelQuerySet, DMLQuery
+from cassandra.cqlengine.management import sync_table, drop_table
 
+from tests.integration.cqlengine import DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+
 
 
 class TestModelClassFunction(BaseCassEngTestCase):
@@ -249,7 +253,7 @@ class TestManualTableNaming(BaseCassEngTestCase):
         data = columns.Text()
 
     class RenamedCaseSensitiveTest(Model):
-        __keyspace__ = 'whatever'
+        __keyspace__ = DEFAULT_KEYSPACE
         __table_name__ = 'Manual_Name'
 
         id = columns.UUID(primary_key=True)
@@ -269,7 +273,27 @@ class TestManualTableNaming(BaseCassEngTestCase):
         @test_category object_mapper
         """
         self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=False), '"Manual_Name"')
-        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True), 'whatever."Manual_Name"')
+        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True),
+                         '{}."Manual_Name"'.format(DEFAULT_KEYSPACE))
+
+    def test_table_is_created_with_name(self):
+        """
+        Test to ensure table names are correctly written to C*
+
+        @since 4.0
+        @jira_ticket PYTHON-855
+        @expected_result table_names are case sensitive
+
+        @test_category object_mapper
+        """
+        sync_table(self.RenamedCaseSensitiveTest)
+        self.addCleanup(drop_table, self.RenamedCaseSensitiveTest)
+
+        cluster = Cluster()
+        cluster.connect()
+        self.addCleanup(cluster.shutdown)
+
+        self.assertIn('Manual_Name', cluster.metadata.keyspaces[DEFAULT_KEYSPACE].tables)
 
 
 class AbstractModel(Model):
