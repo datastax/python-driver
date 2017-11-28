@@ -679,7 +679,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         """
         use_singledc()
         keyspace = 'test_black_list_with_hfp'
-        ignored_address = (IP_FORMAT % 2)
+        ignored_address = ((IP_FORMAT % 2), 9042)
         hfp = HostFilterPolicy(
             child_policy=RoundRobinPolicy(),
             predicate=lambda host: host.address != ignored_address

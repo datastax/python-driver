@@ -350,7 +350,7 @@ class Cluster(object):
     which implicitly handle shutdown when leaving scope.
     """
 
-    contact_points = ['127.0.0.1']
+    contact_points = [('127.0.0.1', 9042)]
     """
     The list of contact points to try connecting for cluster discovery.
 
@@ -810,10 +810,11 @@ class Cluster(object):
         """
         self.port = port
 
-        #Need to make all contact points tuples with ports
-        normalized_contact_points = []
         #Use the default if none is supplied
         if contact_points is not None:
+            # Need to make all contact points tuples with ports
+            normalized_contact_points = []
+
             if contact_points is _NOT_SET:
                 self._contact_points_explicit = False
                 contact_points = ['127.0.0.1']
@@ -823,14 +824,16 @@ class Cluster(object):
             if isinstance(contact_points, six.string_types):
                 raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
 
-        if None in contact_points:
-            raise ValueError("contact_points should not contain None (it can resolve to localhost)")
-        for contact in contact_points:
-            if type(contact) is tuple:
-                normalized_contact_points.append(contact)
-            else:
-                normalized_contact_points.append((contact, self.port))
-        self.contact_points = normalized_contact_points
+            if None in contact_points:
+                raise ValueError("contact_points should not contain None (it can resolve to localhost)")
+
+            for contact in contact_points:
+                if type(contact) is tuple:
+                    normalized_contact_points.append(contact)
+                else:
+                    normalized_contact_points.append((contact, self.port))
+
+            self.contact_points = normalized_contact_points
 
         self.contact_points_resolved = [(endpoint[4][0], a[1]) for a in self.contact_points
                                        for endpoint in socket.getaddrinfo(a[0], self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
