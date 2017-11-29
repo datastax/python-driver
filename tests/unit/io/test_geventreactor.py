@@ -18,7 +18,7 @@ except ImportError:
     import unittest # noqa
 
 
-from tests.unit.io.utils import TimerConnectionTests
+from tests.unit.io.utils import TimerTestMixin
 from tests import MONKEY_PATCH_LOOP, notmonkeypatch
 try:
     from cassandra.io.geventreactor import GeventConnection
@@ -28,9 +28,9 @@ except ImportError:
 
 
 skip_condition = GeventConnection is None or MONKEY_PATCH_LOOP != "gevent"
-@unittest.skipIf(skip_condition, "Skipping the gevent tests because it's not installed")
+@unittest.skipIf(skip_condition, "Skipping the gevent tests because it's not installed; GeventConnection={}; MONKEY_PATCH_LOOP={}".format(GeventConnection, MONKEY_PATCH_LOOP))
 @notmonkeypatch
-class GeventTimerTest(unittest.TestCase, TimerConnectionTests):
+class GeventTimerTest(unittest.TestCase, TimerTestMixin):
     @classmethod
     def setUpClass(cls):
         # This is run even though the class is skipped, so we need
