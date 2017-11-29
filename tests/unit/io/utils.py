@@ -17,7 +17,9 @@ from cassandra.connection import (ConnectionException, ProtocolError,
 from cassandra.marshal import int32_pack, uint8_pack, uint32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
+from tests import is_monkey_patched
 
+from functools import wraps
 import six
 from six import binary_type, BytesIO
 from mock import Mock
@@ -123,6 +125,16 @@ def submit_and_wait_for_completion(unit_test, create_timer, start, end, incremen
     # ensure they are all called back in a timely fashion
     for callback in completed_callbacks:
         unit_test.assertAlmostEqual(callback.expected_wait, callback.get_wait_time(), delta=.15)
+
+
+def noop_if_monkey_patched(f):
+    if is_monkey_patched():
+        @wraps(f)
+        def noop(*args, **kwargs):
+            return
+        return noop
+
+    return f
 
 
 class TimerTestMixin(object):

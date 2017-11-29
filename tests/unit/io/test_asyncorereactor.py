@@ -16,23 +16,12 @@ try:
 except ImportError:
     import unittest # noqa
 
-from functools import wraps
 from mock import patch
 import socket
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from tests import is_monkey_patched
-from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin
+from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
 
-
-def noop_if_monkey_patched(f):
-
-    if is_monkey_patched():
-        @wraps(f)
-        def noop(*args, **kwargs):
-            return
-        return noop
-
-    return f
 
 class AsyncorePatcher(unittest.TestCase):
 

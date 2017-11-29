@@ -16,11 +16,12 @@ try:
 except ImportError:
     import unittest # noqa
 
-from mock import patch
+from mock import patch, Mock
 import weakref
+import socket
 
 from tests import is_monkey_patched
-from tests.unit.io.utils import ReactorTestMixin
+from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
 
 
 try:
@@ -39,9 +40,7 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
     def setUp(self):
         if is_monkey_patched():
-            from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
-            raise unittest.SkipTest("always skipping. is_gevent_monkey_patched: {} is_eventlet_monkey_patched: {}".format(is_gevent_monkey_patched(), is_eventlet_monkey_patched()))
-            # raise unittest.SkipTest("Can't test libev with monkey patching")
+            raise unittest.SkipTest("Can't test libev with monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()
@@ -95,14 +94,10 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         LibevConnection._libevloop._shutdown = False
 
 
-import socket
-from tests.unit.io.utils import TimerTestMixin
-from mock import patch, Mock
-
-
 class LibevTimerPatcher(unittest.TestCase):
 
     @classmethod
+    @noop_if_monkey_patched
     def setUpClass(cls):
         cls.patchers = [
             patch('socket.socket', spec=socket.socket),
@@ -112,6 +107,7 @@ class LibevTimerPatcher(unittest.TestCase):
             p.start()
 
     @classmethod
+    @noop_if_monkey_patched
     def tearDownClass(cls):
         for p in cls.patchers:
             try:
@@ -137,8 +133,6 @@ class LibevTimerTest(LibevTimerPatcher, TimerTestMixin):
         return c
 
     def setUp(self):
-        from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
-        raise unittest.SkipTest("always skipping. is_gevent_monkey_patched: {} is_eventlet_monkey_patched: {}".format(is_gevent_monkey_patched(), is_eventlet_monkey_patched()))
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test libev with monkey patching.")
         if LibevConnection is None:
