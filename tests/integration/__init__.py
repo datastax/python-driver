@@ -178,7 +178,7 @@ def get_supported_protocol_versions():
     elif version >= Version('2.0'):
         return (1, 2)
     else:
-        return (1)
+        return (1, )
 
 
 def get_unsupported_lower_protocol():
