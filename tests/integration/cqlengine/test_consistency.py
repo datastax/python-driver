@@ -16,38 +16,31 @@ from uuid import uuid4
 
 from cassandra import ConsistencyLevel as CL, ConsistencyLevel
 from cassandra.cluster import Session
-from cassandra.cqlengine import columns
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import sync_table, drop_table
-from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
 
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, UUID_int_text_model
 from tests.integration.cqlengine import mock_execute_async
 
-class TestConsistencyModel(Model):
-
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
-    count   = columns.Integer()
-    text    = columns.Text(required=False)
 
 class BaseConsistencyTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
         super(BaseConsistencyTest, cls).setUpClass()
-        sync_table(TestConsistencyModel)
+        sync_table(UUID_int_text_model)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseConsistencyTest, cls).tearDownClass()
-        drop_table(TestConsistencyModel)
+        drop_table(UUID_int_text_model)
 
 
 class TestConsistency(BaseConsistencyTest):
     def test_create_uses_consistency(self):
 
-        qs = TestConsistencyModel.consistency(CL.ALL)
+        qs = UUID_int_text_model.consistency(CL.ALL)
         with mock_execute_async() as m:
             qs.create(text="i am not fault tolerant this way")
 
@@ -55,11 +48,11 @@ class TestConsistency(BaseConsistencyTest):
         self.assertEqual(CL.ALL, args[0][0].consistency_level)
 
     def test_queryset_is_returned_on_create(self):
-        qs = TestConsistencyModel.consistency(CL.ALL)
-        self.assertTrue(isinstance(qs, TestConsistencyModel.__queryset__), type(qs))
+        qs = UUID_int_text_model.consistency(CL.ALL)
+        self.assertTrue(isinstance(qs, UUID_int_text_model.__queryset__), type(qs))
 
     def test_update_uses_consistency(self):
-        t = TestConsistencyModel.create(text="bacon and eggs")
+        t = UUID_int_text_model.create(text="bacon and eggs")
         t.text = "ham sandwich"
 
         with mock_execute_async() as m:
@@ -72,7 +65,7 @@ class TestConsistency(BaseConsistencyTest):
 
         with mock_execute_async() as m:
             with BatchQuery(consistency=CL.ALL) as b:
-                TestConsistencyModel.batch(b).create(text="monkey")
+                UUID_int_text_model.batch(b).create(text="monkey")
 
         args = m.call_args
 
@@ -80,25 +73,25 @@ class TestConsistency(BaseConsistencyTest):
 
         with mock_execute_async() as m:
             with BatchQuery() as b:
-                TestConsistencyModel.batch(b).create(text="monkey")
+                UUID_int_text_model.batch(b).create(text="monkey")
 
         args = m.call_args
         self.assertNotEqual(CL.ALL, args[0][2])
 
     def test_blind_update(self):
-        t = TestConsistencyModel.create(text="bacon and eggs")
+        t = UUID_int_text_model.create(text="bacon and eggs")
         t.text = "ham sandwich"
         uid = t.id
 
         with mock_execute_async() as m:
-            TestConsistencyModel.objects(id=uid).consistency(CL.ALL).update(text="grilled cheese")
+            UUID_int_text_model.objects(id=uid).consistency(CL.ALL).update(text="grilled cheese")
 
         args = m.call_args
         self.assertEqual(CL.ALL, args[0][0].consistency_level)
 
     def test_delete(self):
         # ensures we always carry consistency through on delete statements
-        t = TestConsistencyModel.create(text="bacon and eggs")
+        t = UUID_int_text_model.create(text="bacon and eggs")
         t.text = "ham and cheese sandwich"
         uid = t.id
 
@@ -106,7 +99,7 @@ class TestConsistency(BaseConsistencyTest):
             t.consistency(CL.ALL).delete()
 
         with mock_execute_async() as m:
-            TestConsistencyModel.objects(id=uid).consistency(CL.ALL).delete()
+            UUID_int_text_model.objects(id=uid).consistency(CL.ALL).delete()
 
         args = m.call_args
         self.assertEqual(CL.ALL, args[0][0].consistency_level)

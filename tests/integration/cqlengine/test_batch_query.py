@@ -13,21 +13,11 @@
 # limitations under the License.
 import warnings
 
-import sure
-
-from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import drop_table, sync_table
-from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestMultiKeyModel
 
 from mock import patch
-
-class TestMultiKeyModel(Model):
-    partition   = columns.Integer(primary_key=True)
-    cluster     = columns.Integer(primary_key=True)
-    count       = columns.Integer(required=False)
-    text        = columns.Text(required=False)
 
 
 class BatchQueryTests(BaseCassEngTestCase):

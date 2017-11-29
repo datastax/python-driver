@@ -18,34 +18,12 @@ except ImportError:
 
 from uuid import uuid4
 
-from cassandra.cqlengine import columns, connection
 from cassandra.cqlengine.management import sync_table, drop_table
-from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.query import BatchQuery, BatchType, LWTException, IfExistsWithCounterColumn
+from cassandra.cqlengine.query import BatchQuery, LWTException, IfExistsWithCounterColumn
 
 from tests.integration.cqlengine import mock_execute_async
-from tests.integration.cqlengine.base import BaseCassEngTestCase
-from tests.integration import PROTOCOL_VERSION
-
-
-class TestIfExistsModel(Model):
-
-    id = columns.UUID(primary_key=True, default=lambda: uuid4())
-    count = columns.Integer()
-    text = columns.Text(required=False)
-
-
-class TestIfExistsModel2(Model):
-
-    id = columns.Integer(primary_key=True)
-    count = columns.Integer(primary_key=True, required=False)
-    text = columns.Text(required=False)
-
-
-class TestIfExistsWithCounterModel(Model):
-
-    id = columns.UUID(primary_key=True, default=lambda: uuid4())
-    likes = columns.Counter()
+from tests.integration.cqlengine.base import BaseCassEngTestCase, UUID_int_text_model, TestIfExistsModel2, \
+    WithCounterModel
 
 
 class BaseIfExistsTest(BaseCassEngTestCase):
@@ -53,13 +31,13 @@ class BaseIfExistsTest(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseIfExistsTest, cls).setUpClass()
-        sync_table(TestIfExistsModel)
-        sync_table(TestIfExistsModel2)        
+        sync_table(UUID_int_text_model)
+        sync_table(TestIfExistsModel2)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseIfExistsTest, cls).tearDownClass()
-        drop_table(TestIfExistsModel)
+        drop_table(UUID_int_text_model)
         drop_table(TestIfExistsModel2)
 
 
@@ -68,12 +46,12 @@ class BaseIfExistsWithCounterTest(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseIfExistsWithCounterTest, cls).setUpClass()
-        sync_table(TestIfExistsWithCounterModel)
+        sync_table(WithCounterModel)
 
     @classmethod
     def tearDownClass(cls):
         super(BaseIfExistsWithCounterTest, cls).tearDownClass()
-        drop_table(TestIfExistsWithCounterModel)
+        drop_table(WithCounterModel)
 
 
 class IfExistsUpdateTests(BaseIfExistsTest):
@@ -91,19 +69,19 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         id = uuid4()
 
-        m = TestIfExistsModel.create(id=id, count=8, text='123456789')
+        m = UUID_int_text_model.create(id=id, count=8, text='123456789')
         m.text = 'changed'
         m.if_exists().update()
-        m = TestIfExistsModel.get(id=id)
+        m = UUID_int_text_model.get(id=id)
         self.assertEqual(m.text, 'changed')
 
         # save()
         m.text = 'changed_again'
         m.if_exists().save()
-        m = TestIfExistsModel.get(id=id)
+        m = UUID_int_text_model.get(id=id)
         self.assertEqual(m.text, 'changed_again')
 
-        m = TestIfExistsModel(id=uuid4(), count=44)  # do not exists
+        m = UUID_int_text_model(id=uuid4(), count=44)  # do not exists
         with self.assertRaises(LWTException) as assertion:
             m.if_exists().update()
 
@@ -113,7 +91,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         # queryset update
         with self.assertRaises(LWTException) as assertion:
-            TestIfExistsModel.objects(id=uuid4()).if_exists().update(count=8)
+            UUID_int_text_model.objects(id=uuid4()).if_exists().update(count=8)
 
         self.assertEqual(assertion.exception.existing, {
             '[applied]': False,
@@ -132,7 +110,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         id = uuid4()
 
-        m = TestIfExistsModel.create(id=id, count=8, text='123456789')
+        m = UUID_int_text_model.create(id=id, count=8, text='123456789')
 
         with BatchQuery() as b:
             m.text = '111111111'
@@ -140,14 +118,14 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         with self.assertRaises(LWTException) as assertion:
             with BatchQuery() as b:
-                m = TestIfExistsModel(id=uuid4(), count=42)  # Doesn't exist
+                m = UUID_int_text_model(id=uuid4(), count=42)  # Doesn't exist
                 m.batch(b).if_exists().update()
 
         self.assertEqual(assertion.exception.existing, {
             '[applied]': False,
         })
 
-        q = TestIfExistsModel.objects(id=id)
+        q = UUID_int_text_model.objects(id=id)
         self.assertEqual(len(q), 1)
 
         tm = q.first()
@@ -188,12 +166,12 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         id = uuid4()
 
-        m = TestIfExistsModel.create(id=id, count=8, text='123456789')
+        m = UUID_int_text_model.create(id=id, count=8, text='123456789')
         m.if_exists().delete()
-        q = TestIfExistsModel.objects(id=id)
+        q = UUID_int_text_model.objects(id=id)
         self.assertEqual(len(q), 0)
 
-        m = TestIfExistsModel(id=uuid4(), count=44)  # do not exists
+        m = UUID_int_text_model(id=uuid4(), count=44)  # do not exists
         with self.assertRaises(LWTException) as assertion:
             m.if_exists().delete()
 
@@ -203,7 +181,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         # queryset delete
         with self.assertRaises(LWTException) as assertion:
-            TestIfExistsModel.objects(id=uuid4()).if_exists().delete()
+            UUID_int_text_model.objects(id=uuid4()).if_exists().delete()
 
         self.assertEqual(assertion.exception.existing, {
             '[applied]': False,
@@ -222,17 +200,17 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         id = uuid4()
 
-        m = TestIfExistsModel.create(id=id, count=8, text='123456789')
+        m = UUID_int_text_model.create(id=id, count=8, text='123456789')
 
         with BatchQuery() as b:
             m.batch(b).if_exists().delete()
 
-        q = TestIfExistsModel.objects(id=id)
+        q = UUID_int_text_model.objects(id=id)
         self.assertEqual(len(q), 0)
 
         with self.assertRaises(LWTException) as assertion:
             with BatchQuery() as b:
-                m = TestIfExistsModel(id=uuid4(), count=42)  # Doesn't exist
+                m = UUID_int_text_model(id=uuid4(), count=42)  # Doesn't exist
                 m.batch(b).if_exists().delete()
 
         self.assertEqual(assertion.exception.existing, {
@@ -268,7 +246,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
     def test_if_exists_included_on_queryset_update(self):
 
         with mock_execute_async() as m:
-            TestIfExistsModel.objects(id=uuid4()).if_exists().update(count=42)
+            UUID_int_text_model.objects(id=uuid4()).if_exists().update(count=42)
 
         query = m.call_args[0][0].query_string
         self.assertIn("IF EXISTS", query)
@@ -277,7 +255,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
         """ tests that if_exists on models update works as expected """
 
         with mock_execute_async() as m:
-            TestIfExistsModel(id=uuid4()).if_exists().update(count=8)
+            UUID_int_text_model(id=uuid4()).if_exists().update(count=8)
 
         query = m.call_args[0][0].query_string
         self.assertIn("IF EXISTS", query)
@@ -286,7 +264,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
         """ tests that if_exists on models delete works as expected """
 
         with mock_execute_async() as m:
-            TestIfExistsModel(id=uuid4()).if_exists().delete()
+            UUID_int_text_model(id=uuid4()).if_exists().delete()
 
         query = m.call_args[0][0].query_string
         self.assertIn("IF EXISTS", query)
@@ -306,5 +284,5 @@ class IfExistWithCounterTest(BaseIfExistsWithCounterTest):
         """
         id = uuid4()
         with self.assertRaises(IfExistsWithCounterColumn):
-            TestIfExistsWithCounterModel.if_exists()
+            WithCounterModel.if_exists()
 

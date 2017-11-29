@@ -26,7 +26,7 @@ from cassandra.cqlengine.statements import InsertStatement, UpdateStatement, Sel
 from cassandra.cqlengine.operators import EqualsOperator
 from cassandra.cqlengine.columns import Column
 
-from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
+from tests.integration.cqlengine.base import BaseCassEngTestCase, CollectionsModel
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 from cassandra.cqlengine.connection import execute
 
@@ -49,13 +49,13 @@ class ExecuteStatementTest(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         super(ExecuteStatementTest, cls).setUpClass()
-        sync_table(TestQueryUpdateModel)
-        cls.table_name = '{0}.test_query_update_model'.format(DEFAULT_KEYSPACE)
+        sync_table(CollectionsModel)
+        cls.table_name = '{0}.collections_model'.format(DEFAULT_KEYSPACE)
 
     @classmethod
     def tearDownClass(cls):
         super(ExecuteStatementTest, cls).tearDownClass()
-        drop_table(TestQueryUpdateModel)
+        drop_table(CollectionsModel)
 
     def _verify_statement(self, original):
         st = SelectStatement(self.table_name)
@@ -110,4 +110,4 @@ class ExecuteStatementTest(BaseCassEngTestCase):
 
         # Verifying delete statement
         execute(DeleteStatement(self.table_name, where=where))
-        self.assertEqual(TestQueryUpdateModel.objects.count(), 0)
+        self.assertEqual(CollectionsModel.objects.count(), 0)

@@ -18,18 +18,11 @@ from mock import patch
 from cassandra.cqlengine import ValidationError
 
 from tests.integration import greaterthancass21
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestUpdateModel
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.usertype import UserType
-
-class TestUpdateModel(Model):
-
-    partition   = columns.UUID(primary_key=True, default=uuid4)
-    cluster     = columns.UUID(primary_key=True, default=uuid4)
-    count       = columns.Integer(required=False)
-    text        = columns.Text(required=False, index=True)
 
 
 class ModelUpdateTests(BaseCassEngTestCase):

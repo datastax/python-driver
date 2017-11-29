@@ -19,15 +19,17 @@ try:
 except ImportError:
     import unittest  # noqa
 import mock
-import threading
+from uuid import uuid4
 from functools import partial
 from concurrent.futures import Future
 
+import cassandra
 from cassandra import ConsistencyLevel
 
 from cassandra.cqlengine import connection
+import cassandra.cqlengine.columns as columns
 from cassandra.cqlengine.management import create_keyspace_simple, CQLENG_ALLOW_SCHEMA_MANAGEMENT
-import cassandra
+from cassandra.cqlengine.models import Model
 
 from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION, CASSANDRA_IP, set_default_cass_ip
 DEFAULT_KEYSPACE = 'cqlengine_test'

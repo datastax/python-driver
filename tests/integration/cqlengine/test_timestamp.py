@@ -13,20 +13,14 @@
 # limitations under the License.
 
 from datetime import timedelta, datetime
-import sure
 from uuid import uuid4
 
-from cassandra.cqlengine import columns
+import sure
+
 from cassandra.cqlengine.management import sync_table
-from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
-from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestTimestampModel
 from tests.integration.cqlengine import mock_execute_async
-
-
-class TestTimestampModel(Model):
-    id      = columns.UUID(primary_key=True, default=lambda:uuid4())
-    count   = columns.Integer()
 
 
 class BaseTimestampTest(BaseCassEngTestCase):
