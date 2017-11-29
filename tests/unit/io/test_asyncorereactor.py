@@ -16,50 +16,82 @@ try:
 except ImportError:
     import unittest # noqa
 
-import time
+from functools import wraps
 from mock import patch
 import socket
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from tests import is_monkey_patched
-from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback, ReactorTestMixin, TimerTestMixin
+from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin
 
 
-def patch_socket_and_set_up_connection(cls):
-    AsyncoreConnection.initialize_reactor()
+def noop_if_monkey_patched(f):
 
-    cls.socket_patcher = patch('socket.socket', spec=socket.socket)
-    cls.mock_socket = cls.socket_patcher.start()
-    cls.mock_socket().connect_ex.return_value = 0
-    cls.mock_socket().getsockopt.return_value = 0
-    cls.mock_socket().fileno.return_value = 100
+    if is_monkey_patched():
+        @wraps(f)
+        def noop(*args, **kwargs):
+            return
+        return noop
 
-    AsyncoreConnection.add_channel = lambda *args, **kwargs: None
+    return f
+
+class AsyncorePatcher(unittest.TestCase):
+
+    @classmethod
+    @noop_if_monkey_patched
+    def setUpClass(cls):
+        if is_monkey_patched():
+            return
+        AsyncoreConnection.initialize_reactor()
+
+        socket_patcher = patch('socket.socket', spec=socket.socket)
+        channel_patcher = patch(
+            'cassandra.io.asyncorereactor.AsyncoreConnection.add_channel',
+            new=(lambda *args, **kwargs: None)
+        )
+
+        cls.mock_socket = socket_patcher.start()
+        cls.mock_socket.connect_ex.return_value = 0
+        cls.mock_socket.getsockopt.return_value = 0
+        cls.mock_socket.fileno.return_value = 100
+
+        channel_patcher.start()
+
+        cls.patchers = (socket_patcher, channel_patcher)
+
+    @classmethod
+    @noop_if_monkey_patched
+    def tearDownClass(cls):
+        for p in cls.patchers:
+            try:
+                p.stop()
+            except:
+                pass
 
 
-class AsyncoreConnectionTest(unittest.TestCase, ReactorTestMixin):
+class AsyncoreConnectionTest(AsyncorePatcher, ReactorTestMixin):
 
     connection_class = AsyncoreConnection
     socket_attr_name = 'socket'
     loop_attr_name = '_loop'
 
-    @classmethod
-    def setUpClass(cls):
-        if is_monkey_patched():
-            return
-        patch_socket_and_set_up_connection(cls)
+    # @classmethod
+    # def setUpClass(cls):
+    #     if is_monkey_patched():
+    #         return
+    #     patch_socket_and_set_up_connection(cls)
 
-    @classmethod
-    def tearDownClass(cls):
-        if is_monkey_patched():
-            return
-        cls.socket_patcher.stop()
+    # @classmethod
+    # def tearDownClass(cls):
+    #     if is_monkey_patched():
+    #         return
+    #     cls.socket_patcher.stop()
 
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
 
-class TestAsyncoreTimer(TimerTestMixin, unittest.TestCase):
+class TestAsyncoreTimer(AsyncorePatcher, TimerTestMixin):
     connection_class = AsyncoreConnection
 
     @property
@@ -70,17 +102,17 @@ class TestAsyncoreTimer(TimerTestMixin, unittest.TestCase):
     def _timers(self):
         return self.connection._loop._timers
 
-    @classmethod
-    def setUpClass(cls):
-        if is_monkey_patched():
-            return
-        patch_socket_and_set_up_connection(cls)
+    # @classmethod
+    # def setUpClass(cls):
+    #     if is_monkey_patched():
+    #         return
+    #     patch_socket_and_set_up_connection(cls)
 
-    @classmethod
-    def tearDownClass(cls):
-        if is_monkey_patched():
-            return
-        cls.socket_patcher.stop()
+    # @classmethod
+    # def tearDownClass(cls):
+    #     if is_monkey_patched():
+    #         return
+    #     cls.socket_patcher.stop()
 
     def setUp(self):
         if is_monkey_patched():
