@@ -228,7 +228,8 @@ class Statement(object):
                  is_idempotent=False):
         if retry_policy and not hasattr(retry_policy, 'on_read_timeout'):  # just checking one method to detect positional parameter errors
             raise ValueError('retry_policy should implement cassandra.policies.RetryPolicy')
-        self.retry_policy = retry_policy
+        if retry_policy is not None:
+            self.retry_policy = retry_policy
         if consistency_level is not None:
             self.consistency_level = consistency_level
         self._routing_key = routing_key
@@ -384,6 +385,7 @@ class PreparedStatement(object):
     """
 
     column_metadata = None  #TODO: make this bind_metadata in next major
+    retry_policy = None
     consistency_level = None
     custom_payload = None
     fetch_size = FETCH_SIZE_UNSET
@@ -488,6 +490,7 @@ class BoundStatement(Statement):
         """
         self.prepared_statement = prepared_statement
 
+        self.retry_policy = prepared_statement.retry_policy
         self.consistency_level = prepared_statement.consistency_level
         self.serial_consistency_level = prepared_statement.serial_consistency_level
         self.fetch_size = prepared_statement.fetch_size
