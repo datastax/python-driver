@@ -40,7 +40,7 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
     def setUp(self):
         if is_monkey_patched():
             from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
-            raise unittest.SkipTest("always skipping. is_gevent_time_monkey_patched: {} is_eventlet_monkey_patched: {}".format(is_gevent_monkey_patched(), is_eventlet_monkey_patched()))
+            raise unittest.SkipTest("always skipping. is_gevent_monkey_patched: {} is_eventlet_monkey_patched: {}".format(is_gevent_monkey_patched(), is_eventlet_monkey_patched()))
             # raise unittest.SkipTest("Can't test libev with monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
@@ -93,3 +93,56 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
                 self.assertTrue(conn._read_watcher.stop.mock_calls)
 
         LibevConnection._libevloop._shutdown = False
+
+
+import socket
+from tests.unit.io.utils import TimerTestMixin
+from mock import patch, Mock
+
+
+class LibevTimerPatcher(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.patchers = [
+            patch('socket.socket', spec=socket.socket),
+            patch('cassandra.io.libevwrapper.IO')
+        ]
+        for p in cls.patchers:
+            p.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        for p in cls.patchers:
+            try:
+                p.stop()
+            except:
+                pass
+
+
+class LibevTimerTest(LibevTimerPatcher, TimerTestMixin):
+
+    @property
+    def create_timer(self):
+        return self.connection.create_timer
+
+    @property
+    def _timers(self):
+        return self.connection._libevloop._timers
+
+    def make_connection(self):
+        c = LibevConnection('1.2.3.4', cql_version='3.0.1')
+        c._socket_impl = Mock()
+        c._socket.return_value.send.side_effect = lambda x: len(x)
+        return c
+
+    def setUp(self):
+        from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
+        raise unittest.SkipTest("always skipping. is_gevent_monkey_patched: {} is_eventlet_monkey_patched: {}".format(is_gevent_monkey_patched(), is_eventlet_monkey_patched()))
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test libev with monkey patching.")
+        if LibevConnection is None:
+            raise unittest.SkipTest('libev does not appear to be installed correctly')
+
+        LibevConnection.initialize_reactor()
+        self.connection = self.make_connection()
