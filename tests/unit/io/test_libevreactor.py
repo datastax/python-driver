@@ -39,7 +39,9 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
 
     def setUp(self):
         if is_monkey_patched():
-            raise unittest.SkipTest("Can't test libev with monkey patching")
+            from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
+            raise unittest.SkipTest("always skipping. is_gevent_time_monkey_patched: {} is_eventlet_monkey_patched: {}".format(is_gevent_monkey_patched(), is_eventlet_monkey_patched()))
+            # raise unittest.SkipTest("Can't test libev with monkey patching")
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()

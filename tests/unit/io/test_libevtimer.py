@@ -68,10 +68,12 @@ class LibevTimerTest(LibevTimerPatcher, TimerTestMixin):
         return c
 
     def setUp(self):
+        from tests import is_gevent_monkey_patched, is_eventlet_monkey_patched
+        raise unittest.SkipTest("always skipping. is_gevent_monkey_patched: {} is_eventlet_monkey_patched: {}".format(is_gevent_monkey_patched(), is_eventlet_monkey_patched()))
         if is_monkey_patched():
-            raise unittest.SkipTest("Can't test libev with monkey patching")
+            raise unittest.SkipTest("Can't test libev with monkey patching.")
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
 
-        self.connection = self.make_connection()
         LibevConnection.initialize_reactor()
+        self.connection = self.make_connection()
