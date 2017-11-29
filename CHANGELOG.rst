@@ -1,9 +1,14 @@
 3.13.0
 ======
 
+Features
+--------
+* cqlengine: LIKE filter operator (PYTHON-512)
+
 Bug Fixes
 ---------
 * Support retry_policy in PreparedStatement (PYTHON-861)
+
 
 3.12.0
 ======
