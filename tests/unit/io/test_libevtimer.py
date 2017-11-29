@@ -18,6 +18,7 @@ except ImportError:
 
 
 from mock import patch, Mock
+import socket
 
 
 from tests.unit.io.utils import TimerTestMixin
@@ -30,13 +31,31 @@ except ImportError:
     LibevConnection = None  # noqa
 
 
-@patch('socket.socket')
-@patch('cassandra.io.libevwrapper.IO')
-class LibevTimerTest(unittest.TestCase, TimerTestMixin):
+class LibevTimerPatcher(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.patchers = [
+            patch('socket.socket', spec=socket.socket),
+            patch('cassandra.io.libevwrapper.IO')
+        ]
+        for p in cls.patchers:
+            p.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        for p in cls.patchers:
+            try:
+                p.stop()
+            except:
+                pass
+
+
+class LibevTimerTest(LibevTimerPatcher, TimerTestMixin):
 
     @property
     def create_timer(self):
-        return self.connection.create_timer()
+        return self.connection.create_timer
 
     @property
     def _timers(self):
@@ -44,8 +63,8 @@ class LibevTimerTest(unittest.TestCase, TimerTestMixin):
 
     def make_connection(self):
         c = LibevConnection('1.2.3.4', cql_version='3.0.1')
-        c._socket = Mock()
-        c._socket.send.side_effect = lambda x: len(x)
+        c._socket_impl = Mock()
+        c._socket.return_value.send.side_effect = lambda x: len(x)
         return c
 
     def setUp(self):
@@ -54,42 +73,5 @@ class LibevTimerTest(unittest.TestCase, TimerTestMixin):
         if LibevConnection is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
 
-        # self.connection = LibevConnection('1.2.3.4', cql_version='3.0.1')
-        # self.connection._socket = Mock()
-        # self.connection._socket.send.side_effect = lambda x: len(x)
         self.connection = self.make_connection()
-
         LibevConnection.initialize_reactor()
-
-    # def test_multi_timer_validation(self, *args):
-    #     """
-    #     Verify that timer timeouts are honored appropriately
-    #     """
-    #     c = self.make_connection()
-    #     c.initialize_reactor()
-    #     # Tests timers submitted in order at various timeouts
-    #     submit_and_wait_for_completion(self, c, 0, 100, 1, 100)
-    #     # Tests timers submitted in reverse order at various timeouts
-    #     submit_and_wait_for_completion(self, c, 100, 0, -1, 100)
-    #     # Tests timers submitted in varying order at various timeouts
-    #     submit_and_wait_for_completion(self, c, 0, 100, 1, 100, True)
-
-    # @unittest.skip
-    # def test_timer_cancellation(self, *args):
-    #     """
-    #     Verify that timer cancellation is honored
-    #     """
-
-    #     # Various lists for tracking callback stage
-    #     connection = self.make_connection()
-    #     timeout = .1
-    #     callback = TimerCallback(timeout)
-    #     timer = connection.create_timer(timeout, callback.invoke)
-    #     timer.cancel()
-    #     # Release context allow for timer thread to run.
-    #     time.sleep(.2)
-    #     timer_manager = connection._libevloop._timers
-    #     # Assert that the cancellation was honored
-    #     self.assertFalse(timer_manager._queue)
-    #     self.assertFalse(timer_manager._new_timers)
-    #     self.assertFalse(callback.was_invoked())
