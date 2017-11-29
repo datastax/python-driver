@@ -23,8 +23,9 @@ try:
     from twisted.test import proto_helpers
     from twisted.python.failure import Failure
     from cassandra.io import twistedreactor
+    from twistedreactor import TwistedConnection
 except ImportError:
-    twistedreactor = None  # NOQA
+    twistedreactor = TwistedConnection = None  # NOQA
 
 from cassandra.connection import _Frame
 from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
@@ -36,44 +37,21 @@ class TestTwistedTimer(unittest.TestCase):
     classes function appropriately with the twisted infrastructure
     """
 
+    connection_class = TwistedConnection
+
+    @property
+    def create_timer(self):
+        return self.connection.create_timer
+
+    @property
+    def _timers(self):
+        return self.connection._loop._timers
+
     def setUp(self):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
         twistedreactor.TwistedConnection.initialize_reactor()
-
-    def test_multi_timer_validation(self):
-        """
-        Verify that the timers are called in the correct order
-        """
-        twistedreactor.TwistedConnection.initialize_reactor()
-        connection = twistedreactor.TwistedConnection('1.2.3.4',
-                                                       cql_version='3.0.1')
-        # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, connection, 0, 100, 1, 100)
-        # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, connection, 100, 0, -1, 100)
-        # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, connection, 0, 100, 1, 100, True)
-
-    def test_timer_cancellation(self, *args):
-        """
-        Verify that timer cancellation is honored
-        """
-
-        # Various lists for tracking callback stage
-        connection = twistedreactor.TwistedConnection('1.2.3.4',
-                                                       cql_version='3.0.1')
-        timeout = .1
-        callback = TimerCallback(timeout)
-        timer = connection.create_timer(timeout, callback.invoke)
-        timer.cancel()
-        # Release context allow for timer thread to run.
-        time.sleep(.2)
-        timer_manager = connection._loop._timers
-        # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())
+        super(TestTwistedTimer, self).setup()
 
 
 class TestTwistedProtocol(unittest.TestCase):
