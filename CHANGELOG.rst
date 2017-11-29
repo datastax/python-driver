@@ -13,6 +13,7 @@ Bug Fixes
 Other
 -----
 * cqlengine: avoid warning when unregistering connection on shutdown (PYTHON-865)
+* Fix DeprecationWarning of log.warn (PYTHON-846)
 
 3.12.0
 ======

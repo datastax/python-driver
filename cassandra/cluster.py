@@ -889,7 +889,7 @@ class Cluster(object):
             if self._config_mode is _ConfigMode.PROFILES:
                 default_lbp_profiles = self.profile_manager._profiles_without_explicit_lbps()
                 if default_lbp_profiles:
-                    log.warn(
+                    log.warning(
                         'Cluster.__init__ called with contact_points '
                         'specified, but load-balancing policies are not '
                         'specified in some ExecutionProfiles. In the next '
@@ -900,7 +900,7 @@ class Cluster(object):
                         ''.format(cp=contact_points, eps=default_lbp_profiles))
             else:
                 if load_balancing_policy is None:
-                    log.warn(
+                    log.warning(
                         'Cluster.__init__ called with contact_points '
                         'specified, but no load_balancing_policy. In the next '
                         'major version, this will raise an error; please '
@@ -1053,7 +1053,7 @@ class Cluster(object):
             self._contact_points_explicit and not
             profile._load_balancing_policy_explicit)
         if contact_points_but_no_lbp:
-            log.warn(
+            log.warning(
                 'Tried to add an ExecutionProfile with name {name}. '
                 '{self} was explicitly configured with contact_points, but '
                 '{ep} was not explicitly configured with a '
