@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 4.0.0
 =====
 
@@ -10,6 +11,19 @@ Other
 -----
 * Cassandra 2.0 support removal (PYTHON-716)
 * cqlengine: disallow Counter create, save operations (PYTHON-497)
+=======
+3.13.0
+======
+
+Features
+--------
+* cqlengine: LIKE filter operator (PYTHON-512)
+
+Bug Fixes
+---------
+* Support retry_policy in PreparedStatement (PYTHON-861)
+
+>>>>>>> master
 
 3.12.0
 ======

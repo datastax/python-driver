@@ -21,7 +21,8 @@ from cassandra.cluster import Cluster, ExecutionProfile
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy, RetryPolicy, WriteType
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimulacron, SIMULACRON_JAR
+from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimulacron, SIMULACRON_JAR, \
+    CASSANDRA_VERSION
 from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, \
     stop_simulacron, NO_THEN, clear_queries
 
@@ -45,7 +46,7 @@ class SpecExecTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if SIMULACRON_JAR is None:
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
             return
 
         start_and_prime_singledc()
@@ -70,7 +71,7 @@ class SpecExecTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if SIMULACRON_JAR is None:
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
             return
 
         cls.cluster.shutdown()
@@ -181,7 +182,7 @@ class CustomRetryPolicy(RetryPolicy):
 class RetryPolicyTets(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if SIMULACRON_JAR is None:
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
             return
         start_and_prime_singledc()
 
@@ -191,7 +192,7 @@ class RetryPolicyTets(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if SIMULACRON_JAR is None:
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
             return
         cls.cluster.shutdown()
         stop_simulacron()
@@ -222,9 +223,9 @@ class RetryPolicyTets(unittest.TestCase):
             "block_for": 2,
             "write_type": "SIMPLE"
           }
-        prime_query(query_to_prime_simple, then=then)
+        prime_query(query_to_prime_simple, then=then, rows=None, column_types=None)
         then["write_type"] = "CDC"
-        prime_query(query_to_prime_cdc, then=then)
+        prime_query(query_to_prime_cdc, then=then, rows=None, column_types=None)
 
         with self.assertRaises(WriteTimeout):
             self.session.execute(query_to_prime_simple)

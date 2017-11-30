@@ -58,7 +58,7 @@ class BaseCassEngTestCaseWithTable(BaseCassEngTestCase):
         drop_table(TestMultiKeyModel)
 
 
-class CollectionsModel(Model):
+class TestQueryUpdateModel(Model):
     partition = columns.UUID(primary_key=True, default=uuid4)
     cluster = columns.Integer(primary_key=True)
     count = columns.Integer(required=False)
