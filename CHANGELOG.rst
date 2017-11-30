@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 4.0.0
 =====
 
@@ -6,24 +5,16 @@ Features
 --------
 * cqlengine: asynchronous execution support (PYTHON-605)
 * cqlengine: Makes Model._table_name_ case sensitive (PYTHON-855)
-
-Other
------
-* Cassandra 2.0 support removal (PYTHON-716)
-* cqlengine: disallow Counter create, save operations (PYTHON-497)
-=======
-3.13.0
-======
-
-Features
---------
 * cqlengine: LIKE filter operator (PYTHON-512)
 
 Bug Fixes
 ---------
 * Support retry_policy in PreparedStatement (PYTHON-861)
 
->>>>>>> master
+Other
+-----
+* Cassandra 2.0 support removal (PYTHON-716)
+* cqlengine: disallow Counter create, save operations (PYTHON-497)
 
 3.12.0
 ======
