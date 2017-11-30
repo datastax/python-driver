@@ -17,18 +17,17 @@ try:
 except ImportError:
     import unittest
 from mock import Mock, patch
-import time
 
 try:
     from twisted.test import proto_helpers
     from twisted.python.failure import Failure
     from cassandra.io import twistedreactor
-    from twistedreactor import TwistedConnection
+    from cassandra.io.twistedreactor import TwistedConnection
 except ImportError:
     twistedreactor = TwistedConnection = None  # NOQA
 
+
 from cassandra.connection import _Frame
-from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
 
 
 class TestTwistedTimer(unittest.TestCase):
@@ -209,7 +208,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.handle_read()
         self.assertEqual(self.obj_ut._iobuf.getvalue(), extra)
         self.obj_ut.process_msg.assert_called_with(
-            _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos= 9 + len(body)), body)
+            _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos=9 + len(body)), body)
 
     @patch('twisted.internet.reactor.connectTCP')
     def test_push(self, mock_connectTCP):
@@ -220,4 +219,3 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.push('123 pickup')
         self.mock_reactor_cft.assert_called_with(
             self.obj_ut.connector.transport.write, '123 pickup')
-
