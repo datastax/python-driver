@@ -5,6 +5,11 @@ Features
 --------
 * cqlengine: asynchronous execution support (PYTHON-605)
 * cqlengine: Makes Model._table_name_ case sensitive (PYTHON-855)
+* cqlengine: LIKE filter operator (PYTHON-512)
+
+Bug Fixes
+---------
+* Support retry_policy in PreparedStatement (PYTHON-861)
 
 Other
 -----

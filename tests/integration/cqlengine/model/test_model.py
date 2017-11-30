@@ -24,7 +24,7 @@ from cassandra.cqlengine import models
 from cassandra.cqlengine.models import Model, ModelDefinitionException
 from uuid import uuid1
 from tests.integration import pypy
-from tests.integration.cqlengine.base import CollectionsModel
+from tests.integration.cqlengine.base import TestQueryUpdateModel
 
 class TestModel(unittest.TestCase):
     """ Tests the non-io functionality of models """
@@ -210,16 +210,16 @@ class ModelOverWriteTest(unittest.TestCase):
 
 class TestColumnComparison(unittest.TestCase):
     def test_comparison(self):
-        l = [CollectionsModel.partition.column,
-             CollectionsModel.cluster.column,
-             CollectionsModel.count.column,
-             CollectionsModel.text.column,
-             CollectionsModel.text_set.column,
-             CollectionsModel.text_list.column,
-             CollectionsModel.text_map.column]
+        l = [TestQueryUpdateModel.partition.column,
+             TestQueryUpdateModel.cluster.column,
+             TestQueryUpdateModel.count.column,
+             TestQueryUpdateModel.text.column,
+             TestQueryUpdateModel.text_set.column,
+             TestQueryUpdateModel.text_list.column,
+             TestQueryUpdateModel.text_map.column]
 
         self.assertEqual(l, sorted(l))
-        self.assertNotEqual(CollectionsModel.partition.column, CollectionsModel.cluster.column)
-        self.assertLessEqual(CollectionsModel.partition.column, CollectionsModel.cluster.column)
-        self.assertGreater(CollectionsModel.cluster.column, CollectionsModel.partition.column)
-        self.assertGreaterEqual(CollectionsModel.cluster.column, CollectionsModel.partition.column)
+        self.assertNotEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
+        self.assertLessEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
+        self.assertGreater(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)
+        self.assertGreaterEqual(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)

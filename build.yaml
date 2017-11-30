@@ -58,6 +58,18 @@ schedules:
     env_vars: |
       EVENT_LOOP_MANAGER='twisted'
 
+  upgrade_tests:
+    schedule: adhoc
+    branches:
+      include: [master, python-546]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+      JUST_UPGRADE=True
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
+        - cassandra: ['2.0', '2.1', '2.2', '3.0']
+
 python:
   - 2.7
   - 3.4
@@ -90,6 +102,7 @@ build:
 
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
+      pip install nose-exclude
       FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
         FORCE_CYTHON=True
@@ -117,6 +130,14 @@ build:
 
       popd
 
+
+      echo "JUST_UPGRADE: $JUST_UPGRADE"
+      if [[ $JUST_UPGRADE == 'True' ]]; then
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=upgrade_results.xml tests/integration/upgrade || true
+        exit 0
+      fi
+
+
       # Run the unit tests, this is not done in travis because
       # it takes too much time for the whole matrix to build with cython
       if [[ $CYTHON == 'CYTHON' ]]; then
@@ -138,6 +159,6 @@ build:
       EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
       echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
   - xunit:
     - "*_results.xml"

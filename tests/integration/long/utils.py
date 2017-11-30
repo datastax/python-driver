@@ -20,6 +20,7 @@ from collections import defaultdict
 from ccmlib.node import Node
 
 from cassandra.query import named_tuple_factory
+from cassandra.cluster import ConsistencyLevel
 
 from tests.integration import get_node, get_cluster, wait_for_node_socket
 
@@ -59,6 +60,7 @@ def create_schema(cluster, session, keyspace, simple_strategy=True,
                   replication_factor=1, replication_strategy=None):
     row_factory = session.row_factory
     session.row_factory = named_tuple_factory
+    session.default_consistency_level = ConsistencyLevel.QUORUM
 
     if keyspace in cluster.metadata.keyspaces.keys():
         session.execute('DROP KEYSPACE %s' % keyspace, timeout=20)
@@ -80,6 +82,7 @@ def create_schema(cluster, session, keyspace, simple_strategy=True,
     session.execute('USE %s' % keyspace)
 
     session.row_factory = row_factory
+    session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
 
 
 def start(node):

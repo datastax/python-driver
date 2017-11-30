@@ -320,12 +320,6 @@ def prime_query(query, rows=default_rows, column_types=default_column_types, whe
     :return:
     """
     # If then is set, then rows and column_types should not
-    if then:
-        nose.tools.assert_equal(rows, default_rows)
-        nose.tools.assert_equal(column_types, default_column_types)
-        rows=None
-        column_types=None
-
     query = PrimeQuery(query, rows=rows, column_types=column_types, when=when, then=then, cluster_name=cluster_name)
     response = prime_request(query)
     return response

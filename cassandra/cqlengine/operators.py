@@ -93,3 +93,8 @@ class LessThanOrEqualOperator(BaseWhereOperator):
 class ContainsOperator(EqualsOperator):
     symbol = "CONTAINS"
     cql_symbol = 'CONTAINS'
+
+
+class LikeOperator(EqualsOperator):
+    symbol = "LIKE"
+    cql_symbol = 'LIKE'
