@@ -22,6 +22,7 @@ from tests.unit.io.utils import TimerTestMixin
 from tests import notpypy, MONKEY_PATCH_LOOP, notmonkeypatch
 
 from eventlet import monkey_patch
+from mock import patch
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
@@ -33,7 +34,10 @@ skip_condition = EventletConnection is None or MONKEY_PATCH_LOOP != "eventlet"
 @notpypy
 @unittest.skipIf(skip_condition, "Skipping the eventlet tests because it's not installed")
 @notmonkeypatch
-class EventletTimerTest(unittest.TestCase, TimerTestMixin):
+class EventletTimerTest(TimerTestMixin, unittest.TestCase):
+
+    connection_class = EventletConnection
+
     @classmethod
     def setUpClass(cls):
         # This is run even though the class is skipped, so we need
@@ -45,8 +49,30 @@ class EventletTimerTest(unittest.TestCase, TimerTestMixin):
         # https://github.com/eventlet/eventlet/issues/401
         import eventlet; eventlet.sleep()
         monkey_patch()
-        cls.connection_class = EventletConnection
+        # cls.connection_class = EventletConnection
+
         EventletConnection.initialize_reactor()
+        assert EventletConnection._timers is not None
+
+    def setUp(self):
+        import eventlet
+        patchers = (patch('eventlet.green.socket.socket',
+                          spec=eventlet.green.socket.socket),)
+
+        for p in patchers:
+            self.addCleanup(p.stop)
+        for p in patchers:
+            p.start()
+
+        super(EventletTimerTest, self).setUp()
+
+    @property
+    def create_timer(self):
+        return self.connection.create_timer
+
+    @property
+    def _timers(self):
+        return self.connection._timers
 
     # There is no unpatching because there is not a clear way
     # of doing it reliably

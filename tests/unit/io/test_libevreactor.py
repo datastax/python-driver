@@ -50,8 +50,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
         patchers = [patch(obj) for obj in
                     ('socket.socket',
                      'cassandra.io.libevwrapper.IO',
-                     # 'cassandra.io.libevwrapper.Prepare',
-                     # 'cassandra.io.libevwrapper.Async',
                      'cassandra.io.libevreactor.LibevLoop.maybe_start'
                      )]
         for p in patchers:
