@@ -61,7 +61,6 @@ class AsyncoreConnectionTest(ReactorTestMixin, AsyncorePatcher):
 
     connection_class = AsyncoreConnection
     socket_attr_name = 'socket'
-    loop_attr_name = '_loop'
 
     # @classmethod
     # def setUpClass(cls):
