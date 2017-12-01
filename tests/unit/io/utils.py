@@ -180,7 +180,7 @@ class TimerTestMixin(object):
 
 class ReactorTestMixin(object):
 
-    connection_class = loop_attr_name = socket_attr_name = None
+    connection_class = socket_attr_name = None
     null_handle_function_args = ()
 
     def get_socket(self, connection):
@@ -188,9 +188,6 @@ class ReactorTestMixin(object):
 
     def set_socket(self, connection, obj):
         return setattr(connection, self.socket_attr_name, obj)
-
-    def get_loop(self, connection):
-        return getattr(connection, self.loop_attr_name)
 
     def make_header_prefix(self, message_class, version=2, stream_id=0):
         return binary_type().join(map(uint8_pack, [
