@@ -3460,12 +3460,12 @@ class ResponseFuture(object):
         self.prepared_statement = prepared_statement
         self._callback_lock = Lock()
         self._start_time = start_time or time.time()
+        self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self._make_query_plan()
         self._event = Event()
         self._errors = {}
         self._callbacks = []
         self._errbacks = []
-        self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
         self._start_timer()
 
@@ -3534,6 +3534,10 @@ class ResponseFuture(object):
         # calls to send_request (which retries may do) will resume where
         # they last left off
         self.query_plan = iter(self._load_balancer.make_query_plan(self.session.keyspace, self.query))
+        # Make iterator thread safe when there can be a speculative delay since it could
+        # from different threads
+        if isinstance(self._spec_execution_plan, NoSpeculativeExecutionPlan):
+            self.query_plan = _threadsafe_iter(self.query_plan)
 
     def send_request(self, error_no_hosts=True):
         """ Internal """
@@ -4306,3 +4310,16 @@ class ResultSet(object):
         avoid sending this to untrusted parties.
         """
         return self.response_future._paging_state
+
+
+class _threadsafe_iter(six.Iterator):
+    def __init__(self, it):
+        self.it = it
+        self.lock = Lock()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        with self.lock:
+            return next(self.it)
