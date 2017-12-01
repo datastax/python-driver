@@ -2435,8 +2435,13 @@ class Session(object):
         self.shutdown()
 
     def __del__(self):
-        # Ensure all connections are closed, in case the Session object is deleted by the GC
-        self.shutdown()
+        try:
+            # Ensure all connections are closed, in case the Session object is deleted by the GC
+            self.shutdown()
+        except:
+            # Ignore all errors. Shutdown errors can be caught by the user
+            # when cluster.shutdown() is called explicitly.
+            pass
 
     def add_or_renew_pool(self, host, is_host_addition):
         """

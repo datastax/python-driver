@@ -8,7 +8,7 @@ Features
 Bug Fixes
 ---------
 * Support retry_policy in PreparedStatement (PYTHON-861)
-
+* __del__ method in Session is throwing an exception (PYTHON-813)
 
 3.12.0
 ======
