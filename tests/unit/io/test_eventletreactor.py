@@ -47,7 +47,8 @@ class EventletTimerTest(TimerTestMixin, unittest.TestCase):
 
         # This is being added temporarily due to a bug in eventlet:
         # https://github.com/eventlet/eventlet/issues/401
-        import eventlet; eventlet.sleep()
+        import eventlet
+        eventlet.sleep()
         monkey_patch()
         # cls.connection_class = EventletConnection
 
@@ -55,16 +56,17 @@ class EventletTimerTest(TimerTestMixin, unittest.TestCase):
         assert EventletConnection._timers is not None
 
     def setUp(self):
-        import eventlet
-        patchers = (patch('eventlet.green.socket.socket',
-                          spec=eventlet.green.socket.socket),)
-
-        for p in patchers:
-            self.addCleanup(p.stop)
-        for p in patchers:
-            p.start()
+        socket_patcher = patch('eventlet.green.socket.socket')
+        self.addCleanup(socket_patcher.stop)
+        socket_patcher.start()
 
         super(EventletTimerTest, self).setUp()
+
+        recv_patcher = patch.object(self.connection._socket,
+                                    'recv',
+                                    return_value=b'')
+        self.addCleanup(recv_patcher.stop)
+        recv_patcher.start()
 
     @property
     def create_timer(self):

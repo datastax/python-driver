@@ -28,7 +28,7 @@ except ImportError:
 
 
 skip_condition = GeventConnection is None or MONKEY_PATCH_LOOP != "gevent"
-@unittest.skipIf(skip_condition, "Skipping the gevent tests because it's not installed; GeventConnection={}; MONKEY_PATCH_LOOP={}".format(GeventConnection, MONKEY_PATCH_LOOP))
+@unittest.skipIf(skip_condition, "Skipping the gevent tests because it's not installed")
 @notmonkeypatch
 class GeventTimerTest(unittest.TestCase, TimerTestMixin):
     @classmethod
