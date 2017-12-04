@@ -18,7 +18,7 @@ try:
 except ImportError:
     import unittest # noqa
 
-from tests.unit.io.utils import TimerTestMixin
+from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin
 from tests import notpypy, MONKEY_PATCH_LOOP, notmonkeypatch
 
 from eventlet import monkey_patch
@@ -78,3 +78,35 @@ class EventletTimerTest(TimerTestMixin, unittest.TestCase):
 
     # There is no unpatching because there is not a clear way
     # of doing it reliably
+
+
+# @notpypy
+# @unittest.skipIf(skip_condition, "Skipping the eventlet tests because it's not installed")
+# @notmonkeypatch
+# class EventletConnectionTest(ReactorTestMixin, unittest.TestCase):
+#     connection_class = EventletConnection
+#     socket_attr_name = '_socket'
+
+#     @classmethod
+#     def setUpClass(cls):
+#         # This is run even though the class is skipped, so we need
+#         # to make sure no monkey patching is happening
+#         if skip_condition:
+#             return
+
+#         # This is being added temporarily due to a bug in eventlet:
+#         # https://github.com/eventlet/eventlet/issues/401
+#         import eventlet
+#         eventlet.sleep()
+#         monkey_patch()
+#         # cls.connection_class = EventletConnection
+
+#         EventletConnection.initialize_reactor()
+#         assert EventletConnection._timers is not None
+
+#     def setUp(self):
+#         socket_patcher = patch('eventlet.green.socket.socket')
+#         self.addCleanup(socket_patcher.stop)
+#         socket_patcher.start()
+
+#         super(EventletConnectionTest, self).setUp()
