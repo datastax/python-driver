@@ -62,18 +62,6 @@ class AsyncoreConnectionTest(ReactorTestMixin, AsyncorePatcher):
     connection_class = AsyncoreConnection
     socket_attr_name = 'socket'
 
-    # @classmethod
-    # def setUpClass(cls):
-    #     if is_monkey_patched():
-    #         return
-    #     patch_socket_and_set_up_connection(cls)
-
-    # @classmethod
-    # def tearDownClass(cls):
-    #     if is_monkey_patched():
-    #         return
-    #     cls.socket_patcher.stop()
-
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
@@ -89,18 +77,6 @@ class TestAsyncoreTimer(TimerTestMixin, AsyncorePatcher):
     @property
     def _timers(self):
         return self.connection._loop._timers
-
-    # @classmethod
-    # def setUpClass(cls):
-    #     if is_monkey_patched():
-    #         return
-    #     patch_socket_and_set_up_connection(cls)
-
-    # @classmethod
-    # def tearDownClass(cls):
-    #     if is_monkey_patched():
-    #         return
-    #     cls.socket_patcher.stop()
 
     def setUp(self):
         if is_monkey_patched():
