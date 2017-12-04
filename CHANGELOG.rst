@@ -15,6 +15,7 @@ Other
 -----
 * cqlengine: avoid warning when unregistering connection on shutdown (PYTHON-865)
 * Fix DeprecationWarning of log.warn (PYTHON-846)
+* Fix example_mapper.py for python3 (PYTHON-860)
 
 3.12.0
 ======
