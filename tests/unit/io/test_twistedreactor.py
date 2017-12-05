@@ -29,8 +29,9 @@ except ImportError:
 
 from cassandra.connection import _Frame
 
+from tests.unit.io.utils import TimerTestMixin
 
-class TestTwistedTimer(unittest.TestCase):
+class TestTwistedTimer(TimerTestMixin, unittest.TestCase):
     """
     Simple test class that is used to validate that the TimerManager, and timer
     classes function appropriately with the twisted infrastructure
@@ -50,7 +51,7 @@ class TestTwistedTimer(unittest.TestCase):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
         twistedreactor.TwistedConnection.initialize_reactor()
-        super(TestTwistedTimer, self).setup()
+        super(TestTwistedTimer, self).setUp()
 
 
 class TestTwistedProtocol(unittest.TestCase):
