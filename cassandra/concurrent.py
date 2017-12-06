@@ -81,6 +81,9 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
             else:
                 process_user(result[0])  # result will be a list of rows
 
+    Note: in the case that `generators` are used, it is important to ensure the consumers do not
+    block or attempt further synchronous requests, because no further IO will be processed until
+    the consumer returns. This may also produce a deadlock in the IO event thread.
     """
     if concurrency <= 0:
         raise ValueError("concurrency must be greater than 0")
