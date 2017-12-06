@@ -211,7 +211,6 @@ def unregister_connection(name):
         del _connections[DEFAULT_CONNECTION]
         cluster = None
         session = None
-        log.warning("Unregistering default connection '{0}'. Use set_default_connection to set a new one.".format(name))
 
     conn = _connections[name]
     if conn.cluster:
