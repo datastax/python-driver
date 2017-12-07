@@ -562,13 +562,15 @@ class AbstractQuerySet(object):
         if isinstance(s, slice):
             start = s.start if s.start else 0
 
-            # calculate the amount of results that need to be loaded
-            end = s.stop
-            if start < 0 or s.stop is None or s.stop < 0:
-                end = self.count()
+            # no support for negative indices
+            if start < 0 or (s.stop is not None and s.stop < 0):
+                raise ValueError("QuerySet slice indices must be positive")
 
             try:
-                self._fill_result_cache_to_idx(end)
+                if s.stop:
+                    self._fill_result_cache_to_idx(s.stop)
+                else:
+                    self._fill_result_cache()
             except StopIteration:
                 pass
 
@@ -579,10 +581,9 @@ class AbstractQuerySet(object):
             except (ValueError, TypeError):
                 raise TypeError('QuerySet indices must be integers')
 
-            # Using negative indexing is costly since we have to execute a count()
+            # no support for negative indices
             if s < 0:
-                num_results = self.count()
-                s += num_results
+                raise ValueError("QuerySet indices must be positive")
 
             try:
                 self._fill_result_cache_to_idx(s)

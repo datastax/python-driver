@@ -64,6 +64,11 @@ Upgrade Guide 3.x to 4.x
     v.rating_counter += 1
     v.update()
 
+* ModelQuerySet support for negative slice indices has been removed due to the
+  inefficiency and performance cost. The following code now raises an error::
+
+    Automobile.objects.all()[-10:]
+
 Upgrade Guide cqlengine to cassandra.cqlengine
 ==============================================
 
