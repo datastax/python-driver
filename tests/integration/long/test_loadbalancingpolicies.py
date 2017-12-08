@@ -19,7 +19,7 @@ import traceback
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (RoundRobinPolicy, DCAwareRoundRobinPolicy,
@@ -60,7 +60,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def _connect_probe_cluster(self):
         if not self.probe_cluster:
             # distinct cluster so we can see the status of nodes ignored by the LBP being tested
-            self.probe_cluster = Cluster(load_balancing_policy=RoundRobinPolicy(),
+            ep = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+            self.probe_cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep},
                                          schema_metadata_enabled=False, token_metadata_enabled=False)
             self.probe_session = self.probe_cluster.connect()
 
@@ -80,7 +81,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
     def _cluster_session_with_lbp(self, lbp):
         # create a cluster with no delay on events
-        cluster = Cluster(load_balancing_policy=lbp, protocol_version=PROTOCOL_VERSION,
+        ep = ExecutionProfile(load_balancing_policy=lbp)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: ep},
                           topology_event_refresh_window=0, status_event_refresh_window=0)
         session = cluster.connect()
         return cluster, session
@@ -160,9 +162,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
 
         if murmur3 is not None:
-            self.assertTrue(isinstance(cluster.load_balancing_policy, TokenAwarePolicy))
+            self.assertTrue(isinstance(
+                cluster.profile_manager.default.load_balancing_policy, TokenAwarePolicy))
         else:
-            self.assertTrue(isinstance(cluster.load_balancing_policy, DCAwareRoundRobinPolicy))
+            self.assertTrue(isinstance(
+                cluster.profile_manager.default.load_balancing_policy, DCAwareRoundRobinPolicy))
 
         cluster.shutdown()
 
@@ -636,7 +640,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_singledc()
         keyspace = 'test_white_list'
 
-        cluster = Cluster(('127.0.0.2',), load_balancing_policy=WhiteListRoundRobinPolicy((IP_FORMAT % 2,)),
+        ep = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy((IP_FORMAT % 2,)))
+        cluster = Cluster(('127.0.0.2',), execution_profiles={EXEC_PROFILE_DEFAULT: ep},
                           protocol_version=PROTOCOL_VERSION, topology_event_refresh_window=0,
                           status_event_refresh_window=0)
         session = cluster.connect()
@@ -684,9 +689,10 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             child_policy=RoundRobinPolicy(),
             predicate=lambda host: host.address != ignored_address
         )
+        ep = ExecutionProfile(load_balancing_policy=hfp)
         cluster = Cluster(
             (IP_FORMAT % 1,),
-            load_balancing_policy=hfp,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION,
             topology_event_refresh_window=0,
             status_event_refresh_window=0

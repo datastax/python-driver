@@ -566,8 +566,8 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
         execute_with_long_wait_retry(cls.session, ddl)
 
     @classmethod
-    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, metrics=False):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, metrics_enabled=metrics)
+    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, **cluster_kwargs):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, **cluster_kwargs)
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
@@ -685,7 +685,7 @@ class BasicSharedKeyspaceUnitTestCaseRF3WM(BasicSharedKeyspaceUnitTestCase):
     """
     @classmethod
     def setUpClass(self):
-        self.common_setup(3, True, True, True)
+        self.common_setup(3, True, True, metrics_enabled=True)
 
 
 class BasicSharedKeyspaceUnitTestCaseWFunctionTable(BasicSharedKeyspaceUnitTestCase):

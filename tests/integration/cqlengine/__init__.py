@@ -25,6 +25,7 @@ from concurrent.futures import Future
 
 import cassandra
 from cassandra import ConsistencyLevel
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 
 from cassandra.cqlengine import connection
 import cassandra.cqlengine.columns as columns
@@ -59,8 +60,9 @@ def is_prepend_reversed():
 
 
 def setup_connection(keyspace_name):
+    ep = ExecutionProfile(consistency_level=ConsistencyLevel.ONE)
     connection.setup([CASSANDRA_IP],
-                     consistency=ConsistencyLevel.ONE,
+                     execution_profiles={EXEC_PROFILE_DEFAULT: ep},
                      protocol_version=PROTOCOL_VERSION,
                      default_keyspace=keyspace_name)
 

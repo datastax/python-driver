@@ -312,12 +312,6 @@ Use this as the key in ``Cluster(execution_profiles)`` to override the default p
 """
 
 
-class _ConfigMode(object):
-    UNCOMMITTED = 0
-    LEGACY = 1
-    PROFILES = 2
-
-
 class Cluster(object):
     """
     The main class to use when interacting with a Cassandra cluster.
@@ -430,30 +424,13 @@ class Cluster(object):
 
         self._auth_provider = value
 
-    _load_balancing_policy = None
     @property
-    def load_balancing_policy(self):
-        """
-        An instance of :class:`.policies.LoadBalancingPolicy` or
-        one of its subclasses.
+    def _default_timeout(self):
+        return self.profile_manager.default.request_timeout
 
-        .. versionchanged:: 2.6.0
-
-        Defaults to :class:`~.TokenAwarePolicy` (:class:`~.DCAwareRoundRobinPolicy`).
-        when using CPython (where the murmur3 extension is available). :class:`~.DCAwareRoundRobinPolicy`
-        otherwise. Default local DC will be chosen from contact points.
-
-        **Please see** :class:`~.DCAwareRoundRobinPolicy` **for a discussion on default behavior with respect to
-        DC locality and remote nodes.**
-        """
-        return self._load_balancing_policy
-
-    @load_balancing_policy.setter
-    def load_balancing_policy(self, lbp):
-        if self._config_mode == _ConfigMode.PROFILES:
-            raise ValueError("Cannot set Cluster.load_balancing_policy while using Configuration Profiles. Set this in a profile instead.")
-        self._load_balancing_policy = lbp
-        self._config_mode = _ConfigMode.LEGACY
+    @property
+    def _default_row_factory(self):
+        return self.profile_manager.default.row_factory
 
     @property
     def _default_load_balancing_policy(self):
@@ -465,23 +442,6 @@ class Cluster(object):
     of :class:`.ExponentialReconnectionPolicy` with a base delay of one second and
     a max delay of ten minutes.
     """
-
-    _default_retry_policy = RetryPolicy()
-    @property
-    def default_retry_policy(self):
-        """
-        A default :class:`.policies.RetryPolicy` instance to use for all
-        :class:`.Statement` objects which do not have a :attr:`~.Statement.retry_policy`
-        explicitly set.
-        """
-        return self._default_retry_policy
-
-    @default_retry_policy.setter
-    def default_retry_policy(self, policy):
-        if self._config_mode == _ConfigMode.PROFILES:
-            raise ValueError("Cannot set Cluster.default_retry_policy while using Configuration Profiles. Set this in a profile instead.")
-        self._default_retry_policy = policy
-        self._config_mode = _ConfigMode.LEGACY
 
     conviction_policy_factory = SimpleConvictionPolicy
     """
@@ -499,7 +459,7 @@ class Cluster(object):
     connect_to_remote_hosts = True
     """
     If left as :const:`True`, hosts that are considered :attr:`~.HostDistance.REMOTE`
-    by the :attr:`~.Cluster.load_balancing_policy` will have a connection
+    by the :attr:`~.Cluster.profile_manager` will have a connection
     opened to them.  Otherwise, they will not have a connection opened to them.
 
     Note that the default load balancing policy ignores remote hosts by default.
@@ -716,7 +676,6 @@ class Cluster(object):
         self.control_connection._token_meta_enabled = bool(enabled)
 
     profile_manager = None
-    _config_mode = _ConfigMode.UNCOMMITTED
 
     sessions = None
     control_connection = None
@@ -743,9 +702,7 @@ class Cluster(object):
                  port=9042,
                  compression=True,
                  auth_provider=None,
-                 load_balancing_policy=None,
                  reconnection_policy=None,
-                 default_retry_policy=None,
                  conviction_policy_factory=None,
                  metrics_enabled=False,
                  connection_class=None,
@@ -807,22 +764,10 @@ class Cluster(object):
 
         self.auth_provider = auth_provider
 
-        if load_balancing_policy is not None:
-            if isinstance(load_balancing_policy, type):
-                raise TypeError("load_balancing_policy should not be a class, it should be an instance of that class")
-            self.load_balancing_policy = load_balancing_policy
-        else:
-            self._load_balancing_policy = default_lbp_factory()  # set internal attribute to avoid committing to legacy config mode
-
         if reconnection_policy is not None:
             if isinstance(reconnection_policy, type):
                 raise TypeError("reconnection_policy should not be a class, it should be an instance of that class")
             self.reconnection_policy = reconnection_policy
-
-        if default_retry_policy is not None:
-            if isinstance(default_retry_policy, type):
-                raise TypeError("default_retry_policy should not be a class, it should be an instance of that class")
-            self.default_retry_policy = default_retry_policy
 
         if conviction_policy_factory is not None:
             if not callable(conviction_policy_factory):
@@ -845,46 +790,24 @@ class Cluster(object):
             self.timestamp_generator = MonotonicTimestampGenerator()
 
         self.profile_manager = ProfileManager()
-        self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
-                                                                               self.default_retry_policy,
-                                                                               Session._default_consistency_level,
-                                                                               Session._default_serial_consistency_level,
-                                                                               Session._default_timeout,
-                                                                               Session._row_factory)
-        # legacy mode if either of these is not default
-        if load_balancing_policy or default_retry_policy:
-            if execution_profiles:
-                raise ValueError("Clusters constructed with execution_profiles should not specify legacy parameters "
-                                 "load_balancing_policy or default_retry_policy. Configure this in a profile instead.")
-            self._config_mode = _ConfigMode.LEGACY
 
-        else:
-            if execution_profiles:
-                self.profile_manager.profiles.update(execution_profiles)
-                self._config_mode = _ConfigMode.PROFILES
+        profiles = self.profile_manager.profiles
+        profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile()
+        if execution_profiles:
+            profiles.update(execution_profiles)
 
         if self._contact_points_explicit:
-            if self._config_mode is _ConfigMode.PROFILES:
-                default_lbp_profiles = self.profile_manager._profiles_without_explicit_lbps()
-                if default_lbp_profiles:
-                    log.warn(
-                        'Cluster.__init__ called with contact_points '
-                        'specified, but load-balancing policies are not '
-                        'specified in some ExecutionProfiles. In the next '
-                        'major version, this will raise an error; please '
-                        'specify a load-balancing policy. '
-                        '(contact_points = {cp}, '
-                        'EPs without explicit LBPs = {eps})'
-                        ''.format(cp=contact_points, eps=default_lbp_profiles))
-            else:
-                if load_balancing_policy is None:
-                    log.warn(
-                        'Cluster.__init__ called with contact_points '
-                        'specified, but no load_balancing_policy. In the next '
-                        'major version, this will raise an error; please '
-                        'specify a load-balancing policy. '
-                        '(contact_points = {cp}, lbp = {lbp})'
-                        ''.format(cp=contact_points, lbp=load_balancing_policy))
+            default_lbp_profiles = self.profile_manager._profiles_without_explicit_lbps()
+            if default_lbp_profiles:
+                log.warn(
+                    'Cluster.__init__ called with contact_points '
+                    'specified, but load-balancing policies are not '
+                    'specified in some ExecutionProfiles. In the next '
+                    'major version, this will raise an error; please '
+                    'specify a load-balancing policy. '
+                    '(contact_points = {cp}, '
+                    'EPs without explicit LBPs = {eps})'
+                    ''.format(cp=contact_points, eps=default_lbp_profiles))
 
         self.metrics_enabled = metrics_enabled
         self.ssl_options = ssl_options
@@ -999,8 +922,6 @@ class Cluster(object):
         """
         if not isinstance(profile, ExecutionProfile):
             raise TypeError("profile must be an instance of ExecutionProfile")
-        if self._config_mode == _ConfigMode.LEGACY:
-            raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly.")
         if name in self.profile_manager.profiles:
             raise ValueError("Profile %s already exists")
         contact_points_but_no_lbp = (
@@ -1096,9 +1017,6 @@ class Cluster(object):
 
                 self.profile_manager.populate(
                     weakref.proxy(self), self.metadata.all_hosts())
-                self.load_balancing_policy.populate(
-                    weakref.proxy(self), self.metadata.all_hosts()
-                )
 
                 try:
                     self.control_connection.connect()
@@ -1706,84 +1624,6 @@ class Session(object):
     keyspace = None
     is_shutdown = False
 
-    _row_factory = staticmethod(named_tuple_factory)
-    @property
-    def row_factory(self):
-        """
-        The format to return row results in.  By default, each
-        returned row will be a named tuple.  You can alternatively
-        use any of the following:
-
-          - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
-          - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
-          - :func:`cassandra.query.dict_factory` - return a result row as a dict
-          - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
-
-        """
-        return self._row_factory
-
-    @row_factory.setter
-    def row_factory(self, rf):
-        self._validate_set_legacy_config('row_factory', rf)
-
-    _default_timeout = 10.0
-
-    @property
-    def default_timeout(self):
-        """
-        A default timeout, measured in seconds, for queries executed through
-        :meth:`.execute()` or :meth:`.execute_async()`.  This default may be
-        overridden with the `timeout` parameter for either of those methods.
-
-        Setting this to :const:`None` will cause no timeouts to be set by default.
-
-        Please see :meth:`.ResponseFuture.result` for details on the scope and
-        effect of this timeout.
-
-        .. versionadded:: 2.0.0
-        """
-        return self._default_timeout
-
-    @default_timeout.setter
-    def default_timeout(self, timeout):
-        self._validate_set_legacy_config('default_timeout', timeout)
-
-    _default_consistency_level = ConsistencyLevel.LOCAL_ONE
-
-    @property
-    def default_consistency_level(self):
-        """
-        The default :class:`~ConsistencyLevel` for operations executed through
-        this session.  This default may be overridden by setting the
-        :attr:`~.Statement.consistency_level` on individual statements.
-
-        .. versionadded:: 1.2.0
-
-        .. versionchanged:: 3.0.0
-
-            default changed from ONE to LOCAL_ONE
-        """
-        return self._default_consistency_level
-
-    @default_consistency_level.setter
-    def default_consistency_level(self, cl):
-        self._validate_set_legacy_config('default_consistency_level', cl)
-
-    _default_serial_consistency_level = None
-
-    @property
-    def default_serial_consistency_level(self):
-        """
-        The default :class:`~ConsistencyLevel` for serial phase of  conditional updates executed through
-        this session.  This default may be overridden by setting the
-        :attr:`~.Statement.serial_consistency_level` on individual statements.
-        """
-        return self._default_serial_consistency_level
-
-    @default_serial_consistency_level.setter
-    def default_serial_consistency_level(self, cl):
-        self._validate_set_legacy_config('default_serial_consistency_level', cl)
-
     max_trace_wait = 2.0
     """
     The maximum amount of time (in seconds) the driver will wait for trace
@@ -1926,10 +1766,10 @@ class Session(object):
 
         `timeout` should specify a floating-point timeout (in seconds) after
         which an :exc:`.OperationTimedOut` exception will be raised if the query
-        has not completed.  If not set, the timeout defaults to
-        :attr:`~.Session.default_timeout`.  If set to :const:`None`, there is
-        no timeout. Please see :meth:`.ResponseFuture.result` for details on
-        the scope and effect of this timeout.
+        has not completed. If not set, the timeout defaults to the request_timeout
+        of the selected ``execution_profile``. If set to :const:`None`, there is
+        no timeout. Please see :meth:`.ResponseFuture.result` for details on the scope
+        and effect of this timeout.
 
         If `trace` is set to :const:`True`, the query will be sent with tracing enabled.
         The trace details can be obtained using the returned :class:`.ResultSet` object.
@@ -1997,34 +1837,13 @@ class Session(object):
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
 
-        if self.cluster._config_mode == _ConfigMode.LEGACY:
-            if execution_profile is not EXEC_PROFILE_DEFAULT:
-                raise ValueError("Cannot specify execution_profile while using legacy parameters.")
+        execution_profile = self._get_execution_profile(execution_profile)
 
-            if timeout is _NOT_SET:
-                timeout = self.default_timeout
+        if timeout is _NOT_SET:
+            timeout = execution_profile.request_timeout
 
-            cl = query.consistency_level if query.consistency_level is not None else self.default_consistency_level
-            serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else self.default_serial_consistency_level
-
-            retry_policy = query.retry_policy or self.cluster.default_retry_policy
-            row_factory = self.row_factory
-            load_balancing_policy = self.cluster.load_balancing_policy
-            spec_exec_policy = None
-        else:
-            execution_profile = self._get_execution_profile(execution_profile)
-
-            if timeout is _NOT_SET:
-                timeout = execution_profile.request_timeout
-
-            cl = query.consistency_level if query.consistency_level is not None else execution_profile.consistency_level
-            serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else execution_profile.serial_consistency_level
-
-            retry_policy = query.retry_policy or execution_profile.retry_policy
-            row_factory = execution_profile.row_factory
-            load_balancing_policy = execution_profile.load_balancing_policy
-            spec_exec_policy = execution_profile.speculative_execution_policy
-
+        cl = query.consistency_level if query.consistency_level is not None else execution_profile.consistency_level
+        serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else execution_profile.serial_consistency_level
 
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET:
@@ -2065,11 +1884,14 @@ class Session(object):
         message.allow_beta_protocol_version = self.cluster.allow_beta_protocol_version
         message.paging_state = paging_state
 
+        retry_policy = query.retry_policy or execution_profile.retry_policy
+        spec_exec_policy = execution_profile.speculative_execution_policy
         spec_exec_plan = spec_exec_policy.new_plan(query.keyspace or self.keyspace, query) if query.is_idempotent and spec_exec_policy else None
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
-            prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory,
-            load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan)
+            prepared_statement=prepared_statement, retry_policy=retry_policy,
+            row_factory=execution_profile.row_factory, load_balancer=execution_profile.load_balancing_policy,
+            start_time=start_time, speculative_execution_plan=spec_exec_plan)
 
     def _get_execution_profile(self, ep):
         profiles = self.cluster.profile_manager.profiles
@@ -2166,7 +1988,7 @@ class Session(object):
         message. See :ref:`custom_payload`.
         """
         message = PrepareMessage(query=query, keyspace=keyspace)
-        future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
+        future = ResponseFuture(self, message, query=None, timeout=self.cluster._default_timeout)
         try:
             future.send_request()
             query_id, bind_metadata, pk_indexes, result_metadata, result_metadata_id = future.result()
@@ -2200,7 +2022,7 @@ class Session(object):
         for host in tuple(self._pools.keys()):
             if host != excluded_host and host.is_up:
                 future = ResponseFuture(self, PrepareMessage(query=query, keyspace=keyspace),
-                                            None, self.default_timeout)
+                                            None, self.cluster._default_timeout)
 
                 # we don't care about errors preparing against specific hosts,
                 # since we can always prepare them as needed when the prepared
@@ -2441,12 +2263,6 @@ class Session(object):
     def get_pools(self):
         return self._pools.values()
 
-    def _validate_set_legacy_config(self, attr_name, value):
-        if self.cluster._config_mode == _ConfigMode.PROFILES:
-            raise ValueError("Cannot set Session.%s while using Configuration Profiles. Set this in a profile instead." % (attr_name,))
-        setattr(self, '_' + attr_name, value)
-        self.cluster._config_mode = _ConfigMode.LEGACY
-
 
 class UserTypeDoesNotExist(Exception):
     """
@@ -2585,11 +2401,7 @@ class ControlConnection(object):
         a connection to that host.
         """
         errors = {}
-        lbp = (
-            self._cluster.load_balancing_policy
-            if self._cluster._config_mode == _ConfigMode.LEGACY else
-            self._cluster._default_load_balancing_policy
-        )
+        lbp = self._cluster._default_load_balancing_policy
 
         for host in lbp.make_query_plan():
             try:
@@ -3229,7 +3041,6 @@ class ResponseFuture(object):
     session = None
     row_factory = None
     message = None
-    default_timeout = None
 
     _retry_policy = None
     _profile_manager = None
@@ -3260,7 +3071,7 @@ class ResponseFuture(object):
                  retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None, speculative_execution_plan=None):
         self.session = session
         # TODO: normalize handling of retry policy and row factory
-        self.row_factory = row_factory or session.row_factory
+        self.row_factory = row_factory or session.cluster._default_row_factory
         self._load_balancer = load_balancer or session.cluster._default_load_balancing_policy
         self.message = message
         self.query = query

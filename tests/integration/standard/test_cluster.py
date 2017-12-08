@@ -72,7 +72,8 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
         ingored_host_policy = IgnoredHostPolicy(["127.0.0.2", "127.0.0.3"])
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=ingored_host_policy)
+        ep = ExecutionProfile(load_balancing_policy=ingored_host_policy)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         session = cluster.connect()
         for host in cluster.metadata.all_hosts():
             if str(host) == "127.0.0.1":
@@ -314,11 +315,10 @@ class ClusterTests(unittest.TestCase):
         """
         Ensure errors are not thrown when using non-default policies
         """
-
+        ep = ExecutionProfile(load_balancing_policy=RoundRobinPolicy(), retry_policy=RetryPolicy())
         Cluster(
-            load_balancing_policy=RoundRobinPolicy(),
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             reconnection_policy=ExponentialReconnectionPolicy(1.0, 600.0),
-            default_retry_policy=RetryPolicy(),
             conviction_policy_factory=SimpleConvictionPolicy,
             protocol_version=PROTOCOL_VERSION
         )
@@ -431,11 +431,12 @@ class ClusterTests(unittest.TestCase):
     @notwindows
     def test_refresh_schema_no_wait(self):
         contact_points = [CASSANDRA_IP]
+        ep = ExecutionProfile(load_balancing_policy=HostFilterPolicy(
+            RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
+        ))
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
                           contact_points=contact_points,
-                          load_balancing_policy=HostFilterPolicy(
-                              RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
-                          ))
+                          execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         session = cluster.connect()
 
         schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
@@ -768,18 +769,6 @@ class ClusterTests(unittest.TestCase):
             # make sure original profile is not impacted
             self.assertTrue(session.execute(query, execution_profile='node1')[0].release_version)
 
-    def test_setting_lbp_legacy(self):
-        cluster = Cluster()
-        self.addCleanup(cluster.shutdown)
-        cluster.load_balancing_policy = RoundRobinPolicy()
-        self.assertEqual(
-            list(cluster.load_balancing_policy.make_query_plan()), []
-        )
-        cluster.connect()
-        self.assertNotEqual(
-            list(cluster.load_balancing_policy.make_query_plan()), []
-        )
-
     def test_profile_lb_swap(self):
         """
         Tests that profile load balancing policies are not shared
@@ -974,8 +963,9 @@ class ClusterTests(unittest.TestCase):
         @test_category metadata
         """
         queried_hosts = set()
+        ep = ExecutionProfile(load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         with Cluster(protocol_version=PROTOCOL_VERSION,
-                     load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy())) as cluster:
+                     execution_profiles={EXEC_PROFILE_DEFAULT: ep}) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
             session.execute('''
                     CREATE TABLE test1rf.table_with_big_key (
@@ -996,10 +986,12 @@ class ClusterTests(unittest.TestCase):
         log = logging.getLogger(__name__)
         log.info("The only replica found was: {}".format(only_replica))
         available_hosts = [host for host in ["127.0.0.1", "127.0.0.2", "127.0.0.3"] if host != only_replica]
+        ep = ExecutionProfile(load_balancing_policy=HostFilterPolicy(
+            RoundRobinPolicy(), lambda host: host.address != only_replica
+        ))
         with Cluster(contact_points=available_hosts,
                      protocol_version=PROTOCOL_VERSION,
-                     load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
-                     predicate=lambda host: host.address != only_replica)) as cluster:
+                     execution_profiles={EXEC_PROFILE_DEFAULT: ep}) as cluster:
 
             session = cluster.connect(wait_for_all_pools=True)
             prepared = session.prepare("""SELECT * from test1rf.table_with_big_key
@@ -1271,8 +1263,9 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
 
     def test_prepare_on_ignored_hosts(self):
 
+        ep = ExecutionProfile(load_balancing_policy=self.ignore_node_3_policy)
         cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                          load_balancing_policy=self.ignore_node_3_policy)
+                          execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         session = cluster.connect()
         cluster.reprepare_on_up, cluster.prepare_on_all_hosts = True, False
 
@@ -1309,7 +1302,8 @@ class DuplicateRpcTest(unittest.TestCase):
                                              lambda host: host.address == "127.0.0.1")
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        ep = ExecutionProfile(load_balancing_policy=self.load_balancing_policy)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         self.session = self.cluster.connect()
         self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.1' WHERE peer='127.0.0.2'")
 
@@ -1332,7 +1326,8 @@ class DuplicateRpcTest(unittest.TestCase):
         mock_handler = MockLoggingHandler()
         logger = logging.getLogger(cassandra.cluster.__name__)
         logger.addHandler(mock_handler)
-        test_cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
+        ep = ExecutionProfile(load_balancing_policy=self.load_balancing_policy)
+        test_cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         test_cluster.connect()
         warnings = mock_handler.messages.get("warning")
         self.assertEqual(len(warnings), 1)

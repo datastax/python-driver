@@ -10,7 +10,7 @@ except ImportError:
 from itertools import count
 
 from cassandra.query import tuple_factory
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
@@ -64,9 +64,9 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         Test Cython-based parser that returns an iterator, over multiple pages
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="testspace")
-        session.row_factory = tuple_factory
         session.client_protocol_handler = LazyProtocolHandler
         session.default_fetch_size = 2
 
@@ -95,9 +95,9 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         Test Numpy-based parser that returns a NumPy array
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="testspace")
-        session.row_factory = tuple_factory
         session.client_protocol_handler = NumpyProtocolHandler
         session.default_fetch_size = 2
 
@@ -177,12 +177,12 @@ def get_data(protocol_handler):
     """
     Get data from the test table.
     """
-    cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
     session = cluster.connect(keyspace="testspace")
 
     # use our custom protocol handler
     session.client_protocol_handler = protocol_handler
-    session.row_factory = tuple_factory
 
     results = session.execute("SELECT * FROM test_table")
     cluster.shutdown()
@@ -206,6 +206,10 @@ def verify_iterator_data(assertEqual, results):
 
 class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(1, execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
+
     @numpytest
     @greaterthancass21
     def test_null_types(self):
@@ -219,7 +223,6 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
         @test_category data_types:serialization
         """
         s = self.session
-        s.row_factory = tuple_factory
         s.client_protocol_handler = NumpyProtocolHandler
 
         table = "%s.%s" % (self.keyspace_name, self.function_table_name)

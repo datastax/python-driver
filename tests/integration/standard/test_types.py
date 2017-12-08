@@ -23,7 +23,7 @@ import six
 
 import cassandra
 from cassandra import InvalidRequest
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
@@ -200,9 +200,9 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             self.assertEqual(actual, expected)
 
         # verify data with with prepared statement, use dictionary with no explicit columns
-        s.row_factory = ordered_dict_factory
         select = s.prepare("SELECT * FROM alltypes")
-        results = s.execute(select)[0]
+        results = s.execute(select,
+            execution_profile=s.execution_profile_clone_update(EXEC_PROFILE_DEFAULT, row_factory=ordered_dict_factory))[0]
 
         for expected, actual in zip(params, results.values()):
             self.assertEqual(actual, expected)
@@ -278,9 +278,9 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             self.assertEqual(actual, expected)
 
         # verify data with with prepared statement, use dictionary with no explicit columns
-        s.row_factory = ordered_dict_factory
         select = s.prepare("SELECT * FROM allcoltypes")
-        results = s.execute(select)[0]
+        results = s.execute(select,
+            execution_profile=s.execution_profile_clone_update(EXEC_PROFILE_DEFAULT, row_factory=ordered_dict_factory))[0]
 
         for expected, actual in zip(params, results.values()):
             self.assertEqual(actual, expected)
@@ -497,12 +497,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
         s = c.connect(self.keyspace_name)
 
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
-        s.row_factory = dict_factory
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         # programmatically create the table with tuples of said sizes
@@ -564,12 +564,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
         s = c.connect(self.keyspace_name)
 
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
-        s.row_factory = dict_factory
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         values = []
@@ -663,12 +663,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
         s = c.connect(self.keyspace_name)
 
         # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
-        s.row_factory = dict_factory
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         # create a table with multiple sizes of nested tuples

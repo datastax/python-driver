@@ -25,7 +25,8 @@ import time
 import weakref
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
+from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster, \
+    ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
@@ -50,11 +51,12 @@ class ConnectionTimeoutTest(unittest.TestCase):
     def setUp(self):
         self.defaultInFlight = Connection.max_in_flight
         Connection.max_in_flight = 2
+        ep = ExecutionProfile(load_balancing_policy=HostFilterPolicy(
+            RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
+        ))
         self.cluster = Cluster(
             protocol_version=PROTOCOL_VERSION,
-            load_balancing_policy=HostFilterPolicy(
-                RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
-            )
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep}
         )
         self.session = self.cluster.connect()
 

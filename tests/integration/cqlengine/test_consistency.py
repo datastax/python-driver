@@ -15,7 +15,7 @@
 from uuid import uuid4
 
 from cassandra import ConsistencyLevel as CL, ConsistencyLevel
-from cassandra.cluster import Session
+from cassandra.cluster import Session, EXEC_PROFILE_DEFAULT
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.query import BatchQuery
@@ -105,10 +105,7 @@ class TestConsistency(BaseConsistencyTest):
         self.assertEqual(CL.ALL, args[0][0].consistency_level)
 
     def test_default_consistency(self):
-        # verify global assumed default
-        self.assertEqual(Session._default_consistency_level, ConsistencyLevel.LOCAL_ONE)
-
         # verify that this session default is set according to connection.setup
         # assumes tests/cqlengine/__init__ setup uses CL.ONE
         session = connection.get_session()
-        self.assertEqual(session.default_consistency_level, ConsistencyLevel.ONE)
+        self.assertEqual(session._get_execution_profile(EXEC_PROFILE_DEFAULT).consistency_level, ConsistencyLevel.ONE)

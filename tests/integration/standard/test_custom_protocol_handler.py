@@ -19,7 +19,7 @@ except ImportError:
 
 from cassandra.protocol import ProtocolHandler, ResultMessage, QueryMessage, UUIDType, read_int
 from cassandra.query import tuple_factory, SimpleStatement
-from cassandra.cluster import Cluster, ResponseFuture
+from cassandra.cluster import Cluster, ResponseFuture, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra import ProtocolVersion, ConsistencyLevel
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, \
@@ -66,9 +66,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
 
         # Ensure that we get normal uuid back first
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="custserdes")
-        session.row_factory = tuple_factory
 
         result = session.execute("SELECT schema_version FROM system.local")
         uuid_type = result[0][0]
@@ -77,7 +77,6 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         # use our custom protocol handlder
 
         session.client_protocol_handler = CustomTestRawRowType
-        session.row_factory = tuple_factory
         result_set = session.execute("SELECT schema_version FROM system.local")
         raw_value = result_set[0][0]
         self.assertTrue(isinstance(raw_value, binary_type))
@@ -105,10 +104,10 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         @test_category data_types:serialization
         """
         # Connect using a custom protocol handler that tracks the various types the result message is used with.
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="custserdes")
         session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
-        session.row_factory = tuple_factory
 
         colnames = create_table_with_all_types("alltypes", session, 1)
         columns_string = ", ".join(colnames)

@@ -75,8 +75,8 @@ With prepared statements, the replicas are obtained by ``routing_key``, based on
 
 How does the driver manage request retries?
 -------------------------------------------
-By default, retries are managed by the :attr:`.Cluster.default_retry_policy` set on the session Cluster. It can also
-be specialized per statement by setting :attr:`.Statement.retry_policy`.
+By default, retries are managed by the :attr:`.ExecutionProfile.retry_policy` of the selected profile of the
+Cluster. It can also be specialized per statement by setting :attr:`.Statement.retry_policy`.
 
 Retries are presently attempted on the same coordinator, but this may change in the future.
 
