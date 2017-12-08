@@ -653,11 +653,10 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
             assert q[i].attempt_id == expected_order[i]
 
     @execute_count(1)
-    def test_negative_indexing_works_properly(self):
+    def test_negative_indexing_raises_error(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
-        expected_order = [0, 1, 2, 3]
-        assert q[-1].attempt_id == expected_order[-1]
-        assert q[-2].attempt_id == expected_order[-2]
+        with self.assertRaises(ValueError):
+            q[-1].attempt_id
 
     @execute_count(1)
     def test_slicing_works_properly(self):
@@ -670,25 +669,33 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
         for model, expect in zip(q[0:3:2], expected_order[0:3:2]):
             self.assertEqual(model.attempt_id, expect)
 
+        for model, expect in zip(q[0:], expected_order):
+            self.assertEqual(model.attempt_id, expect)
+
     @execute_count(1)
-    def test_negative_slicing(self):
+    def test_negative_slicing_raises_error(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
-        expected_order = [0, 1, 2, 3]
 
-        for model, expect in zip(q[-3:], expected_order[-3:]):
-            self.assertEqual(model.attempt_id, expect)
+        with self.assertRaises(ValueError):
+            q[-1:]
 
-        for model, expect in zip(q[:-1], expected_order[:-1]):
-            self.assertEqual(model.attempt_id, expect)
+        with self.assertRaises(ValueError):
+            q[:-1]
 
-        for model, expect in zip(q[1:-1], expected_order[1:-1]):
-            self.assertEqual(model.attempt_id, expect)
+        with self.assertRaises(ValueError):
+            q[1:-1]
 
-        for model, expect in zip(q[-3:-1], expected_order[-3:-1]):
-            self.assertEqual(model.attempt_id, expect)
+        with self.assertRaises(ValueError):
+            q[-1:-1]
 
-        for model, expect in zip(q[-3:-1:2], expected_order[-3:-1:2]):
-            self.assertEqual(model.attempt_id, expect)
+        with self.assertRaises(ValueError):
+            q[-1:1]
+
+        with self.assertRaises(ValueError):
+            q[-1:4:2]
+
+        with self.assertRaises(ValueError):
+            q[4:-1:2]
 
 
 class TestQuerySetValidation(BaseQuerySetUsage):
