@@ -370,7 +370,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._readable = False
 
         # We don't have to wait for this to be closed, we can just schedule it
-        AsyncoreConnection.create_timer(0, partial(asyncore.dispatcher.close, self))
+        self.create_timer(0, partial(asyncore.dispatcher.close, self))
 
         log.debug("Closed socket to %s", self.host)
 
