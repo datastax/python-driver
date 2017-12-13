@@ -672,31 +672,42 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
         for model, expect in zip(q[0:], expected_order):
             self.assertEqual(model.attempt_id, expect)
 
-    @execute_count(1)
+    @execute_count(4)
     def test_negative_slicing_raises_error(self):
+
+        def assert_slicing(q):
+            with self.assertRaises(ValueError):
+                q[-1:]
+
+            with self.assertRaises(ValueError):
+                q[:-1]
+
+            with self.assertRaises(ValueError):
+                q[1:-1]
+
+            with self.assertRaises(ValueError):
+                q[-1:-1]
+
+            with self.assertRaises(ValueError):
+                q[-1:1]
+
+            with self.assertRaises(ValueError):
+                q[-1:4:2]
+
+            with self.assertRaises(ValueError):
+                q[4:-1:2]
+
         q = TestModel.objects(test_id=0).order_by('attempt_id')
+        assert_slicing(q)
 
-        with self.assertRaises(ValueError):
-            q[-1:]
+        q = TestModel.objects(test_id=0)
+        assert_slicing(q)
 
-        with self.assertRaises(ValueError):
-            q[:-1]
+        q = TestModel.objects(test_id=0).filter(attempt_id=0)
+        assert_slicing(q)
 
-        with self.assertRaises(ValueError):
-            q[1:-1]
-
-        with self.assertRaises(ValueError):
-            q[-1:-1]
-
-        with self.assertRaises(ValueError):
-            q[-1:1]
-
-        with self.assertRaises(ValueError):
-            q[-1:4:2]
-
-        with self.assertRaises(ValueError):
-            q[4:-1:2]
-
+        # We should be able to do this
+        q = TestModel.get_all()[-1:]
 
 class TestQuerySetValidation(BaseQuerySetUsage):
 
