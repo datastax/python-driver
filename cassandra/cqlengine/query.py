@@ -532,6 +532,10 @@ class AbstractQuerySet(object):
         if isinstance(s, slice):
             start = s.start if s.start else 0
 
+            if start < 0 or (s.stop is not None and s.stop < 0):
+                warn("ModelQuerySet slicing with negative indices support will be removed in 4.0.",
+                     DeprecationWarning)
+
             # calculate the amount of results that need to be loaded
             end = s.stop
             if start < 0 or s.stop is None or s.stop < 0:
@@ -548,6 +552,10 @@ class AbstractQuerySet(object):
                 s = int(s)
             except (ValueError, TypeError):
                 raise TypeError('QuerySet indices must be integers')
+
+            if s < 0:
+                warn("ModelQuerySet indexing with negative indices support will be removed in 4.0.",
+                     DeprecationWarning)
 
             # Using negative indexing is costly since we have to execute a count()
             if s < 0:
@@ -1450,7 +1458,8 @@ class DMLQuery(object):
         nulled_fields = set()
         if self.instance._has_counter or self.instance._can_update():
             if self.instance._has_counter:
-                warn("'create' and 'save' actions on Counters are deprecated. A future version will disallow this. Use the 'update' mechanism instead.")
+                warn("'create' and 'save' actions on Counters are deprecated. It will be disallowed in 4.0. "
+                    "Use the 'update' mechanism instead.", DeprecationWarning)
             return self.update()
         else:
             insert = InsertStatement(self.column_family_name, ttl=self._ttl, timestamp=self._timestamp, if_not_exists=self._if_not_exists)
