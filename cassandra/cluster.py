@@ -32,7 +32,7 @@ from six.moves import filter, range, queue as Queue
 import socket
 import sys
 import time
-from threading import Lock, RLock, Thread, Event
+from threading import Lock, RLock, Thread, Event, ThreadError
 
 import weakref
 from weakref import WeakValueDictionary
@@ -2170,7 +2170,8 @@ class Session(object):
         """
         future = self._create_response_future(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state)
         future._protocol_handler = self.client_protocol_handler
-        self._on_request(future)
+        if self._request_init_callbacks:
+            self._on_request(future)
         future.send_request()
         return future
 
@@ -3474,7 +3475,9 @@ class ResponseFuture(object):
         self._start_time = start_time or time.time()
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self._make_query_plan()
-        self._event = Event()
+        self._lock_event = Lock()
+        self._lock_event.acquire()
+        self._is_result_set = False
         self._errors = {}
         self._callbacks = []
         self._errbacks = []
@@ -3547,7 +3550,7 @@ class ResponseFuture(object):
 
     def _on_speculative_execute(self):
         self._timer = None
-        if not self._event.is_set():
+        if not self._is_result_set:
 
             # PYTHON-836, the speculative queries must be after
             # the query is sent from the main thread, otherwise the
@@ -3660,7 +3663,7 @@ class ResponseFuture(object):
         Otherwise it may throw if the response has not been received.
         """
         # TODO: When timers are introduced, just make this wait
-        if not self._event.is_set():
+        if not self._is_result_set:
             raise DriverException("warnings cannot be retrieved before ResponseFuture is finalized")
         return self._warnings
 
@@ -3678,7 +3681,7 @@ class ResponseFuture(object):
         :return: :ref:`custom_payload`.
         """
         # TODO: When timers are introduced, just make this wait
-        if not self._event.is_set():
+        if not self._is_result_set:
             raise DriverException("custom_payload cannot be retrieved before ResponseFuture is finalized")
         return self._custom_payload
 
@@ -3697,7 +3700,7 @@ class ResponseFuture(object):
 
         self._make_query_plan()
         self.message.paging_state = self._paging_state
-        self._event.clear()
+        self._lock_event.acquire()
         self._final_result = _NOT_SET
         self._final_exception = None
         self._start_timer()
@@ -3941,7 +3944,13 @@ class ResponseFuture(object):
                 for (fn, args, kwargs) in self._callbacks
             )
 
-        self._event.set()
+        self._is_result_set = True
+        try:
+            self._lock_event.release()
+        # This can happen in speculative executions
+        # _set_result is called several times
+        except ThreadError:
+            pass
 
         # apply each callback
         for callback_partial in to_call:
@@ -3962,7 +3971,14 @@ class ResponseFuture(object):
                 partial(fn, response, *args, **kwargs)
                 for (fn, args, kwargs) in self._errbacks
             )
-        self._event.set()
+
+        self._is_result_set = True
+        try:
+            self._lock_event.release()
+        # This can happen in speculative executions
+        # _set_result is called several times
+        except ThreadError:
+            pass
 
         # apply each callback
         for callback_partial in to_call:
@@ -4019,7 +4035,13 @@ class ResponseFuture(object):
             ...     log.exception("Operation failed:")
 
         """
-        self._event.wait()
+        self._lock_event.acquire()
+        try:
+            self._lock_event.release()
+        # This can happen in speculative executions
+        # _set_result is called several times
+        except ThreadError:
+            pass
         if self._final_result is not _NOT_SET:
             return ResultSet(self, self._final_result)
         else:

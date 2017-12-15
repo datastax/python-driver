@@ -162,7 +162,7 @@ class SpecExecTest(unittest.TestCase):
         # we have to directly wait for the event
         response_future = self.session.execute_async(statement, execution_profile='spec_ep_brr_lim',
                                                      timeout=14)
-        response_future._event.wait(16)
+        response_future._lock_event.acquire(16)
         self.assertIsInstance(response_future._final_exception, OperationTimedOut)
 
         # This is because 14 / 4 + 1 = 4

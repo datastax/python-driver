@@ -303,10 +303,11 @@ class ResponseFutureTests(unittest.TestCase):
         pool_shutdown = self.make_pool()
         pool_shutdown.is_shutdown = True
         pool_ok = self.make_pool()
-        pool_ok.is_shutdown = True
+        pool_ok.is_shutdown = False
         session._pools.get.side_effect = [pool_shutdown, pool_ok]
 
         rf = self.make_response_future(session)
+        rf.query_plan = ['ip1', 'ip2']
         rf.send_request()
 
         rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
@@ -420,6 +421,7 @@ class ResponseFutureTests(unittest.TestCase):
         retry_policy = Mock()
         retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
+        rf._query_retries = 1
         rf.send_request()
 
         callback = Mock()
@@ -436,7 +438,6 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=UnavailableErrorMessage, info={"required_replicas":2, "alive_replicas": 1, "consistency": 1})
         result.to_exception.return_value = expected_exception
         rf._set_result(None, None, None, result)
-        rf._event.set()
         self.assertRaises(Exception, rf.result)
 
         callback.assert_called_once_with(expected_exception, arg, **kwargs)
