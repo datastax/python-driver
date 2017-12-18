@@ -29,6 +29,7 @@ Features
 * Include hash of result set metadata in prepared stmt id (PYTHON-808)
 * Add NO_COMPACT startup option (PYTHON-839)
 * Add new exception type for CDC (PYTHON-837)
+* Allow 0ms in ConstantSpeculativeExecutionPolicy (PYTHON-836)
 
 Bug Fixes
 ---------
