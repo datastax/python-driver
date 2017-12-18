@@ -104,7 +104,7 @@ class SpeculativeExecutionPolicy(unittest.TestCase):
         @expected_result all the queries are executed immediately
         @test_category policy
         """
-        number_of_requests = 6
+        number_of_requests = 4
         spec = ExecutionProfile(speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0, number_of_requests))
 
         cluster = Cluster()
