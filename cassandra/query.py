@@ -378,7 +378,7 @@ class PreparedStatement(object):
        <b>A note about <code>*</code> in prepared statements</b>
     """
 
-    column_metadata = None  #TODO: make this bind_metadata in next major
+    bind_metadata = None
     retry_policy = None
     consistency_level = None
     custom_payload = None
@@ -393,9 +393,9 @@ class PreparedStatement(object):
     _routing_key_index_set = None
     serial_consistency_level = None
 
-    def __init__(self, column_metadata, query_id, routing_key_indexes, query,
+    def __init__(self, bind_metadata, query_id, routing_key_indexes, query,
                  keyspace, protocol_version, result_metadata, result_metadata_id):
-        self.column_metadata = column_metadata
+        self.bind_metadata = bind_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
         self.query_string = query
@@ -406,18 +406,18 @@ class PreparedStatement(object):
         self.is_idempotent = False
 
     @classmethod
-    def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata,
+    def from_message(cls, query_id, bind_metadata, pk_indexes, cluster_metadata,
                      query, prepared_keyspace, protocol_version, result_metadata,
                      result_metadata_id):
-        if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version, result_metadata, result_metadata_id)
+        if not bind_metadata:
+            return PreparedStatement(bind_metadata, query_id, None, query, prepared_keyspace, protocol_version, result_metadata, result_metadata_id)
 
         if pk_indexes:
             routing_key_indexes = pk_indexes
         else:
             routing_key_indexes = None
 
-            first_col = column_metadata[0]
+            first_col = bind_metadata[0]
             ks_meta = cluster_metadata.keyspaces.get(first_col.keyspace_name)
             if ks_meta:
                 table_meta = ks_meta.tables.get(first_col.table_name)
@@ -425,7 +425,7 @@ class PreparedStatement(object):
                     partition_key_columns = table_meta.partition_key
 
                     # make a map of {column_name: index} for each column in the statement
-                    statement_indexes = dict((c.name, i) for i, c in enumerate(column_metadata))
+                    statement_indexes = dict((c.name, i) for i, c in enumerate(bind_metadata))
 
                     # a list of which indexes in the statement correspond to partition key items
                     try:
@@ -434,7 +434,7 @@ class PreparedStatement(object):
                     except KeyError:  # we're missing a partition key component in the prepared
                         pass          # statement; just leave routing_key_indexes as None
 
-        return PreparedStatement(column_metadata, query_id, routing_key_indexes,
+        return PreparedStatement(bind_metadata, query_id, routing_key_indexes,
                                  query, prepared_keyspace, protocol_version, result_metadata,
                                  result_metadata_id)
 
@@ -492,7 +492,7 @@ class BoundStatement(Statement):
         self.is_idempotent = prepared_statement.is_idempotent
         self.values = []
 
-        meta = prepared_statement.column_metadata
+        meta = prepared_statement.bind_metadata
         if meta:
             self.keyspace = meta[0].keyspace_name
 
@@ -523,7 +523,7 @@ class BoundStatement(Statement):
         if values is None:
             values = ()
         proto_version = self.prepared_statement.protocol_version
-        col_meta = self.prepared_statement.column_metadata
+        col_meta = self.prepared_statement.bind_metadata
 
         # special case for binding dicts
         if isinstance(values, dict):
@@ -588,7 +588,7 @@ class BoundStatement(Statement):
     def _append_unset_value(self):
         next_index = len(self.values)
         if self.prepared_statement.is_routing_key_index(next_index):
-            col_meta = self.prepared_statement.column_metadata[next_index]
+            col_meta = self.prepared_statement.bind_metadata[next_index]
             raise ValueError("Cannot bind UNSET_VALUE as a part of the routing key '%s'" % col_meta.name)
         self.values.append(UNSET_VALUE)
 

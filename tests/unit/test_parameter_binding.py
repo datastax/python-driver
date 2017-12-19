@@ -80,11 +80,13 @@ class BoundStatementTestV3(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        column_metadata = [ColumnMetadata('keyspace', 'cf', 'rk0', Int32Type),
-                           ColumnMetadata('keyspace', 'cf', 'rk1', Int32Type),
-                           ColumnMetadata('keyspace', 'cf', 'ck0', Int32Type),
-                           ColumnMetadata('keyspace', 'cf', 'v0', Int32Type)]
-        cls.prepared = PreparedStatement(column_metadata=column_metadata,
+        bind_metadata = [
+            ColumnMetadata('keyspace', 'cf', 'rk0', Int32Type),
+            ColumnMetadata('keyspace', 'cf', 'rk1', Int32Type),
+            ColumnMetadata('keyspace', 'cf', 'ck0', Int32Type),
+            ColumnMetadata('keyspace', 'cf', 'v0', Int32Type)
+        ]
+        cls.prepared = PreparedStatement(bind_metadata=bind_metadata,
                                          query_id=None,
                                          routing_key_indexes=[1, 0],
                                          query=None,
@@ -119,12 +121,12 @@ class BoundStatementTestV3(unittest.TestCase):
         keyspace = 'keyspace1'
         column_family = 'cf1'
 
-        column_metadata = [
+        bind_metadata = [
             ColumnMetadata(keyspace, column_family, 'foo1', Int32Type),
             ColumnMetadata(keyspace, column_family, 'foo2', Int32Type)
         ]
 
-        prepared_statement = PreparedStatement(column_metadata=column_metadata,
+        prepared_statement = PreparedStatement(bind_metadata=bind_metadata,
                                                query_id=None,
                                                routing_key_indexes=[],
                                                query=None,
@@ -159,7 +161,7 @@ class BoundStatementTestV3(unittest.TestCase):
         self.assertRaises(ValueError, self.bound.bind, None)
 
         # prepared statement with no values
-        prepared_statement = PreparedStatement(column_metadata=[],
+        prepared_statement = PreparedStatement(bind_metadata=[],
                                                query_id=None,
                                                routing_key_indexes=[],
                                                query=None,
