@@ -16,6 +16,7 @@ Other
 * Cassandra 2.0 support removal (PYTHON-716)
 * cqlengine: disallow Counter create, save operations (PYTHON-497)
 * cqlengine: remove the negative indices slicing support in ModelQuerySet (PYTHON-875)
+* PreparedStatement.column_metadata should be renamed to bind_metadata (PYTHON-884)
 
 3.12.0
 ======
