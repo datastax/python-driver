@@ -127,11 +127,6 @@ class AbstractQueryableColumn(UnicodeMixin):
         return WhereClause(six.text_type(self), LessThanOrEqualOperator(), self._to_database(other))
 
 
-class BatchType(object):
-    Unlogged = 'UNLOGGED'
-    Counter = 'COUNTER'
-
-
 class BatchQuery(object):
     """
     Handles the batching of queries
@@ -147,12 +142,11 @@ class BatchQuery(object):
     _connection = None
     _connection_explicit = False
 
-
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False,
                  timeout=conn.NOT_SET, connection=None):
         """
-        :param batch_type: (optional) One of batch type values available through BatchType enum
-        :type batch_type: str or None
+        :param batch_type: (optional) One of batch type values available through :class:`cassandra.query.BatchType` enum
+        :type batch_type: BatchType or None
         :param timestamp: (optional) A datetime or timedelta object with desired timestamp to be applied
             to the batch conditional.
         :type timestamp: datetime or timedelta or None
@@ -226,7 +220,7 @@ class BatchQuery(object):
             self._execute_callbacks()
             return CQLEngineFuture()
 
-        opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
+        opener = 'BEGIN ' + (str(self.batch_type) + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
 
             if isinstance(self.timestamp, six.integer_types):

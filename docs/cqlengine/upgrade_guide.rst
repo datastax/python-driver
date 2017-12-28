@@ -89,6 +89,9 @@ Upgrade Guide 3.x to 4.x
 
 * Model.__default_ttl__ has been removed.
 
+* cassandra.cqlengine.query.BatchType has been removed. Use :class:`cassandra.query.BatchType`
+  instead when specifying the batch type with cqlengine.
+
 Upgrade Guide cqlengine to cassandra.cqlengine
 ==============================================
 
