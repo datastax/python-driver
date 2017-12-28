@@ -35,7 +35,6 @@ def _clone_model_class(model, attrs):
     try:
         new_type.__abstract__ = model.__abstract__
         new_type.__discriminator_value__ = model.__discriminator_value__
-        new_type.__default_ttl__ = model.__default_ttl__
     except AttributeError:
         pass
     return new_type
@@ -932,10 +931,6 @@ class ModelMetaClass(type):
 
         # short circuit __discriminator_value__ inheritance
         attrs['__discriminator_value__'] = attrs.get('__discriminator_value__')
-
-        # TODO __default__ttl__ should be removed in the next major release
-        options = attrs.get('__options__') or {}
-        attrs['__default_ttl__'] = options.get('default_time_to_live')
 
         column_definitions = [(k, v) for k, v in attrs.items() if isinstance(v, columns.Column)]
         column_definitions = sorted(column_definitions, key=lambda x: x[1].position)

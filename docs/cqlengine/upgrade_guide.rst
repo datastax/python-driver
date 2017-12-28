@@ -69,6 +69,8 @@ Upgrade Guide 3.x to 4.x
 
     Automobile.objects.all()[-10:]
 
+* Model.__default_ttl__ has been removed.
+
 Upgrade Guide cqlengine to cassandra.cqlengine
 ==============================================
 
