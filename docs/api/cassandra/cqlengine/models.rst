@@ -34,11 +34,6 @@ Model
 
     .. autoattribute:: __connection__
 
-    .. attribute:: __default_ttl__
-        :annotation:  = None
-
-        Will be deprecated in release 4.0. You can set the default ttl by configuring the table ``__options__``. See :ref:`ttl-change` for more details.
-
     .. autoattribute:: __discriminator_value__
 
         See :ref:`model_inheritance` for usage examples.
