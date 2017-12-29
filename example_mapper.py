@@ -76,7 +76,7 @@ def main():
     try:
         nick.iff(birth_year=1988).update(birth_year=1989)
     except LWTException:
-        print "precondition not met"
+        print("precondition not met")
 
     log.info("### setting individual column to NULL by updating it to None")
     nick.update(birth_year=None)
@@ -99,15 +99,15 @@ def main():
 
     log.info("### All members")
     for m in FamilyMembers.all():
-        print m, m.birth_year, m.sex
+        print(m, m.birth_year, m.sex)
 
     log.info("### Select by partition key")
     for m in FamilyMembers.objects(id=simmons.id):
-        print m, m.birth_year, m.sex
+        print(m, m.birth_year, m.sex)
 
     log.info("### Constrain on clustering key")
     for m in FamilyMembers.objects(id=simmons.id, surname=simmons.surname):
-        print m, m.birth_year, m.sex
+        print(m, m.birth_year, m.sex)
 
     log.info("### Constrain on clustering key")
     kids = FamilyMembers.objects(id=simmons.id, surname=simmons.surname, name__in=['Nick', 'Sophie'])
@@ -115,7 +115,7 @@ def main():
     log.info("### Delete a record")
     FamilyMembers(id=hogan_id, surname='Hogan', name='Linda').delete()
     for m in FamilyMembers.objects(id=hogan_id):
-        print m, m.birth_year, m.sex
+        print(m, m.birth_year, m.sex)
 
     management.drop_keyspace(KEYSPACE)
 
