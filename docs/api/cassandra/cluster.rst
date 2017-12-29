@@ -112,8 +112,6 @@
 
    .. automethod:: refresh_nodes
 
-   .. automethod:: set_meta_refresh_enabled
-
 .. autoclass:: ExecutionProfile
    :members:
 

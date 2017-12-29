@@ -17,6 +17,7 @@ Other
 * cqlengine: disallow Counter create, save operations (PYTHON-497)
 * cqlengine: remove the negative indices slicing support in ModelQuerySet (PYTHON-875)
 * PreparedStatement.column_metadata should be renamed to bind_metadata (PYTHON-884)
+* Remove Cluster.set_meta_refresh_enabled (PYTHON-890)
 
 3.12.0
 ======

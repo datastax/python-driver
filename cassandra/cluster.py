@@ -1627,21 +1627,6 @@ class Cluster(object):
         if not self.control_connection.refresh_node_list_and_token_map(force_token_rebuild):
             raise DriverException("Node list was not refreshed. See log for details.")
 
-    def set_meta_refresh_enabled(self, enabled):
-        """
-        *Deprecated:* set :attr:`~.Cluster.schema_metadata_enabled` :attr:`~.Cluster.token_metadata_enabled` instead
-
-        Sets a flag to enable (True) or disable (False) all metadata refresh queries.
-        This applies to both schema and node topology.
-
-        Disabling this is useful to minimize refreshes during multiple changes.
-
-        Meta refresh must be enabled for the driver to become aware of any cluster
-        topology changes or schema updates.
-        """
-        self.schema_metadata_enabled = enabled
-        self.token_metadata_enabled = enabled
-
     @classmethod
     def _send_chunks(cls, connection, host, chunks, set_keyspace=False):
         for ks_chunk in chunks:

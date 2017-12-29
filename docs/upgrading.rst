@@ -7,10 +7,10 @@ Upgrading
 Upgrading to 4.0
 ----------------
 
-Execution API Updates
-^^^^^^^^^^^^^^^^^^^^^
-:attr:`~.PreparedStatement.column_metadata` is renamed to :attr:`~.PreparedStatement.bind_metadata`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* :attr:`~.PreparedStatement.column_metadata` is renamed to :attr:`~.PreparedStatement.bind_metadata`
+
+* :attr:`Cluster.set_meta_refresh_enabled` has been removed. Set :attr:`Cluster.schema_metadata_enabled`
+  and :attr:`Cluster.token_metadata_enabled` instead.
 
 
 Upgrading to 3.0
