@@ -25,6 +25,7 @@ from copy import copy
 from functools import partial, wraps
 from itertools import groupby, count
 import logging
+from warnings import warn
 from random import random
 import six
 from six.moves import filter, range, queue as Queue
@@ -1795,6 +1796,8 @@ class Cluster(object):
         Meta refresh must be enabled for the driver to become aware of any cluster
         topology changes or schema updates.
         """
+        warn("Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0. Set "
+             "Cluster.schema_metadata_enabled and Cluster.token_metadata_enabled instead.", DeprecationWarning)
         self.schema_metadata_enabled = enabled
         self.token_metadata_enabled = enabled
 
