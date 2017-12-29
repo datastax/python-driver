@@ -100,7 +100,7 @@ class MonotonicTimestampGenerator(object):
                 (diff >= self.warning_threshold * 1e6) and
                 (since_last_warn >= self.warning_interval * 1e6))
         if warn:
-            log.warn(
+            log.warning(
                 "Clock skew detected: current tick ({now}) was {diff} "
                 "microseconds behind the last generated timestamp "
                 "({last}), returned timestamps will be artificially "
