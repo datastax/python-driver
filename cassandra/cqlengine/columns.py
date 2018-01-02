@@ -531,7 +531,7 @@ class DateTime(Column):
             return
         if isinstance(value, datetime):
             if DateTime.truncate_microseconds:
-                return value.replace(microsecond=0)
+                return value.replace(microseconds=0, milliseconds=value.microseconds // 1000)
             else:
                 return value
         elif isinstance(value, date):
