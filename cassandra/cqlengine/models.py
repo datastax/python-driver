@@ -567,6 +567,7 @@ class BaseModel(object):
         if not cls._table_name:
             if cls.__table_name__:
                 if cls.__table_name_case_sensitive__:
+                    warn("Model __table_name_case_sensitive__ will be removed in 4.0.", PendingDeprecationWarning)
                     cls._table_name = cls.__table_name__
                 else:
                     table_name = cls.__table_name__.lower()

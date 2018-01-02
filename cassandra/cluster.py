@@ -879,7 +879,10 @@ class Cluster(object):
             if execution_profiles:
                 raise ValueError("Clusters constructed with execution_profiles should not specify legacy parameters "
                                  "load_balancing_policy or default_retry_policy. Configure this in a profile instead.")
+
             self._config_mode = _ConfigMode.LEGACY
+            warn("Legacy execution parameters will be removed in 4.0. Consider using "
+                 "execution profiles.", DeprecationWarning)
 
         else:
             if execution_profiles:
