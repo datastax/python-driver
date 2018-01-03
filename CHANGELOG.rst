@@ -1,3 +1,10 @@
+3.13.0
+======
+
+Bug Fixes
+---------
+* ResponseFuture._connection can be None when returning request_id (PYTHON-853)
+
 3.12.0
 ======
 November 6, 2017
