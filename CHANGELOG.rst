@@ -18,6 +18,7 @@ Other
 * Fix example_mapper.py for python3 (PYTHON-860)
 * Possible deadlock on cassandra.concurrent.execute_concurrent (PYTHON-768)
 * Add some known deprecated warnings for 4.x (PYTHON-877)
+* Remove copyright dates from copyright notices (PYTHON-863)
 
 3.12.0
 ======
