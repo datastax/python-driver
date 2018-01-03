@@ -241,15 +241,13 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         cluster = Cluster([CASSANDRA_IP])
         session = cluster.connect()
         with self.assertRaises(CQLEngineException):
-            conn.register_connection("bad_coonection1", session=session, consistency="not_null")
+            conn.register_connection("bad_connection1", session=session, lazy_connect="not_null")
         with self.assertRaises(CQLEngineException):
-            conn.register_connection("bad_coonection2", session=session, lazy_connect="not_null")
+            conn.register_connection("bad_connection2", session=session, retry_connect="not_null")
         with self.assertRaises(CQLEngineException):
-            conn.register_connection("bad_coonection3", session=session, retry_connect="not_null")
+            conn.register_connection("bad_connection3", session=session, cluster_options="not_null")
         with self.assertRaises(CQLEngineException):
-            conn.register_connection("bad_coonection4", session=session, cluster_options="not_null")
-        with self.assertRaises(CQLEngineException):
-            conn.register_connection("bad_coonection5", hosts="not_null", session=session)
+            conn.register_connection("bad_connection4", hosts="not_null", session=session)
         cluster.shutdown()
 
         cluster.shutdown()

@@ -372,7 +372,7 @@ class TimeoutTimerTest(unittest.TestCase):
             future.result()
         end_time = time.time()
         total_time = end_time-start_time
-        expected_time = self.session.default_timeout
+        expected_time = self.session.cluster.profile_manager.default.request_timeout
         # check timeout and ensure it's within a reasonable range
         self.assertAlmostEqual(expected_time, total_time, delta=.05)
 

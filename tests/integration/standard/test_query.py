@@ -24,7 +24,7 @@ from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
@@ -116,18 +116,20 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
     def test_trace_ignores_row_factory(self):
-        self.session.row_factory = dict_factory
+        with Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}) as cluster:
 
-        query = "SELECT * FROM system.local"
-        statement = SimpleStatement(query)
-        rs = self.session.execute(statement, trace=True)
+            s = cluster.connect()
+            query = "SELECT * FROM system.local"
+            statement = SimpleStatement(query)
+            rs = s.execute(statement, trace=True)
 
-        # Ensure this does not throw an exception
-        trace = rs.get_query_trace()
-        self.assertTrue(trace.events)
-        str(trace)
-        for event in trace.events:
-            str(event)
+            # Ensure this does not throw an exception
+            trace = rs.get_query_trace()
+            self.assertTrue(trace.events)
+            str(trace)
+            for event in trace.events:
+                str(event)
 
     @local
     @greaterthanprotocolv3
@@ -471,8 +473,8 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         """
         white_list = ForcedHostSwitchPolicy()
-        clus = Cluster(
-            load_balancing_policy=white_list,
+        ep = ExecutionProfile(load_balancing_policy=white_list)
+        clus = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
@@ -498,8 +500,8 @@ class PreparedStatementArgTest(unittest.TestCase):
         and the batch statement will be sent.
         """
         white_list = ForcedHostSwitchPolicy()
-        clus = Cluster(
-            load_balancing_policy=white_list,
+        ep = ExecutionProfile(load_balancing_policy=white_list)
+        clus = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
             reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
@@ -535,8 +537,8 @@ class PreparedStatementArgTest(unittest.TestCase):
         and the batch statement will be sent.
         """
         white_list = ForcedHostSwitchPolicy()
-        clus = Cluster(
-            load_balancing_policy=white_list,
+        ep = ExecutionProfile(load_balancing_policy=white_list)
+        clus = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
             reprepare_on_up=False)
         self.addCleanup(clus.shutdown)

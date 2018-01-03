@@ -40,11 +40,12 @@ behavior in some other way, this is the place to do it:
 .. code-block:: python
 
     from cassandra.cluster import Cluster
-    from cassandra.policies import DCAwareRoundRobinPolicy
+    from cassandra.auth import PlainTextAuthProvider
 
+    auth_provider = PlainTextAuthProvider(username='cassandra', password='cassandra')
     cluster = Cluster(
         ['10.1.1.3', '10.1.1.4', '10.1.1.5'],
-        load_balancing_policy=DCAwareRoundRobinPolicy(local_dc='US_EAST'),
+        auth_provider=auth_provider,
         port=9042)
 
 
@@ -118,7 +119,8 @@ examples are equivalent:
         print row[0], row[1], row[2]
 
 If you prefer another result format, such as a ``dict`` per row, you
-can change the :attr:`~.Session.row_factory` attribute.
+can change the :attr:`~.ExecutionProfile.row_factory` attribute of the
+selected execution profile of the cluster.
 
 For queries that will be run repeatedly, you should use
 `Prepared statements <#prepared-statements>`_.
@@ -328,7 +330,7 @@ replicas of the data you are interacting with need to respond for
 the query to be considered a success.
 
 By default, :attr:`.ConsistencyLevel.LOCAL_ONE` will be used for all queries.
-You can specify a different default for the session on :attr:`.Session.default_consistency_level`.
+You can specify a different default using execution profiles (See: :attr:`.ExecutionProfile.consistency_level`).
 To specify a different consistency level per request, wrap queries
 in a :class:`~.SimpleStatement`:
 

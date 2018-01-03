@@ -16,7 +16,7 @@ import struct, time, traceback, sys, logging
 
 from random import randint
 from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, Unavailable
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
 from cassandra.query import SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
@@ -128,8 +128,9 @@ class ConsistencyTests(unittest.TestCase):
                 pass
 
     def _test_tokenaware_one_node_down(self, keyspace, rf, accepted):
+        ep = ExecutionProfile(load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
         cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION)
         session = cluster.connect(wait_for_all_pools=True)
         wait_for_up(cluster, 1)
@@ -180,8 +181,8 @@ class ConsistencyTests(unittest.TestCase):
 
     def test_rfthree_tokenaware_none_down(self):
         keyspace = 'test_rfthree_tokenaware_none_down'
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+        ep = ExecutionProfile(load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
+        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION)
         session = cluster.connect(wait_for_all_pools=True)
         wait_for_up(cluster, 1)
@@ -204,9 +205,10 @@ class ConsistencyTests(unittest.TestCase):
         cluster.shutdown()
 
     def _test_downgrading_cl(self, keyspace, rf, accepted):
+        ep = ExecutionProfile(load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+            retry_policy=DowngradingConsistencyRetryPolicy())
         cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION)
         session = cluster.connect(wait_for_all_pools=True)
 
@@ -248,18 +250,18 @@ class ConsistencyTests(unittest.TestCase):
 
     def test_rfthree_roundrobin_downgradingcl(self):
         keyspace = 'test_rfthree_roundrobin_downgradingcl'
-        cluster = Cluster(
-            load_balancing_policy=RoundRobinPolicy(),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
+        ep = ExecutionProfile(load_balancing_policy=RoundRobinPolicy(),
+            retry_policy=DowngradingConsistencyRetryPolicy())
+        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep},
             protocol_version=PROTOCOL_VERSION)
         self.rfthree_downgradingcl(cluster, keyspace, True)
 
     def test_rfthree_tokenaware_downgradingcl(self):
         keyspace = 'test_rfthree_tokenaware_downgradingcl'
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
-            protocol_version=PROTOCOL_VERSION)
+        ep = ExecutionProfile(retry_policy=DowngradingConsistencyRetryPolicy(),
+            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+            execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         self.rfthree_downgradingcl(cluster, keyspace, False)
 
     def rfthree_downgradingcl(self, cluster, keyspace, roundrobin):

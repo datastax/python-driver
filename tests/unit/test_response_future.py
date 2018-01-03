@@ -37,7 +37,9 @@ from cassandra.query import SimpleStatement
 class ResponseFutureTests(unittest.TestCase):
 
     def make_basic_session(self):
-        return Mock(spec=Session, row_factory=lambda *x: list(x))
+        s = Mock(spec=Session)
+        s.cluster._default_row_factory = lambda *x: list(x)
+        return s
 
     def make_session(self):
         session = self.make_basic_session()

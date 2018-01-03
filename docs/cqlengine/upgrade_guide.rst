@@ -46,6 +46,24 @@ Upgrade Guide 3.x to 4.x
         # The creation will fail properly due to our pre-check in Pet.save_async()
         Pet.create(owner_id=ownder_uuid, pet_id=pet_uuid, pet_type='cat', name='rambo')
 
+* Due to the legacy execution parameters removal in the core driver, you now have to use
+  execution profiles as well for cqlengine setup or connection registration.
+
+  Before::
+
+    connection.setup(...,
+                     consistency=ConsistencyLevel.ONE,
+                     load_balancing_policy=RoundRobinPolicy()
+    )
+
+  After::
+
+    ep = ExecutionProfile(load_balancing_policy=RoundRobinPolicy(),
+        consistency_level=ConsistencyLevel.ONE)
+
+    connection.setup(..., execution_profiles={EXEC_PROFILE_DEFAULT: ep})
+
+
 * Model.__table_name__ is now case sensitive
 * Model.__table_name_case_sensitive__ has been removed
 * Model with counters cannot use `create` or `save` anymore. You have to use the `update` mechanism::

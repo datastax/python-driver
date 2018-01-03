@@ -17,7 +17,7 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra import OperationTimedOut, WriteTimeout
-from cassandra.cluster import Cluster, ExecutionProfile
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy, RetryPolicy, WriteType
 
@@ -186,8 +186,9 @@ class RetryPolicyTets(unittest.TestCase):
             return
         start_and_prime_singledc()
 
+        ep = ExecutionProfile(retry_policy=CustomRetryPolicy())
         cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
-                              default_retry_policy=CustomRetryPolicy())
+                              execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
 
     @classmethod

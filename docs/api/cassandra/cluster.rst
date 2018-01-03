@@ -17,12 +17,7 @@
 
    .. autoattribute:: auth_provider
 
-   .. autoattribute:: load_balancing_policy
-
    .. autoattribute:: reconnection_policy
-
-   .. autoattribute:: default_retry_policy
-      :annotation: = <cassandra.policies.RetryPolicy object>
 
    .. autoattribute:: conviction_policy_factory
 
@@ -119,18 +114,6 @@
    :annotation:
 
 .. autoclass:: Session ()
-
-   .. autoattribute:: default_timeout
-      :annotation: = 10.0
-
-   .. autoattribute:: default_consistency_level
-      :annotation: = LOCAL_ONE
-
-   .. autoattribute:: default_serial_consistency_level
-      :annotation: = None
-
-   .. autoattribute:: row_factory
-      :annotation: = <function named_tuple_factory>
 
    .. autoattribute:: default_fetch_size
 

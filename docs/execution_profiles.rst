@@ -6,26 +6,22 @@ a single connected ``Session``. Execution profiles are being introduced to deal 
 configuration options, especially as the database platform evolves more complex workloads.
 
 The Execution Profile API is being introduced now, in an experimental capacity, in order to take advantage of it in
-existing projects, and to gauge interest and feedback in the community. For now, the legacy configuration remains
-intact, but legacy and Execution Profile APIs cannot be used simultaneously on the same client ``Cluster``.
+existing projects, and to gauge interest and feedback in the community.
 
 This document explains how Execution Profiles relate to existing settings, and shows how to use the new profiles for
 request execution.
 
-Mapping Legacy Parameters to Profiles
--------------------------------------
+Execution Profile Options
+-------------------------
 
-Execution profiles can inherit from :class:`.cluster.ExecutionProfile`, and currently provide the following options,
-previously input from the noted attributes:
+Execution profiles can inherit from :class:`.cluster.ExecutionProfile` and currently provide the following options:
 
-- load_balancing_policy - :attr:`.Cluster.load_balancing_policy`
-- request_timeout - :attr:`.Session.default_timeout`, optional :meth:`.Session.execute` parameter
-- retry_policy - :attr:`.Cluster.default_retry_policy`, optional :attr:`.Statement.retry_policy` attribute
-- consistency_level - :attr:`.Session.default_consistency_level`, optional :attr:`.Statement.consistency_level` attribute
-- serial_consistency_level - :attr:`.Session.default_serial_consistency_level`, optional :attr:`.Statement.serial_consistency_level` attribute
-- row_factory - :attr:`.Session.row_factory` attribute
-
-When using the new API, these parameters can be defined by instances of :class:`.cluster.ExecutionProfile`.
+- :attr:`.ExecutionProfile.load_balancing_policy`
+- :attr:`.ExecutionProfile.request_timeout` (optional :meth:`.Session.execute` parameter)
+- :attr:`.ExecutionProfile.retry_policy` (optional :attr:`.Statement.retry_policy` attribute)
+- :attr:`.ExecutionProfile.consistency_level` (optional :attr:`.Statement.consistency_level` attribute)
+- :attr:`.ExecutionProfile.serial_consistency_level` (optional :attr:`.Statement.serial_consistency_level` attribute)
+- :attr:`.ExecutionProfile.row_factory`
 
 Using Execution Profiles
 ------------------------
