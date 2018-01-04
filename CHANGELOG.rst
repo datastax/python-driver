@@ -20,6 +20,7 @@ Other
 * Add some known deprecated warnings for 4.x (PYTHON-877)
 * Remove copyright dates from copyright notices (PYTHON-863)
 * Remove "Experimental" tag from execution profiles documentation (PYTHON-840)
+* request_timer metrics descriptions are slightly incorrect (PYTHON-885)
 
 3.12.0
 ======

@@ -39,10 +39,10 @@ class Metrics(object):
       * min - min latency
       * max - max latency
       * mean - mean latency
-      * stdev - standard deviation for latencies
+      * stddev - standard deviation for latencies
       * median - median latency
       * 75percentile - 75th percentile latencies
-      * 97percentile - 97th percentile latencies
+      * 95percentile - 95th percentile latencies
       * 98percentile - 98th percentile latencies
       * 99percentile - 99th percentile latencies
       * 999percentile - 99.9th percentile latencies
