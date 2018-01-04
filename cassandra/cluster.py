@@ -3495,22 +3495,37 @@ class ResponseFuture(object):
         if self._timer:
             self._timer.cancel()
 
-    def _on_timeout(self):
+    def _on_timeout(self, _attempts=0):
+        """
+        Called when the request associated with this ResponseFuture times out.
 
-        try:
-            self._connection._requests.pop(self._req_id)
-        # This prevents the race condition of the
-        # event loop thread just receiving the waited message
-        # If it arrives after this, it will be ignored
-        except KeyError:
+        This function may reschedule itself. The ``_attempts`` parameter tracks
+        the number of times this has happened. This parameter should only be
+        set in those cases, where ``_on_timeout`` reschedules itself.
+        """
+        # PYTHON-853: for short timeouts, we sometimes race with our __init__
+        if self._connection is None and _attempts < 3:
+            self._timer = self.session.cluster.connection_class.create_timer(
+                0.01,
+                partial(self._on_timeout, _attempts=_attempts + 1)
+            )
             return
 
-        pool = self.session._pools.get(self._current_host)
-        if pool and not pool.is_shutdown:
-            with self._connection.lock:
-                self._connection.request_ids.append(self._req_id)
+        if self._connection is not None:
+            try:
+                self._connection._requests.pop(self._req_id)
+            # This prevents the race condition of the
+            # event loop thread just receiving the waited message
+            # If it arrives after this, it will be ignored
+            except KeyError:
+                return
 
-            pool.return_connection(self._connection)
+            pool = self.session._pools.get(self._current_host)
+            if pool and not pool.is_shutdown:
+                with self._connection.lock:
+                    self._connection.request_ids.append(self._req_id)
+
+                pool.return_connection(self._connection)
 
         errors = self._errors
         if not errors:
