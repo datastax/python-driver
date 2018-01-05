@@ -814,10 +814,19 @@ class Cluster(object):
                 raise ValueError("contact_points should not contain None (it can resolve to localhost)")
             self.contact_points = contact_points
 
-        self.port = port
-
-        self.contact_points_resolved = [endpoint[4][0] for a in self.contact_points
-                                        for endpoint in socket.getaddrinfo(a, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+        self.contact_points_resolved = []
+        self.contact_points_resolved_w_port = {}
+        # Allow to connect to a list of cassandra nodes with distinct port numbers.
+        # Iterate over all contact_points and split (if necessary) the IP address
+        # from the port number. Add the IP and port mapping to dict.
+        for a in self.contact_points:
+            if not ':' in a:
+                a += ':{0}'.format(port)
+            h, p = a.split(':')
+            for endpoint in socket.getaddrinfo(h, p, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                _ip, _port = endpoint[4]
+                self.contact_points_resolved.append(_ip)
+                self.contact_points_resolved_w_port[_ip] = int(_port)
 
         self.compression = compression
 
@@ -1206,7 +1215,7 @@ class Cluster(object):
         if self._auth_provider_callable:
             kwargs_dict.setdefault('authenticator', self._auth_provider_callable(address))
 
-        kwargs_dict.setdefault('port', self.port)
+        kwargs_dict.setdefault('port', self.contact_points_resolved_w_port[address])
         kwargs_dict.setdefault('compression', self.compression)
         kwargs_dict.setdefault('sockopts', self.sockopts)
         kwargs_dict.setdefault('ssl_options', self.ssl_options)
