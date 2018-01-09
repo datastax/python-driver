@@ -80,7 +80,7 @@ def validate_ssl_options(ssl_options):
                 break
             except Exception:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
                 tries += 1
 
@@ -158,7 +158,7 @@ class SSLConnectionTests(unittest.TestCase):
                 break
             except Exception:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
                 tries += 1
 

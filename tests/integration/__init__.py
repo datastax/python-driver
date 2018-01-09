@@ -238,7 +238,7 @@ requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION
 def wait_for_node_socket(node, timeout):
     binary_itf = node.network_interfaces['binary']
     if not common.check_socket_listening(binary_itf, timeout=timeout):
-        log.warn("Unable to connect to binary socket for node " + node.name)
+        log.warning("Unable to connect to binary socket for node " + node.name)
     else:
         log.debug("Node %s is up and listening " % (node.name,))
 
@@ -293,7 +293,7 @@ def remove_cluster():
                 return
             except OSError:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
                 tries += 1
                 time.sleep(1)
@@ -343,7 +343,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
             CCM_CLUSTER.set_configuration_options(configuration_options)
         except Exception:
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
 
             log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
@@ -413,12 +413,12 @@ def execute_until_pass(session, query):
         try:
             return session.execute(query)
         except (ConfigurationException, AlreadyExists, InvalidRequest):
-            log.warn("Received already exists from query {0}   not exiting".format(query))
+            log.warning("Received already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
             tries += 1
 
@@ -431,12 +431,12 @@ def execute_with_long_wait_retry(session, query, timeout=30):
         try:
             return session.execute(query, timeout=timeout)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Received already exists from query {0}    not exiting".format(query))
+            log.warning("Received already exists from query {0}    not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
             tries += 1
 
@@ -463,12 +463,12 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
     try:
         execute_with_long_wait_retry(session, "DROP KEYSPACE {0}".format(keyspace_name))
     except:
-        log.warn("Error encountered when droping keyspace {0}".format(keyspace_name))
+        log.warning("Error encountered when droping keyspace {0}".format(keyspace_name))
         ex_type, ex, tb = sys.exc_info()
-        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+        log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
         del tb
     finally:
-        log.warn("Shutting down cluster")
+        log.warning("Shutting down cluster")
         cluster.shutdown()
 
 

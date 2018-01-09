@@ -252,7 +252,7 @@ class TestListColumn(BaseCassEngTestCase):
                 break
             except WriteTimeout:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
         self.assertRaises(ValidationError, TestListModel.create, **{'text_list': [str(uuid4()) for _ in range(65536)]})
 
@@ -422,7 +422,7 @@ class TestMapColumn(BaseCassEngTestCase):
                 break
             except WriteTimeout:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
         self.assertRaises(ValidationError, TestMapModel.create, **{'text_map': dict((str(uuid4()), i) for i in range(65536))})
 
