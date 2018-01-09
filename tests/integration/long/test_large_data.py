@@ -82,7 +82,7 @@ class LargeDataTests(unittest.TestCase):
                     except (OperationTimedOut, WriteTimeout):
                         ex_type, ex, tb = sys.exc_info()
                         number_of_timeouts += 1
-                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                         del tb
                         time.sleep(1)
                     except Empty:
@@ -97,7 +97,7 @@ class LargeDataTests(unittest.TestCase):
             except (OperationTimedOut, WriteTimeout):
                 ex_type, ex, tb = sys.exc_info()
                 number_of_timeouts += 1
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
                 time.sleep(1)
             except Empty:
@@ -156,8 +156,8 @@ class LargeDataTests(unittest.TestCase):
             #If we timeout on insertion that's bad but it could be just slow underlying c*
             #Attempt to validate anyway, we will fail if we don't get the right data back.
             ex_type, ex, tb = sys.exc_info()
-            log.warn("Batch wide row insertion timed out, this may require additional investigation")
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("Batch wide row insertion timed out, this may require additional investigation")
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
 
         # Verify

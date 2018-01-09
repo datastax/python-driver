@@ -83,7 +83,7 @@ class ConsistencyTests(unittest.TestCase):
                     break
                 except (OperationTimedOut, ReadTimeout):
                     ex_type, ex, tb = sys.exc_info()
-                    log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                    log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                     del tb
                     tries += 1
                     time.sleep(1)

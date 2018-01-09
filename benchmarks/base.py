@@ -248,7 +248,7 @@ def parse_options():
     try:
         log.setLevel(_log_levels[level])
     except KeyError:
-        log.warn("Unknown log level specified: %s; specify one of %s", options.log_level, _log_levels.keys())
+        log.warning("Unknown log level specified: %s; specify one of %s", options.log_level, _log_levels.keys())
 
     if options.asyncore_only:
         options.supported_reactors = [AsyncoreConnection]

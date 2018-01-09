@@ -97,7 +97,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                 return
             except (OperationTimedOut, WriteTimeout, WriteFailure):
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
                 tries += 1
 
@@ -120,7 +120,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                         break
                     except (OperationTimedOut, ReadTimeout, ReadFailure):
                         ex_type, ex, tb = sys.exc_info()
-                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                         del tb
                         tries += 1
         else:
@@ -138,7 +138,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                         break
                     except (OperationTimedOut, ReadTimeout, ReadFailure):
                         ex_type, ex, tb = sys.exc_info()
-                        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                        log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                         del tb
                         tries += 1
 
