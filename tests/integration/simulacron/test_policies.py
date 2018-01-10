@@ -17,7 +17,7 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra import OperationTimedOut, WriteTimeout
-from cassandra.cluster import Cluster, ExecutionProfile
+from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy, RetryPolicy, WriteType
 
@@ -168,6 +168,45 @@ class SpecExecTest(unittest.TestCase):
         # This is because 14 / 4 + 1 = 4
         self.assertEqual(len(response_future.attempted_hosts), 4)
 
+    def test_delay_can_be_0(self):
+        """
+        Test to validate that the delay can be zero for the ConstantSpeculativeExecutionPolicy
+        @since 3.13
+        @jira_ticket PYTHON-836
+        @expected_result all the queries are executed immediately
+        @test_category policy
+        """
+        query_to_prime = "INSERT INTO madeup_keyspace.madeup_table(k, v) VALUES (1, 2)"
+        prime_query(query_to_prime, then={"delay_in_ms": 5000})
+        number_of_requests = 4
+        spec = ExecutionProfile(load_balancing_policy=RoundRobinPolicy(),
+                                speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0, number_of_requests))
+
+        cluster = Cluster()
+        cluster.add_execution_profile("spec", spec)
+        session = cluster.connect(wait_for_all_pools=True)
+        self.addCleanup(cluster.shutdown)
+
+        counter = count()
+
+        def patch_and_count(f):
+            def patched(*args, **kwargs):
+                next(counter)
+                print("patched")
+                f(*args, **kwargs)
+            return patched
+
+        self.addCleanup(setattr, ResponseFuture, "send_request", ResponseFuture.send_request)
+        ResponseFuture.send_request = patch_and_count(ResponseFuture.send_request)
+        stmt = SimpleStatement(query_to_prime)
+        stmt.is_idempotent = True
+        results = session.execute(stmt, execution_profile="spec")
+        self.assertEqual(len(results.response_future.attempted_hosts), 3)
+
+        # send_request is called number_of_requests times for the speculative request
+        # plus one for the call from the main thread.
+        self.assertEqual(next(counter), number_of_requests + 1)
+
 
 class CustomRetryPolicy(RetryPolicy):
     def on_write_timeout(self, query, consistency, write_type,
@@ -193,7 +232,6 @@ class CounterRetryPolicy(RetryPolicy):
 
     def on_write_timeout(self, query, consistency, write_type,
                          required_responses, received_responses, retry_num):
-        print("counter on_write_timeout")
         next(self.write_timeout)
         return self.IGNORE, None
 

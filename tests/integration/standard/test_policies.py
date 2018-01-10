@@ -19,14 +19,11 @@ except ImportError:
 
 from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, \
-    WhiteListRoundRobinPolicy, ConstantSpeculativeExecutionPolicy
+    WhiteListRoundRobinPolicy
 from cassandra.pool import Host
-from cassandra.query import SimpleStatement
 
 from tests.integration import PROTOCOL_VERSION, local, use_singledc
-from tests import notwindows
 
-from itertools import count
 from concurrent.futures import wait as wait_futures
 
 def setup_module():
@@ -92,37 +89,3 @@ class WhiteListRoundRobinPolicyTests(unittest.TestCase):
             queried_hosts.update(response.response_future.attempted_hosts)
         queried_hosts = set(host.address for host in queried_hosts)
         self.assertEqual(queried_hosts, only_connect_hosts)
-
-
-class SpeculativeExecutionPolicy(unittest.TestCase):
-    @notwindows
-    def test_delay_can_be_0(self):
-        """
-        Test to validate that the delay can be zero for the ConstantSpeculativeExecutionPolicy
-        @since 3.13
-        @jira_ticket PYTHON-836
-        @expected_result all the queries are executed immediately
-        @test_category policy
-        """
-        number_of_requests = 4
-        spec = ExecutionProfile(speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0, number_of_requests))
-
-        cluster = Cluster()
-        cluster.add_execution_profile("spec", spec)
-        session = cluster.connect(wait_for_all_pools=True)
-        self.addCleanup(cluster.shutdown)
-
-        counter = count()
-
-        def patch_and_count(f):
-            def patched(*args, **kwargs):
-                next(counter)
-                f(*args, **kwargs)
-            return patched
-
-        ResponseFuture._on_speculative_execute = patch_and_count(ResponseFuture._on_speculative_execute)
-        stmt = SimpleStatement("INSERT INTO test3rf.test(k, v) VALUES (1, 2)")
-        stmt.is_idempotent = True
-        results = session.execute(stmt, execution_profile="spec")
-        self.assertEqual(len(results.response_future.attempted_hosts), 3)
-        self.assertEqual(next(counter), number_of_requests)

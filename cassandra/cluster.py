@@ -3527,6 +3527,18 @@ class ResponseFuture(object):
     def _on_speculative_execute(self):
         self._timer = None
         if not self._event.is_set():
+
+            # PYTHON-836, the speculative queries must be after
+            # the query is sent from the main thread, otherwise the
+            # query from the main thread may raise NoHostAvailable
+            # if the _query_plan has been exhausted by the specualtive queries.
+            # This also prevents a race condition accessing the iterator.
+            # We reschedule this call until the main thread has succeeded
+            # making a query
+            if not self.attempted_hosts:
+                self._timer = self.session.cluster.connection_class.create_timer(0.01, self._on_speculative_execute)
+                return
+
             if self._time_remaining is not None:
                 if self._time_remaining <= 0:
                     self._on_timeout()
@@ -3540,10 +3552,6 @@ class ResponseFuture(object):
         # calls to send_request (which retries may do) will resume where
         # they last left off
         self.query_plan = iter(self._load_balancer.make_query_plan(self.session.keyspace, self.query))
-        # Make iterator thread safe when there can be a speculative delay since it could
-        # from different threads
-        if isinstance(self._spec_execution_plan, NoSpeculativeExecutionPlan):
-            self.query_plan = _threadsafe_iter(self.query_plan)
 
     def send_request(self, error_no_hosts=True):
         """ Internal """
@@ -4316,16 +4324,3 @@ class ResultSet(object):
         avoid sending this to untrusted parties.
         """
         return self.response_future._paging_state
-
-
-class _threadsafe_iter(six.Iterator):
-    def __init__(self, it):
-        self.it = it
-        self.lock = Lock()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        with self.lock:
-            return next(self.it)
