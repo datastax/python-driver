@@ -129,11 +129,10 @@ class AsyncioConnection(Connection):
             self._push_chunk(data)
 
     def _push_chunk(self, chunk):
-        fut = asyncio.run_coroutine_threadsafe(self._write_queue.put(chunk),
-                                               loop=self._loop)
-        asyncio.wait_for(fut,
-                         timeout=None,
-                         loop=self._loop)
+        asyncio.run_coroutine_threadsafe(
+            self._write_queue.put(chunk),
+            loop=self._loop
+        ).result()
 
     @asyncio.coroutine
     def handle_write(self):
