@@ -80,12 +80,12 @@ schedules:
   adhoc_asyncio_integration:
     schedule: adhoc
     branches:
-      include: [python-asyncio-reactor]
+      include: [python-asyncio-reactor-detect-thread]
     env_vars: |
       EVENT_LOOP_MANAGER='asyncio'
     matrix:
       exclude:
-        - python: [2.7, 3.4, 3.5]  # 3.6 only
+        - python: [2.7, 3.4]
         - cassandra: ['2.0', '2.1', '2.2', '3.0']  # run on 3.11
 python:
   - 2.7

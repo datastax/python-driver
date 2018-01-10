@@ -101,7 +101,7 @@ class AsyncioConnection(Connection):
                 # daemonize so the loop will be shut down on interpreter
                 # shutdown
                 cls._loop_thread = Thread(target=cls._loop.run_forever,
-                                          daemon=True)
+                                          daemon=True, name="asyncio_thread")
                 cls._loop_thread.start()
 
     @classmethod
@@ -129,10 +129,14 @@ class AsyncioConnection(Connection):
             self._push_chunk(data)
 
     def _push_chunk(self, chunk):
-        asyncio.run_coroutine_threadsafe(
-            self._write_queue.put(chunk),
-            loop=self._loop
-        ).result()
+        import threading
+        if self._loop_thread.ident != threading.get_ident():
+            asyncio.run_coroutine_threadsafe(
+                self._write_queue.put(chunk),
+                loop=self._loop
+            )
+        else:
+            asyncio.gather(self._write_queue.put(chunk))
 
     @asyncio.coroutine
     def handle_write(self):
