@@ -136,7 +136,7 @@ class AsyncioConnection(Connection):
                 loop=self._loop
             )
         else:
-            asyncio.gather(self._write_queue.put(chunk))
+            self._loop.create_task(self._write_queue.put(chunk))
 
     @asyncio.coroutine
     def handle_write(self):
