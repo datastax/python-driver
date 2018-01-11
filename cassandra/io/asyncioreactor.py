@@ -95,7 +95,8 @@ class AsyncioConnection(Connection):
             if cls._pid != os.getpid():
                 cls._loop = None
             if cls._loop is None:
-                cls._loop = asyncio.get_event_loop()
+                cls._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(cls._loop)
 
             if not cls._loop_thread:
                 # daemonize so the loop will be shut down on interpreter
