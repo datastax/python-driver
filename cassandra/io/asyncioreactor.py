@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import socket
+import ssl
 from threading import Lock, Thread
 
 
@@ -157,6 +158,13 @@ class AsyncioConnection(Connection):
             try:
                 buf = yield from self._loop.sock_recv(self._socket, self.in_buffer_size)
                 self._iobuf.write(buf)
+            # sock_recv expects EWOULDBLOCK if socket provides no data, but
+            # nonblocking ssl sockets raise these instead, so we handle them
+            # ourselves by yielding to the event loop, where the socket will
+            # get the reading/writing it "wants" before retrying
+            except (ssl.SSLWantWriteError, ssl.SSLWantReadError):
+                yield
+                continue
             except socket.error as err:
                 log.debug("Exception during socket recv for %s: %s",
                           self, err)
