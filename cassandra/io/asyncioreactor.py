@@ -5,7 +5,7 @@ import logging
 import os
 import socket
 import ssl
-from threading import Lock, Thread
+from threading import Lock, Thread, get_ident
 
 
 log = logging.getLogger(__name__)
@@ -122,7 +122,10 @@ class AsyncioConnection(Connection):
         if self._read_watcher:
             self._read_watcher.cancel()
         if self._socket:
+            self._loop.remove_writer(self._socket.fileno())
+            self._loop.remove_reader(self._socket.fileno())
             self._socket.close()
+
         log.debug("Closed socket to %s" % (self.host,))
 
         if not self.is_defunct:
@@ -140,8 +143,7 @@ class AsyncioConnection(Connection):
             self._push_chunk(data)
 
     def _push_chunk(self, chunk):
-        import threading
-        if self._loop_thread.ident != threading.get_ident():
+        if self._loop_thread.ident != get_ident():
             asyncio.run_coroutine_threadsafe(
                 self._write_queue.put(chunk),
                 loop=self._loop
@@ -159,6 +161,8 @@ class AsyncioConnection(Connection):
             except socket.error as err:
                 log.debug("Exception in send for %s: %s", self, err)
                 self.defunct(err)
+                return
+            except asyncio.CancelledError:
                 return
 
     @asyncio.coroutine
@@ -179,6 +183,8 @@ class AsyncioConnection(Connection):
                           self, err)
                 self.defunct(err)
                 return  # leave the read loop
+            except asyncio.CancelledError:
+                return
 
             if buf and self._iobuf.tell():
                 self.process_io_buffer()
