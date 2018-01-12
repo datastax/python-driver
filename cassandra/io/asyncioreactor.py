@@ -1,4 +1,4 @@
-from cassandra.connection import Connection
+from cassandra.connection import Connection, ConnectionShutdown
 
 import asyncio
 import logging
@@ -111,16 +111,25 @@ class AsyncioConnection(Connection):
         return AsyncioTimer(timeout, callback, loop=cls._loop)
 
     def close(self):
-        log.debug("Closing connection (%s) to %s" % (id(self), self.host))
         with self.lock:
             if self.is_closed:
                 return
             self.is_closed = True
 
-        self._write_watcher.cancel()
-        self._read_watcher.cancel()
+        log.debug("Closing connection (%s) to %s" % (id(self), self.host))
+        if self._write_watcher:
+            self._write_watcher.cancel()
+        if self._read_watcher:
+            self._read_watcher.cancel()
+        if self._socket:
+            self._socket.close()
+        log.debug("Closed socket to %s" % (self.host,))
 
-        self.connected_event.set()
+        if not self.is_defunct:
+            self.error_all_requests(
+                ConnectionShutdown("Connection to %s was closed" % self.host))
+            # don't leave in-progress operations hanging
+            self.connected_event.set()
 
     def push(self, data):
         buff_size = self.out_buffer_size
