@@ -10,6 +10,7 @@ Bug Fixes
 * AttributeError: 'NoneType' object has no attribute 'add_timer' (PYTHON-862)
 * Support retry_policy in PreparedStatement (PYTHON-861)
 * __del__ method in Session is throwing an exception (PYTHON-813)
+* LZ4 import issue with recent versions (PYTHON-897)
 
 Other
 -----
