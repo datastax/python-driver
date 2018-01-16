@@ -17,6 +17,11 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
         cls.connection_class = AsyncioConnection
         AsyncioConnection.initialize_reactor()
 
+    @classmethod
+    def tearDownClass(cls):
+        AsyncioConnection.close()
+        AsyncioConnection._loop.stop()
+
     @property
     def create_timer(self):
         return self.connection.create_timer
