@@ -148,6 +148,9 @@ class TimerTestMixin(object):
             connect_timeout=5
         )
 
+    def tearDown(self):
+        self.connection.close()
+
     def test_multi_timer_validation(self):
         """
         Verify that timer timeouts are honored appropriately

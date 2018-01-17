@@ -19,7 +19,6 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        AsyncioConnection.close()
         AsyncioConnection._loop.stop()
 
     @property

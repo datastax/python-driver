@@ -137,4 +137,4 @@ class LibevTimerTest(LibevTimerPatcher, TimerTestMixin):
             raise unittest.SkipTest('libev does not appear to be installed correctly')
 
         LibevConnection.initialize_reactor()
-        self.connection = self.make_connection()
+        super(LibevTimerTest, self).setUp()

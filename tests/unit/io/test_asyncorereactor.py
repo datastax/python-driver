@@ -81,4 +81,4 @@ class TestAsyncoreTimer(AsyncorePatcher, TimerTestMixin):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
-        self.connection = self.connection_class(connect_timeout=5)
+        super(TestAsyncoreTimer, self).setUp()
