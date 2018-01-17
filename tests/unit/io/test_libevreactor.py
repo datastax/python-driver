@@ -115,6 +115,7 @@ class LibevTimerPatcher(unittest.TestCase):
 
 
 class LibevTimerTest(TimerTestMixin, LibevTimerPatcher):
+    connection_class = LibevConnection
 
     @property
     def create_timer(self):
