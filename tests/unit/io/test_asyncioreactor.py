@@ -2,6 +2,7 @@ from cassandra.io.asyncioreactor import AsyncioConnection
 from tests import is_monkey_patched
 from tests.unit.io.utils import TimerCallback, TimerTestMixin
 
+import asynctest
 from mock import patch
 
 import unittest
@@ -33,6 +34,14 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
         socket_patcher = patch('socket.socket')
         self.addCleanup(socket_patcher.stop)
         socket_patcher.start()
+
+        old_selector = AsyncioConnection._loop._selector
+        AsyncioConnection._loop._selector = asynctest.TestSelector()
+
+        def reset_selector():
+            AsyncioConnection._loop._selector = old_selector
+
+        self.addCleanup(reset_selector)
 
         super(AsyncioTimerTests, self).setUp()
 
