@@ -116,6 +116,12 @@ class AsyncioConnection(Connection):
                 return
             self.is_closed = True
 
+        asyncio.run_coroutine_threadsafe(
+            self._close(), loop=self._loop
+        )
+
+    @asyncio.coroutine
+    def _close(self):
         log.debug("Closing connection (%s) to %s" % (id(self), self.host))
         if self._write_watcher:
             self._write_watcher.cancel()
