@@ -1,26 +1,34 @@
-from cassandra.io.asyncioreactor import AsyncioConnection
+
+try:
+    from cassandra.io.asyncioreactor import AsyncioConnection
+    import asynctest
+    ASYNCIO_AVAILABLE = True
+except (ImportError, SyntaxError):
+    ASYNCIO_AVAILABLE = False
+
 from tests import is_monkey_patched
 from tests.unit.io.utils import TimerCallback, TimerTestMixin
 
-import asynctest
 from mock import patch
 
 import unittest
 import time
 
 
+@unittest.skipUnless(ASYNCIO_AVAILABLE, "asyncio is not available for this runtime")
 class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if is_monkey_patched():
+        if is_monkey_patched() or not ASYNCIO_AVAILABLE:
             return
         cls.connection_class = AsyncioConnection
         AsyncioConnection.initialize_reactor()
 
     @classmethod
     def tearDownClass(cls):
-        AsyncioConnection._loop.stop()
+        if ASYNCIO_AVAILABLE:
+            AsyncioConnection._loop.stop()
 
     @property
     def create_timer(self):
