@@ -31,7 +31,7 @@ except ImportError:
     LibevConnection = None  # noqa
 
 
-class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
+class LibevConnectionTest(ReactorTestMixin, unittest.TestCase):
 
     connection_class = LibevConnection
     socket_attr_name = '_socket'
@@ -114,7 +114,8 @@ class LibevTimerPatcher(unittest.TestCase):
                 pass
 
 
-class LibevTimerTest(LibevTimerPatcher, TimerTestMixin):
+class LibevTimerTest(TimerTestMixin, LibevTimerPatcher):
+    connection_class = LibevConnection
 
     @property
     def create_timer(self):
@@ -137,4 +138,4 @@ class LibevTimerTest(LibevTimerPatcher, TimerTestMixin):
             raise unittest.SkipTest('libev does not appear to be installed correctly')
 
         LibevConnection.initialize_reactor()
-        self.connection = self.make_connection()
+        super(LibevTimerTest, self).setUp()

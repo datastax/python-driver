@@ -57,7 +57,7 @@ class AsyncorePatcher(unittest.TestCase):
                 pass
 
 
-class AsyncoreConnectionTest(AsyncorePatcher, ReactorTestMixin):
+class AsyncoreConnectionTest(ReactorTestMixin, AsyncorePatcher):
 
     connection_class = AsyncoreConnection
     socket_attr_name = 'socket'
@@ -67,7 +67,7 @@ class AsyncoreConnectionTest(AsyncorePatcher, ReactorTestMixin):
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
 
-class TestAsyncoreTimer(AsyncorePatcher, TimerTestMixin):
+class TestAsyncoreTimer(TimerTestMixin, AsyncorePatcher):
     connection_class = AsyncoreConnection
 
     @property
@@ -81,4 +81,4 @@ class TestAsyncoreTimer(AsyncorePatcher, TimerTestMixin):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
-        self.connection = self.connection_class(connect_timeout=5)
+        super(TestAsyncoreTimer, self).setUp()
