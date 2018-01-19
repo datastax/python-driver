@@ -106,7 +106,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             self.assertEqual(row.count, i)
             self.assertEqual(row.text, None if i == 3 else str(i))
 
-    @execute_count(9)
+    @execute_count(8)
     def test_mixed_value_and_null_update(self):
         """ tests that updating a columns value, and removing another works properly """
         partition = uuid4()
