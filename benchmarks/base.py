@@ -62,7 +62,7 @@ try:
     from cassandra.io.asyncioreactor import AsyncioConnection
     have_asyncio = True
     supported_reactors.append(AsyncioConnection)
-except ImportError:
+except (ImportError, SyntaxError):
     pass
 
 have_twisted = False
