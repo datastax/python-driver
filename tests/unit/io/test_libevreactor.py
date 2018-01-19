@@ -26,7 +26,7 @@ from socket import error as socket_error
 
 from cassandra.connection import ConnectionException, ProtocolError
 from cassandra.protocol import (SupportedMessage, ReadyMessage, ServerError)
-from cassandra.marshal import uint32_pack, int32_pack
+from cassandra.marshal import int32_pack
 
 from tests import is_monkey_patched
 from tests.unit.io.utils import ReactorTestMixin
@@ -51,8 +51,6 @@ class LibevConnectionTest(unittest.TestCase, ReactorTestMixin):
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         LibevConnection.initialize_reactor()
 
-    def make_msg(self, header, body=six.binary_type()):
-        return header + uint32_pack(len(body)) + body
         # we patch here rather than as a decorator so that the Mixin can avoid
         # specifying patch args to test methods
         patchers = [patch(obj) for obj in

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cassandra.connection import HEADER_DIRECTION_TO_CLIENT
-from cassandra.marshal import uint8_pack
+from cassandra.marshal import uint8_pack, uint32_pack
 from cassandra.protocol import write_stringmultimap, write_int, write_string
 
 from six import binary_type, BytesIO
@@ -180,3 +180,6 @@ class ReactorTestMixin(object):
         write_int(buf, code)
         write_string(buf, msg)
         return buf.getvalue()
+
+    def make_msg(self, header, body=binary_type()):
+        return header + uint32_pack(len(body)) + body
