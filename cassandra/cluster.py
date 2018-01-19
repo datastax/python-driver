@@ -594,6 +594,7 @@ class Cluster(object):
     * :class:`cassandra.io.eventletreactor.EventletConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.twistedreactor.TwistedConnection`
+    * EXPERIMENTAL: :class:`cassandra.io.asyncioreactor.AsyncioConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.
@@ -602,6 +603,11 @@ class Cluster(object):
 
     If ``gevent`` or ``eventlet`` monkey-patching is detected, the corresponding
     connection class will be used automatically.
+
+    ``AsyncioConnection``, which uses the ``asyncio`` module in the Python
+    standard library, is also available, but currently experimental. Note that
+    it requires ``asyncio`` features that were only introduced in the 3.4 line
+    in 3.4.6, and in the 3.5 line in 3.5.1.
     """
 
     control_connection_timeout = 2.0

@@ -97,6 +97,8 @@ class LibevTimerPatcher(unittest.TestCase):
     @classmethod
     @noop_if_monkey_patched
     def setUpClass(cls):
+        if LibevConnection is None:
+            raise unittest.SkipTest('libev does not appear to be installed correctly')
         cls.patchers = [
             patch('socket.socket', spec=socket.socket),
             patch('cassandra.io.libevwrapper.IO')
