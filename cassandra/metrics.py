@@ -28,6 +28,8 @@ log = logging.getLogger(__name__)
 class Metrics(object):
     """
     A collection of timers and counters for various performance metrics.
+
+    Timer metrics are represented as floating point seconds.
     """
 
     request_timer = None

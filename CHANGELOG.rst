@@ -24,6 +24,7 @@ Other
 * Remove "Experimental" tag from execution profiles documentation (PYTHON-840)
 * request_timer metrics descriptions are slightly incorrect (PYTHON-885)
 * Remove "Experimental" tag from cqlengine connections documentation (PYTHON-892)
+* Set in documentation default consistency for operations is LOCAL_ONE (PYTHON-901)
 
 3.12.0
 ======
