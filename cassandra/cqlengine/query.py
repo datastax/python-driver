@@ -151,7 +151,7 @@ class BatchQuery(object):
                  timeout=conn.NOT_SET, connection=None):
         """
         :param batch_type: (optional) One of batch type values available through BatchType enum
-        :type batch_type: str or None
+        :type batch_type: BatchType, str or None
         :param timestamp: (optional) A datetime or timedelta object with desired timestamp to be applied
             to the batch conditional.
         :type timestamp: datetime or timedelta or None
@@ -225,7 +225,7 @@ class BatchQuery(object):
             self._execute_callbacks()
             return
 
-        opener = 'BEGIN ' + (self.batch_type + ' ' if self.batch_type else '') + ' BATCH'
+        opener = 'BEGIN ' + (str(self.batch_type) + ' ' if self.batch_type else '') + ' BATCH'
         if self.timestamp:
 
             if isinstance(self.timestamp, six.integer_types):

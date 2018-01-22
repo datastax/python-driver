@@ -4,6 +4,7 @@
 Features
 --------
 * cqlengine: LIKE filter operator (PYTHON-512)
+* Support cassandra.query.BatchType with cqlengine BatchQuery (PYTHON-888)
 
 Bug Fixes
 ---------
