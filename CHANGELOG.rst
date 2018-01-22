@@ -23,6 +23,7 @@ Other
 * Remove copyright dates from copyright notices (PYTHON-863)
 * Remove "Experimental" tag from execution profiles documentation (PYTHON-840)
 * request_timer metrics descriptions are slightly incorrect (PYTHON-885)
+* Remove "Experimental" tag from cqlengine connections documentation (PYTHON-892)
 
 3.12.0
 ======

@@ -1,8 +1,8 @@
-==========================
-Connections (experimental)
-==========================
+===========
+Connections
+===========
 
-Connections are experimental and aimed to ease the use of multiple sessions with cqlengine. Connections can be set on a model class, per query or using a context manager.
+Connections aim to ease the use of multiple sessions with cqlengine. Connections can be set on a model class, per query or using a context manager.
 
 
 Register a new connection
