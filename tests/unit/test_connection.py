@@ -57,7 +57,6 @@ class ConnectionTest(unittest.TestCase):
                 message_class.opcode  # opcode
             ]))
 
-
     def make_options_body(self):
         options_buf = BytesIO()
         write_stringmultimap(options_buf, {
@@ -116,9 +115,6 @@ class ConnectionTest(unittest.TestCase):
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-
         options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['7.8.9'],
@@ -168,9 +164,6 @@ class ConnectionTest(unittest.TestCase):
         locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
         locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
 
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-
         # the server only supports snappy
         options_buf = BytesIO()
         write_stringmultimap(options_buf, {
@@ -197,9 +190,6 @@ class ConnectionTest(unittest.TestCase):
         locally_supported_compressions.pop('snappy', None)
         locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
         locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
-
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
 
         # the server only supports snappy
         options_buf = BytesIO()

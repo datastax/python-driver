@@ -44,12 +44,22 @@ schedules:
     env_vars: |
       EVENT_LOOP_MANAGER='eventlet'
 
+  weekly_asyncio:
+    schedule: 0 22 * * 6
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='asyncio'
+    matrix:
+      exclude:
+        - python: [2.7]
+
   weekly_async:
     schedule: 0 10 * * 7
     branches:
       include: [master]
     env_vars: |
-      EVENT_LOOP_MANAGER='async'
+      EVENT_LOOP_MANAGER='asyncore'
 
   weekly_twister:
     schedule: 0 14 * * 7
@@ -142,8 +152,8 @@ build:
       # it takes too much time for the whole matrix to build with cython
       if [[ $CYTHON == 'CYTHON' ]]; then
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml tests/unit/ || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
+        MONKEY_PATCH_LOOP=$EVENT_LOOP_MANAGER EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
+        MONKEY_PATCH_LOOP=$EVENT_LOOP_MANAGER EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
 
       fi
 

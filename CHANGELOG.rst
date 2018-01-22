@@ -39,6 +39,7 @@ Features
 * Add NO_COMPACT startup option (PYTHON-839)
 * Add new exception type for CDC (PYTHON-837)
 * Allow 0ms in ConstantSpeculativeExecutionPolicy (PYTHON-836)
+* Add asyncio reactor (PYTHON-507)
 
 Bug Fixes
 ---------
