@@ -10,6 +10,7 @@ Features
 Bug Fixes
 ---------
 * Support retry_policy in PreparedStatement (PYTHON-861)
+* cqlengine: Remove cassandra.cqlengine.query.BatchType in favor of cassandra.query.BatchType (PYTHON-888)
 
 Other
 -----
