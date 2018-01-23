@@ -12,6 +12,7 @@ Bug Fixes
 * Support retry_policy in PreparedStatement (PYTHON-861)
 * __del__ method in Session is throwing an exception (PYTHON-813)
 * LZ4 import issue with recent versions (PYTHON-897)
+* ResponseFuture._connection can be None when returning request_id (PYTHON-853)
 
 Other
 -----
