@@ -19,7 +19,7 @@ import time
 import six
 from warnings import warn
 
-from cassandra.query import SimpleStatement
+from cassandra.query import SimpleStatement, BatchType as CBatchType
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -225,7 +225,8 @@ class BatchQuery(object):
             self._execute_callbacks()
             return
 
-        opener = 'BEGIN ' + (str(self.batch_type) + ' ' if self.batch_type else '') + ' BATCH'
+        batch_type = None if self.batch_type is CBatchType.LOGGED else self.batch_type
+        opener = 'BEGIN ' + (str(batch_type) + ' ' if batch_type else '') + ' BATCH'
         if self.timestamp:
 
             if isinstance(self.timestamp, six.integer_types):
