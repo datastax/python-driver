@@ -4321,13 +4321,20 @@ class ResultSet(object):
         """
         For LWT results, returns whether the transaction was applied.
 
-        Result is indeterminate if called on a result that was not an LWT request.
+        Result is indeterminate if called on a result that was not an LWT request or on
+        a :class:`.query.BatchStatement` containing LWT. In the latter case either all the batch
+        succeeds or fails.
 
-        Only valid when one of tne of the internal row factories is in use.
+        Only valid when one of the of the internal row factories is in use.
         """
         if self.response_future.row_factory not in (named_tuple_factory, dict_factory, tuple_factory):
             raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factsory,))
-        if len(self.current_rows) != 1:
+
+        is_batch_statement = isinstance(self.response_future.query, BatchStatement)
+        if is_batch_statement and self.column_names[0] != "[applied]":
+            raise RuntimeError("No LWT were present in the BatchStatement")
+
+        if not is_batch_statement and len(self.current_rows) != 1:
             raise RuntimeError("LWT result should have exactly one row. This has %d." % (len(self.current_rows)))
 
         row = self.current_rows[0]
