@@ -31,17 +31,16 @@ from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggrega
                                 RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,
                                 group_keys_by_replica, NO_VALID_REPLICA)
 
-from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
+from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
-                               get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30, local)
+                               get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30, local,
+                               greaterthancass20)
 
 from tests.integration import greaterthancass21
 
 def setup_module():
     use_singledc()
-    global CASS_SERVER_VERSION
-    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
 class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
@@ -207,7 +206,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
         cc = self.cluster.control_connection._connection
-        parser = get_schema_parser(cc, str(CASS_SERVER_VERSION[0]), 1)
+        parser = get_schema_parser(cc, CASSANDRA_VERSION, 1)
 
         for option in tablemeta.options:
             self.assertIn(option, parser.recognized_table_options)
@@ -344,9 +343,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         self.check_create_statement(tablemeta, create_statement)
 
+    @lessthancass30
     def test_cql_compatibility(self):
-        if CASS_SERVER_VERSION >= (3, 0):
-            raise unittest.SkipTest("cql compatibility does not apply Cassandra 3.0+")
 
         # having more than one non-PK column is okay if there aren't any
         # clustering columns
@@ -412,9 +410,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn('CREATE INDEX d_index', statement)
         self.assertIn('CREATE INDEX e_index', statement)
 
+    @greaterthancass21
     def test_collection_indexes(self):
-        if CASS_SERVER_VERSION < (2, 1, 0):
-            raise unittest.SkipTest("Secondary index on collections were introduced in Cassandra 2.1")
 
         self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
                              % (self.keyspace_name, self.function_table_name))
@@ -429,11 +426,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
                              % (self.keyspace_name, self.function_table_name))
 
         tablemeta = self.get_table_metadata()
-        target = ' (b)' if CASS_SERVER_VERSION < (3, 0) else 'values(b))'  # explicit values in C* 3+
+        target = ' (b)' if CASSANDRA_VERSION < "3.0" else 'values(b))'  # explicit values in C* 3+
         self.assertIn(target, tablemeta.export_as_string())
 
         # test full indexes on frozen collections, if available
-        if CASS_SERVER_VERSION >= (2, 1, 3):
+        if CASSANDRA_VERSION >= "2.1.3":
             self.session.execute("DROP TABLE %s.%s" % (self.keyspace_name, self.function_table_name))
             self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b frozen<map<text, text>>)"
                                  % (self.keyspace_name, self.function_table_name))
@@ -448,7 +445,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         create_statement += " WITH compression = {}"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
-        expected = "compression = {}" if CASS_SERVER_VERSION < (3, 0) else "compression = {'enabled': 'false'}"
+        expected = "compression = {}" if CASSANDRA_VERSION < "3.0" else "compression = {'enabled': 'false'}"
         self.assertIn(expected, tablemeta.export_as_string())
 
     def test_non_size_tiered_compaction(self):
@@ -620,6 +617,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthanorequalcass30
     def test_refresh_metadata_for_mv(self):
         """
         test for synchronously refreshing materialized view metadata
@@ -638,9 +636,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
 
@@ -823,6 +818,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthanorequalcass30
     def test_multiple_indices(self):
         """
         test multiple indices on the same column.
@@ -835,8 +831,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b map<text, int>)".format(self.keyspace_name, self.function_table_name))
         self.session.execute("CREATE INDEX index_1 ON {0}.{1}(b)".format(self.keyspace_name, self.function_table_name))
@@ -1001,7 +995,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test udt exports
         """
 
-        if CASS_SERVER_VERSION < (2, 1, 0):
+        if CASSANDRA_VERSION < "2.1":
             raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
 
         if PROTOCOL_VERSION < 3:
@@ -1826,16 +1820,12 @@ class BadMetaTest(unittest.TestCase):
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
-        cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
+        cls.parser_class = get_schema_parser(connection, CASSANDRA_VERSION, timeout=20).__class__
         cls.cluster.control_connection.reconnect = Mock()
 
     @classmethod
     def teardown_class(cls):
         drop_keyspace_shutdown_cluster(cls.keyspace_name, cls.session, cls.cluster)
-
-    def _skip_if_not_version(self, version):
-        if CASS_SERVER_VERSION < version:
-            raise unittest.SkipTest("Requires server version >= %s" % (version,))
 
     def test_bad_keyspace(self):
         with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
@@ -1861,8 +1851,8 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+    @greaterthancass20
     def test_bad_user_type(self):
-        self._skip_if_not_version((2, 1, 0))
         self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name)
         with patch.object(self.parser_class, '_build_user_type', side_effect=self.BadMetaException):
             self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
@@ -1870,8 +1860,8 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+    @greaterthancass21
     def test_bad_user_function(self):
-        self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS %s (key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
@@ -1882,8 +1872,8 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+    @greaterthancass21
     def test_bad_user_aggregate(self):
-        self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS sum_int (key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
@@ -1923,11 +1913,10 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(s=>org.apache.cassandra.db.marshal.UTF8Type,i=>org.apache.cassandra.db.marshal.Int32Type)'" in dct_table.as_cql_query().replace(" ", ""))
 
 
+@greaterthanorequalcass30
 class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
         self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
@@ -2003,12 +1992,8 @@ class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
 
+@greaterthanorequalcass30
 class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
-    def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
-        super(MaterializedViewMetadataTestComplex, self).setUp()
-
     def test_create_view_metadata(self):
         """
         test to ensure that materialized view metadata is properly constructed

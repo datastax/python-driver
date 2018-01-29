@@ -26,7 +26,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
     USE_CASS_EXTERNAL, greaterthanorequalcass40
 from tests import notwindows
@@ -47,8 +47,6 @@ def setup_module():
         ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
     setup_keyspace()
-    global CASS_SERVER_VERSION
-    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
 class QueryTests(BasicSharedKeyspaceUnitTestCase):
@@ -980,11 +978,8 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         self.assertEqual(batch.routing_key, self.prepared.bind((1, 0)).routing_key)
 
 
+@greaterthanorequalcass30
 class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
-
-    def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
     def test_mv_filtering(self):
         """
