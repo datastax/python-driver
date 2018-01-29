@@ -28,7 +28,8 @@ from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor
 from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
 from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate,  protect_name, protect_names,
-                                RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,)
+                                RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,
+                                group_keys_by_replica, NO_VALID_REPLICA)
 
 from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
@@ -2306,3 +2307,50 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
         self.assertEqual(value_column.name, 'the Value')
+
+class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(rf=1, create_class_table=True)
+        cls.table_two_pk = "table_with_two_pk"
+        cls.session.execute(
+            '''
+            CREATE TABLE {0}.{1} (
+                k_one int,
+                k_two int,
+                v int,
+                PRIMARY KEY ((k_one, k_two))
+            )'''.format(cls.ks_name, cls.table_two_pk)
+        )
+
+    def test_group_keys_by_host(self):
+        """
+        Test to ensure group_keys_by_host functions as expected. It is tried
+        with a table with a single field for the partition key and a table
+        with two fields for the partition key
+        @since 3.13
+        @jira_ticket PYTHON-647
+        @expected_result group_keys_by_host return the expected value
+
+        @test_category metadata
+        """
+        stmt = """SELECT * FROM {}.{}
+                         WHERE k_one = ? AND k_two = ? """.format(self.ks_name, self.table_two_pk)
+        keys = ((1, 2), (2, 2), (2, 3), (3, 4))
+        self._assert_group_keys_by_host(keys, self.table_two_pk, stmt)
+
+        stmt = """SELECT * FROM {}.{}
+                                 WHERE k = ? """.format(self.ks_name, self.ks_name)
+        keys = ((1, ), (2, ), (2, ), (3, ))
+        self._assert_group_keys_by_host(keys, self.ks_name, stmt)
+
+    def _assert_group_keys_by_host(self, keys, table_name, stmt):
+        keys_per_host = group_keys_by_replica(self.session, self.ks_name, table_name, keys)
+        self.assertNotIn(NO_VALID_REPLICA, keys_per_host)
+
+        prepared_stmt = self.session.prepare(stmt)
+        for key in keys:
+            routing_key = prepared_stmt.bind(key).routing_key
+            hosts = self.cluster.metadata.get_replicas(self.ks_name, routing_key)
+            self.assertEqual(1, len(hosts)) # RF is 1 for this keyspace
+            self.assertIn(key, keys_per_host[hosts[0]])

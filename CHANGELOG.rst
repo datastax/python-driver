@@ -43,6 +43,7 @@ Features
 * Add new exception type for CDC (PYTHON-837)
 * Allow 0ms in ConstantSpeculativeExecutionPolicy (PYTHON-836)
 * Add asyncio reactor (PYTHON-507)
+* Create an utility function to fetch concurrently many keys from the same replica (PYTHON-647)
 
 Bug Fixes
 ---------
