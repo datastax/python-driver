@@ -92,6 +92,8 @@ Upgrade Guide 3.x to 4.x
 * cassandra.cqlengine.query.BatchType has been removed. Use :class:`cassandra.query.BatchType`
   instead when specifying the batch type with cqlengine.
 
+* There is no more default limit on QuerySets (was 10000 before).
+
 Upgrade Guide cqlengine to cassandra.cqlengine
 ==============================================
 
