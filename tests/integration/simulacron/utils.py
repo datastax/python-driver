@@ -103,7 +103,7 @@ class SimulacronClient(object):
 
         request = Request("http://{}/{}{}".format(
             self.admin_addr, query.path, query.fetch_url_params()), data=data)
-        request.get_method = lambda: 'POST'
+        request.get_method = lambda: query.method
         request.add_header("Content-Type", 'application/json')
         request.add_header("Content-Length", len(data))
 
@@ -142,9 +142,13 @@ NO_THEN = object()
 
 class SimulacronRequest(object):
     def fetch_json(self):
-        raise NotImplementedError()
+        return {}
 
     def fetch_url_params(self):
+        return ""
+
+    @property
+    def method(self):
         raise NotImplementedError()
 
 
@@ -174,6 +178,44 @@ class PrimeOptions(SimulacronRequest):
 
     def fetch_url_params(self):
         return ""
+
+    @property
+    def method(self):
+        return "POST"
+
+
+class RejectType():
+    UNBIND = "UNBIND"
+    STOP = "STOP"
+    REJECT_STARTUP = "REJECT_STARTUP"
+
+
+class RejectConnections(SimulacronRequest):
+    """
+    Class used for making simulacron reject new connections
+    """
+    def __init__(self, reject_type, cluster_name=DEFAULT_CLUSTER):
+        self.path = "listener/{}".format(cluster_name)
+        self.reject_type = reject_type
+
+    def fetch_url_params(self):
+        return "?type={0}".format(self.reject_type)
+
+    @property
+    def method(self):
+        return "DELETE"
+
+
+class AcceptConnections(SimulacronRequest):
+    """
+    Class used for making simulacron reject new connections
+    """
+    def __init__(self, cluster_name=DEFAULT_CLUSTER):
+        self.path = "listener/{}".format(cluster_name)
+
+    @property
+    def method(self):
+        return "PUT"
 
 
 class PrimeQuery(SimulacronRequest):
@@ -228,6 +270,9 @@ class PrimeQuery(SimulacronRequest):
     def fetch_url_params(self):
         return ""
 
+    @property
+    def method(self):
+        return "POST"
 
 class ClusterQuery(SimulacronRequest):
     """
@@ -251,6 +296,9 @@ class ClusterQuery(SimulacronRequest):
         return "?cassandra_version={0}&data_centers={1}&name={2}".\
             format(self.cassandra_version, self.data_centers, self.cluster_name)
 
+    @property
+    def method(self):
+        return "POST"
 
 def prime_driver_defaults():
     """
