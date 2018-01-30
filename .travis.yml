@@ -33,4 +33,5 @@ script:
       exit 1
     fi
   - tox
-  - tox -e patched_loops
+  - tox -e gevent_loop
+  - tox -e eventlet_loop
