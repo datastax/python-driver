@@ -13,6 +13,8 @@ sections:
 prebuilds:
   - python setup.py build_ext --inplace --force --no-murmur3 --no-cython
 versions:
+  - name: '3.13'
+    ref: '3.13.0'
   - name: '3.12'
     ref: '43b9c995'
   - name: '3.11'
