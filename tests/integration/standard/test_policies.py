@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import use_singledc
-
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cluster import Cluster, ExecutionProfile
-from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, WhiteListRoundRobinPolicy
+from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture
+from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, \
+    WhiteListRoundRobinPolicy
 from cassandra.pool import Host
 
-from tests.integration import PROTOCOL_VERSION, local
+from tests.integration import PROTOCOL_VERSION, local, use_singledc
 
 from concurrent.futures import wait as wait_futures
-
 
 def setup_module():
     use_singledc()
@@ -36,7 +34,7 @@ class HostFilterPolicyTests(unittest.TestCase):
 
     def test_predicate_changes(self):
         """
-        Test to validate hostfilter reacts correctly when the predicate return
+        Test to validate host filter reacts correctly when the predicate return
         a different subset of the hosts
         HostFilterPolicy
         @since 3.8

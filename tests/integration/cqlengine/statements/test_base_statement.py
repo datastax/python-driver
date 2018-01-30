@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,17 +17,21 @@ except ImportError:
     import unittest  # noqa
 
 from uuid import uuid4
+import six
 
 from cassandra.query import FETCH_SIZE_UNSET
+from cassandra.cluster import Cluster, ConsistencyLevel
 from cassandra.cqlengine.statements import BaseCQLStatement
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.statements import InsertStatement, UpdateStatement, SelectStatement, DeleteStatement, \
     WhereClause
-from cassandra.cqlengine.operators import EqualsOperator
+from cassandra.cqlengine.operators import EqualsOperator, LikeOperator
 from cassandra.cqlengine.columns import Column
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
+from tests.integration import greaterthanorequalcass3_10
+
 from cassandra.cqlengine.connection import execute
 
 
@@ -46,6 +50,8 @@ class BaseStatementTest(unittest.TestCase):
 
 
 class ExecuteStatementTest(BaseCassEngTestCase):
+    text = "text_for_db"
+
     @classmethod
     def setUpClass(cls):
         super(ExecuteStatementTest, cls).setUpClass()
@@ -79,20 +85,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         """
         partition = uuid4()
         cluster = 1
-
-        #Verifying insert statement
-        st = InsertStatement(self.table_name)
-        st.add_assignment(Column(db_field='partition'), partition)
-        st.add_assignment(Column(db_field='cluster'), cluster)
-
-        st.add_assignment(Column(db_field='count'), 1)
-        st.add_assignment(Column(db_field='text'), "text_for_db")
-        st.add_assignment(Column(db_field='text_set'), set(("foo", "bar")))
-        st.add_assignment(Column(db_field='text_list'), ["foo", "bar"])
-        st.add_assignment(Column(db_field='text_map'), {"foo": '1', "bar": '2'})
-
-        execute(st)
-        self._verify_statement(st)
+        self._insert_statement(partition, cluster)
 
         # Verifying update statement
         where = [WhereClause('partition', EqualsOperator(), partition),
@@ -111,3 +104,56 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         # Verifying delete statement
         execute(DeleteStatement(self.table_name, where=where))
         self.assertEqual(TestQueryUpdateModel.objects.count(), 0)
+
+    @greaterthanorequalcass3_10
+    def test_like_operator(self):
+        """
+        Test to verify the like operator works appropriately
+
+        @since 3.13
+        @jira_ticket PYTHON-512
+        @expected_result the expected row is read using LIKE
+
+        @test_category data_types:object_mapper
+        """
+        cluster = Cluster()
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+
+        session.execute("""CREATE CUSTOM INDEX text_index ON {} (text)
+                                    USING 'org.apache.cassandra.index.sasi.SASIIndex';""".format(self.table_name))
+        self.addCleanup(session.execute, "DROP INDEX {}.text_index".format(DEFAULT_KEYSPACE))
+
+        partition = uuid4()
+        cluster = 1
+        self._insert_statement(partition, cluster)
+
+        ss = SelectStatement(self.table_name)
+        like_clause = "text_for_%"
+        ss.add_where(Column(db_field='text'), LikeOperator(), like_clause)
+        self.assertEqual(six.text_type(ss),
+                         'SELECT * FROM {} WHERE "text" LIKE %(0)s'.format(self.table_name))
+
+        result = execute(ss)
+        self.assertEqual(result[0]["text"], self.text)
+
+        q = TestQueryUpdateModel.objects.filter(text__like=like_clause).allow_filtering()
+        self.assertEqual(q[0].text, self.text)
+
+        q = TestQueryUpdateModel.objects.filter(text__like=like_clause)
+        self.assertEqual(q[0].text, self.text)
+
+    def _insert_statement(self, partition, cluster):
+        # Verifying insert statement
+        st = InsertStatement(self.table_name)
+        st.add_assignment(Column(db_field='partition'), partition)
+        st.add_assignment(Column(db_field='cluster'), cluster)
+
+        st.add_assignment(Column(db_field='count'), 1)
+        st.add_assignment(Column(db_field='text'), self.text)
+        st.add_assignment(Column(db_field='text_set'), set(("foo", "bar")))
+        st.add_assignment(Column(db_field='text_list'), ["foo", "bar"])
+        st.add_assignment(Column(db_field='text_map'), {"foo": '1', "bar": '2'})
+
+        execute(st)
+        self._verify_statement(st)

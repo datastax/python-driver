@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,10 @@ from tests.integration import (get_server_versions, greaterthanorequalcass40,
                                set_default_beta_flag_true,
                                BasicSharedKeyspaceUnitTestCase)
 
+import logging
+
+
+LOG = logging.getLogger(__name__)
 
 def setup_module():
     use_singledc()
@@ -447,6 +451,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         """
         prepared_statement = self.session.prepare("SELECT * from {} WHERE a = ?".format(self.table_name))
         id_before = prepared_statement.result_metadata_id
+        self.assertEqual(len(prepared_statement.result_metadata), 3)
 
         self.session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
         bound_statement = prepared_statement.bind((1, ))
@@ -455,6 +460,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         id_after = prepared_statement.result_metadata_id
 
         self.assertNotEqual(id_before, id_after)
+        self.assertEqual(len(prepared_statement.result_metadata), 4)
 
     def test_prepared_id_is_updated_across_pages(self):
         """
@@ -468,6 +474,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         """
         prepared_statement = self.session.prepare("SELECT * from {}".format(self.table_name))
         id_before = prepared_statement.result_metadata_id
+        self.assertEqual(len(prepared_statement.result_metadata), 3)
 
         prepared_statement.fetch_size = 2
         result = self.session.execute(prepared_statement.bind((None)))
@@ -483,6 +490,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         self.assertEqual(result_set, expected_result_set)
         self.assertNotEqual(id_before, id_after)
+        self.assertEqual(len(prepared_statement.result_metadata), 4)
 
     def test_prepare_id_is_updated_across_session(self):
         """
@@ -499,6 +507,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         stm = "SELECT * from {} WHERE a = ?".format(self.table_name)
         one_prepared_stm = one_session.prepare(stm)
+        self.assertEqual(len(one_prepared_stm.result_metadata), 3)
 
         one_id_before = one_prepared_stm.result_metadata_id
 
@@ -507,6 +516,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         one_id_after = one_prepared_stm.result_metadata_id
         self.assertNotEqual(one_id_before, one_id_after)
+        self.assertEqual(len(one_prepared_stm.result_metadata), 4)
 
     def test_not_reprepare_invalid_statements(self):
         """
@@ -521,3 +531,57 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("ALTER TABLE {} DROP d".format(self.table_name))
         with self.assertRaises(InvalidRequest):
             self.session.execute(prepared_statement.bind((1, )))
+
+    def test_id_is_not_updated_conditional_v4(self):
+        """
+        Test that verifies that the result_metadata and the
+        result_metadata_id are udpated correctly in conditional statements
+        in protocol V4
+
+        @since 3.13
+        @jira_ticket PYTHON-847
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.V4)
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+        self._test_updated_conditional(session, 9)
+
+    def test_id_is_not_updated_conditional_v5(self):
+        """
+        Test that verifies that the result_metadata and the
+        result_metadata_id are udpated correctly in conditional statements
+        in protocol V5
+
+        @since 3.13
+        @jira_ticket PYTHON-847
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.V5)
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+        self._test_updated_conditional(session, 10)
+
+    def _test_updated_conditional(self, session, value):
+        prepared_statement = session.prepare(
+            "INSERT INTO {}(a, b, d) VALUES "
+            "(?, ? , ?) IF NOT EXISTS".format(self.table_name))
+        first_id = prepared_statement.result_metadata_id
+        LOG.debug('initial result_metadata_id: {}'.format(first_id))
+
+        def check_result_and_metadata(expected):
+            self.assertEqual(
+                session.execute(prepared_statement, (value, value, value))[0],
+                expected
+            )
+            self.assertEqual(prepared_statement.result_metadata_id, first_id)
+            self.assertEqual(prepared_statement.result_metadata, [])
+
+        # Successful conditional update
+        check_result_and_metadata((True,))
+
+        # Failed conditional update
+        check_result_and_metadata((False, value, value, value))
+
+        session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
+
+        # Failed conditional update
+        check_result_and_metadata((False, value, value, None, value))

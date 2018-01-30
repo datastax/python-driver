@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,8 +64,8 @@ else:
     # The compress and decompress functions we need were moved from the lz4 to
     # the lz4.block namespace, so we try both here.
     try:
-        lz4_block = lz4.block
-    except AttributeError:
+        from lz4 import block as lz4_block
+    except ImportError:
         lz4_block = lz4
 
     # Cassandra writes the uncompressed message length in big endian order,

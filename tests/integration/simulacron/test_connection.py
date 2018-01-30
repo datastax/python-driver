@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
 from cassandra.policies import HostStateListener, RoundRobinPolicy
+from cassandra.io.asyncorereactor import AsyncoreConnection
 from tests.integration import (CASSANDRA_VERSION, PROTOCOL_VERSION,
                                requiressimulacron)
 from tests.integration.util import assert_quiescent_pool_state
@@ -194,7 +195,7 @@ class ConnectionTests(SimulacronBase):
                 "scope": "connection"
             }
 
-            prime_query(query_to_prime, then=then)
+            prime_query(query_to_prime, then=then, rows=None, column_types=None)
             self.assertRaises(NoHostAvailable, session.execute, query_to_prime)
 
     def test_retry_after_defunct(self):
@@ -328,3 +329,13 @@ class ConnectionTests(SimulacronBase):
 
         self.assertEqual(listener.hosts_marked_down, [])
         assert_quiescent_pool_state(self, cluster)
+
+    def test_can_shutdown_asyncoreconnection_subclass(self):
+        start_and_prime_singledc()
+        class ExtendedConnection(AsyncoreConnection):
+            pass
+
+        cluster = Cluster(contact_points=["127.0.0.2"],
+                          connection_class=ExtendedConnection)
+        cluster.connect()
+        cluster.shutdown()

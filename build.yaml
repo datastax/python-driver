@@ -44,12 +44,22 @@ schedules:
     env_vars: |
       EVENT_LOOP_MANAGER='eventlet'
 
+  weekly_asyncio:
+    schedule: 0 22 * * 6
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='asyncio'
+    matrix:
+      exclude:
+        - python: [2.7]
+
   weekly_async:
     schedule: 0 10 * * 7
     branches:
       include: [master]
     env_vars: |
-      EVENT_LOOP_MANAGER='async'
+      EVENT_LOOP_MANAGER='asyncore'
 
   weekly_twister:
     schedule: 0 14 * * 7
@@ -57,6 +67,18 @@ schedules:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='twisted'
+
+  upgrade_tests:
+    schedule: adhoc
+    branches:
+      include: [master, python-546]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+      JUST_UPGRADE=True
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
+        - cassandra: ['2.0', '2.1', '2.2', '3.0']
 
 python:
   - 2.7
@@ -68,7 +90,6 @@ os:
   - ubuntu/trusty64
 
 cassandra:
-  - '2.0'
   - '2.1'
   - '2.2'
   - '3.0'
@@ -91,6 +112,7 @@ build:
 
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
+      pip install nose-exclude
       FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
         FORCE_CYTHON=True
@@ -118,12 +140,20 @@ build:
 
       popd
 
+
+      echo "JUST_UPGRADE: $JUST_UPGRADE"
+      if [[ $JUST_UPGRADE == 'True' ]]; then
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=upgrade_results.xml tests/integration/upgrade || true
+        exit 0
+      fi
+
+
       # Run the unit tests, this is not done in travis because
       # it takes too much time for the whole matrix to build with cython
       if [[ $CYTHON == 'CYTHON' ]]; then
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml tests/unit/ || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
+        MONKEY_PATCH_LOOP=$EVENT_LOOP_MANAGER EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
+        MONKEY_PATCH_LOOP=$EVENT_LOOP_MANAGER EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
 
       fi
 
@@ -139,6 +169,6 @@ build:
       EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
       echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
   - xunit:
     - "*_results.xml"

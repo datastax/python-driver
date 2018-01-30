@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@ log = logging.getLogger(__name__)
 class Metrics(object):
     """
     A collection of timers and counters for various performance metrics.
+
+    Timer metrics are represented as floating point seconds.
     """
 
     request_timer = None
@@ -39,10 +41,10 @@ class Metrics(object):
       * min - min latency
       * max - max latency
       * mean - mean latency
-      * stdev - standard deviation for latencies
+      * stddev - standard deviation for latencies
       * median - median latency
       * 75percentile - 75th percentile latencies
-      * 97percentile - 97th percentile latencies
+      * 95percentile - 95th percentile latencies
       * 98percentile - 98th percentile latencies
       * 99percentile - 99th percentile latencies
       * 999percentile - 99.9th percentile latencies

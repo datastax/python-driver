@@ -1,3 +1,33 @@
+3.13.0
+======
+January 30, 2018
+
+Features
+--------
+* cqlengine: LIKE filter operator (PYTHON-512)
+* Support cassandra.query.BatchType with cqlengine BatchQuery (PYTHON-888)
+
+Bug Fixes
+---------
+* AttributeError: 'NoneType' object has no attribute 'add_timer' (PYTHON-862)
+* Support retry_policy in PreparedStatement (PYTHON-861)
+* __del__ method in Session is throwing an exception (PYTHON-813)
+* LZ4 import issue with recent versions (PYTHON-897)
+* ResponseFuture._connection can be None when returning request_id (PYTHON-853)
+
+Other
+-----
+* cqlengine: avoid warning when unregistering connection on shutdown (PYTHON-865)
+* Fix DeprecationWarning of log.warn (PYTHON-846)
+* Fix example_mapper.py for python3 (PYTHON-860)
+* Possible deadlock on cassandra.concurrent.execute_concurrent (PYTHON-768)
+* Add some known deprecated warnings for 4.x (PYTHON-877)
+* Remove copyright dates from copyright notices (PYTHON-863)
+* Remove "Experimental" tag from execution profiles documentation (PYTHON-840)
+* request_timer metrics descriptions are slightly incorrect (PYTHON-885)
+* Remove "Experimental" tag from cqlengine connections documentation (PYTHON-892)
+* Set in documentation default consistency for operations is LOCAL_ONE (PYTHON-901)
+
 3.12.0
 ======
 November 6, 2017
@@ -12,6 +42,8 @@ Features
 * Include hash of result set metadata in prepared stmt id (PYTHON-808)
 * Add NO_COMPACT startup option (PYTHON-839)
 * Add new exception type for CDC (PYTHON-837)
+* Allow 0ms in ConstantSpeculativeExecutionPolicy (PYTHON-836)
+* Add asyncio reactor (PYTHON-507)
 
 Bug Fixes
 ---------

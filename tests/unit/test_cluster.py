@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -404,8 +404,8 @@ class ExecutionProfileTest(unittest.TestCase):
     def _check_warning_on_no_lbp_with_contact_points(self, cluster_kwargs):
         with patch('cassandra.cluster.log') as patched_logger:
             Cluster(**cluster_kwargs)
-        patched_logger.warn.assert_called_once()
-        warning_message = patched_logger.warn.call_args[0][0]
+        patched_logger.warning.assert_called_once()
+        warning_message = patched_logger.warning.call_args[0][0]
         self.assertIn('please specify a load-balancing policy', warning_message)
         self.assertIn("contact_points = ['127.0.0.1']", warning_message)
 
@@ -459,7 +459,7 @@ class ExecutionProfileTest(unittest.TestCase):
         """
         with patch('cassandra.cluster.log') as patched_logger:
             Cluster(**cluster_kwargs)
-        patched_logger.warn.assert_not_called()
+        patched_logger.warning.assert_not_called()
 
     @mock_session_pools
     def test_warning_adding_no_lbp_ep_to_cluster_with_contact_points(self):
@@ -473,8 +473,8 @@ class ExecutionProfileTest(unittest.TestCase):
                 profile=ExecutionProfile()
             )
 
-        patched_logger.warn.assert_called_once()
-        warning_message = patched_logger.warn.call_args[0][0]
+        patched_logger.warning.assert_called_once()
+        warning_message = patched_logger.warning.call_args[0][0]
         self.assertIn('no_lbp', warning_message)
         self.assertIn('trying to add', warning_message)
         self.assertIn('please specify a load-balancing policy', warning_message)
@@ -491,4 +491,4 @@ class ExecutionProfileTest(unittest.TestCase):
                 profile=ExecutionProfile(load_balancing_policy=Mock(name='lbp'))
             )
 
-        patched_logger.warn.assert_not_called()
+        patched_logger.warning.assert_not_called()

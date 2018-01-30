@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -567,6 +567,7 @@ class BaseModel(object):
         if not cls._table_name:
             if cls.__table_name__:
                 if cls.__table_name_case_sensitive__:
+                    warn("Model __table_name_case_sensitive__ will be removed in 4.0.", PendingDeprecationWarning)
                     cls._table_name = cls.__table_name__
                 else:
                     table_name = cls.__table_name__.lower()

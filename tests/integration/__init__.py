@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,15 +31,16 @@ import platform
 from threading import Event
 from subprocess import call
 from itertools import groupby
+import six
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
     InvalidRequest
+from cassandra.cluster import NoHostAvailable
 
 from cassandra.protocol import ConfigurationException
 
 try:
     from ccmlib.cluster import Cluster as CCMCluster
-    from ccmlib.dse_cluster import DseCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
 except ImportError as e:
@@ -105,30 +106,9 @@ if(cython_env == 'True'):
 
 default_cassandra_version = '2.2.0'
 
-
-def _get_cass_version_from_dse(dse_version):
-    if dse_version.startswith('4.6') or dse_version.startswith('4.5'):
-        cass_ver = "2.0"
-    elif dse_version.startswith('4.7') or dse_version.startswith('4.8'):
-        cass_ver = "2.1"
-    elif dse_version.startswith('5.0'):
-        cass_ver = "3.0"
-    elif dse_version.startswith("5.1"):
-        cass_ver = "3.10"
-    else:
-        log.error("Uknown dse version found {0}, defaulting to 2.1".format(dse_version))
-        cass_ver = "2.1"
-
-    return cass_ver
-
 CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
-DSE_VERSION = os.getenv('DSE_VERSION', None)
-DSE_CRED = os.getenv('DSE_CREDS', None)
-if DSE_VERSION:
-    CASSANDRA_VERSION = _get_cass_version_from_dse(DSE_VERSION)
-else:
-    CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
+CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
 
 CCM_KWARGS = {}
 if CASSANDRA_DIR:
@@ -138,15 +118,6 @@ if CASSANDRA_DIR:
 else:
     log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
     CCM_KWARGS['version'] = CASSANDRA_VERSION
-
-if DSE_VERSION:
-    log.info('Using DSE version: %s', DSE_VERSION)
-    if not CASSANDRA_DIR:
-        CCM_KWARGS['version'] = DSE_VERSION
-        if DSE_CRED:
-            log.info("Using DSE credentials file located at {0}".format(DSE_CRED))
-            CCM_KWARGS['dse_credentials_file'] = DSE_CRED
-
 
 #This changes the default contact_point parameter in Cluster
 def set_default_cass_ip():
@@ -207,7 +178,7 @@ def get_supported_protocol_versions():
     elif version >= Version('2.0'):
         return (1, 2)
     else:
-        return (1)
+        return (1, )
 
 
 def get_unsupported_lower_protocol():
@@ -257,18 +228,17 @@ greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'C
 greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
 lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
-dseonly = unittest.skipUnless(DSE_VERSION, "Test is only applicalbe to DSE clusters")
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
-requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "async" in EVENT_LOOP_MANAGER,
+requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "asyncore" in EVENT_LOOP_MANAGER,
                                                "This test is not suitible for environments with large clock granularity")
-requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None, "Simulacron jar hasn't been specified")
+requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1", "Simulacron jar hasn't been specified or C* version is 2.0")
 
 
 def wait_for_node_socket(node, timeout):
     binary_itf = node.network_interfaces['binary']
     if not common.check_socket_listening(binary_itf, timeout=timeout):
-        log.warn("Unable to connect to binary socket for node " + node.name)
+        log.warning("Unable to connect to binary socket for node " + node.name)
     else:
         log.debug("Node %s is up and listening " % (node.name,))
 
@@ -323,7 +293,7 @@ def remove_cluster():
                 return
             except OSError:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
                 tries += 1
                 time.sleep(1)
@@ -340,8 +310,13 @@ def is_current_cluster(cluster_name, node_counts):
     return False
 
 
-def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
+def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
+                configuration_options={}):
     set_default_cass_ip()
+
+    if ccm_options is None:
+        ccm_options = CCM_KWARGS
+    cassandra_version = ccm_options.get('version', CASSANDRA_VERSION)
 
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
@@ -349,7 +324,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             log.debug("Using external CCM cluster {0}".format(CCM_CLUSTER.name))
         else:
             log.debug("Using unnamed external cluster")
-        setup_keyspace(ipformat=ipformat, wait=False)
+        if set_keyspace and start:
+            setup_keyspace(ipformat=ipformat, wait=False)
         return
 
     if is_current_cluster(cluster_name, nodes):
@@ -363,27 +339,22 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             CCM_CLUSTER = CCMClusterFactory.load(path, cluster_name)
             log.debug("Found existing CCM cluster, {0}; clearing.".format(cluster_name))
             CCM_CLUSTER.clear()
-            CCM_CLUSTER.set_install_dir(**CCM_KWARGS)
+            CCM_CLUSTER.set_install_dir(**ccm_options)
+            CCM_CLUSTER.set_configuration_options(configuration_options)
         except Exception:
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
 
-            log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, CCM_KWARGS))
-            if DSE_VERSION:
-                log.error("creating dse cluster")
-                CCM_CLUSTER = DseCluster(path, cluster_name, **CCM_KWARGS)
-            else:
-                CCM_CLUSTER = CCMCluster(path, cluster_name, **CCM_KWARGS)
+            log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
+            CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
             CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-            if CASSANDRA_VERSION >= '2.2':
+            if cassandra_version >= '2.2':
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                if CASSANDRA_VERSION >= '3.0':
+                if cassandra_version >= '3.0':
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-            if 'spark' in workloads:
-                config_options = {"initial_spark_worker_resources": 0.1}
-                CCM_CLUSTER.set_dse_configuration_options(config_options)
             common.switch_cluster(path, cluster_name)
+            CCM_CLUSTER.set_configuration_options(configuration_options)
             CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
         jvm_args = []
@@ -401,18 +372,20 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[]):
             # Added to wait for slow nodes to start up
             for node in CCM_CLUSTER.nodes.values():
                 wait_for_node_socket(node, 120)
-            setup_keyspace(ipformat=ipformat)
+            if set_keyspace:
+                setup_keyspace(ipformat=ipformat)
     except Exception:
         log.exception("Failed to start CCM cluster; removing cluster.")
 
         if os.name == "nt":
             if CCM_CLUSTER:
-                for node in CCM_CLUSTER.nodes.itervalues():
+                for node in six.itervalues(CCM_CLUSTER.nodes):
                     os.system("taskkill /F /PID " + str(node.pid))
         else:
             call(["pkill", "-9", "-f", ".ccm"])
         remove_cluster()
         raise
+    return CCM_CLUSTER
 
 
 def teardown_package():
@@ -440,12 +413,12 @@ def execute_until_pass(session, query):
         try:
             return session.execute(query)
         except (ConfigurationException, AlreadyExists, InvalidRequest):
-            log.warn("Received already exists from query {0}   not exiting".format(query))
+            log.warning("Received already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
             tries += 1
 
@@ -458,12 +431,12 @@ def execute_with_long_wait_retry(session, query, timeout=30):
         try:
             return session.execute(query, timeout=timeout)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Received already exists from query {0}    not exiting".format(query))
+            log.warning("Received already exists from query {0}    not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
             tries += 1
 
@@ -490,12 +463,12 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
     try:
         execute_with_long_wait_retry(session, "DROP KEYSPACE {0}".format(keyspace_name))
     except:
-        log.warn("Error encountered when droping keyspace {0}".format(keyspace_name))
+        log.warning("Error encountered when droping keyspace {0}".format(keyspace_name))
         ex_type, ex, tb = sys.exc_info()
-        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+        log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
         del tb
     finally:
-        log.warn("Shutting down cluster")
+        log.warning("Shutting down cluster")
         cluster.shutdown()
 
 

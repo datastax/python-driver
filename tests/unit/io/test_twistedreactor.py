@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,63 +17,41 @@ try:
 except ImportError:
     import unittest
 from mock import Mock, patch
-import time
 
 try:
     from twisted.test import proto_helpers
     from twisted.python.failure import Failure
     from cassandra.io import twistedreactor
+    from cassandra.io.twistedreactor import TwistedConnection
 except ImportError:
-    twistedreactor = None  # NOQA
+    twistedreactor = TwistedConnection = None  # NOQA
+
 
 from cassandra.connection import _Frame
-from tests.unit.io.utils import submit_and_wait_for_completion, TimerCallback
 
+from tests.unit.io.utils import TimerTestMixin
 
-class TestTwistedTimer(unittest.TestCase):
+class TestTwistedTimer(TimerTestMixin, unittest.TestCase):
     """
     Simple test class that is used to validate that the TimerManager, and timer
     classes function appropriately with the twisted infrastructure
     """
 
+    connection_class = TwistedConnection
+
+    @property
+    def create_timer(self):
+        return self.connection.create_timer
+
+    @property
+    def _timers(self):
+        return self.connection._loop._timers
+
     def setUp(self):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
         twistedreactor.TwistedConnection.initialize_reactor()
-
-    def test_multi_timer_validation(self):
-        """
-        Verify that the timers are called in the correct order
-        """
-        twistedreactor.TwistedConnection.initialize_reactor()
-        connection = twistedreactor.TwistedConnection('1.2.3.4',
-                                                       cql_version='3.0.1')
-        # Tests timers submitted in order at various timeouts
-        submit_and_wait_for_completion(self, connection, 0, 100, 1, 100)
-        # Tests timers submitted in reverse order at various timeouts
-        submit_and_wait_for_completion(self, connection, 100, 0, -1, 100)
-        # Tests timers submitted in varying order at various timeouts
-        submit_and_wait_for_completion(self, connection, 0, 100, 1, 100, True)
-
-    def test_timer_cancellation(self, *args):
-        """
-        Verify that timer cancellation is honored
-        """
-
-        # Various lists for tracking callback stage
-        connection = twistedreactor.TwistedConnection('1.2.3.4',
-                                                       cql_version='3.0.1')
-        timeout = .1
-        callback = TimerCallback(timeout)
-        timer = connection.create_timer(timeout, callback.invoke)
-        timer.cancel()
-        # Release context allow for timer thread to run.
-        time.sleep(.2)
-        timer_manager = connection._loop._timers
-        # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())
+        super(TestTwistedTimer, self).setUp()
 
 
 class TestTwistedProtocol(unittest.TestCase):
@@ -231,7 +209,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.handle_read()
         self.assertEqual(self.obj_ut._iobuf.getvalue(), extra)
         self.obj_ut.process_msg.assert_called_with(
-            _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos= 9 + len(body)), body)
+            _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos=9 + len(body)), body)
 
     @patch('twisted.internet.reactor.connectTCP')
     def test_push(self, mock_connectTCP):
@@ -242,4 +220,3 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.push('123 pickup')
         self.mock_reactor_cft.assert_called_with(
             self.obj_ut.connector.transport.write, '123 pickup')
-

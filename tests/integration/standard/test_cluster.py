@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ from mock import Mock, call, patch
 import time
 from uuid import uuid4
 import logging
+import warnings
 
 import cassandra
 from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
@@ -45,6 +46,7 @@ import sys
 
 def setup_module():
     use_singledc()
+    warnings.simplefilter("always")
 
 
 class IgnoredHostPolicy(RoundRobinPolicy):
@@ -1428,3 +1430,40 @@ class BetaProtocolTest(unittest.TestCase):
         self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.MAX_SUPPORTED)
         self.assertTrue(session.execute("select release_version from system.local")[0])
         cluster.shutdown()
+
+
+class DeprecationWarningTest(unittest.TestCase):
+    def test_deprecation_warnings_legacy_parameters(self):
+        """
+        Tests the deprecation warning has been added when using
+        legacy parameters
+
+        @since 3.13
+        @jira_ticket PYTHON-877
+        @expected_result the deprecation warning is emitted
+
+        @test_category logs
+        """
+        with warnings.catch_warnings(record=True) as w:
+            Cluster(load_balancing_policy=RoundRobinPolicy())
+            self.assertEqual(len(w), 1)
+            self.assertIn("Legacy execution parameters will be removed in 4.0. Consider using execution profiles.",
+                          str(w[0].message))
+
+    def test_deprecation_warnings_meta_refreshed(self):
+        """
+        Tests the deprecation warning has been added when enabling
+        metadata refreshment
+
+        @since 3.13
+        @jira_ticket PYTHON-890
+        @expected_result the deprecation warning is emitted
+
+        @test_category logs
+        """
+        with warnings.catch_warnings(record=True) as w:
+            cluster = Cluster()
+            cluster.set_meta_refresh_enabled(True)
+            self.assertEqual(len(w), 1)
+            self.assertIn("Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0.",
+                          str(w[0].message))

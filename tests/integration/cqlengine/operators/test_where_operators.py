@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ class TestWhereOperators(TestCase):
         check_lookup('LT', LessThanOperator)
         check_lookup('LTE', LessThanOrEqualOperator)
         check_lookup('CONTAINS', ContainsOperator)
+        check_lookup('LIKE', LikeOperator)
 
     def test_operator_rendering(self):
         """ tests symbols are rendered properly """
@@ -46,5 +47,4 @@ class TestWhereOperators(TestCase):
         self.assertEqual("<", six.text_type(LessThanOperator()))
         self.assertEqual("<=", six.text_type(LessThanOrEqualOperator()))
         self.assertEqual("CONTAINS", six.text_type(ContainsOperator()))
-
-
+        self.assertEqual("LIKE", six.text_type(LikeOperator()))

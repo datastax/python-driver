@@ -31,9 +31,6 @@
 .. autoexception:: RequestExecutionException()
    :members:
 
-.. autoexception:: CDCWriteException()
-   :members:
-
 .. autoexception:: Unavailable()
    :members:
 

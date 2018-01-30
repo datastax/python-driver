@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -420,7 +420,7 @@ def run_setup(extensions):
         keywords='cassandra,cql,orm',
         include_package_data=True,
         install_requires=dependencies,
-        tests_require=['nose', 'mock<=1.0.1', 'PyYAML', 'pytz', 'sure'],
+        tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',

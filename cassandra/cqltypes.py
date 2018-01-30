@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -971,12 +971,14 @@ class UserType(TupleType):
         except ValueError:
             try:
                 t = namedtuple(name, util._positional_rename_invalid_identifiers(field_names))
-                log.warn("could not create a namedtuple for '%s' because one or more field names are not valid Python identifiers (%s); " \
-                         "returning positionally-named fields" % (name, field_names))
+                log.warning("could not create a namedtuple for '%s' because one or more "
+                            "field names are not valid Python identifiers (%s); "
+                            "returning positionally-named fields" % (name, field_names))
             except ValueError:
                 t = None
-                log.warn("could not create a namedtuple for '%s' because the name is not a valid Python identifier; " \
-                         "will return tuples in its place" % (name,))
+                log.warning("could not create a namedtuple for '%s' because the name is "
+                            "not a valid Python identifier; will return tuples in "
+                            "its place" % (name,))
         return t
 
 

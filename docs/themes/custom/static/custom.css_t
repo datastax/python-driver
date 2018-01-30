@@ -1,4 +1,21 @@
-@import url("sphinxdoc.css");
+@import url("alabaster.css");
+
+div.document {
+	width: 1200px;
+}
+
+div.sphinxsidebar h1.logo a {
+	font-size: 24px;
+}
+
+code.descname {
+    color: #4885ed;
+}
+
+th.field-name {
+    min-width: 100px;
+    color: #3cba54;
+}
 
 div.versionmodified {
     font-weight: bold

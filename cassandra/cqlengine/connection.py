@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -211,7 +211,6 @@ def unregister_connection(name):
         del _connections[DEFAULT_CONNECTION]
         cluster = None
         session = None
-        log.warning("Unregistering default connection '{0}'. Use set_default_connection to set a new one.".format(name))
 
     conn = _connections[name]
     if conn.cluster:
