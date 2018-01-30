@@ -15,13 +15,15 @@
 
 from collections import namedtuple
 from heapq import heappush, heappop
-from itertools import cycle
+from itertools import count, cycle
 import six
 from six.moves import xrange, zip
-from threading import Condition
+from six.moves.queue import Queue, Empty
+from threading import Condition, Event, Lock
 import sys
 
 from cassandra.cluster import ResultSet
+from cassandra.query import PreparedStatement
 
 import logging
 log = logging.getLogger(__name__)
@@ -236,3 +238,124 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
         execute_concurrent_with_args(session, statement, parameters, concurrency=50)
     """
     return execute_concurrent(session, zip(cycle((statement,)), parameters), *args, **kwargs)
+
+
+pipeline_sentinel = object()
+
+
+class WritePipeline(object):
+    def __init__(self, session, max_concurrency=None,
+                 max_pending_statements=5000, error_handler=None):
+        # the Cassandra session object
+        self.session = session
+
+        # set max_concurrency if provided
+        if max_concurrency:
+            self.max_concurrency = max_concurrency
+        else:
+            # else, use the recommended defaults for newer protocol versions
+            if self.session._protocol_version >= 3:
+                self.max_concurrency = 1000
+            else:
+                self.max_concurrency = 100
+
+        # set the number of maximum amount of unformed statements
+        self.max_pending_statements = max_pending_statements
+
+        # use a custom error_handler function upon future.result() errors
+        self.error_handler = error_handler
+
+        # store all pending PreparedStatements along with matching args/kwargs
+        self.statements = Queue()
+
+        # track the number of in-flight futures and completed statements
+        self.num_started = count()
+        self.num_finished = count()
+
+        # track when all pending statements and futures have returned
+        self.completed_futures = Event()
+
+        # ensure that self.completed_futures will never be set() between:
+        # 1. emptying the self.statements
+        # 2. creating the last future
+        self.executing_lock = Lock()
+
+    def __future_callback(self, previous_result=pipeline_sentinel):
+        # check to see if we're processing a future.result()
+        if previous_result is not pipeline_sentinel:
+            # handle the case where future.result() is an exception
+            if isinstance(previous_result, BaseException):
+                log.error('Error on statement: %r', previous_result)
+
+                # if an self.error_handler has been defined, handle appropriately
+                if self.error_handler:
+                    self.error_handler(previous_result)
+                else:
+                    # else, raise the seen future.result() exception
+                    raise previous_result
+
+            # ensure that the last statement within self.statements is not being processed
+            self.executing_lock.acquire()
+
+            # if there are no more pending statements and all in-flight futures have returned...
+            if self.statements.empty() \
+                    and next(self.num_finished) >= self.num_started:
+                # ... set self.completed_futures to True
+                self.completed_futures.set()
+
+            # allow the continued processing of pending statements
+            self.executing_lock.release()
+
+        # attempt to process the another statement
+        self.__maximize_in_flight_futures()
+
+    def __maximize_in_flight_futures(self):
+        # convert pending statements to in-flight futures if we haven't hit our
+        # soft concurrency threshold
+        if not self.statements.empty() \
+                and self.num_started - self.num_finished < self.max_concurrency:
+            try:
+                # ensure self.completed_futures is never set to True when we
+                # are processing the very last pending statement
+                self.executing_lock.acquire()
+
+                # grab the next statement, if still available
+                try:
+                    args, kwargs = self.statements.get_nowait()
+                except Empty:
+                    return
+                next(self.num_started)
+            finally:
+                # allow self.completed_futures to be modified again
+                self.executing_lock.release()
+
+            # send the statement to Cassandra and await for the future's callback
+            future = self.session.execute_async(*args, **kwargs)
+            future.add_callbacks(self.__future_callback,
+                                 self.__future_callback)
+
+    def execute(self, *args, **kwargs):
+        # to ensure maximum throughput, only interact with PreparedStatements
+        # as is the best practice
+        if not isinstance(args[0], PreparedStatement):
+            raise TypeError('Only PreparedStatements are allowed when when'
+                            ' using the WritePipeline.')
+
+        # if the soft maximum size of pending statements has been exceeded,
+        # wait until all pending statements and in-flight futures have returned
+        if self.statements.qsize() > self.max_pending_statements:
+            self.confirm()
+
+        # reset the self.completed_futures Event and block on self.confirm()
+        # until the new statement has been processed
+        self.completed_futures.clear()
+
+        # add the new statement to the pending statements Queue
+        self.statements.put((args, kwargs))
+
+        # attempt to process the newest statement
+        self.__maximize_in_flight_futures()
+
+    def confirm(self):
+        # block until all pending statements and in-flight futures have returned
+        self.completed_futures.wait()
