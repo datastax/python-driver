@@ -36,7 +36,8 @@ from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
                                                 start_and_prime_cluster_defaults,
                                                 start_and_prime_singledc,
-                                                clear_queries)
+                                                clear_queries, RejectConnections,
+                                                RejectType, AcceptConnections)
 
 
 class TrackDownListener(HostStateListener):
@@ -45,6 +46,15 @@ class TrackDownListener(HostStateListener):
 
     def on_down(self, host):
         self.hosts_marked_down.append(host)
+
+    def on_up(self, host):
+        pass
+
+    def on_add(self, host):
+        pass
+
+    def on_remove(self, host):
+        pass
 
 class ThreadTracker(ThreadPoolExecutor):
     called_functions = []
@@ -339,3 +349,37 @@ class ConnectionTests(SimulacronBase):
                           connection_class=ExtendedConnection)
         cluster.connect()
         cluster.shutdown()
+
+    def test_driver_recovers_nework_isolation(self):
+        start_and_prime_singledc()
+
+        idle_heartbeat_timeout = 3
+        idle_heartbeat_interval = 1
+
+        listener = TrackDownListener()
+
+        cluster = Cluster(['127.0.0.1'],
+                          load_balancing_policy=RoundRobinPolicy(),
+                          idle_heartbeat_timeout=idle_heartbeat_timeout,
+                          idle_heartbeat_interval=idle_heartbeat_interval,
+                          executor_threads=16)
+        session = cluster.connect(wait_for_all_pools=True)
+
+        cluster.register_listener(listener)
+
+        prime_request(PrimeOptions(then=NO_THEN))
+        prime_request(RejectConnections(RejectType.REJECT_STARTUP))
+
+        time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval) * 2)
+
+        for host in cluster.metadata.all_hosts():
+            self.assertIn(host, listener.hosts_marked_down)
+
+        self.assertRaises(NoHostAvailable, session.execute, "SELECT * from system.local")
+
+        clear_queries()
+        prime_request(AcceptConnections())
+
+        time.sleep(idle_heartbeat_timeout + idle_heartbeat_interval + 2)
+
+        self.assertIsNotNone(session.execute("SELECT * from system.local"))
