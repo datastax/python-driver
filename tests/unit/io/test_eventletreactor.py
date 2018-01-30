@@ -19,7 +19,7 @@ except ImportError:
     import unittest # noqa
 
 from tests.unit.io.utils import TimerTestMixin
-from tests import notpypy, MONKEY_PATCH_LOOP, notmonkeypatch
+from tests import notpypy, EVENT_LOOP_MANAGER
 
 from eventlet import monkey_patch
 from mock import patch
@@ -29,11 +29,10 @@ try:
 except ImportError:
     EventletConnection = None  # noqa
 
-skip_condition = EventletConnection is None or MONKEY_PATCH_LOOP != "eventlet"
+skip_condition = EventletConnection is None or EVENT_LOOP_MANAGER != "eventlet"
 # There are some issues with some versions of pypy and eventlet
 @notpypy
 @unittest.skipIf(skip_condition, "Skipping the eventlet tests because it's not installed")
-@notmonkeypatch
 class EventletTimerTest(TimerTestMixin, unittest.TestCase):
 
     connection_class = EventletConnection

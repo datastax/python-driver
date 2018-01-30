@@ -19,7 +19,7 @@ except ImportError:
 
 
 from tests.unit.io.utils import TimerTestMixin
-from tests import MONKEY_PATCH_LOOP, notmonkeypatch
+from tests import EVENT_LOOP_MANAGER
 try:
     from cassandra.io.geventreactor import GeventConnection
     import gevent.monkey
@@ -29,9 +29,8 @@ except ImportError:
 from mock import patch
 
 
-skip_condition = GeventConnection is None or MONKEY_PATCH_LOOP != "gevent"
+skip_condition = GeventConnection is None or EVENT_LOOP_MANAGER != "gevent"
 @unittest.skipIf(skip_condition, "Skipping the gevent tests because it's not installed")
-@notmonkeypatch
 class GeventTimerTest(TimerTestMixin, unittest.TestCase):
 
     connection_class = GeventConnection
