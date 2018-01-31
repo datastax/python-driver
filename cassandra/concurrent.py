@@ -280,6 +280,14 @@ class WritePipeline(object):
         # 2. creating the last future
         self.executing_lock = Lock()
 
+    def __enter__(self):
+        # add with-block support
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # ensure all writes are confirmed when exiting the with-block
+        self.confirm()
+
     def __future_callback(self, previous_result=pipeline_sentinel):
         # check to see if we're processing a future.result()
         if previous_result is not pipeline_sentinel:
