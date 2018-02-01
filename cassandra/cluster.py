@@ -381,7 +381,7 @@ class Cluster(object):
     server will be automatically used.
     """
 
-    protocol_version = ProtocolVersion.V5
+    protocol_version = ProtocolVersion.V4
     """
     The maximum version of the native protocol to use.
 

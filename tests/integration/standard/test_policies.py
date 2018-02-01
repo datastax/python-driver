@@ -47,7 +47,7 @@ class HostFilterPolicyTests(unittest.TestCase):
         contact_point = "127.0.0.1"
 
         single_host = {Host(contact_point, SimpleConvictionPolicy, 9042)}
-        all_hosts = {Host("127.0.0.{}".format(i), SimpleConvictionPolicy) for i in (1, 2, 3)}
+        all_hosts = {Host("127.0.0.{}".format(i), SimpleConvictionPolicy, 9042) for i in (1, 2, 3)}
 
         predicate = lambda host: host.address == contact_point if external_event else True
         cluster = Cluster((contact_point,), load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
