@@ -1,3 +1,10 @@
+3.14.0
+======
+
+Other
+-----
+* Fix Broken Links in Docs (PYTHON-916)
+
 3.13.0
 ======
 January 30, 2018
