@@ -104,11 +104,11 @@ VERIFY_CYTHON = False
 if(cython_env == 'True'):
     VERIFY_CYTHON = True
 
-default_cassandra_version = '2.2.0'
+default_cassandra_version = Version('2.2.0')
 
 CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
-CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
+CASSANDRA_VERSION = Version(os.getenv('CASSANDRA_VERSION', default_cassandra_version))
 
 CCM_KWARGS = {}
 if CASSANDRA_DIR:
@@ -141,15 +141,14 @@ def set_default_beta_flag_true():
 
 
 def get_default_protocol():
-    version = Version(CASSANDRA_VERSION)
-    if version >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0'):
         set_default_beta_flag_true()
         return 5
-    elif version >= Version('2.2'):
+    elif CASSANDRA_VERSION >= Version('2.2'):
         return 4
-    elif version >= Version('2.1'):
+    elif CASSANDRA_VERSION >= Version('2.1'):
         return 3
-    elif version >= Version('2.0'):
+    elif CASSANDRA_VERSION >= Version('2.0'):
         return 2
     else:
         return 1
@@ -164,18 +163,17 @@ def get_supported_protocol_versions():
     3.X -> 4, 3
     3.10 -> 5(beta),4,3
 `   """
-    version = Version(CASSANDRA_VERSION)
-    if version >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0'):
         return (3, 4, 5)
-    elif version >= Version('3.10'):
+    elif CASSANDRA_VERSION >= Version('3.10'):
         return (3, 4)
-    elif version >= Version('3.0'):
+    elif CASSANDRA_VERSION >= Version('3.0'):
         return (3, 4)
-    elif version >= Version('2.2'):
+    elif CASSANDRA_VERSION >= Version('2.2'):
         return (1, 2, 3, 4)
-    elif version >= Version('2.1'):
+    elif CASSANDRA_VERSION >= Version('2.1'):
         return (1, 2, 3)
-    elif version >= Version('2.0'):
+    elif CASSANDRA_VERSION >= Version('2.0'):
         return (1, 2)
     else:
         return (1, )
@@ -187,7 +185,7 @@ def get_unsupported_lower_protocol():
     supported by the version of C* running
     """
 
-    if Version(CASSANDRA_VERSION) >= Version('3.0'):
+    if CASSANDRA_VERSION >= Version('3.0'):
         return 2
     else:
         return None
@@ -199,11 +197,11 @@ def get_unsupported_upper_protocol():
     supported by the version of C* running
     """
 
-    if Version(CASSANDRA_VERSION) >= Version('2.2'):
+    if CASSANDRA_VERSION >= Version('2.2'):
         return None
-    if Version(CASSANDRA_VERSION) >= Version('2.1'):
+    if CASSANDRA_VERSION >= Version('2.1'):
         return 4
-    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
+    elif CASSANDRA_VERSION >= Version('2.0'):
         return 3
     else:
         return None
@@ -219,20 +217,20 @@ lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol version
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
 protocolv5 = unittest.skipUnless(5 in get_supported_protocol_versions(), 'Protocol versions less than 5 are not supported')
 
-greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= '2.1', 'Cassandra version 2.1 or greater required')
-greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra version 2.2 or greater required')
-greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
-greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cassandra version 3.6 or greater required')
-greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
-greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'Cassandra version 3.10 or greater required')
-greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
-lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
-lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
+greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= Version('2.1'), 'Cassandra version 2.1 or greater required')
+greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= Version('2.2'), 'Cassandra version 2.2 or greater required')
+greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.0'), 'Cassandra version 3.0 or greater required')
+greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.6'), 'Cassandra version 3.6 or greater required')
+greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.10'), 'Cassandra version 3.10 or greater required')
+greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.11'), 'Cassandra version 3.10 or greater required')
+greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
+lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
+lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
 requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "asyncore" in EVENT_LOOP_MANAGER,
                                                "This test is not suitible for environments with large clock granularity")
-requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1", "Simulacron jar hasn't been specified or C* version is 2.0")
+requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
 
 
 def wait_for_node_socket(node, timeout):
@@ -315,8 +313,11 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
     set_default_cass_ip()
 
     if ccm_options is None:
-        ccm_options = CCM_KWARGS
+        ccm_options = CCM_KWARGS.copy()
+
     cassandra_version = ccm_options.get('version', CASSANDRA_VERSION)
+    if 'version' in ccm_options:
+        ccm_options['version'] = ccm_options['version'].base_version
 
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
@@ -349,9 +350,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
             log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
             CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
             CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-            if cassandra_version >= '2.2':
+            if cassandra_version >= Version('2.2'):
                 CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                if cassandra_version >= '3.0':
+                if cassandra_version >= Version('3.0'):
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
             common.switch_cluster(path, cluster_name)
             CCM_CLUSTER.set_configuration_options(configuration_options)

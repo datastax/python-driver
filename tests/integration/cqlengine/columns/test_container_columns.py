@@ -19,6 +19,7 @@ import six
 import sys
 import traceback
 from uuid import uuid4
+from packaging.version import Version
 
 from cassandra import WriteTimeout, OperationTimedOut
 import cassandra.cqlengine.columns as columns
@@ -559,7 +560,7 @@ class TestTupleColumn(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         # Skip annotations don't seem to skip class level teradown and setup methods
-        if(CASSANDRA_VERSION >= '2.1'):
+        if CASSANDRA_VERSION >= Version('2.1'):
             drop_table(TestTupleModel)
             sync_table(TestTupleModel)
 
@@ -759,7 +760,7 @@ class TestNestedType(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         # Skip annotations don't seem to skip class level teradown and setup methods
-        if(CASSANDRA_VERSION >= '2.1'):
+        if CASSANDRA_VERSION >= Version('2.1'):
             drop_table(TestNestedModel)
             sync_table(TestNestedModel)
 

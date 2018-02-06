@@ -19,8 +19,8 @@ except ImportError:
     import unittest  # noqa
 
 from datetime import datetime
-import time
-from uuid import uuid1, uuid4
+from uuid import uuid4
+from packaging.version import Version
 import uuid
 
 from cassandra.cluster import Session
@@ -41,7 +41,8 @@ from cassandra.cqlengine import statements
 from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
-from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21
+from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21, \
+    greaterthanorequalcass30
 from tests.integration.cqlengine import execute_count
 
 
@@ -351,7 +352,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         IndexedTestModel.objects.create(test_id=11, attempt_id=3, description='try12', expected_result=75,
                                         test_result=45)
 
-        if(CASSANDRA_VERSION >= '2.1'):
+        if CASSANDRA_VERSION >= Version('2.1'):
             drop_table(IndexedCollectionsTestModel)
             sync_table(IndexedCollectionsTestModel)
             IndexedCollectionsTestModel.objects.create(test_id=12, attempt_id=3, description='list12', expected_result=75,
@@ -763,7 +764,7 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         with self.assertRaises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
 
-    @unittest.skipIf(CASSANDRA_VERSION < '3.0', "range deletion was introduce in C* 3.0, currently running {0}".format(CASSANDRA_VERSION))
+    @greaterthanorequalcass30
     @execute_count(18)
     def test_range_deletion(self):
         """

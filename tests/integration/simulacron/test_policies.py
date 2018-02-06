@@ -27,7 +27,7 @@ from tests.integration.simulacron.utils import start_and_prime_singledc, prime_q
     stop_simulacron, NO_THEN, clear_queries
 
 from itertools import count
-
+from packaging.version import Version
 
 class BadRoundRobinPolicy(RoundRobinPolicy):
 
@@ -48,7 +48,7 @@ class SpecExecTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
 
         start_and_prime_singledc()
@@ -73,7 +73,7 @@ class SpecExecTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
 
         cls.cluster.shutdown()
@@ -249,13 +249,13 @@ class CounterRetryPolicy(RetryPolicy):
 class RetryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
         start_and_prime_singledc()
 
     @classmethod
     def tearDownClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
         stop_simulacron()
 

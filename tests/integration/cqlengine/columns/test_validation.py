@@ -21,6 +21,7 @@ import sys
 from datetime import datetime, timedelta, date, tzinfo, time
 from decimal import Decimal as D
 from uuid import uuid4, uuid1
+from packaging.version import Version
 
 from cassandra import InvalidRequest
 from cassandra.cqlengine.columns import (TimeUUID, Ascii, Text, Integer, BigInt,
@@ -194,7 +195,7 @@ class TestVarInt(BaseCassEngTestCase):
 class DataType():
     @classmethod
     def setUpClass(cls):
-        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < Version("3.0"):
             return
 
         class DataTypeTest(Model):
@@ -206,12 +207,12 @@ class DataType():
 
     @classmethod
     def tearDownClass(cls):
-        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < Version("3.0"):
             return
         drop_table(cls.model_class)
 
     def setUp(self):
-        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < Version("3.0"):
             raise unittest.SkipTest("Protocol v4 datatypes "
                                     "require native protocol 4+ and C* version >=3.0, "
                                     "currently using protocol {0} and C* version {1}".
@@ -349,7 +350,7 @@ class TestDuration(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         # setUpClass is executed despite the whole class being skipped
-        if CASSANDRA_VERSION >= "3.10":
+        if CASSANDRA_VERSION >= Version("3.10"):
             cls.db_klass, cls.python_klass = (
                 Duration,
                 util.Duration
@@ -363,7 +364,7 @@ class TestDuration(DataType, BaseCassEngTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if CASSANDRA_VERSION >= "3.10":
+        if CASSANDRA_VERSION >= Version("3.10"):
             super(TestDuration, cls).tearDownClass()
 
 
@@ -386,7 +387,7 @@ class UserModel(Model):
 class TestUDT(DataType, BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
-        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < "3.0":
+        if PROTOCOL_VERSION < 4 or CASSANDRA_VERSION < Version("3.0"):
             return
         
         cls.db_klass, cls.python_klass = UserDefinedType, User

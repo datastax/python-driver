@@ -21,6 +21,7 @@ import difflib
 import six
 import sys
 import time
+from packaging.version import Version
 from mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
@@ -76,7 +77,7 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         @test_category metadata
         """
         for host in self.cluster.metadata.all_hosts():
-            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
+            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION.base_version))
 
 @local
 class MetaDataRemovalTest(unittest.TestCase):
@@ -206,7 +207,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
         cc = self.cluster.control_connection._connection
-        parser = get_schema_parser(cc, CASSANDRA_VERSION, 1)
+        parser = get_schema_parser(cc, CASSANDRA_VERSION.base_version, 1)
 
         for option in tablemeta.options:
             self.assertIn(option, parser.recognized_table_options)
@@ -426,11 +427,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
                              % (self.keyspace_name, self.function_table_name))
 
         tablemeta = self.get_table_metadata()
-        target = ' (b)' if CASSANDRA_VERSION < "3.0" else 'values(b))'  # explicit values in C* 3+
+        target = ' (b)' if CASSANDRA_VERSION < Version("3.0") else 'values(b))'  # explicit values in C* 3+
         self.assertIn(target, tablemeta.export_as_string())
 
         # test full indexes on frozen collections, if available
-        if CASSANDRA_VERSION >= "2.1.3":
+        if CASSANDRA_VERSION >= Version("2.1.3"):
             self.session.execute("DROP TABLE %s.%s" % (self.keyspace_name, self.function_table_name))
             self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b frozen<map<text, text>>)"
                                  % (self.keyspace_name, self.function_table_name))
@@ -445,7 +446,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         create_statement += " WITH compression = {}"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
-        expected = "compression = {}" if CASSANDRA_VERSION < "3.0" else "compression = {'enabled': 'false'}"
+        expected = "compression = {}" if CASSANDRA_VERSION < Version("3.0") else "compression = {'enabled': 'false'}"
         self.assertIn(expected, tablemeta.export_as_string())
 
     def test_non_size_tiered_compaction(self):
@@ -706,6 +707,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthancass20
     def test_refresh_user_type_metadata_proto_2(self):
         """
         Test to insure that protocol v1/v2 surface UDT metadata changes
@@ -717,7 +719,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
         supported_versions = get_supported_protocol_versions()
-        if 2 not in supported_versions or CASSANDRA_VERSION < "2.1":  # 1 and 2 were dropped in the same version
+        if 2 not in supported_versions:  # 1 and 2 were dropped in the same version
                 raise unittest.SkipTest("Protocol versions 1 and 2 are not supported in Cassandra version ".format(CASSANDRA_VERSION))
 
         for protocol_version in (1, 2):
@@ -990,13 +992,11 @@ class TestCodeCoverage(unittest.TestCase):
                                                          lineterm=''))
             self.fail(diff_string)
 
+    @greaterthancass20
     def test_export_keyspace_schema_udts(self):
         """
         Test udt exports
         """
-
-        if CASSANDRA_VERSION < "2.1":
-            raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
 
         if PROTOCOL_VERSION < 3:
             raise unittest.SkipTest(
@@ -1820,7 +1820,7 @@ class BadMetaTest(unittest.TestCase):
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
-        cls.parser_class = get_schema_parser(connection, CASSANDRA_VERSION, timeout=20).__class__
+        cls.parser_class = get_schema_parser(connection, CASSANDRA_VERSION.base_version, timeout=20).__class__
         cls.cluster.control_connection.reconnect = Mock()
 
     @classmethod

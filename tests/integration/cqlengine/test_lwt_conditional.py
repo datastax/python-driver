@@ -27,7 +27,7 @@ from cassandra.cqlengine.query import BatchQuery, LWTException
 from cassandra.cqlengine.statements import ConditionalClause
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
-from tests.integration import CASSANDRA_VERSION, greaterthancass20
+from tests.integration import greaterthancass20
 
 
 class TestConditionalModel(Model):
@@ -36,7 +36,7 @@ class TestConditionalModel(Model):
     text = columns.Text(required=False)
 
 
-@unittest.skipUnless(CASSANDRA_VERSION >= '2.0.0', "conditionals only supported on cassandra 2.0 or higher")
+@greaterthancass20
 class TestConditional(BaseCassEngTestCase):
 
     @classmethod
@@ -154,7 +154,6 @@ class TestConditional(BaseCassEngTestCase):
         TestConditionalModel.objects(id=t.id).iff(count=5).delete()
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
 
-    @greaterthancass20
     def test_delete_lwt_ne(self):
         """
         Test to ensure that deletes using IF and not equals are honored correctly
@@ -182,7 +181,6 @@ class TestConditional(BaseCassEngTestCase):
         TestConditionalModel.objects(id=t.id).iff(count__ne=2).delete()
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
 
-    @greaterthancass20
     def test_update_lwt_ne(self):
         """
         Test to ensure that update using IF and not equals are honored correctly
