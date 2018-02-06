@@ -31,5 +31,8 @@ versions:
     ref: 3.6-doc
   - name: 3.5
     ref: 3.5-doc
--redirects:
--  - \A\/(.*)/\Z: /\1.html
+redirects:
+  - \A\/(.*)/\Z: /\1.html
+rewrites:
+  - search: cassandra.apache.org/doc/cql3/CQL.html
+    replace: cassandra.apache.org/doc/cql3/CQL-3.0.html
