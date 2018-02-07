@@ -275,7 +275,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         # not worrying about threads because this will happen during
         # control connection startup/refresh
         if not self.local_dc and host.datacenter:
-            if host.address in self._contact_points:
+            if (host.address, host.rpc_port) in self._contact_points:
                 self.local_dc = host.datacenter
                 log.info("Using datacenter '%s' for DCAwareRoundRobinPolicy (via host '%s'); "
                          "if incorrect, please specify a local_dc to the constructor, "

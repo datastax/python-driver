@@ -285,11 +285,12 @@ class TestOrdering(unittest.TestCase):
 
         @test_category data_types
         """
-        hosts = [Host(addr, SimpleConvictionPolicy) for addr in
+        hosts = [Host(addr, SimpleConvictionPolicy, 9042) for addr in
                  ("127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4")]
-        hosts_equal = [Host(addr, SimpleConvictionPolicy) for addr in
+        hosts_equal = [Host(addr, SimpleConvictionPolicy, 9042) for addr in
                        ("127.0.0.1", "127.0.0.1")]
-        hosts_equal_conviction = [Host("127.0.0.1", SimpleConvictionPolicy), Host("127.0.0.1", ConvictionPolicy)]
+        hosts_equal_conviction = [Host("127.0.0.1", SimpleConvictionPolicy, 9042),
+                                  Host("127.0.0.1", ConvictionPolicy, 9042)]
         self._check_sequence_consistency(hosts)
         self._check_sequence_consistency(hosts_equal, equal=True)
         self._check_sequence_consistency(hosts_equal_conviction, equal=True)

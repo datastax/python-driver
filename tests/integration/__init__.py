@@ -270,8 +270,8 @@ def use_multidc(dc_list, workloads=[]):
     use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True, workloads=workloads)
 
 
-def use_singledc(start=True, workloads=[]):
-    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads)
+def use_singledc(start=True, workloads=[], use_single_interface=False):
+    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads, use_single_interface=use_single_interface)
 
 
 def use_single_node(start=True, workloads=[]):
@@ -311,7 +311,7 @@ def is_current_cluster(cluster_name, node_counts):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
-                configuration_options={}):
+                configuration_options={}, use_single_interface=False):
     set_default_cass_ip()
 
     if ccm_options is None:
@@ -355,7 +355,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
             common.switch_cluster(path, cluster_name)
             CCM_CLUSTER.set_configuration_options(configuration_options)
-            CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+            CCM_CLUSTER.populate(nodes, ipformat=ipformat, use_single_interface=use_single_interface)
     try:
         jvm_args = []
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
@@ -478,7 +478,8 @@ def setup_keyspace(ipformat=None, wait=True):
         time.sleep(10)
 
     if not ipformat:
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        contact_points = [CCM_CLUSTER.nodelist()[0].network_interfaces['binary']]
+        cluster = Cluster(contact_points=contact_points, protocol_version=PROTOCOL_VERSION)
     else:
         cluster = Cluster(contact_points=["::1"], protocol_version=PROTOCOL_VERSION)
     session = cluster.connect()

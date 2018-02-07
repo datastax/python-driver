@@ -109,10 +109,13 @@ class Metadata(object):
     token_map = None
     """ A :class:`~.TokenMap` instance describing the ring topology. """
 
-    def __init__(self):
+    _port_suppler = None;
+
+    def __init__(self, port_supplier=lambda: 9042):
         self.keyspaces = {}
         self._hosts = {}
         self._hosts_lock = RLock()
+        self._port_supplier = port_supplier
 
     def export_schema_as_string(self):
         """
@@ -123,7 +126,7 @@ class Metadata(object):
 
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
-        server_version = self.get_host(connection.host).release_version
+        server_version = self.get_host((connection.host, connection.port)).release_version
         parser = get_schema_parser(connection, server_version, timeout)
 
         if not target_type:
@@ -317,16 +320,18 @@ class Metadata(object):
         """
         with self._hosts_lock:
             try:
-                return self._hosts[host.address], False
+                return self._hosts[(host.address, host.rpc_port)], False
             except KeyError:
-                self._hosts[host.address] = host
+                self._hosts[(host.address, host.rpc_port)] = host
                 return host, True
 
     def remove_host(self, host):
         with self._hosts_lock:
-            return bool(self._hosts.pop(host.address, False))
+            return bool(self._hosts.pop((host.address, host.rpc_port), False))
 
     def get_host(self, address):
+        if not isinstance(address, tuple):
+            address = (address, self._port_supplier())
         return self._hosts.get(address)
 
     def all_hosts(self):

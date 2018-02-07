@@ -56,7 +56,7 @@ class IgnoredHostPolicy(RoundRobinPolicy):
         RoundRobinPolicy.__init__(self)
 
     def distance(self, host):
-        if(str(host) in self.ignored_hosts):
+        if(str(host).split(":")[0] in self.ignored_hosts):
             return HostDistance.IGNORED
         else:
             return HostDistance.LOCAL
@@ -78,7 +78,7 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=ingored_host_policy)
         session = cluster.connect()
         for host in cluster.metadata.all_hosts():
-            if str(host) == "127.0.0.1":
+            if str(host) == "127.0.0.1:9042":
                 self.assertTrue(host.is_up)
             else:
                 self.assertIsNone(host.is_up)
@@ -96,7 +96,7 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
         cluster = Cluster(contact_points=["localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
-        self.assertTrue('127.0.0.1' in cluster.contact_points_resolved)
+        self.assertTrue(('127.0.0.1', 9042) in cluster.contact_points_resolved)
 
     @local
     def test_host_duplication(self):
@@ -206,13 +206,13 @@ class ClusterTests(unittest.TestCase):
         # Test with only invalid
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(cluster, [Host("1.2.3.4", SimpleConvictionPolicy)])
+            Session(cluster, [Host("1.2.3.4", SimpleConvictionPolicy, 9042)])
         cluster.shutdown()
 
         # Test with valid and invalid hosts
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        Session(cluster, [Host(x, SimpleConvictionPolicy) for x in
-                                      ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
+        Session(cluster, [Host(x, SimpleConvictionPolicy, 9042) for x in
+                          ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
         cluster.shutdown()
 
     def test_protocol_negotiation(self):
@@ -237,7 +237,10 @@ class ClusterTests(unittest.TestCase):
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
         # Make sure the correct protocol was selected by default
-        if CASSANDRA_VERSION >= '2.2':
+        if CASSANDRA_VERSION >= '4.0':
+            self.assertEqual(updated_protocol_version, 5)
+            self.assertEqual(updated_cluster_version, 5)
+        elif CASSANDRA_VERSION >= '2.2':
             self.assertEqual(updated_protocol_version, 4)
             self.assertEqual(updated_cluster_version, 4)
         elif CASSANDRA_VERSION >= '2.1':
@@ -1189,7 +1192,7 @@ class TestAddressTranslation(unittest.TestCase):
         c = Cluster(address_translator=lh_ad)
         c.connect()
         for host in c.metadata.all_hosts():
-            self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
+            self.assertEqual(adder_map.get(str(host).split(":")[0]), host.broadcast_address)
         c.shutdown()
 
 @local
@@ -1349,7 +1352,7 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         # the length of mock_calls will vary, but all should use the unignored
         # address
         for c in cluster.connection_factory.mock_calls:
-            self.assertEqual(call(unignored_address), c)
+            self.assertEqual(call(unignored_address, 9042), c)
         cluster.shutdown()
 
 
@@ -1363,9 +1366,13 @@ class DuplicateRpcTest(unittest.TestCase):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
         self.session = self.cluster.connect()
         self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.1' WHERE peer='127.0.0.2'")
+        if PROTOCOL_VERSION > 4:
+            self.session.execute("UPDATE system.peers_v2 SET native_address = '127.0.0.1' WHERE peer='127.0.0.2' AND peer_port = 7000")
 
     def tearDown(self):
         self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.2' WHERE peer='127.0.0.2'")
+        if PROTOCOL_VERSION > 4:
+            self.session.execute("UPDATE system.peers_v2 SET native_address = '127.0.0.2' WHERE peer='127.0.0.2' AND peer_port = 7000")
         self.cluster.shutdown()
 
     def test_duplicate(self):

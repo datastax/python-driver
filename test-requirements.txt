@@ -2,7 +2,7 @@
 scales
 nose
 mock!=1.1.*
-ccm>=2.0
+-e git+https://github.com/riptano/ccm.git@cassandra-test#egg=ccm
 unittest2
 PyYAML
 pytz
