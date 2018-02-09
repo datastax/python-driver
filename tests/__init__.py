@@ -89,5 +89,15 @@ else:
         connection_class = None
 
 
+# If set to to true this will force the Cython tests to run regardless of whether they are installed
+cython_env = os.getenv('VERIFY_CYTHON', "False")
+
+
+VERIFY_CYTHON = False
+
+if(cython_env == 'True'):
+    VERIFY_CYTHON = True
+
+
 notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adequate for windows")
 notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")
