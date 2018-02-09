@@ -24,6 +24,7 @@ import time
 from uuid import uuid4
 import logging
 import warnings
+from packaging.version import Version
 
 import cassandra
 from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
@@ -237,13 +238,13 @@ class ClusterTests(unittest.TestCase):
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
         # Make sure the correct protocol was selected by default
-        if CASSANDRA_VERSION >= '2.2':
+        if CASSANDRA_VERSION >= Version('2.2'):
             self.assertEqual(updated_protocol_version, 4)
             self.assertEqual(updated_cluster_version, 4)
-        elif CASSANDRA_VERSION >= '2.1':
+        elif CASSANDRA_VERSION >= Version('2.1'):
             self.assertEqual(updated_protocol_version, 3)
             self.assertEqual(updated_cluster_version, 3)
-        elif CASSANDRA_VERSION >= '2.0':
+        elif CASSANDRA_VERSION >= Version('2.0'):
             self.assertEqual(updated_protocol_version, 2)
             self.assertEqual(updated_cluster_version, 2)
         else:

@@ -28,8 +28,7 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 from cassandra.io.asyncorereactor import AsyncoreConnection
-from tests.integration import (CASSANDRA_VERSION, PROTOCOL_VERSION,
-                               requiressimulacron)
+from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
 from tests.integration.util import assert_quiescent_pool_state
 from tests.integration.simulacron import SimulacronBase
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
@@ -97,7 +96,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_timeout = 5
         idle_heartbeat_interval = 1
 
-        start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc, CASSANDRA_VERSION)
+        start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc)
 
         listener = TrackDownListener()
         executor = ThreadTracker(max_workers=8)
@@ -231,7 +230,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_timeout = 1
         idle_heartbeat_interval = 5
 
-        simulacron_cluster = start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc, CASSANDRA_VERSION)
+        simulacron_cluster = start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc)
 
         dc_ids = sorted(simulacron_cluster.data_center_ids)
         last_host = dc_ids.pop()

@@ -115,8 +115,8 @@ class SimulacronClient(object):
         This information has to be primed for the test harness to run
         """
         system_local_row = {}
-        system_local_row["cql_version"] = CASSANDRA_VERSION
-        system_local_row["release_version"] = CASSANDRA_VERSION + "-SNAPSHOT"
+        system_local_row["cql_version"] = CASSANDRA_VERSION.base_version
+        system_local_row["release_version"] = CASSANDRA_VERSION.base_version + "-SNAPSHOT"
         column_types = {"cql_version": "ascii", "release_version": "ascii"}
         system_local = PrimeQuery("SELECT cql_version, release_version FROM system.local",
                                   rows=[system_local_row],
@@ -308,7 +308,7 @@ def prime_driver_defaults():
     client_simulacron.prime_server_versions()
 
 
-def prime_cluster(data_centers="3", version=None, cluster_name=DEFAULT_CLUSTER):
+def prime_cluster(data_centers="3", version=CASSANDRA_VERSION, cluster_name=DEFAULT_CLUSTER):
     """
     Creates a new cluster in the simulacron server
     :param cluster_name: name of the cluster
@@ -316,7 +316,7 @@ def prime_cluster(data_centers="3", version=None, cluster_name=DEFAULT_CLUSTER):
     datacenters of 2 nodes and three nodes
     :param version: C* version
     """
-    version = version or CASSANDRA_VERSION
+    version = version or CASSANDRA_VERSION.base_version
     cluster_query = ClusterQuery(cluster_name, version, data_centers)
     client_simulacron = SimulacronClient()
     response = client_simulacron.submit_request(cluster_query)
@@ -332,7 +332,7 @@ def start_and_prime_singledc(cluster_name=DEFAULT_CLUSTER):
     return start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, cluster_name=cluster_name)
 
 
-def start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, version=None, cluster_name=DEFAULT_CLUSTER):
+def start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, version=CASSANDRA_VERSION, cluster_name=DEFAULT_CLUSTER):
     """
     :param number_of_dc: number of datacentes
     :param nodes_per_dc: number of nodes per datacenter

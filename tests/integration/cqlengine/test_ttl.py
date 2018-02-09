@@ -18,6 +18,8 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from packaging.version import Version
+
 from cassandra import InvalidRequest
 from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine.base import BaseCassEngTestCase
@@ -26,7 +28,7 @@ from uuid import uuid4
 from cassandra.cqlengine import columns
 import mock
 from cassandra.cqlengine.connection import get_session
-from tests.integration import CASSANDRA_VERSION
+from tests.integration import CASSANDRA_VERSION, greaterthancass20
 
 
 class TestTTLModel(Model):
@@ -59,14 +61,14 @@ class BaseDefaultTTLTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        if CASSANDRA_VERSION >= '2.0':
+        if CASSANDRA_VERSION >= Version('2.0'):
             super(BaseDefaultTTLTest, cls).setUpClass()
             sync_table(TestDefaultTTLModel)
             sync_table(TestTTLModel)
 
     @classmethod
     def tearDownClass(cls):
-        if CASSANDRA_VERSION >= '2.0':
+        if CASSANDRA_VERSION >= Version('2.0'):
             super(BaseDefaultTTLTest, cls).tearDownClass()
             drop_table(TestDefaultTTLModel)
             drop_table(TestTTLModel)
@@ -157,7 +159,6 @@ class TTLBlindUpdateTest(BaseTTLTest):
         self.assertIn("USING TTL", query)
 
 
-@unittest.skipIf(CASSANDRA_VERSION < '2.0', "default_time_to_Live was introduce in C* 2.0, currently running {0}".format(CASSANDRA_VERSION))
 class TTLDefaultTest(BaseDefaultTTLTest):
     def get_default_ttl(self, table_name):
         session = get_session()

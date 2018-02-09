@@ -18,6 +18,8 @@ except ImportError:
 
 import mock
 import logging
+from packaging.version import Version
+
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
@@ -358,7 +360,7 @@ class InconsistentTable(BaseCassEngTestCase):
         sync_table(BaseInconsistent)
         sync_table(ChangedInconsistent)
         self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
-        if CASSANDRA_VERSION >= '2.1':
+        if CASSANDRA_VERSION >= Version('2.1'):
             sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
             mock_handler.reset()
             sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)
