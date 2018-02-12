@@ -42,7 +42,8 @@ except ImportError:
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, SchemaTargetType,
-                       DriverException, ProtocolVersion)
+                       DriverException)
+from cassandra.context import DriverContext
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -362,7 +363,7 @@ class Cluster(object):
     server will be automatically used.
     """
 
-    protocol_version = ProtocolVersion.V4
+    protocol_version = None
     """
     The maximum version of the native protocol to use.
 
@@ -644,6 +645,9 @@ class Cluster(object):
     documentation for :meth:`Session.timestamp_generator`.
     """
 
+    context = None
+    """DriverContext"""
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -727,13 +731,16 @@ class Cluster(object):
                  allow_beta_protocol_version=False,
                  timestamp_generator=None,
                  idle_heartbeat_timeout=30,
-                 no_compact=False):
+                 no_compact=False,
+                 context=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
+        self.context = DriverContext()
+
         if contact_points is not None:
             if contact_points is _NOT_SET:
                 self._contact_points_explicit = False
@@ -758,6 +765,9 @@ class Cluster(object):
         if protocol_version is not _NOT_SET:
             self.protocol_version = protocol_version
             self._protocol_version_explicit = True
+        else:
+            self.protocol_version = self.context.protocol_version_registry.max_non_beta_supported()
+
         self.allow_beta_protocol_version = allow_beta_protocol_version
 
         self.no_compact = no_compact
@@ -830,7 +840,7 @@ class Cluster(object):
         # let Session objects be GC'ed (and shutdown) when the user no longer
         # holds a reference.
         self.sessions = WeakSet()
-        self.metadata = Metadata()
+        self.metadata = Metadata(self.context)
         self.control_connection = None
         self._prepared_statements = WeakValueDictionary()
         self._prepared_statement_lock = Lock()
@@ -850,7 +860,8 @@ class Cluster(object):
             self, self.control_connection_timeout,
             self.schema_event_refresh_window, self.topology_event_refresh_window,
             self.status_event_refresh_window,
-            schema_metadata_enabled, token_metadata_enabled)
+            schema_metadata_enabled, token_metadata_enabled,
+            context=self.context)
 
     def register_user_type(self, keyspace, user_type, klass):
         """
@@ -976,9 +987,11 @@ class Cluster(object):
         kwargs_dict.setdefault('user_type_map', self._user_types)
         kwargs_dict.setdefault('allow_beta_protocol_version', self.allow_beta_protocol_version)
         kwargs_dict.setdefault('no_compact', self.no_compact)
+        kwargs_dict.setdefault('context', self.context)
 
         return kwargs_dict
 
+    # downgrading version should be determined by the registry
     def protocol_downgrade(self, host_addr, previous_version):
         if self._protocol_version_explicit:
             raise DriverException("ProtocolError returned from server while using explicitly set client protocol_version %d" % (previous_version,))
@@ -1623,6 +1636,7 @@ class Session(object):
     hosts = None
     keyspace = None
     is_shutdown = False
+    context = None
 
     max_trace_wait = 2.0
     """
@@ -1723,6 +1737,7 @@ class Session(object):
         self.cluster = cluster
         self.hosts = hosts
         self.keyspace = keyspace
+        self.context = cluster.context
 
         self._lock = RLock()
         self._pools = {}
@@ -1857,25 +1872,27 @@ class Session(object):
 
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
-            statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
+            statement_keyspace = query.keyspace if self.context.protocol_version_registry.uses_keyspace_flag(self._protocol_version) else None
             if parameters:
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
                 query_string, cl, serial_cl,
                 fetch_size, timestamp=timestamp,
-                keyspace=statement_keyspace)
+                keyspace=statement_keyspace,
+                context=self.context)
         elif isinstance(query, BoundStatement):
             prepared_statement = query.prepared_statement
             message = ExecuteMessage(
                 prepared_statement.query_id, query.values, cl,
                 serial_cl, fetch_size,
                 timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata),
-                result_metadata_id=prepared_statement.result_metadata_id)
+                result_metadata_id=prepared_statement.result_metadata_id,
+                context=self.context)
         elif isinstance(query, BatchStatement):
-            statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
+            statement_keyspace = query.keyspace if self.context.protocol_version_registry.uses_keyspace_flag(self._protocol_version) else None
             message = BatchMessage(
                 query.batch_type, query._statements_and_parameters, cl,
-                serial_cl, timestamp, statement_keyspace)
+                serial_cl, timestamp, statement_keyspace, context=self.context)
 
         message.tracing = trace
 
@@ -1891,7 +1908,7 @@ class Session(object):
             self, message, query, timeout, metrics=self._metrics,
             prepared_statement=prepared_statement, retry_policy=retry_policy,
             row_factory=execution_profile.row_factory, load_balancer=execution_profile.load_balancing_policy,
-            start_time=start_time, speculative_execution_plan=spec_exec_plan)
+            start_time=start_time, speculative_execution_plan=spec_exec_plan, context=self.context)
 
     def _get_execution_profile(self, ep):
         profiles = self.cluster.profile_manager.profiles
@@ -1987,7 +2004,7 @@ class Session(object):
         `custom_payload` is a key value map to be passed along with the prepare
         message. See :ref:`custom_payload`.
         """
-        message = PrepareMessage(query=query, keyspace=keyspace)
+        message = PrepareMessage(query=query, keyspace=keyspace, context=self.context)
         future = ResponseFuture(self, message, query=None, timeout=self.cluster._default_timeout)
         try:
             future.send_request()
@@ -2021,7 +2038,7 @@ class Session(object):
         futures = []
         for host in tuple(self._pools.keys()):
             if host != excluded_host and host.is_up:
-                future = ResponseFuture(self, PrepareMessage(query=query, keyspace=keyspace),
+                future = ResponseFuture(self, PrepareMessage(query=query, keyspace=keyspace, context=self.context),
                                             None, self.cluster._default_timeout)
 
                 # we don't care about errors preparing against specific hosts,
@@ -2351,7 +2368,8 @@ class ControlConnection(object):
                  topology_event_refresh_window,
                  status_event_refresh_window,
                  schema_meta_enabled=True,
-                 token_meta_enabled=True):
+                 token_meta_enabled=True,
+                 context=None):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
@@ -2363,6 +2381,7 @@ class ControlConnection(object):
         self._status_event_refresh_window = status_event_refresh_window
         self._schema_meta_enabled = schema_meta_enabled
         self._token_meta_enabled = token_meta_enabled
+        self.context = context
 
         self._lock = RLock()
         self._schema_agreement_lock = Lock()
@@ -2376,7 +2395,7 @@ class ControlConnection(object):
         if self._is_shutdown:
             return
 
-        self._protocol_version = self._cluster.protocol_version
+        self._protocol_version = self.context.protocol_version_registry.max_non_beta_supported()
         self._set_new_connection(self._reconnect_internal())
 
     def _set_new_connection(self, conn):
@@ -2427,7 +2446,7 @@ class ControlConnection(object):
 
         while True:
             try:
-                connection = self._cluster.connection_factory(host.address, is_control_connection=True)
+                connection = self._cluster.connection_factory(host.address, is_control_connection=True, context=self.context)
                 if self._is_shutdown:
                     connection.close()
                     raise DriverException("Reconnecting during shutdown")
@@ -2453,8 +2472,8 @@ class ControlConnection(object):
 
             sel_peers = self._SELECT_PEERS if self._token_meta_enabled else self._SELECT_PEERS_NO_TOKENS
             sel_local = self._SELECT_LOCAL if self._token_meta_enabled else self._SELECT_LOCAL_NO_TOKENS
-            peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
-            local_query = QueryMessage(query=sel_local, consistency_level=ConsistencyLevel.ONE)
+            peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE, context=self.context)
+            local_query = QueryMessage(query=sel_local, consistency_level=ConsistencyLevel.ONE, context=self.context)
             shared_results = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
@@ -2594,8 +2613,8 @@ class ControlConnection(object):
                 log.debug("[control connection] Refreshing node list and token map")
                 sel_peers = self._SELECT_PEERS
                 sel_local = self._SELECT_LOCAL
-            peers_query = QueryMessage(query=sel_peers, consistency_level=cl)
-            local_query = QueryMessage(query=sel_local, consistency_level=cl)
+            peers_query = QueryMessage(query=sel_peers, consistency_level=cl, context=self.context)
+            local_query = QueryMessage(query=sel_local, consistency_level=cl, context=self.context)
             peers_result, local_result = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
@@ -2782,8 +2801,8 @@ class ControlConnection(object):
             cl = ConsistencyLevel.ONE
             schema_mismatches = None
             while elapsed < total_timeout:
-                peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
-                local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
+                peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl, context=self.context)
+                local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl, context=self.context)
                 try:
                     timeout = min(self._timeout, total_timeout - elapsed)
                     peers_result, local_result = connection.wait_for_responses(
@@ -3066,9 +3085,10 @@ class ResponseFuture(object):
     _spec_execution_plan = NoSpeculativeExecutionPlan()
 
     _warned_timeout = False
+    _context = None
 
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None,
-                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None, speculative_execution_plan=None):
+                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None, speculative_execution_plan=None, context=None):
         self.session = session
         # TODO: normalize handling of retry policy and row factory
         self.row_factory = row_factory or session.cluster._default_row_factory
@@ -3088,6 +3108,8 @@ class ResponseFuture(object):
         self._errbacks = []
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
+        self._context = context
+        self._start_timer()
         self._start_timer()
 
     @property
@@ -3391,7 +3413,7 @@ class ResponseFuture(object):
 
                     current_keyspace = self._connection.keyspace
                     prepared_keyspace = prepared_statement.keyspace
-                    if not ProtocolVersion.uses_keyspace_flag(self.session.cluster.protocol_version) \
+                    if not self._context.protocol_version_registry.uses_keyspace_flag(self.session.cluster.protocol_version) \
                             and prepared_keyspace  and current_keyspace != prepared_keyspace:
                         self._set_final_exception(
                             ValueError("The Session's current keyspace (%s) does "
@@ -3403,9 +3425,9 @@ class ResponseFuture(object):
                     log.debug("Re-preparing unrecognized prepared statement against host %s: %s",
                               host, prepared_statement.query_string)
                     prepared_keyspace = prepared_statement.keyspace \
-                        if ProtocolVersion.uses_keyspace_flag(self.session.cluster.protocol_version) else None
+                        if self._context.protocol_version_registry.uses_keyspace_flag(self.session.cluster.protocol_version) else None
                     prepare_message = PrepareMessage(query=prepared_statement.query_string,
-                                                     keyspace=prepared_keyspace)
+                                                     keyspace=prepared_keyspace, context=self.context)
                     # since this might block, run on the executor to avoid hanging
                     # the event loop thread
                     self.session.submit(self._reprepare, prepare_message, host, connection, pool)

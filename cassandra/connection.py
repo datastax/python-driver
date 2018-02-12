@@ -37,7 +37,7 @@ if 'gevent.monkey' in sys.modules:
 else:
     from six.moves.queue import Queue, Empty  # noqa
 
-from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
+from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
 from cassandra.marshal import int32_pack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage,
@@ -154,7 +154,7 @@ class ProtocolVersionUnsupported(ConnectionException):
     Server rejected startup message due to unsupported protocol version
     """
     def __init__(self, host, startup_version):
-        msg = "Unsupported protocol version on %s: %d" % (host, startup_version)
+        msg = "Unsupported protocol version on %s: %d" % (host, startup_version.code)
         super(ProtocolVersionUnsupported, self).__init__(msg, host)
         self.startup_version = startup_version
 
@@ -203,7 +203,7 @@ class Connection(object):
 
     cql_version = None
     no_compact = False
-    protocol_version = ProtocolVersion.MAX_SUPPORTED
+    protocol_version = None
 
     keyspace = None
     compression = True
@@ -255,11 +255,12 @@ class Connection(object):
     _ssl_impl = ssl
 
     _check_hostname = False
+    context = None
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
-                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False):
+                 cql_version=None, protocol_version=None, is_control_connection=False,
+                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False, context=None):
         self.host = host
         self.port = port
         self.authenticator = authenticator
@@ -267,7 +268,7 @@ class Connection(object):
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
-        self.protocol_version = protocol_version
+        self.protocol_version = protocol_version or context.protocol_version_registry.max_non_beta_supported()  # TODO wrong
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self.connect_timeout = connect_timeout
@@ -276,6 +277,7 @@ class Connection(object):
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
+        self.context = context
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -328,7 +330,7 @@ class Connection(object):
         conn.connected_event.wait(timeout - elapsed)
         if conn.last_error:
             if conn.is_unsupported_proto_version:
-                raise ProtocolVersionUnsupported(host, conn.protocol_version)
+                raise ProtocolVersionUnsupported(host, conn.protocol_version.code)
             raise conn.last_error
         elif not conn.connected_event.is_set():
             conn.close()
@@ -521,7 +523,7 @@ class Connection(object):
         """
         self._push_watchers[event_type].add(callback)
         self.wait_for_response(
-            RegisterMessage(event_list=[event_type]),
+            RegisterMessage(event_list=[event_type], context=self.context),
             timeout=register_timeout)
 
     def register_watchers(self, type_callback_dict, register_timeout=None):
@@ -531,7 +533,7 @@ class Connection(object):
         for event_type, callback in type_callback_dict.items():
             self._push_watchers[event_type].add(callback)
         self.wait_for_response(
-            RegisterMessage(event_list=type_callback_dict.keys()),
+            RegisterMessage(event_list=type_callback_dict.keys(), context=self.context),
             timeout=register_timeout)
 
     def control_conn_disposed(self):
@@ -544,7 +546,7 @@ class Connection(object):
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
-            if version > ProtocolVersion.MAX_SUPPORTED:
+            if version > self.context.protocol_version_registry.max_supported().code:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3
             # this frame header struct is everything after the version byte
@@ -601,7 +603,7 @@ class Connection(object):
 
         try:
             response = decoder(header.version, self.user_type_map, stream_id,
-                               header.flags, header.opcode, body, self.decompressor, result_metadata)
+                               header.flags, header.opcode, body, self.decompressor, result_metadata, self.context)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "%s; buffer: %r", header, self._iobuf.getvalue())
@@ -636,7 +638,7 @@ class Connection(object):
             self._send_startup_message(no_compact=self.no_compact)
         else:
             log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.host)
-            self.send_msg(OptionsMessage(), self.get_request_id(), self._handle_options_response)
+            self.send_msg(OptionsMessage(context=self.context), self.get_request_id(), self._handle_options_response)
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
@@ -709,7 +711,7 @@ class Connection(object):
             opts['COMPRESSION'] = compression
         if no_compact:
             opts['NO_COMPACT'] = 'true'
-        sm = StartupMessage(cqlversion=self.cql_version, options=opts)
+        sm = StartupMessage(cqlversion=self.cql_version, options=opts, context=self.context)
         self.send_msg(sm, self.get_request_id(), cb=self._handle_startup_response)
         log.debug("Sent StartupMessage on %s", self)
 
@@ -733,7 +735,7 @@ class Connection(object):
             self.authenticator.server_authenticator_class = startup_response.authenticator
             initial_response = self.authenticator.initial_response()
             initial_response = "" if initial_response is None else initial_response
-            self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
+            self.send_msg(AuthResponseMessage(initial_response, context=self.context), self.get_request_id(), self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.host, startup_response.summary_msg())
@@ -788,7 +790,7 @@ class Connection(object):
             return
 
         query = QueryMessage(query='USE "%s"' % (keyspace,),
-                             consistency_level=ConsistencyLevel.ONE)
+                             consistency_level=ConsistencyLevel.ONE, context=self.context)
         try:
             result = self.wait_for_response(query)
         except InvalidRequestException as ire:
