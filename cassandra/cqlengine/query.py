@@ -353,9 +353,7 @@ class AbstractQuerySet(object):
 
         self._allow_filtering = False
 
-        # CQL has a default limit of 10000, it's defined here
-        # because explicit is better than implicit
-        self._limit = 10000
+        self._limit = None
 
         # We store the fields for which we use the Equal operator
         # in a query, so we don't select it from the DB. _defer_fields
@@ -943,9 +941,7 @@ class AbstractQuerySet(object):
 
     def limit(self, v):
         """
-        Limits the number of results returned by Cassandra. Use *0* or *None* to disable.
-
-        *Note that CQL's default limit is 10,000, so all queries without a limit set explicitly will have an implicit limit of 10,000*
+        Limits the number of results returned by Cassandra. Default is *None*. Use *0* or *None* to disable.
 
         .. code-block:: python
 
@@ -958,16 +954,15 @@ class AbstractQuerySet(object):
                 print(user)
         """
 
-        if v is None:
-            v = 0
-
-        if not isinstance(v, six.integer_types):
-            raise TypeError
         if v == self._limit:
             return self
 
-        if v < 0:
-            raise QueryException("Negative limit is not allowed")
+        if v is not None:
+            if not isinstance(v, six.integer_types):
+                raise TypeError
+
+            if v < 0:
+                raise QueryException("Negative limit is not allowed")
 
         clone = copy.deepcopy(self)
         clone._limit = v
