@@ -2598,7 +2598,7 @@ def group_keys_by_replica(session, keyspace, table, keys):
 
     for key in keys:
         serialized_key = [serializer.serialize(pk, cluster.protocol_version)
-                              for serializer, pk in zip(serializers, key)]
+                          for serializer, pk in zip(serializers, key)]
         if len(serialized_key) == 1:
             routing_key = serialized_key[0]
         else:
@@ -2606,7 +2606,7 @@ def group_keys_by_replica(session, keyspace, table, keys):
         all_replicas = cluster.metadata.get_replicas(keyspace, routing_key)
         # First check if there are local replicas
         valid_replicas = [host for host in all_replicas if
-                              host.is_up and distance(host) == HostDistance.LOCAL]
+                          host.is_up and distance(host) == HostDistance.LOCAL]
         if not valid_replicas:
             valid_replicas = [host for host in all_replicas if host.is_up]
 
