@@ -2594,6 +2594,8 @@ def group_keys_by_replica(session, keyspace, table, keys):
 
     serializers = list(types._cqltypes[partition_key.cql_type] for partition_key in partition_keys)
     keys_per_host = defaultdict(list)
+    distance = cluster._default_load_balancing_policy.distance
+
     for key in keys:
         serialized_key = [serializer.serialize(pk, cluster.protocol_version)
                               for serializer, pk in zip(serializers, key)]
@@ -2604,8 +2606,7 @@ def group_keys_by_replica(session, keyspace, table, keys):
         all_replicas = cluster.metadata.get_replicas(keyspace, routing_key)
         # First check if there are local replicas
         valid_replicas = [host for host in all_replicas if
-                              host.is_up and cluster._default_load_balancing_policy.distance(
-                                  host) == HostDistance.LOCAL]
+                              host.is_up and distance(host) == HostDistance.LOCAL]
         if not valid_replicas:
             valid_replicas = [host for host in all_replicas if host.is_up]
 
