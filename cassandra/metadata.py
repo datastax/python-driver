@@ -2616,4 +2616,5 @@ def group_keys_by_replica(session, keyspace, table, keys):
             # We will group under this statement all the keys for which
             # we haven't found a valid replica
             keys_per_host[NO_VALID_REPLICA].append(key)
-    return keys_per_host
+
+    return dict(keys_per_host)
