@@ -2611,12 +2611,7 @@ def group_keys_by_replica(session, keyspace, table, keys):
             valid_replicas = [host for host in all_replicas if host.is_up]
 
         if valid_replicas:
-            for replica in valid_replicas:
-                if replica in keys_per_host:
-                    keys_per_host[replica].append(key)
-                    break
-            else:
-                    keys_per_host[random.choice(valid_replicas)].append(key)
+            keys_per_host[random.choice(valid_replicas)].append(key)
         else:
             # We will group under this statement all the keys for which
             # we haven't found a valid replica
