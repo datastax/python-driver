@@ -2576,15 +2576,17 @@ NO_VALID_REPLICA = object()
 
 def group_keys_by_replica(session, keyspace, table, keys):
     """
-    Returns a :class:`collections.defaultdict` with the keys grouped per host. This can be
+    Returns a :class:`dict` with the keys grouped per host. This can be
     used to more accurately group by IN clause or to batch the keys per host.
 
     If a valid replica is not found for a particular key it will be grouped under
     :class:`~.NO_VALID_REPLICA`
 
     Example usage::
-        result = group_keys_by_host(session, "system", "peers",
-                ("peer", "data_center"), (("127.0.0.1", ), ("127.0.0.2", )))
+        result = group_keys_by_host(
+                     session, "system", "peers",
+                     (("127.0.0.1", ), ("127.0.0.2", ))
+                 )
     """
     cluster = session.cluster
 
