@@ -2576,15 +2576,17 @@ NO_VALID_REPLICA = object()
 
 def group_keys_by_replica(session, keyspace, table, keys):
     """
-    Returns a :class:`collections.defaultdict` with the keys grouped per host. This can be
+    Returns a :class:`dict` with the keys grouped per host. This can be
     used to more accurately group by IN clause or to batch the keys per host.
 
     If a valid replica is not found for a particular key it will be grouped under
     :class:`~.NO_VALID_REPLICA`
 
     Example usage::
-        result = group_keys_by_host(session, "system", "peers",
-                ("peer", "data_center"), (("127.0.0.1", ), ("127.0.0.2", )))
+        result = group_keys_by_host(
+                     session, "system", "peers",
+                     (("127.0.0.1", ), ("127.0.0.2", ))
+                 )
     """
     cluster = session.cluster
 
@@ -2592,9 +2594,11 @@ def group_keys_by_replica(session, keyspace, table, keys):
 
     serializers = list(types._cqltypes[partition_key.cql_type] for partition_key in partition_keys)
     keys_per_host = defaultdict(list)
+    distance = cluster._default_load_balancing_policy.distance
+
     for key in keys:
         serialized_key = [serializer.serialize(pk, cluster.protocol_version)
-                              for serializer, pk in zip(serializers, key)]
+                          for serializer, pk in zip(serializers, key)]
         if len(serialized_key) == 1:
             routing_key = serialized_key[0]
         else:
@@ -2602,20 +2606,15 @@ def group_keys_by_replica(session, keyspace, table, keys):
         all_replicas = cluster.metadata.get_replicas(keyspace, routing_key)
         # First check if there are local replicas
         valid_replicas = [host for host in all_replicas if
-                              host.is_up and cluster._default_load_balancing_policy.distance(
-                                  host) == HostDistance.LOCAL]
+                          host.is_up and distance(host) == HostDistance.LOCAL]
         if not valid_replicas:
             valid_replicas = [host for host in all_replicas if host.is_up]
 
         if valid_replicas:
-            for replica in valid_replicas:
-                if replica in keys_per_host:
-                    keys_per_host[replica].append(key)
-                    break
-            else:
-                    keys_per_host[random.choice(valid_replicas)].append(key)
+            keys_per_host[random.choice(valid_replicas)].append(key)
         else:
             # We will group under this statement all the keys for which
             # we haven't found a valid replica
             keys_per_host[NO_VALID_REPLICA].append(key)
-    return keys_per_host
+
+    return dict(keys_per_host)
