@@ -142,6 +142,7 @@ class TestConditional(BaseCassEngTestCase):
         updated = TestConditionalModel.objects(id=id).first()
         self.assertEqual(updated.text, 'something else')
 
+    @unittest.skip("Skipping until PYTHON-943 is resolved")
     def test_batch_update_conditional_several_rows(self):
         sync_table(TestUpdateModel)
         self.addCleanup(drop_table, TestUpdateModel)
