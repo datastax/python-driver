@@ -175,7 +175,7 @@ class ClusterTests(unittest.TestCase):
         self.assertFalse(result)
 
         result = session.execute("SELECT * FROM clustertests.cf0")
-        self.assertEqual([('a', 'b', 'c')], result)
+        self.assertEqual([('a', 'b', 'c')], list(result))
 
         execute_with_long_wait_retry(session, "DROP KEYSPACE clustertests")
 
@@ -296,12 +296,12 @@ class ClusterTests(unittest.TestCase):
         self.assertFalse(result)
 
         result = session.execute("SELECT * FROM test1rf.test")
-        self.assertEqual([(8889, 8889)], result, "Rows in ResultSet are {0}".format(result.current_rows))
+        self.assertEqual([(8889, 8889)], list(result), "Rows in ResultSet are {0}".format(result.current_rows))
 
         # test_connect_on_keyspace
         session2 = cluster.connect('test1rf')
         result2 = session2.execute("SELECT * FROM test")
-        self.assertEqual(result, result2)
+        self.assertEqual(list(result), list(result2)
         cluster.shutdown()
 
     def test_set_keyspace_twice(self):
@@ -439,7 +439,7 @@ class ClusterTests(unittest.TestCase):
                           execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         session = cluster.connect()
 
-        schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
+        schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'").one()[0]
         new_schema_ver = uuid4()
         session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (new_schema_ver,))
 
@@ -750,7 +750,7 @@ class ClusterTests(unittest.TestCase):
 
             # use a copied instance and override the row factory
             # assert last returned value can be accessed as a namedtuple so we can prove something different
-            named_tuple_row = rs[0]
+            named_tuple_row = rs.one()
             self.assertIsInstance(named_tuple_row, tuple)
             self.assertTrue(named_tuple_row.release_version)
 
@@ -761,13 +761,13 @@ class ClusterTests(unittest.TestCase):
                 rs = session.execute(query, execution_profile=tmp_profile)
                 queried_hosts.add(rs.response_future._current_host)
             self.assertEqual(queried_hosts, expected_hosts)
-            tuple_row = rs[0]
+            tuple_row = rs.one()
             self.assertIsInstance(tuple_row, tuple)
             with self.assertRaises(AttributeError):
                 tuple_row.release_version
 
             # make sure original profile is not impacted
-            self.assertTrue(session.execute(query, execution_profile='node1')[0].release_version)
+            self.assertTrue(session.execute(query, execution_profile='node1').one().release_version)
 
     def test_profile_lb_swap(self):
         """
@@ -1171,7 +1171,7 @@ class ContextManagementTest(unittest.TestCase):
             with cluster.connect() as session:
                 self.assertFalse(cluster.is_shutdown)
                 self.assertFalse(session.is_shutdown)
-                self.assertTrue(session.execute('select release_version from system.local')[0])
+                self.assertTrue(session.execute('select release_version from system.local').one())
             self.assertTrue(session.is_shutdown)
         self.assertTrue(cluster.is_shutdown)
 
@@ -1189,7 +1189,7 @@ class ContextManagementTest(unittest.TestCase):
             session = cluster.connect()
             self.assertFalse(cluster.is_shutdown)
             self.assertFalse(session.is_shutdown)
-            self.assertTrue(session.execute('select release_version from system.local')[0])
+            self.assertTrue(session.execute('select release_version from system.local').one())
         self.assertTrue(session.is_shutdown)
         self.assertTrue(cluster.is_shutdown)
 
@@ -1209,7 +1209,7 @@ class ContextManagementTest(unittest.TestCase):
             self.assertFalse(cluster.is_shutdown)
             self.assertFalse(session.is_shutdown)
             self.assertFalse(unmanaged_session.is_shutdown)
-            self.assertTrue(session.execute('select release_version from system.local')[0])
+            self.assertTrue(session.execute('select release_version from system.local').one())
         self.assertTrue(session.is_shutdown)
         self.assertFalse(cluster.is_shutdown)
         self.assertFalse(unmanaged_session.is_shutdown)

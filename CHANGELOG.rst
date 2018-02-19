@@ -3,12 +3,14 @@
 
 Features
 --------
+* Add one() function to the ResultSet API (PYTHON-947)
 * cqlengine: asynchronous execution support (PYTHON-605)
 * cqlengine: Makes Model._table_name_ case sensitive (PYTHON-855)
 * cqlengine: LIKE filter operator (PYTHON-512)
 
 Bug Fixes
 ---------
+* Calling next() on a ResultSet throws an exception (PYTHON-463)
 * Support retry_policy in PreparedStatement (PYTHON-861)
 * cqlengine: Remove cassandra.cqlengine.query.BatchType in favor of cassandra.query.BatchType (PYTHON-888)
 
@@ -18,6 +20,7 @@ Other
 * PreparedStatement.column_metadata should be renamed to bind_metadata (PYTHON-884)
 * Remove Cluster.set_meta_refresh_enabled (PYTHON-890)
 * Remove legacy execution parameters (PYTHON-876)
+* Remove basic equality and indexing support of ResultSet (PYTHON-945)
 * cqlengine: disallow Counter create, save operations (PYTHON-497)
 * cqlengine: remove the negative indices slicing support in ModelQuerySet (PYTHON-875)
 * cqlengine: Remove Model.__default_ttl__ (PYTHON-889)

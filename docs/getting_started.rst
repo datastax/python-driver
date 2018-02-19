@@ -272,7 +272,7 @@ For example:
 
     try:
         rows = future.result()
-        user = rows[0]
+        user = rows.one()
         print user.name, user.age
     except ReadTimeout:
         log.exception("Query timed out:")
@@ -290,7 +290,7 @@ This works well for executing many queries concurrently:
     # wait for them to complete and use the results
     for future in futures:
         rows = future.result()
-        print rows[0].name
+        print rows.one().name
 
 Alternatively, instead of calling :meth:`~.ResponseFuture.result()`,
 you can attach callback and errback functions through the
@@ -303,7 +303,7 @@ that:
 .. code-block:: python
 
     def handle_success(rows):
-        user = rows[0]
+        user = rows.one()
         try:
             process_user(user.name, user.age, user.id)
         except Exception:
@@ -389,8 +389,8 @@ prepared statement:
     user_lookup_stmt.consistency_level = ConsistencyLevel.QUORUM
 
     # these will both use QUORUM
-    user1 = session.execute(user_lookup_stmt, [user_id1])[0]
-    user2 = session.execute(user_lookup_stmt, [user_id2])[0]
+    user1 = session.execute(user_lookup_stmt, [user_id1]).one()
+    user2 = session.execute(user_lookup_stmt, [user_id2]).one()
 
 The second option is to create a :class:`~.BoundStatement` from the
 :class:`~.PreparedStatement` and binding parameters and set a consistency

@@ -87,7 +87,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         # arrays = { 'a': arr1, 'b': arr2, ... }
         result = get_data(NumpyProtocolHandler)
         self.assertFalse(result.has_more_pages)
-        self._verify_numpy_page(result[0])
+        self._verify_numpy_page(result.one())
 
     @numpytest
     def test_numpy_results_paged(self):
@@ -228,14 +228,14 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
         table = "%s.%s" % (self.keyspace_name, self.function_table_name)
         create_table_with_all_types(table, s, 10)
 
-        begin_unset = max(s.execute('select primkey from %s' % (table,))[0]['primkey']) + 1
+        begin_unset = max(s.execute('select primkey from %s' % (table,)).one()['primkey']) + 1
         keys_null = range(begin_unset, begin_unset + 10)
 
         # scatter some emptry rows in here
         insert = "insert into %s (primkey) values (%%s)" % (table,)
         execute_concurrent_with_args(s, insert, ((k,) for k in keys_null))
 
-        result = s.execute("select * from %s" % (table,))[0]
+        result = s.execute("select * from %s" % (table,)).one()
 
         from numpy.ma import masked, MaskedArray
         result_keys = result.pop('primkey')

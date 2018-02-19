@@ -128,8 +128,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         query = "SELECT * FROM system.local"
         no_schema_rs = no_schema_session.execute(query)
         no_token_rs = no_token_session.execute(query)
-        self.assertIsNotNone(no_schema_rs[0])
-        self.assertIsNotNone(no_token_rs[0])
+        self.assertIsNotNone(no_schema_rs.one())
+        self.assertIsNotNone(no_token_rs.one())
         no_schema.shutdown()
         no_token.shutdown()
 
@@ -1856,14 +1856,14 @@ class AggregateMetadata(FunctionTest):
         for init_cond in (-1, 0, 1):
             cql_init = encoder.cql_encode_all_types(init_cond)
             with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond=cql_init)) as va:
-                sum_res = s.execute("SELECT %s(v) AS sum FROM t" % va.function_kwargs['name'])[0].sum
+                sum_res = s.execute("SELECT %s(v) AS sum FROM t" % va.function_kwargs['name']).one().sum
                 self.assertEqual(sum_res, int(init_cond) + sum(expected_values))
 
         # list<text>
         for init_cond in ([], ['1', '2']):
             cql_init = encoder.cql_encode_all_types(init_cond)
             with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>', init_cond=cql_init)) as va:
-                list_res = s.execute("SELECT %s(v) AS list_res FROM t" % va.function_kwargs['name'])[0].list_res
+                list_res = s.execute("SELECT %s(v) AS list_res FROM t" % va.function_kwargs['name']).one().list_res
                 self.assertListEqual(list_res[:len(init_cond)], init_cond)
                 self.assertEqual(set(i for i in list_res[len(init_cond):]),
                                  set(str(i) for i in expected_values))
@@ -1874,7 +1874,7 @@ class AggregateMetadata(FunctionTest):
         for init_cond in ({}, {1: 2, 3: 4}, {5: 5}):
             cql_init = encoder.cql_encode_all_types(init_cond)
             with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', 'map<int, int>', init_cond=cql_init)) as va:
-                map_res = s.execute("SELECT %s(v) AS map_res FROM t" % va.function_kwargs['name'])[0].map_res
+                map_res = s.execute("SELECT %s(v) AS map_res FROM t" % va.function_kwargs['name']).one().map_res
                 self.assertDictContainsSubset(expected_map_values, map_res)
                 init_not_updated = dict((k, init_cond[k]) for k in set(init_cond) - expected_key_set)
                 self.assertDictContainsSubset(init_not_updated, map_res)

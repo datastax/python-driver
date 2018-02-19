@@ -35,7 +35,7 @@ Default
     session = cluster.connect()
     local_query = 'SELECT rpc_address FROM system.local'
     for _ in cluster.metadata.all_hosts():
-        print session.execute(local_query)[0]
+        print session.execute(local_query).one()
 
 
 .. parsed-literal::
@@ -61,7 +61,7 @@ Initializing cluster with profiles
     profiles = {'node1': node1_profile, 'node2': node2_profile}
     session = Cluster(execution_profiles=profiles).connect()
     for _ in cluster.metadata.all_hosts():
-        print session.execute(local_query, execution_profile='node1')[0]
+        print session.execute(local_query, execution_profile='node1').one()
 
 
 .. parsed-literal::
@@ -73,7 +73,7 @@ Initializing cluster with profiles
 .. code:: python
 
     for _ in cluster.metadata.all_hosts():
-        print session.execute(local_query, execution_profile='node2')[0]
+        print session.execute(local_query, execution_profile='node2').one()
 
 
 .. parsed-literal::
@@ -85,7 +85,7 @@ Initializing cluster with profiles
 .. code:: python
 
     for _ in cluster.metadata.all_hosts():
-        print session.execute(local_query)[0]
+        print session.execute(local_query).one()
 
 
 .. parsed-literal::
@@ -115,7 +115,7 @@ New profiles can be added constructing from scratch, or deriving from default:
     cluster.add_execution_profile(node1_profile, locked_execution)
     
     for _ in cluster.metadata.all_hosts():
-        print session.execute(local_query, execution_profile=node1_profile)[0]
+        print session.execute(local_query, execution_profile=node1_profile).one()
 
 
 .. parsed-literal::
@@ -136,8 +136,8 @@ We also have the ability to pass profile instances to be used for execution, but
     
     tmp = session.execution_profile_clone_update('node1', request_timeout=100, row_factory=tuple_factory)
 
-    print session.execute(local_query, execution_profile=tmp)[0]
-    print session.execute(local_query, execution_profile='node1')[0]
+    print session.execute(local_query, execution_profile=tmp).one()
+    print session.execute(local_query, execution_profile='node1').one()
 
 .. parsed-literal::
 

@@ -23,6 +23,39 @@ Upgrading to 4.0
   - Session.default_serial_consistency_level
   - Session.row_factory
 
+ResultSet
+~~~~~~~~~
+
+* :class:`~.ResultSet` *next* method has been removed. Use an iterator 
+  to consume the results.
+
+  .. code-block:: python
+
+    rs = session.execute("select * from cars")
+    for car in rs:
+        # ...
+  
+    # or
+    car = next(iter(rs))
+
+* Basic equality and indexing support of the :class:`~.ResultSet` class have been removed.
+  In previous versions, these were preserved for backward compatibility. Since a 
+  ResultSet is not final until all pages are fetched, you should materialize the 
+  results first if you want to compare or access an element by index.
+
+  .. code-block:: python
+
+    list(result_set1) == list(result_set2)  # materialize then comparison 
+    results = list(result_set1)
+    results[3]                              # results is just a python list
+
+* With :class:`~.ResultSet` indexing support removed, you have to use 
+  :meth:`~.ResultSet.one()` to get a single row.
+
+  .. code-block:: python
+
+    row = session.execute("select * from cars where id=42").one()
+
 Upgrading to 3.0
 ----------------
 Version 3.0 of the DataStax Python driver for Apache Cassandra

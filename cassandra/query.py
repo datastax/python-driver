@@ -944,7 +944,7 @@ class QueryTrace(object):
                 SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
             # PYTHON-730: There is race condition that the duration mutation is written before started_at the for fast queries
-            is_complete = session_results and session_results[0].duration is not None and session_results[0].started_at is not None
+            is_complete = session_results and session_results.one().duration is not None and session_results.one().started_at is not None
             if not session_results or (wait_for_complete and not is_complete):
                 time.sleep(self._BASE_RETRY_SLEEP * (2 ** attempt))
                 attempt += 1
@@ -954,7 +954,7 @@ class QueryTrace(object):
             else:
                 log.debug("Fetching parital trace info for trace ID: %s", self.trace_id)
 
-            session_row = session_results[0]
+            session_row = session_results.one()
             self.request_type = session_row.request
             self.duration = timedelta(microseconds=session_row.duration) if is_complete else None
             self.started_at = session_row.started_at

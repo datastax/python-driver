@@ -161,7 +161,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         except InvalidRequest:
             default_ttl = session.execute("SELECT default_time_to_live FROM system.schema_columnfamilies "
                                           "WHERE keyspace_name = 'cqlengine_test' AND columnfamily_name = '{0}'".format(table_name))
-        return default_ttl[0]['default_time_to_live']
+        return default_ttl.one()['default_time_to_live']
 
     def test_default_ttl_not_set(self):
         session = get_session()

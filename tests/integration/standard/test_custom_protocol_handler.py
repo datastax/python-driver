@@ -70,22 +70,22 @@ class CustomProtocolHandlerTest(unittest.TestCase):
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="custserdes")
 
-        result = session.execute("SELECT schema_version FROM system.local")
-        uuid_type = result[0][0]
+        result = session.execute("SELECT schema_version FROM system.local").one()
+        uuid_type = result[0]
         self.assertEqual(type(uuid_type), uuid.UUID)
 
         # use our custom protocol handlder
 
         session.client_protocol_handler = CustomTestRawRowType
-        result_set = session.execute("SELECT schema_version FROM system.local")
-        raw_value = result_set[0][0]
+        result = session.execute("SELECT schema_version FROM system.local").one()
+        raw_value = result[0]
         self.assertTrue(isinstance(raw_value, binary_type))
         self.assertEqual(len(raw_value), 16)
 
         # Ensure that we get normal uuid back when we re-connect
         session.client_protocol_handler = ProtocolHandler
-        result_set = session.execute("SELECT schema_version FROM system.local")
-        uuid_type = result_set[0][0]
+        result = session.execute("SELECT schema_version FROM system.local").one()
+        uuid_type = result[0]
         self.assertEqual(type(uuid_type), uuid.UUID)
         cluster.shutdown()
 
@@ -114,7 +114,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
         # verify data
         params = get_all_primitive_params(0)
-        results = session.execute("SELECT {0} FROM alltypes WHERE primkey=0".format(columns_string))[0]
+        results = session.execute("SELECT {0} FROM alltypes WHERE primkey=0".format(columns_string)).one()
         for expected, actual in zip(params, results):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
