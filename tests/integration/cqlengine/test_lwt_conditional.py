@@ -123,7 +123,7 @@ class TestConditional(BaseCassEngTestCase):
         t = TestConditionalModel.create(text='something', count=5)
         id = t.id
         with BatchQuery() as b:
-            t.batch(b).if_not_exists(count=5).update(text='something else')
+            t.batch(b).iff(count=5).update(text='something else')
 
         updated = TestConditionalModel.objects(id=id).first()
         self.assertEqual(updated.text, 'something else')

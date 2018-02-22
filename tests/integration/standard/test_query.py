@@ -915,7 +915,7 @@ class LightweightTransactionTests(unittest.TestCase):
             - All the queries succeed
 
         @since 3.14
-        @jira_ticket PYTHON-399
+        @jira_ticket PYTHON-848
         @expected_result `:attr:cassandra.cluster.ResultSet.was_applied` is updated as
         expected
 
@@ -971,6 +971,24 @@ class LightweightTransactionTests(unittest.TestCase):
 
             self.session.execute("TRUNCATE TABLE test3rf.lwt_clustering")
 
+    def test_empty_batch_statement(self):
+        """
+        Test to ensure `:attr:cassandra.cluster.ResultSet.was_applied` works as expected
+        with empty Batchstatements.
+
+        @since 3.14
+        @jira_ticket PYTHON-848
+        @expected_result an Exception is raised
+        expected
+
+        @test_category query
+        """
+        batch_statement = BatchStatement()
+        results = self.session.execute(batch_statement)
+        with self.assertRaises(RuntimeError):
+            results.was_applied
+
+    @unittest.skip("Skipping until PYTHON-943 is resolved")
     def test_was_applied_batch_string(self):
         batch_statement = BatchStatement(BatchType.LOGGED)
         batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",

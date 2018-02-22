@@ -4328,10 +4328,10 @@ class ResultSet(object):
         Only valid when one of the of the internal row factories is in use.
         """
         if self.response_future.row_factory not in (named_tuple_factory, dict_factory, tuple_factory):
-            raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factsory,))
+            raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factory,))
 
         is_batch_statement = isinstance(self.response_future.query, BatchStatement)
-        if is_batch_statement and self.column_names[0] != "[applied]":
+        if is_batch_statement and (not self.column_names or self.column_names[0] != "[applied]"):
             raise RuntimeError("No LWT were present in the BatchStatement")
 
         if not is_batch_statement and len(self.current_rows) != 1:
