@@ -36,6 +36,13 @@ class TestConditionalModel(Model):
     text = columns.Text(required=False)
 
 
+class TestUpdateModel(Model):
+    partition = columns.Integer(primary_key=True)
+    cluster = columns.Integer(primary_key=True)
+    value = columns.Integer(required=False)
+    text = columns.Text(required=False, index=True)
+
+
 @greaterthancass20
 class TestConditional(BaseCassEngTestCase):
 
@@ -134,6 +141,28 @@ class TestConditional(BaseCassEngTestCase):
 
         updated = TestConditionalModel.objects(id=id).first()
         self.assertEqual(updated.text, 'something else')
+
+    @unittest.skip("Skipping until PYTHON-943 is resolved")
+    def test_batch_update_conditional_several_rows(self):
+        sync_table(TestUpdateModel)
+        self.addCleanup(drop_table, TestUpdateModel)
+
+        first_row = TestUpdateModel.create(partition=1, cluster=1, value=5, text="something")
+        second_row = TestUpdateModel.create(partition=1, cluster=2, value=5, text="something")
+
+        b = BatchQuery()
+        TestUpdateModel.batch(b).if_not_exists().create(partition=1, cluster=1, value=5, text='something else')
+        TestUpdateModel.batch(b).if_not_exists().create(partition=1, cluster=2, value=5, text='something else')
+        TestUpdateModel.batch(b).if_not_exists().create(partition=1, cluster=3, value=5, text='something else')
+
+        # The response will be more than two rows because two of the inserts will fail
+        with self.assertRaises(LWTException):
+            b.execute()
+
+        first_row.delete()
+        second_row.delete()
+        b.execute()
+
 
     def test_delete_conditional(self):
         # DML path

@@ -19,7 +19,7 @@ import time
 import six
 from warnings import warn
 
-from cassandra.query import SimpleStatement, BatchType as CBatchType
+from cassandra.query import SimpleStatement, BatchType as CBatchType, BatchStatement
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -67,7 +67,9 @@ class MultipleObjectsReturned(QueryException):
 
 def check_applied(result):
     """
-    Raises LWTException if it looks like a failed LWT request.
+    Raises LWTException if it looks like a failed LWT request. A LWTException
+    won't be raised in the special case in which there are several failed LWT
+    in a  :class:`~cqlengine.query.BatchQuery`.
     """
     try:
         applied = result.was_applied
