@@ -18,11 +18,11 @@ from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine import columns
+from cassandra.cqlengine.query import QueryException
 
 from tests.integration.cqlengine import is_prepend_reversed
-from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
+from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel, TestMultiKeyModel
 from tests.integration.cqlengine import execute_count
-
 
 
 class QueryUpdateTests(BaseCassEngTestCase):
@@ -309,6 +309,40 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj.save()
         #execute_count will check the execution count and
         #assert no more calls than necessary where made
+
+    def test_queryset_limit(self):
+        """
+        Test to ensure limit works as expected and raise the appropriate exceptions
+
+        @since 4.0
+        @jira_ticket PYTHON-517
+
+        @test_category query
+        """
+        sync_table(TestMultiKeyModel)
+        self.addCleanup(drop_table, TestMultiKeyModel)
+
+        for i in range(10):
+            TestMultiKeyModel.create(partition=i, cluster=i)
+
+        query1 = TestMultiKeyModel.objects()
+        self.assertEqual(query1._limit, None)
+        self.assertEqual(len(query1), 10)
+
+        query1 = TestMultiKeyModel.objects().limit(None)
+        self.assertEqual(query1._limit, None)
+        self.assertEqual(len(query1), 10)
+
+        query1 = TestMultiKeyModel.objects().limit(3)
+        self.assertEqual(query1._limit, 3)
+        self.assertEqual(len(query1), 3)
+
+        with self.assertRaises(TypeError):
+            TestMultiKeyModel.objects().limit("10")
+
+        with self.assertRaises(QueryException):
+            TestMultiKeyModel.objects().limit(-10)
+
 
 class StaticDeleteModel(Model):
     example_id = columns.Integer(partition_key=True, primary_key=True, default=uuid4)
