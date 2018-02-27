@@ -1,6 +1,10 @@
 3.14.0
 ======
 
+Features
+--------
+* Add one() function to the ResultSet API (PYTHON-947)
+
 Other
 -----
 * Fix Broken Links in Docs (PYTHON-916)

@@ -4230,6 +4230,15 @@ class ResultSet(object):
         """
         return self._current_rows or []
 
+    def one(self):
+        """
+        Return a single row of the results or None if empty. This is basically
+        a shortcut to `result_set.current_rows[0]` and should only be used when
+        you know a query returns a single row. Consider using an iterator if the
+        ResultSet contains more than one row.
+        """
+        return self._current_rows[0] if self._current_rows else None
+
     def __iter__(self):
         if self._list_mode:
             return iter(self._current_rows)
@@ -4294,6 +4303,9 @@ class ResultSet(object):
         return self._current_rows == other
 
     def __getitem__(self, i):
+        if i is 0:
+            warn("ResultSet indexing support will be removed in 4.0. Consider using "
+                 "ResultSet.one() to get a single row.", DeprecationWarning)
         self._enter_list_mode("index operator")
         return self._current_rows[i]
 
