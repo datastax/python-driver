@@ -4303,7 +4303,7 @@ class ResultSet(object):
         return self._current_rows == other
 
     def __getitem__(self, i):
-        if i is 0:
+        if i == 0:
             warn("ResultSet indexing support will be removed in 4.0. Consider using "
                  "ResultSet.one() to get a single row.", DeprecationWarning)
         self._enter_list_mode("index operator")
