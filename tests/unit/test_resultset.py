@@ -187,3 +187,10 @@ class ResultSetTests(unittest.TestCase):
         for applied in (True, False):
             rs = ResultSet(Mock(row_factory=row_factory), [{'[applied]': applied}])
             self.assertEqual(rs.was_applied, applied)
+
+    def test_one(self):
+        # no pages
+        first, second = Mock(), Mock()
+        rs = ResultSet(Mock(has_more_pages=False), [first, second])
+
+        self.assertEqual(rs.one(), first)
