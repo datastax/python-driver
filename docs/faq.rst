@@ -28,7 +28,7 @@ To avoid this, make sure to create sessions per process, after the fork. Using u
 
     @app.route('/')
     def server_version():
-        row = session.execute(prepared, ('local',))[0]
+        row = session.execute(prepared, ('local',)).one()
         return row.release_version
 
 uWSGI provides a ``postfork`` hook you can use to create sessions and prepared statements after the child process forks.

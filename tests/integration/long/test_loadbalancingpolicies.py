@@ -496,7 +496,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.assertIn(results.response_future.attempted_hosts[0],
                       cluster.metadata.get_replicas(keyspace, bound.routing_key))
 
-        self.assertTrue(results[0].i)
+        self.assertTrue(results.one().i)
 
         cluster.shutdown()
 
@@ -533,8 +533,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
         # this would blow up prior to 61b4fad
-        r = session.execute(p, ('local',))
-        self.assertEqual(r[0].key, 'local')
+        r = session.execute(p, ('local',)).one()
+        self.assertEqual(r.key, 'local')
 
         cluster.shutdown()
 

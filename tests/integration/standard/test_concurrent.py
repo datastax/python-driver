@@ -98,7 +98,9 @@ class ClusterTests(unittest.TestCase):
             statements = cycle((statement, ))
             parameters = [(i, ) for i in range(num_statements)]
 
-            results = self.execute_concurrent_helper(self.session, list(zip(statements, parameters)))
+            results = [(s, list(r)) for s, r in
+                       self.execute_concurrent_helper(self.session,
+                                                      list(zip(statements, parameters)))]
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
 
@@ -121,9 +123,12 @@ class ClusterTests(unittest.TestCase):
                 consistency_level=ConsistencyLevel.QUORUM)
             parameters = [(i, ) for i in range(num_statements)]
 
-            results = self.execute_concurrent_args_helper(self.session, statement, parameters)
+            results = [(s, list(r)) for s, r in
+                       self.execute_concurrent_args_helper(self.session,
+                                                           statement,
+                                                           parameters)]
             self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
+            self.assertEqual([(True, [(i,)]) for i in range(num_statements)], list(results))
 
     def test_execute_concurrent_with_args_generator(self):
         """
@@ -161,8 +166,13 @@ class ClusterTests(unittest.TestCase):
                 consistency_level=ConsistencyLevel.QUORUM)
             parameters = [(i, ) for i in range(num_statements)]
 
-            results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
-
+            results = iter(
+                [(s, list(r)) for s, r in
+                 self.execute_concurrent_args_helper(self.session,
+                                                     statement,
+                                                     parameters,
+                                                     results_generator=True)]
+            )
             for i in range(num_statements):
                 result = next(results)
                 self.assertEqual((True, [(i,)]), result)

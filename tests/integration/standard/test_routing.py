@@ -53,7 +53,7 @@ class RoutingTests(unittest.TestCase):
 
         my_token = s.cluster.metadata.token_map.token_class.from_key(bound.routing_key)
 
-        cass_token = s.execute(select, key_values)[0][0]
+        cass_token = s.execute(select, key_values).one()[0]
         token = s.cluster.metadata.token_map.token_class(cass_token)
         self.assertEqual(my_token, token)
 

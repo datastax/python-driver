@@ -74,7 +74,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
         result = rf.result()
-        self.assertEqual(result, [{'col': 'val'}])
+        self.assertEqual(list(result), [{'col': 'val'}])
 
     def test_unknown_result_class(self):
         session = self.make_session()
@@ -305,7 +305,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
 
         result = rf.result()
-        self.assertEqual(result, [{'col': 'val'}])
+        self.assertEqual(list(result), [{'col': 'val'}])
 
     def test_timeout_getting_connection_from_pool(self):
         session = self.make_basic_session()
@@ -327,7 +327,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
-        self.assertEqual(rf.result(), [{'col': 'val'}])
+        self.assertEqual(list(rf.result()), [{'col': 'val'}])
 
         # make sure the exception is recorded correctly
         self.assertEqual(rf._errors, {'ip1': exc})
@@ -346,7 +346,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf._set_result(None, None, None, self.make_mock_response(expected_result))
 
         result = rf.result()
-        self.assertEqual(result, expected_result)
+        self.assertEqual(list(result), expected_result)
 
         callback.assert_called_once_with(expected_result, arg, **kwargs)
 
@@ -395,7 +395,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf._set_result(None, None, None, self.make_mock_response(expected_result))
 
         result = rf.result()
-        self.assertEqual(result, expected_result)
+        self.assertEqual(list(result), expected_result)
 
         callback.assert_called_once_with(expected_result, arg, **kwargs)
         callback2.assert_called_once_with(expected_result, arg2, **kwargs2)
@@ -465,7 +465,7 @@ class ResponseFutureTests(unittest.TestCase):
             errback=self.assertIsInstance, errback_args=(Exception,))
 
         rf._set_result(None, None, None, self.make_mock_response(expected_result))
-        self.assertEqual(rf.result(), expected_result)
+        self.assertEqual(list(rf.result()), expected_result)
 
         callback.assert_called_once_with(expected_result, arg, **kwargs)
 
