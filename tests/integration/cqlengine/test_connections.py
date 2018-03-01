@@ -583,19 +583,6 @@ class TestQuerySetCountSelectionAndIterationNoDefault(BaseConnectionTestNoDefaul
     pass
 
 
-class TestQuerySetSlicingNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetSlicing):
-    """
-    Execute test_queryset.TestQuerySetOrdering using non default connection
-
-    @since 3.7
-    @jira_ticket PYTHON-613
-    @expected_result proper connection should be used
-
-    @test_category object_mapper
-    """
-    pass
-
-
 class TestQuerySetValidationNoDefault(BaseConnectionTestNoDefault, test_queryset.TestQuerySetValidation):
     """
     Execute test_queryset.TestQuerySetOrdering using non default connection

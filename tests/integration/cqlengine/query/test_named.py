@@ -367,11 +367,12 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
 
         filtered_mv_monthly_objects = mv_monthly.objects.filter(game='Chess', year=2015, month=6)
         self.assertEqual(len(filtered_mv_monthly_objects), 1)
-        self.assertEqual(filtered_mv_monthly_objects[0]['score'], 3500)
-        self.assertEqual(filtered_mv_monthly_objects[0]['user'], 'jbellis')
+        row = filtered_mv_monthly_objects.first()
+        self.assertEqual(row['score'], 3500)
+        self.assertEqual(row['user'], 'jbellis')
         filtered_mv_alltime_objects = mv_all_time.objects.filter(game='Chess')
         self.assertEqual(len(filtered_mv_alltime_objects), 2)
-        self.assertEqual(filtered_mv_alltime_objects[0]['score'], 3500)
+        self.assertEqual(filtered_mv_alltime_objects.first()['score'], 3500)
 
     def check_table_size(self, table_name, key_space, expected_size):
         table = key_space.table(table_name)

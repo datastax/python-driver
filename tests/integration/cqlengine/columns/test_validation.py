@@ -88,7 +88,7 @@ class TestDatetime(BaseCassEngTestCase):
         self.assertIsNone(dt2.created_at)
 
         dts = self.DatetimeTest.objects.filter(test_id=3).values_list('created_at')
-        self.assertIsNone(dts[0][0])
+        self.assertIsNone(dts.first()[0])
 
     def test_datetime_invalid(self):
         dt_value= 'INVALID'
@@ -281,7 +281,7 @@ class DataType():
         self.assertIsNone(dt2.class_param)
 
         dts = self.model_class.objects(test_id=1).values_list('class_param')
-        self.assertIsNone(dts[0][0])
+        self.assertIsNone(dts.first()[0])
 
 
 class TestDate(DataType, BaseCassEngTestCase):

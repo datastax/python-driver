@@ -733,14 +733,16 @@ class AbstractQuerySet(object):
         def check_multiple_object(_):
             # Check that the resultset only contains one element, avoiding sending a COUNT query
             try:
-                self[1]
+                it = iter(self)
+                for _ in range(2):
+                    next(it)
                 raise self.model.MultipleObjectsReturned('Multiple objects found')
-            except IndexError:
+            except StopIteration:
                 pass
 
             try:
-                obj = self[0]
-            except IndexError:
+                obj = next(iter(self))
+            except StopIteration:
                 raise self.model.DoesNotExist
 
             return obj

@@ -637,78 +637,6 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
         assert [r.three for r in results] == [1, 2, 3, 4, 5]
 
 
-class TestQuerySetSlicing(BaseQuerySetUsage):
-
-    @execute_count(1)
-    def test_out_of_range_index_raises_error(self):
-        q = TestModel.objects(test_id=0).order_by('attempt_id')
-        with self.assertRaises(IndexError):
-            q[10]
-
-    @execute_count(1)
-    def test_array_indexing_works_properly(self):
-        q = TestModel.objects(test_id=0).order_by('attempt_id')
-        expected_order = [0, 1, 2, 3]
-        for i in range(len(q)):
-            assert q[i].attempt_id == expected_order[i]
-
-    @execute_count(1)
-    def test_negative_indexing_raises_error(self):
-        q = TestModel.objects(test_id=0).order_by('attempt_id')
-        with self.assertRaises(ValueError):
-            q[-1].attempt_id
-
-    @execute_count(1)
-    def test_slicing_works_properly(self):
-        q = TestModel.objects(test_id=0).order_by('attempt_id')
-        expected_order = [0, 1, 2, 3]
-
-        for model, expect in zip(q[1:3], expected_order[1:3]):
-            self.assertEqual(model.attempt_id, expect)
-
-        for model, expect in zip(q[0:3:2], expected_order[0:3:2]):
-            self.assertEqual(model.attempt_id, expect)
-
-        for model, expect in zip(q[0:], expected_order):
-            self.assertEqual(model.attempt_id, expect)
-
-    @execute_count(4)
-    def test_negative_slicing_raises_error(self):
-
-        def assert_slicing(q):
-            with self.assertRaises(ValueError):
-                q[-1:]
-
-            with self.assertRaises(ValueError):
-                q[:-1]
-
-            with self.assertRaises(ValueError):
-                q[1:-1]
-
-            with self.assertRaises(ValueError):
-                q[-1:-1]
-
-            with self.assertRaises(ValueError):
-                q[-1:1]
-
-            with self.assertRaises(ValueError):
-                q[-1:4:2]
-
-            with self.assertRaises(ValueError):
-                q[4:-1:2]
-
-        q = TestModel.objects(test_id=0).order_by('attempt_id')
-        assert_slicing(q)
-
-        q = TestModel.objects(test_id=0)
-        assert_slicing(q)
-
-        q = TestModel.objects(test_id=0).filter(attempt_id=0)
-        assert_slicing(q)
-
-        # We should be able to do this
-        q = TestModel.get_all()[-1:]
-
 class TestQuerySetValidation(BaseQuerySetUsage):
 
     def test_primary_key_or_index_must_be_specified(self):
@@ -1071,7 +999,7 @@ class PageQueryTests(BaseCassEngTestCase):
 
         session = get_session()
         with mock.patch.object(session, 'default_fetch_size', 1):
-            results = PagingTest.objects()[:]
+            results = list(PagingTest.objects())[:]
 
         assert len(results) == 2
 
