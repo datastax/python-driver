@@ -138,7 +138,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         self.assertEqual(result.one()["text"], self.text)
 
         q = TestQueryUpdateModel.objects.filter(text__like=like_clause).allow_filtering()
-        self.assertEqual(q[0].text, self.text)
+        self.assertEqual(q.first().text, self.text)
 
         q = TestQueryUpdateModel.objects.filter(text__like=like_clause)
         self.assertEqual(q[0].text, self.text)
