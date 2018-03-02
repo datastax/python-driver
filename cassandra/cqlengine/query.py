@@ -734,8 +734,8 @@ class AbstractQuerySet(object):
             # Check that the resultset only contains one element, avoiding sending a COUNT query
             try:
                 it = iter(self)
-                for _ in range(2):
-                    next(it)
+                next(it)
+                next(it)  # if this works.. there are more than one row in the results.
                 raise self.model.MultipleObjectsReturned('Multiple objects found')
             except StopIteration:
                 pass
