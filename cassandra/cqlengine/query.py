@@ -548,42 +548,6 @@ class AbstractQuerySet(object):
 
             idx += 1
 
-    def __getitem__(self, s):
-        self._execute_query()
-
-        if isinstance(s, slice):
-            start = s.start if s.start else 0
-
-            # no support for negative indices
-            if start < 0 or (s.stop is not None and s.stop < 0):
-                raise ValueError("QuerySet slice indices must be positive")
-
-            try:
-                if s.stop:
-                    self._fill_result_cache_to_idx(s.stop)
-                else:
-                    self._fill_result_cache()
-            except StopIteration:
-                pass
-
-            return self._result_cache[start:s.stop:s.step]
-        else:
-            try:
-                s = int(s)
-            except (ValueError, TypeError):
-                raise TypeError('QuerySet indices must be integers')
-
-            # no support for negative indices
-            if s < 0:
-                raise ValueError("QuerySet indices must be positive")
-
-            try:
-                self._fill_result_cache_to_idx(s)
-            except StopIteration:
-                raise IndexError
-
-            return self._result_cache[s]
-
     def _get_result_constructor(self):
         """
         Returns a function that will be used to instantiate query results
@@ -769,14 +733,16 @@ class AbstractQuerySet(object):
         def check_multiple_object(_):
             # Check that the resultset only contains one element, avoiding sending a COUNT query
             try:
-                self[1]
+                it = iter(self)
+                next(it)
+                next(it)  # if this works.. there are more than one row in the results.
                 raise self.model.MultipleObjectsReturned('Multiple objects found')
-            except IndexError:
+            except StopIteration:
                 pass
 
             try:
-                obj = self[0]
-            except IndexError:
+                obj = next(iter(self))
+            except StopIteration:
                 raise self.model.DoesNotExist
 
             return obj

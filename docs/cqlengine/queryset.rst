@@ -78,30 +78,6 @@ Accessing objects in a QuerySet
                 #...do something to the car instance
                 pass
 
-    * list index
-        .. code-block:: python
-
-            q = Automobile.objects.all()
-            q[0] #returns the first result
-            q[1] #returns the second result
-
-        .. note::
-
-            * CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array indexing will load every result up to the index value requested
-            * Using negative indices requires a "SELECT COUNT()" to be executed. This has a performance cost on large datasets.
-
-    * list slicing
-        .. code-block:: python
-
-            q = Automobile.objects.all()
-            q[1:] #returns all results except the first
-            q[1:9] #returns a slice of the results
-
-        .. note::
-
-            * CQL does not support specifying a start position in it's queries. Therefore, accessing elements using array slicing will load every result up to the index value requested
-            * Using negative indices requires a "SELECT COUNT()" to be executed. This has a performance cost on large datasets.
-
     * calling :attr:`get() <query.QuerySet.get>` on the queryset
         .. code-block:: python
 
@@ -257,7 +233,7 @@ Token Function
 
         query = Items.objects.all().limit(10)
 
-        first_page = list(query);
+        first_page = list(query)
         last = first_page[-1]
         next_page = list(query.filter(pk__token__gt=cqlengine.Token(last.pk)))
 
@@ -414,6 +390,6 @@ Named tables are a way of querying a table without creating an class.  They're u
         from cassandra.cqlengine.named import NamedTable
         user = NamedTable("cqlengine_test", "user")
         user.objects()
-        user.objects()[0]
+        user.objects().first()
 
         # {u'pk': 1, u't': datetime.datetime(2014, 6, 26, 17, 10, 31, 774000)}

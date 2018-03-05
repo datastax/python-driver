@@ -200,7 +200,7 @@ are only created, presisted, and queried via table Models. A short example to in
         addr = UserDefinedType(address)
 
     users.create(name="Joe", addr=address(street="Easy St.", zipcode=99999))
-    user = users.objects(name="Joe")[0]
+    user = users.objects(name="Joe").first()
     print user.name, user.addr
     # Joe address(street=u'Easy St.', zipcode=99999)
 

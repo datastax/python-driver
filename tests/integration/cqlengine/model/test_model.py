@@ -89,7 +89,7 @@ class TestModel(unittest.TestCase):
         sync_table(table)
 
         created = table.create(select=0, table='table')
-        selected = table.objects(select=0)[0]
+        selected = table.objects(select=0).first()
         self.assertEqual(created.select, selected.select)
         self.assertEqual(created.table, selected.table)
 
@@ -103,7 +103,7 @@ class TestModel(unittest.TestCase):
         sync_table(table)
 
         created = table.create(select=1, table='table')
-        selected = table.objects(select=1)[0]
+        selected = table.objects(select=1).first()
         self.assertEqual(created.select, selected.select)
         self.assertEqual(created.table, selected.table)
         self.assertEqual(created.where, selected.where)

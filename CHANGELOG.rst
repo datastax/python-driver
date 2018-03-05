@@ -25,6 +25,7 @@ Other
 * cqlengine: disallow Counter create, save operations (PYTHON-497)
 * cqlengine: remove the negative indices slicing support in ModelQuerySet (PYTHON-875)
 * cqlengine: Remove Model.__default_ttl__ (PYTHON-889)
+* cqlengine: Remove cqlengine QuerySet indexing support (PYTHON-950)
 
 3.12.0
 ======

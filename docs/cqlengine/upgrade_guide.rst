@@ -87,12 +87,30 @@ Upgrade Guide 3.x to 4.x
 
     Automobile.objects.all()[-10:]
 
-* Model.__default_ttl__ has been removed.
+* Model.__default_ttl__ has been removed. The default ttl should be set in the model __options__.
 
 * cassandra.cqlengine.query.BatchType has been removed. Use :class:`cassandra.query.BatchType`
   instead when specifying the batch type with cqlengine.
 
 * There is no more default limit on QuerySets (was 10000 before).
+
+* The QuerySet indexing support has been removed (e.g *Automobile.objects.all()[0]*). To access
+  objects in a queryset, you should use one of these:
+  
+  - An Iterator::
+
+      for car in Automobile.objects.all():
+          print(car.model)
+
+  - Materialize the results::
+
+      cars = list(Automobile.objects.all())  # This will fetch *all* rows from the server
+      car = cars[1:10]
+
+  - QuerySet.get() for a single row::
+
+      cars = Automobile.objects.filter(manufacturer=..., model=...)
+      car = cars.get()
 
 Upgrade Guide cqlengine to cassandra.cqlengine
 ==============================================

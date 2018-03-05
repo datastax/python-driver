@@ -656,8 +656,9 @@ class TestQueryQuoting(BaseCassEngTestCase):
         model2 = ReservedWordModel.filter(token='1')
 
         self.assertTrue(len(model2) == 1)
-        self.assertTrue(model1.token == model2[0].token)
-        self.assertTrue(model1.insert == model2[0].insert)
+        row = model2.first()
+        self.assertTrue(model1.token == row.token)
+        self.assertTrue(model1.insert == row.insert)
 
 
 class TestQueryModel(Model):
