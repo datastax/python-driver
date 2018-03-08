@@ -99,5 +99,9 @@ if(cython_env == 'True'):
     VERIFY_CYTHON = True
 
 
-notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adequate for windows")
+def is_windows():
+    return "Windows" in platform.system()
+
+
+notwindows = unittest.skipUnless(not is_windows(), "This test is not adequate for windows")
 notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")

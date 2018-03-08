@@ -11,6 +11,7 @@ Other
 * Reevaluate MONKEY_PATCH_LOOP in test codebase (PYTHON-903)
 * Remove CASS_SERVER_VERSION and replace it for CASSANDRA_VERSION in tests (PYTHON-910)
 * Refactor CASSANDRA_VERSION to a some kind of version object (PYTHON-915)
+* Add DSE smoke test to OSS driver tests (PYTHON-894)
 
 
 3.13.0
