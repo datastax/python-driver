@@ -639,6 +639,20 @@ class ClusterTests(unittest.TestCase):
         else:
             raise Exception("get_query_trace didn't raise TraceUnavailable after {} tries".format(max_retry_count))
 
+    def test_one_returns_none(self):
+        """
+        Test ResulSet.one returns None if no rows where found
+
+        @since 3.14
+        @jira_ticket PYTHON-947
+        @expected_result ResulSet.one is None
+
+        @test_category query
+        """
+        with Cluster() as cluster:
+            session = cluster.connect()
+            self.assertIsNone(session.execute("SELECT * from system.local WHERE key='madeup_key'").one())
+
     def test_string_coverage(self):
         """
         Ensure str(future) returns without error
