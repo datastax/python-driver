@@ -25,7 +25,8 @@ from uuid import uuid4
 import logging
 
 import cassandra
-from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, ResultSetIterator, \
+    EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
@@ -37,7 +38,8 @@ from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
-    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40
+    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40, \
+    BasicSharedKeyspaceUnitTestCase
 from tests.integration.util import assert_quiescent_pool_state
 import sys
 
@@ -301,7 +303,7 @@ class ClusterTests(unittest.TestCase):
         # test_connect_on_keyspace
         session2 = cluster.connect('test1rf')
         result2 = session2.execute("SELECT * FROM test")
-        self.assertEqual(list(result), list(result2)
+        self.assertEqual(list(result), list(result2))
         cluster.shutdown()
 
     def test_set_keyspace_twice(self):
@@ -1076,6 +1078,54 @@ class ClusterTests(unittest.TestCase):
         self.assertIsNotNone(trace.started_at)
         self.assertIsNotNone(trace.coordinator)
         self.assertIsNotNone(trace.events)
+
+
+class ResultSetIteratorTests(BasicSharedKeyspaceUnitTestCase):
+
+    def setUp(self):
+        self.num_rows = 5
+        for i in range(self.num_rows):
+            self.session.execute("INSERT INTO test3rf.test (k, v) VALUES  ({0}, {0})".format(i))
+
+    def tearDown(self):
+        self.session.execute("TRUNCATE TABLE test3rf.test")
+
+    def test_get_next_resultset(self):
+        """
+        Tests that we can call next on a ResultSet
+
+        @since 3.14
+        @jira_ticket PYTHON-945
+
+        @test_category query
+        """
+        results = self.session.execute("SELECT * from test3rf.test")
+        result_iterator = iter(ResultSetIterator(results))
+
+        itered_results = set()
+        for i in range(self.num_rows):
+            itered_results.add(result_iterator.next())
+
+        self.assertEqual(itered_results, {(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)})
+
+        with self.assertRaises(StopIteration):
+            result_iterator.next()
+
+    def test_iter_over_resultset(self):
+        """
+        Tests that we can iter over a ResultSet in a loop
+
+        @since 3.14
+        @jira_ticket PYTHON-945
+
+        @test_category query
+        """
+        results = self.session.execute("SELECT * from test3rf.test")
+        itered_results = set()
+        for row in ResultSetIterator(results):
+            itered_results.add(row)
+
+        self.assertEqual(itered_results, {(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)})
 
 
 class LocalHostAdressTranslator(AddressTranslator):
