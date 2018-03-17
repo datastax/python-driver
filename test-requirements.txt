@@ -14,3 +14,4 @@ eventlet
 cython>=0.20,<0.28
 packaging
 asynctest; python_version > '3.4'
+pyOpenSSL

@@ -42,6 +42,9 @@ class TwistedConnectionProtocol(protocol.Protocol):
     made events.
     """
 
+    def __init__(self):
+        self.connection = None
+
     def dataReceived(self, data):
         """
         Callback function that is called when data has been received
@@ -50,9 +53,8 @@ class TwistedConnectionProtocol(protocol.Protocol):
         Reaches back to the Connection object and queues the data for
         processing.
         """
-        self.transport.connector.factory.conn._iobuf.write(data)
-        self.transport.connector.factory.conn.handle_read()
-
+        self.connection._iobuf.write(data)
+        self.connection.handle_read()
     def connectionMade(self):
         """
         Callback function that is called when a connection has succeeded.
@@ -60,11 +62,18 @@ class TwistedConnectionProtocol(protocol.Protocol):
         Reaches back to the Connection object and confirms that the connection
         is ready.
         """
-        self.transport.connector.factory.conn.client_connection_made()
+        try:
+            # Non SSL connection
+            self.connection = self.transport.connector.factory.conn
+        except AttributeError:
+            # SSL connection
+            self.connection = self.transport.connector.factory.wrappedFactory.conn
+
+        self.connection.client_connection_made(self.transport)
 
     def connectionLost(self, reason):
         # reason is a Failure instance
-        self.transport.connector.factory.conn.defunct(reason.value)
+        self.connection.defunct(reason.value)
 
 
 class TwistedConnectionClientFactory(protocol.ClientFactory):
@@ -157,6 +166,49 @@ class TwistedLoop(object):
         self._schedule_timeout(self._timers.next_timeout)
 
 
+try:
+    from twisted.internet import ssl
+    import OpenSSL.crypto
+    from OpenSSL.crypto import load_certificate, FILETYPE_PEM
+
+    class _SSLContextFactory(ssl.ClientContextFactory):
+        def __init__(self, ssl_options, check_hostname, host):
+            self.ssl_options = ssl_options
+            self.check_hostname = check_hostname
+            self.host = host
+
+        def getContext(self):
+            # This version has to be OpenSSL.SSL.DESIRED_VERSION
+            # instead of ssl.DESIRED_VERSION as in other loops
+            self.method = self.ssl_options["ssl_version"]
+            context = ssl.ClientContextFactory.getContext(self)
+            if "certfile" in self.ssl_options:
+                context.use_certificate_file(self.ssl_options["certfile"])
+            if "keyfile" in self.ssl_options:
+                context.use_privatekey_file(self.ssl_options["keyfile"])
+            if "ca_certs" in self.ssl_options:
+                x509 = load_certificate(FILETYPE_PEM, open(self.ssl_options["ca_certs"]).read())
+                store = context.get_cert_store()
+                store.add_cert(x509)
+            if "cert_reqs" in self.ssl_options:
+                # This expects OpenSSL.SSL.VERIFY_NONE/OpenSSL.SSL.VERIFY_PEER
+                # or OpenSSL.SSL.VERIFY_FAIL_IF_NO_PEER_CERT
+                context.set_verify(self.ssl_options["cert_reqs"],
+                                   callback=self.verify_callback)
+            return context
+
+        def verify_callback(self, connection, x509, errnum, errdepth, ok):
+            if ok:
+                if self.check_hostname and self.host != x509.get_subject().commonName:
+                    return False
+            return ok
+
+    _HAS_SSL = True
+
+except ImportError as e:
+    _HAS_SSL = False
+
+
 class TwistedConnection(Connection):
     """
     An implementation of :class:`.Connection` that utilizes the
@@ -189,6 +241,7 @@ class TwistedConnection(Connection):
 
         self.is_closed = True
         self.connector = None
+        self.transport = None
 
         reactor.callFromThread(self.add_connection)
         self._loop.maybe_start()
@@ -198,18 +251,33 @@ class TwistedConnection(Connection):
         Convenience function to connect and store the resulting
         connector.
         """
-        self.connector = reactor.connectTCP(
-            host=self.host, port=self.port,
-            factory=TwistedConnectionClientFactory(self),
-            timeout=self.connect_timeout)
+        if self.ssl_options:
 
-    def client_connection_made(self):
+            if not _HAS_SSL:
+                raise ImportError(
+                    str(e) +
+                    ', pyOpenSSL must be installed to enable SSL support with the Twisted event loop'
+                )
+
+            self.connector = reactor.connectSSL(
+                host=self.host, port=self.port,
+                factory=TwistedConnectionClientFactory(self),
+                contextFactory=_SSLContextFactory(self.ssl_options, self._check_hostname, self.host),
+                timeout=self.connect_timeout)
+        else:
+            self.connector = reactor.connectTCP(
+                host=self.host, port=self.port,
+                factory=TwistedConnectionClientFactory(self),
+                timeout=self.connect_timeout)
+
+    def client_connection_made(self, transport):
         """
         Called by twisted protocol when a connection attempt has
         succeeded.
         """
         with self.lock:
             self.is_closed = False
+        self.transport = transport
         self._send_options_message()
 
     def close(self):
@@ -222,7 +290,7 @@ class TwistedConnection(Connection):
             self.is_closed = True
 
         log.debug("Closing connection (%s) to %s", id(self), self.host)
-        self.connector.disconnect()
+        reactor.callFromThread(self.connector.disconnect)
         log.debug("Closed socket to %s", self.host)
 
         if not self.is_defunct:
@@ -246,4 +314,4 @@ class TwistedConnection(Connection):
         it is not thread-safe, so we schedule it to run from within
         the event loop when it gets the chance.
         """
-        reactor.callFromThread(self.connector.transport.write, data)
+        reactor.callFromThread(self.transport.write, data)
