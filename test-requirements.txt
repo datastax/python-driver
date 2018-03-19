@@ -13,4 +13,4 @@ gevent>=1.0
 eventlet
 cython>=0.20,<0.28
 packaging
-asynctest
+asynctest; python_version > '3.4'
