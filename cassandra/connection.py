@@ -724,6 +724,12 @@ class Connection(object):
         if self.is_defunct:
             return
         if isinstance(startup_response, ReadyMessage):
+            if self.authenticator:
+                log.warning("An authentication challenge was not sent, "
+                            "this is suspicious because the driver expects "
+                            "authentication (configured authenticator = %s)",
+                            self.authenticator.__class__.__name__)
+
             log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.host)
             if self._compressor:
                 self.compressor = self._compressor

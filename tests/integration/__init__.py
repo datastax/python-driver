@@ -619,6 +619,22 @@ class MockLoggingHandler(logging.Handler):
                 count+=1
         return count
 
+    def set_module_name(self, module_name):
+        """
+        This is intended to be used doing:
+        with MockLoggingHandler().set_module_name(connection.__name__) as mock_handler:
+        """
+        self.module_name = module_name
+        return self
+
+    def __enter__(self):
+        self.logger = logging.getLogger(self.module_name)
+        self.logger.addHandler(self)
+        return self
+
+    def __exit__(self, *args):
+        pass
+
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
     """
