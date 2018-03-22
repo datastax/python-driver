@@ -13,6 +13,7 @@ Other
 * Refactor CASSANDRA_VERSION to a some kind of version object (PYTHON-915)
 * Warn users when using the deprecated Session.default_consistency_level (PYTHON-953)
 * Add DSE smoke test to OSS driver tests (PYTHON-894)
+* Document long compilation times and workarounds (PYTHON-868)
 
 3.13.0
 ======

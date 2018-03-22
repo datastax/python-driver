@@ -20,6 +20,44 @@ You can use ``pip install --pre cassandra-driver`` if you need to install a beta
 
 ***Note**: if intending to use optional extensions, install the `dependencies <#optional-non-python-dependencies>`_ first. The driver may need to be reinstalled if dependencies are added after the initial installation.
 
+Speeding Up Installation
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, installing the driver through ``pip`` uses Cython to compile
+certain parts of the driver.
+This makes those hot paths faster at runtime, but the Cython compilation
+process can take a long time -- as long as 10 minutes in some environments.
+
+In environments where performance is less important, it may be worth it to
+:ref:`disable Cython as documented below <cython-extensions>`.
+You can also use ``CASS_DRIVER_BUILD_CONCURRENCY`` to increase the number of
+threads used to build the driver and any C extensions:
+
+    $ # installing from source
+    $ CASS_DRIVER_BUILD_CONCURRENCY=8 python setup.py install
+    $ # installing from pip
+    $ CASS_DRIVER_BUILD_CONCURRENCY=8 pip install cassandra-driver
+
+Finally, you can `build a wheel <https://packaging.python.org/tutorials/distributing-packages/#wheels>`_ from the driver's source and distribute that to computers
+that depend on it. For example:
+
+    $ git clone https://github.com/datastax/python-driver.git
+    $ cd python-driver
+    $ git checkout 3.14.0 # or other desired tag
+    $ pip install wheel
+    $ python setup.py bdist_wheel
+    $ # build wheel with optional concurrency settings
+    $ CASS_DRIVER_BUILD_CONCURRENCY=8 python setup.py bdist_wheel
+    $ scp ./dist/cassandra_driver-3.14.0-cp27-cp27mu-linux_x86_64.whl user@host:/remote_dir
+
+Then, on the remote machine or machines, simply
+
+    $ pip install /remote_dir/cassandra_driver-3.14.0-cp27-cp27mu-linux_x86_64.whl
+
+Note that the wheel created this way is a `platform wheel
+<https://packaging.python.org/tutorials/distributing-packages/#platform-wheels>`_
+and as such will not work across platforms or architectures.
+
 OSX Installation Error
 ^^^^^^^^^^^^^^^^^^^^^^
 If you're installing on OSX and have XCode 5.1 installed, you may see an error like this::
@@ -122,6 +160,8 @@ On RedHat and RedHat-based systems like CentOS and Fedora::
 On OS X, homebrew installations of Python should provide the necessary headers.
 
 See :ref:`windows_build` for notes on configuring the build environment on Windows.
+
+.. _cython-extensions:
 
 Cython-based Extensions
 ~~~~~~~~~~~~~~~~~~~~~~~
