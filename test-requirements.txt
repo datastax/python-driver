@@ -1,6 +1,7 @@
 -r requirements.txt
 scales
 nose
+nose-exclude
 mock!=1.1.*
 ccm>=2.0
 unittest2
