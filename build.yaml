@@ -1,26 +1,24 @@
-anchors:
-  master_default: &MASTER_DEFAULT
-    schedule: adhoc
+schedules:
+  commit_master:
+    schedule: per_commit
     branches:
       include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+      EXCLUDE_LONG=1
     matrix:
       exclude:
         - python: [3.4, 3.6]
 
-schedules:
-  commit_master:
-    <<: *MASTER_DEFAULT
-    schedule: per_commit
-    env_vars: |
-      EVENT_LOOP_MANAGER='libev'
-      EXCLUDE_LONG=1
-
-  # same as above, but with the long tests
   nightly_master:
-    <<: *MASTER_DEFAULT
     schedule: nightly
+    branches:
+      include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
 
   commit_branches:
     schedule: per_commit
