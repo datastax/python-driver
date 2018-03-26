@@ -33,6 +33,8 @@ In environments where performance is less important, it may be worth it to
 You can also use ``CASS_DRIVER_BUILD_CONCURRENCY`` to increase the number of
 threads used to build the driver and any C extensions:
 
+.. code-block:: bash
+
     $ # installing from source
     $ CASS_DRIVER_BUILD_CONCURRENCY=8 python setup.py install
     $ # installing from pip
@@ -40,6 +42,8 @@ threads used to build the driver and any C extensions:
 
 Finally, you can `build a wheel <https://packaging.python.org/tutorials/distributing-packages/#wheels>`_ from the driver's source and distribute that to computers
 that depend on it. For example:
+
+.. code-block:: bash
 
     $ git clone https://github.com/datastax/python-driver.git
     $ cd python-driver
@@ -51,6 +55,8 @@ that depend on it. For example:
     $ scp ./dist/cassandra_driver-3.14.0-cp27-cp27mu-linux_x86_64.whl user@host:/remote_dir
 
 Then, on the remote machine or machines, simply
+
+.. code-block:: bash
 
     $ pip install /remote_dir/cassandra_driver-3.14.0-cp27-cp27mu-linux_x86_64.whl
 
@@ -64,7 +70,9 @@ If you're installing on OSX and have XCode 5.1 installed, you may see an error l
 
     clang: error: unknown argument: '-mno-fused-madd' [-Wunused-command-line-argument-hard-error-in-future]
 
-To fix this, re-run the installation with an extra compilation flag::
+To fix this, re-run the installation with an extra compilation flag:
+
+.. code-block:: bash
 
     ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future pip install cassandra-driver
 
