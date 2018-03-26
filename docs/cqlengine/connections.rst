@@ -110,7 +110,7 @@ You can use the :attr:`using() <.query.ModelQuerySet.using>` method to select a 
 
         Automobile.objects.using(connection='cluster1').create(manufacturer='honda', year=2010, model='civic')
         q = Automobile.objects.filter(manufacturer='Tesla')
-        autos = q.using(keyspace='ks2, connection='cluster2').all()
+        autos = q.using(keyspace='ks2', connection='cluster2').all()
 
         for auto in autos:
             auto.using(connection='cluster1').save()
