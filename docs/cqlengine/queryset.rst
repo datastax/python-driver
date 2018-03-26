@@ -119,92 +119,92 @@ Accessing objects in a QuerySet
 Filtering Operators
 ===================
 
-    :attr:`Equal To <query.QueryOperator.EqualsOperator>`
+:attr:`Equal To <query.QueryOperator.EqualsOperator>`
 
-        The default filtering operator.
+    The default filtering operator.
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(manufacturer='Tesla')
-            q = q.filter(year=2012)  #year == 2012
+        q = Automobile.objects.filter(manufacturer='Tesla')
+        q = q.filter(year=2012)  #year == 2012
 
-    In addition to simple equal to queries, cqlengine also supports querying with other operators by appending a ``__<op>`` to the field name on the filtering call
+In addition to simple equal to queries, cqlengine also supports querying with other operators by appending a ``__<op>`` to the field name on the filtering call
 
-    :attr:`in (__in) <query.QueryOperator.InOperator>`
+:attr:`in (__in) <query.QueryOperator.InOperator>`
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(manufacturer='Tesla')
-            q = q.filter(year__in=[2011, 2012])
+        q = Automobile.objects.filter(manufacturer='Tesla')
+        q = q.filter(year__in=[2011, 2012])
 
 
-    :attr:`> (__gt) <query.QueryOperator.GreaterThanOperator>`
+:attr:`> (__gt) <query.QueryOperator.GreaterThanOperator>`
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(manufacturer='Tesla')
-            q = q.filter(year__gt=2010)  # year > 2010
+        q = Automobile.objects.filter(manufacturer='Tesla')
+        q = q.filter(year__gt=2010)  # year > 2010
 
-            # or the nicer syntax
+        # or the nicer syntax
 
-            q.filter(Automobile.year > 2010)
+        q.filter(Automobile.year > 2010)
 
-    :attr:`>= (__gte) <query.QueryOperator.GreaterThanOrEqualOperator>`
+:attr:`>= (__gte) <query.QueryOperator.GreaterThanOrEqualOperator>`
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(manufacturer='Tesla')
-            q = q.filter(year__gte=2010)  # year >= 2010
+        q = Automobile.objects.filter(manufacturer='Tesla')
+        q = q.filter(year__gte=2010)  # year >= 2010
 
-            # or the nicer syntax
+        # or the nicer syntax
 
-            q.filter(Automobile.year >= 2010)
+        q.filter(Automobile.year >= 2010)
 
-    :attr:`< (__lt) <query.QueryOperator.LessThanOperator>`
+:attr:`< (__lt) <query.QueryOperator.LessThanOperator>`
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(manufacturer='Tesla')
-            q = q.filter(year__lt=2012)  # year < 2012
+        q = Automobile.objects.filter(manufacturer='Tesla')
+        q = q.filter(year__lt=2012)  # year < 2012
 
-            # or...
+        # or...
 
-            q.filter(Automobile.year < 2012)
+        q.filter(Automobile.year < 2012)
 
-    :attr:`<= (__lte) <query.QueryOperator.LessThanOrEqualOperator>`
+:attr:`<= (__lte) <query.QueryOperator.LessThanOrEqualOperator>`
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(manufacturer='Tesla')
-            q = q.filter(year__lte=2012)  # year <= 2012
+        q = Automobile.objects.filter(manufacturer='Tesla')
+        q = q.filter(year__lte=2012)  # year <= 2012
 
-            q.filter(Automobile.year <= 2012)
+        q.filter(Automobile.year <= 2012)
 
-    :attr:`CONTAINS (__contains) <query.QueryOperator.ContainsOperator>`
+:attr:`CONTAINS (__contains) <query.QueryOperator.ContainsOperator>`
 
-        The CONTAINS operator is available for all collection types (List, Set, Map).
+    The CONTAINS operator is available for all collection types (List, Set, Map).
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(manufacturer='Tesla')
-            q.filter(options__contains='backup camera').allow_filtering()
+        q = Automobile.objects.filter(manufacturer='Tesla')
+        q.filter(options__contains='backup camera').allow_filtering()
 
-        Note that we need to use allow_filtering() since the *options* column has no secondary index.
+    Note that we need to use allow_filtering() since the *options* column has no secondary index.
 
-    :attr:`LIKE (__like) <query.QueryOperator.LikeOperator>`
+:attr:`LIKE (__like) <query.QueryOperator.LikeOperator>`
 
-        The LIKE operator is available for text columns that have a SASI secondary index.
+    The LIKE operator is available for text columns that have a SASI secondary index.
 
-        .. code-block:: python
+    .. code-block:: python
 
-            q = Automobile.objects.filter(model__like='%Civic%').allow_filtering()
+        q = Automobile.objects.filter(model__like='%Civic%').allow_filtering()
 
-        Limitations:
-        - Currently, cqlengine does not support SASI index creation. To use this feature,
-          you need to create the SASI index using the core driver.
-        - Queries using LIKE must use allow_filtering() since the *model* column has no
-          standard secondary index. Note that the server will use the SASI index properly
-          when executing the query.
+    Limitations:
+    - Currently, cqlengine does not support SASI index creation. To use this feature,
+      you need to create the SASI index using the core driver.
+    - Queries using LIKE must use allow_filtering() since the *model* column has no
+      standard secondary index. Note that the server will use the SASI index properly
+      when executing the query.
 
 TimeUUID Functions
 ==================
