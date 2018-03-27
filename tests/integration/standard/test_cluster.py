@@ -1482,3 +1482,22 @@ class DeprecationWarningTest(unittest.TestCase):
             self.assertEqual(len(w), 1)
             self.assertIn("Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0.",
                           str(w[0].message))
+
+    def test_deprecation_warning_default_consistency_level(self):
+        """
+        Tests the deprecation warning has been added when enabling
+        session the default consistency level to session
+
+        @since 3.14
+        @jira_ticket PYTHON-935
+        @expected_result the deprecation warning is emitted
+
+        @test_category logs
+        """
+        with warnings.catch_warnings(record=True) as w:
+            cluster = Cluster()
+            session = cluster.connect()
+            session.default_consistency_level = ConsistencyLevel.ONE
+            self.assertEqual(len(w), 1)
+            self.assertIn("Setting the consistency level at the session level will be removed in 4.0",
+                          str(w[0].message))

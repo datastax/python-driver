@@ -1936,6 +1936,7 @@ class Session(object):
     @property
     def default_consistency_level(self):
         """
+        *Deprecated:* use execution profiles instead
         The default :class:`~ConsistencyLevel` for operations executed through
         this session.  This default may be overridden by setting the
         :attr:`~.Statement.consistency_level` on individual statements.
@@ -1950,6 +1951,12 @@ class Session(object):
 
     @default_consistency_level.setter
     def default_consistency_level(self, cl):
+        """
+        *Deprecated:* use execution profiles instead
+        """
+        warn("Setting the consistency level at the session level will be removed in 4.0. Consider using "
+             "execution profiles and setting the desired consitency level to the EXEC_PROFILE_DEFAULT profile."
+             , DeprecationWarning)
         self._validate_set_legacy_config('default_consistency_level', cl)
 
     _default_serial_consistency_level = None
