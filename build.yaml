@@ -5,6 +5,17 @@ schedules:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
+      EXCLUDE_LONG=1
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
+
+  nightly_master:
+    schedule: nightly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
         - python: [3.4, 3.6]
@@ -15,6 +26,7 @@ schedules:
       include: [/python.*/]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
+      EXCLUDE_LONG=1
     matrix:
       exclude:
         - python: [3.4, 3.6]
@@ -172,7 +184,9 @@ build:
       echo "==========RUNNING INTEGRATION TESTS=========="
       EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
-      echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      if [ -z "$EXCLUDE_LONG" ]; then
+        echo "==========RUNNING LONG INTEGRATION TESTS=========="
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      fi
   - xunit:
     - "*_results.xml"
