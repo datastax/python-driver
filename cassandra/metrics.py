@@ -37,17 +37,17 @@ class Metrics(object):
     A :class:`greplin.scales.PmfStat` timer for requests. This is a dict-like
     object with the following keys:
 
-      * count - number of requests that have been timed
-      * min - min latency
-      * max - max latency
-      * mean - mean latency
-      * stddev - standard deviation for latencies
-      * median - median latency
-      * 75percentile - 75th percentile latencies
-      * 95percentile - 95th percentile latencies
-      * 98percentile - 98th percentile latencies
-      * 99percentile - 99th percentile latencies
-      * 999percentile - 99.9th percentile latencies
+    * count - number of requests that have been timed
+    * min - min latency
+    * max - max latency
+    * mean - mean latency
+    * stddev - standard deviation for latencies
+    * median - median latency
+    * 75percentile - 75th percentile latencies
+    * 95percentile - 95th percentile latencies
+    * 98percentile - 98th percentile latencies
+    * 99percentile - 99th percentile latencies
+    * 999percentile - 99.9th percentile latencies
     """
 
     connection_errors = None

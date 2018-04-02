@@ -230,10 +230,10 @@ class ExecutionProfile(object):
 
     Some example implementations:
 
-        - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
-        - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
-        - :func:`cassandra.query.dict_factory` - return a result row as a dict
-        - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
+    - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
+    - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
+    - :func:`cassandra.query.dict_factory` - return a result row as a dict
+    - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
     """
 
     speculative_execution_policy = None
@@ -1897,10 +1897,10 @@ class Session(object):
         returned row will be a named tuple.  You can alternatively
         use any of the following:
 
-          - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
-          - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
-          - :func:`cassandra.query.dict_factory` - return a result row as a dict
-          - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
+        - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
+        - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
+        - :func:`cassandra.query.dict_factory` - return a result row as a dict
+        - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
 
         """
         return self._row_factory
