@@ -1071,19 +1071,32 @@ class ModelQuerySet(AbstractQuerySet):
     """
     def _validate_select_where(self):
         """ Checks that a filterset will not create invalid select statement """
-        # check that there's either a =, a IN or a CONTAINS (collection) relationship with a primary key or indexed field
+        # check that there's either a =, a IN or a CONTAINS (collection)
+        # relationship with a primary key or indexed field. We also allow
+        # custom indexes to be queried with any operator (a difference
+        # between a secondary index)
         equal_ops = [self.model._get_column_by_db_name(w.field) \
-                     for w in self._where if isinstance(w.operator, EqualsOperator) and not isinstance(w.value, Token)]
+                     for w in self._where if (isinstance(w.operator, EqualsOperator) and not isinstance(w.value, Token))
+                     or self.model._get_column_by_db_name(w.field).custom_index]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
-        if not any(w.primary_key or w.index for w in equal_ops) and not token_comparison and not self._allow_filtering:
-            raise QueryException(('Where clauses require either  =, a IN or a CONTAINS (collection) '
-                                  'comparison with either a primary key or indexed field'))
+        if not any(w.primary_key or w.has_index for w in equal_ops) and not token_comparison and not self._allow_filtering:
+            raise QueryException(
+                ('Where clauses require either  =, a IN or a CONTAINS '
+                 '(collection) comparison with either a primary key or '
+                 'indexed field. You might want to consider setting '
+                 'custom_index on fields that you manage index outside '
+                 'cqlengine.'))
 
         if not self._allow_filtering:
             # if the query is not on an indexed field
-            if not any(w.index for w in equal_ops):
+            if not any(w.has_index for w in equal_ops):
                 if not any([w.partition_key for w in equal_ops]) and not token_comparison:
-                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
+                    raise QueryException(
+                        ('Filtering on a clustering key without a partition '
+                         'key is not allowed unless allow_filtering() is '
+                         'called on the queryset. You might want to consider '
+                         'setting custom_index on fields that you manage '
+                         'index outside cqlengine.'))
 
     def _select_fields(self):
         if self._defer_fields or self._only_fields:

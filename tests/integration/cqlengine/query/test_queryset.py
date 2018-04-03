@@ -82,6 +82,13 @@ class IndexedTestModel(Model):
     test_result = columns.Integer(index=True)
 
 
+class CustomIndexedTestModel(Model):
+
+    test_id = columns.Integer(primary_key=True)
+    description = columns.Text(custom_index=True)
+    data = columns.Text()
+
+
 class IndexedCollectionsTestModel(Model):
 
     test_id = columns.Integer(primary_key=True)
@@ -314,9 +321,11 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         super(BaseQuerySetUsage, cls).setUpClass()
         drop_table(TestModel)
         drop_table(IndexedTestModel)
+        drop_table(CustomIndexedTestModel)
 
         sync_table(TestModel)
         sync_table(IndexedTestModel)
+        sync_table(CustomIndexedTestModel)
         sync_table(TestMultiClusteringModel)
 
         TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
@@ -374,6 +383,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         super(BaseQuerySetUsage, cls).tearDownClass()
         drop_table(TestModel)
         drop_table(IndexedTestModel)
+        drop_table(CustomIndexedTestModel)
         drop_table(TestMultiClusteringModel)
 
 
@@ -735,6 +745,23 @@ class TestQuerySetValidation(BaseQuerySetUsage):
 
         q = IndexedCollectionsTestModel.objects.filter(test_map__contains=13)
         self.assertEqual(q.count(), 0)
+
+    def test_custom_indexed_field_can_be_queried(self):
+        """
+        Tests that queries on an custom indexed field will work without any primary key relations specified
+        """
+
+        with self.assertRaises(query.QueryException):
+            list(CustomIndexedTestModel.objects.filter(data='test'))  # not custom indexed
+
+        # equals operator, server error since there is no real index, but it passes
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(description='test'))
+
+        # gte operator, server error since there is no real index, but it passes
+        # this can't work with a secondary index
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(description__gte='test'))
 
 
 class TestQuerySetDelete(BaseQuerySetUsage):

@@ -21,6 +21,8 @@ Columns
 
     .. autoattribute:: index
 
+    .. autoattribute:: custom_index
+
     .. autoattribute:: db_field
 
     .. autoattribute:: default
