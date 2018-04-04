@@ -18,7 +18,7 @@ try:
 except ImportError:
     import unittest # noqa
 
-from mock import Mock, PropertyMock
+from mock import Mock, PropertyMock, patch
 
 from cassandra.cluster import ResultSet
 
@@ -195,19 +195,15 @@ class ResultSetTests(unittest.TestCase):
 
         self.assertEqual(rs.one(), first)
 
-    def test_indexing_deprecation(self):
-        import warnings
-
+    @patch('cassandra.cluster.warn')
+    def test_indexing_deprecation(self, mocked_warn):
+        # normally we'd use catch_warnings to test this, but that doesn't work
+        # pre-Py3.0 for some reason
         first, second = Mock(), Mock()
         rs = ResultSet(Mock(has_more_pages=False), [first, second])
         self.assertEqual(rs[0], first)
-
-        with warnings.catch_warnings(record=True) as ws:
-            # catch_warnings restores original filter on close
-            warnings.simplefilter('always')
-            rs[0]
-        self.assertEqual(len(ws), 1)
-        index_warning = ws[0]
-        self.assertIs(index_warning.category, DeprecationWarning)
+        self.assertEqual(len(mocked_warn.mock_calls), 1)
+        index_warning_args = tuple(mocked_warn.mock_calls[0])[1]
         self.assertIn('indexing support will be removed in 4.0',
-                      str(index_warning.message))
+                      str(index_warning_args[0]))
+        self.assertIs(index_warning_args[1], DeprecationWarning)

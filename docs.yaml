@@ -10,8 +10,16 @@ sections:
     prefix: /
     type: sphinx
     directory: docs
-prebuilds:
-  - python setup.py build_ext --inplace --force --no-murmur3 --no-cython
+    virtualenv_init: |
+      set -x
+      CASS_DRIVER_NO_CYTHON=1 pip install -r test-requirements.txt
+      # for newer versions this is redundant, but in older versions we need to
+      # install, e.g., the cassandra driver, and those versions don't specify
+      # the cassandra driver version in requirements files
+      CASS_DRIVER_NO_CYTHON=1 python setup.py develop
+      pip install "jinja2==2.8.1;python_version<'3.6'" "sphinx>=1.3,<2" geomet
+      # build extensions like libev
+      CASS_DRIVER_NO_CYTHON=1 python setup.py build_ext --inplace --force
 versions:
   - name: '3.13'
     ref: '3.13.0'

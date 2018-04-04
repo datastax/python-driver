@@ -883,9 +883,9 @@ class Time(object):
         """
         Initializer value can be:
 
-            - integer_type: absolute nanoseconds in the day
-            - datetime.time: built-in time
-            - string_type: a string time of the form "HH:MM:SS[.mmmuuunnn]"
+        - integer_type: absolute nanoseconds in the day
+        - datetime.time: built-in time
+        - string_type: a string time of the form "HH:MM:SS[.mmmuuunnn]"
         """
         if isinstance(value, six.integer_types):
             self._from_timestamp(value)
@@ -1012,9 +1012,9 @@ class Date(object):
         """
         Initializer value can be:
 
-            - integer_type: absolute days from epoch (1970, 1, 1). Can be negative.
-            - datetime.date: built-in date
-            - string_type: a string time of the form "yyyy-mm-dd"
+        - integer_type: absolute days from epoch (1970, 1, 1). Can be negative.
+        - datetime.date: built-in date
+        - string_type: a string time of the form "yyyy-mm-dd"
         """
         if isinstance(value, six.integer_types):
             self.days_from_epoch = value

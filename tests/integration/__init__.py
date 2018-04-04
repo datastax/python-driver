@@ -40,6 +40,7 @@ from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import ConfigurationException
 
 try:
+    from ccmlib.dse_cluster import DseCluster
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
@@ -91,15 +92,34 @@ def _tuple_version(version_string):
     return tuple([int(p) for p in version_string.split('.')])
 
 
+def _get_dse_version_from_cass(cass_version):
+    if cass_version.startswith('2.1'):
+        dse_ver = "4.8.15"
+    elif cass_version.startswith('3.0'):
+        dse_ver = "5.0.12"
+    elif cass_version.startswith('3.10') or cass_version.startswith('3.11'):
+        dse_ver = "5.1.7"
+    elif cass_version.startswith('4.0'):
+        dse_ver = "6.0"
+    else:
+        log.error("Unknown cassandra version found {0}, defaulting to 2.1".format(cass_version))
+        dse_ver = "2.1"
+    return dse_ver
+
+
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
 SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 
-default_cassandra_version = Version('3.11')
-
 CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
+
+default_cassandra_version = '3.11'
 CASSANDRA_VERSION = Version(os.getenv('CASSANDRA_VERSION', default_cassandra_version))
+
+default_dse_version = _get_dse_version_from_cass(CASSANDRA_VERSION.base_version)
+
+DSE_VERSION = Version(os.getenv('DSE_VERSION', default_dse_version))
 
 CCM_KWARGS = {}
 if CASSANDRA_DIR:
@@ -197,12 +217,23 @@ def get_unsupported_upper_protocol():
     else:
         return None
 
+
 default_protocol_version = get_default_protocol()
 
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
-local = unittest.skipUnless(CASSANDRA_IP.startswith("127.0.0."), 'Tests only runs against local C*')
+
+def local_decorator_creator():
+    if not CASSANDRA_IP.startswith("127.0.0."):
+        return unittest.skip('Tests only runs against local C*')
+
+    def _id_and_mark(f):
+        f.local = True
+
+    return _id_and_mark
+
+local = local_decorator_creator()
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
@@ -300,13 +331,17 @@ def is_current_cluster(cluster_name, node_counts):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
-                configuration_options={}):
+                configuration_options={}, dse_cluster=False, dse_options={}):
     set_default_cass_ip()
 
-    if ccm_options is None:
+    if ccm_options is None and dse_cluster:
+        ccm_options = {"version": DSE_VERSION}
+    elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
 
     cassandra_version = ccm_options.get('version', CASSANDRA_VERSION)
+    dse_version = ccm_options.get('version', DSE_VERSION)
+
     if 'version' in ccm_options:
         ccm_options['version'] = ccm_options['version'].base_version
 
@@ -339,15 +374,34 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
             del tb
 
             log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
-            CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
-            CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-            if cassandra_version >= Version('2.2'):
-                CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                if cassandra_version >= Version('3.0'):
+
+            if dse_cluster:
+                CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
+                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+                CCM_CLUSTER.set_configuration_options({'batch_size_warn_threshold_in_kb': 5})
+                if dse_version >= Version('5.0'):
+                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-            common.switch_cluster(path, cluster_name)
-            CCM_CLUSTER.set_configuration_options(configuration_options)
-            CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+                if 'spark' in workloads:
+                    config_options = {"initial_spark_worker_resources": 0.1}
+                    CCM_CLUSTER.set_dse_configuration_options(config_options)
+                common.switch_cluster(path, cluster_name)
+                CCM_CLUSTER.set_configuration_options(configuration_options)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+
+                CCM_CLUSTER.set_dse_configuration_options(dse_options)
+            else:
+                log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
+                CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
+                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+                if cassandra_version >= Version('2.2'):
+                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+                    if cassandra_version >= Version('3.0'):
+                        CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                common.switch_cluster(path, cluster_name)
+                CCM_CLUSTER.set_configuration_options(configuration_options)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+
     try:
         jvm_args = []
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
