@@ -12,6 +12,7 @@ Other
 * Reevaluate MONKEY_PATCH_LOOP in test codebase (PYTHON-903)
 * Remove CASS_SERVER_VERSION and replace it for CASSANDRA_VERSION in tests (PYTHON-910)
 * Refactor CASSANDRA_VERSION to a some kind of version object (PYTHON-915)
+* Log warning when driver configures an authenticator, but server does not request authentication (PYTHON-940)
 * Warn users when using the deprecated Session.default_consistency_level (PYTHON-953)
 * Add DSE smoke test to OSS driver tests (PYTHON-894)
 * Document long compilation times and workarounds (PYTHON-868)
