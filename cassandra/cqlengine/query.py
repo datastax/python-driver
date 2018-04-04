@@ -1076,8 +1076,9 @@ class ModelQuerySet(AbstractQuerySet):
         # custom indexes to be queried with any operator (a difference
         # between a secondary index)
         equal_ops = [self.model._get_column_by_db_name(w.field) \
-                     for w in self._where if (isinstance(w.operator, EqualsOperator) and not isinstance(w.value, Token))
-                     or self.model._get_column_by_db_name(w.field).custom_index]
+                     for w in self._where if not isinstance(w.value, Token)
+                     and (isinstance(w.operator, EqualsOperator)
+                          or self.model._get_column_by_db_name(w.field).custom_index)]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
         if not any(w.primary_key or w.has_index for w in equal_ops) and not token_comparison and not self._allow_filtering:
             raise QueryException(
