@@ -15,6 +15,7 @@ Features
 * Allow filter queries with fields that have an index managed outside of cqlengine (PYTHON-966)
 * Twisted SSL Support (PYTHON-343)
 * Support IS NOT NULL operator in cqlengine (PYTHON-968)
+* Asyncore reactors should use a global variable instead of a class variable for the event loop (PYTHON-697)
 
 Other
 -----
