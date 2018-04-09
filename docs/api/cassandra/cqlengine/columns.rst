@@ -21,6 +21,8 @@ Each column on your model definitions needs to be an instance of a Column class.
 
     .. autoattribute:: index
 
+    .. autoattribute:: custom_index
+
     .. autoattribute:: db_field
 
     .. autoattribute:: default
