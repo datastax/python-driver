@@ -23,7 +23,7 @@ from uuid import uuid4
 from packaging.version import Version
 import uuid
 
-from cassandra.cluster import Session
+from cassandra.cluster import Cluster, Session
 from cassandra import InvalidRequest
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.connection import NOT_SET
@@ -43,7 +43,7 @@ from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
 from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21, \
     greaterthanorequalcass30
-from tests.integration.cqlengine import execute_count
+from tests.integration.cqlengine import execute_count, DEFAULT_KEYSPACE
 
 
 class TzOffset(tzinfo):
@@ -86,6 +86,7 @@ class CustomIndexedTestModel(Model):
 
     test_id = columns.Integer(primary_key=True)
     description = columns.Text(custom_index=True)
+    indexed = columns.Text(index=True)
     data = columns.Text()
 
 
@@ -754,14 +755,32 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         with self.assertRaises(query.QueryException):
             list(CustomIndexedTestModel.objects.filter(data='test'))  # not custom indexed
 
+        # It should return InvalidRequest if target an indexed columns
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(indexed='test', data='test'))
+
+        # It should return InvalidRequest if target an indexed columns
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(description='test', data='test'))
+
         # equals operator, server error since there is no real index, but it passes
         with self.assertRaises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(description='test'))
+
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(test_id=1, description='test'))
 
         # gte operator, server error since there is no real index, but it passes
         # this can't work with a secondary index
         with self.assertRaises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(description__gte='test'))
+
+        with Cluster().connect() as session:
+            session.execute("CREATE INDEX custom_index_cqlengine ON {}.{} (description)".
+                            format(DEFAULT_KEYSPACE, CustomIndexedTestModel._table_name))
+
+        list(CustomIndexedTestModel.objects.filter(description='test'))
+        list(CustomIndexedTestModel.objects.filter(test_id=1, description='test'))
 
 
 class TestQuerySetDelete(BaseQuerySetUsage):
