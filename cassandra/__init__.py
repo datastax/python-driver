@@ -409,16 +409,21 @@ class Timeout(RequestExecutionException):
     the operation
     """
 
-    def __init__(self, summary_message, **kwargs):
-        self.consistency = kwargs.get("consistency")
-        self.required_responses = kwargs.get("required_responses")
-        self.received_responses = kwargs.get("received_responses")
-        if "consistency" in kwargs:
-            kwargs["consistency"] = consistency_value_to_name(kwargs["consistency"])
+    def __init__(self, summary_message, consistency=None, required_responses=None,
+                 received_responses=None, **kwargs):
+        self.consistency = consistency
+        self.required_responses = required_responses
+        self.received_responses = received_responses
+
         if "write_type" in kwargs:
             kwargs["write_type"] = WriteType.value_to_name[kwargs["write_type"]]
 
-        Exception.__init__(self, summary_message + ' info=' + repr(kwargs))
+        info = {'consistency': consistency_value_to_name(consistency),
+                'required_responses': required_responses,
+                'received_responses': received_responses}
+        info.update(kwargs)
+
+        Exception.__init__(self, summary_message + ' info=' + repr(info))
 
 
 class ReadTimeout(Timeout):
