@@ -17,7 +17,12 @@ except ImportError:
     import unittest  # noqa
 
 from tests.integration.simulacron.utils import stop_simulacron, clear_queries
+from tests.integration import PROTOCOL_VERSION, SIMULACRON_JAR,  CASSANDRA_VERSION
+from tests.integration.simulacron.utils import start_and_prime_singledc
 
+from cassandra.cluster import Cluster
+
+from packaging.version import Version
 
 def teardown_package():
     stop_simulacron()
@@ -27,3 +32,23 @@ class SimulacronBase(unittest.TestCase):
     def tearDown(self):
         clear_queries()
         stop_simulacron()
+
+
+class SimulacronCluster(SimulacronBase):
+    @classmethod
+    def setUpClass(cls):
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
+            return
+
+        start_and_prime_singledc()
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
+        cls.session = cls.cluster.connect(wait_for_all_pools=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
+            return
+
+        cls.cluster.shutdown()
+        stop_simulacron()
+

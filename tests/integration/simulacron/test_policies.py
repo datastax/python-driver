@@ -29,8 +29,8 @@ from tests.integration.simulacron.utils import start_and_prime_singledc, prime_q
 from itertools import count
 from packaging.version import Version
 
-class BadRoundRobinPolicy(RoundRobinPolicy):
 
+class BadRoundRobinPolicy(RoundRobinPolicy):
     def make_query_plan(self, working_keyspace=None, query=None):
         pos = self._position
         self._position += 1
@@ -293,6 +293,7 @@ class RetryPolicyTests(unittest.TestCase):
 
         with self.assertRaises(WriteTimeout):
             self.session.execute(query_to_prime_simple)
+
         #CDC should be ignored
         self.session.execute(query_to_prime_cdc)
 
