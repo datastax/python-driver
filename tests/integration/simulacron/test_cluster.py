@@ -42,14 +42,14 @@ class ClusterTests(SimulacronCluster):
         }
         prime_query(query_to_prime_simple, then=then, rows=None, column_types=None)
 
-        try:
+        with self.assertRaises(WriteTimeout) as assert_raised_context:
             self.session.execute(query_to_prime_simple)
-        except WriteTimeout as wt:
-            self.assertEqual(wt.write_type, WriteType.name_to_value[write_type])
-            self.assertEqual(wt.consistency, ConsistencyLevel.name_to_value[consistency])
-            self.assertEqual(wt.received_responses, received_responses)
-            self.assertEqual(wt.required_responses, required_responses)
-            self.assertIn(write_type, str(wt))
-            self.assertIn(consistency, str(wt))
-            self.assertIn(str(received_responses), str(wt))
-            self.assertIn(str(required_responses), str(wt))
+        wt = assert_raised_context.exception
+        self.assertEqual(wt.write_type, WriteType.name_to_value[write_type])
+        self.assertEqual(wt.consistency, ConsistencyLevel.name_to_value[consistency])
+        self.assertEqual(wt.received_responses, received_responses)
+        self.assertEqual(wt.required_responses, required_responses)
+        self.assertIn(write_type, str(wt))
+        self.assertIn(consistency, str(wt))
+        self.assertIn(str(received_responses), str(wt))
+        self.assertIn(str(required_responses), str(wt))
