@@ -8,7 +8,7 @@ PyYAML
 pytz
 sure
 pure-sasl
-twisted
+twisted[tls]
 gevent>=1.0
 eventlet
 cython>=0.20,<0.28

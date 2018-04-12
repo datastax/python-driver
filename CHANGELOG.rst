@@ -6,6 +6,7 @@ Features
 * Add one() function to the ResultSet API (PYTHON-947)
 * Create an utility function to fetch concurrently many keys from the same replica (PYTHON-647)
 * Allow filter queries with fields that have an index managed outside of cqlengine (PYTHON-966)
+* Twisted SSL Support (PYTHON-343)
 * Support IS NOT NULL operator in cqlengine (PYTHON-968)
 
 Other

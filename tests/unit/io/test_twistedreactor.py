@@ -156,7 +156,7 @@ class TestTwistedConnection(unittest.TestCase):
         client_connection_made()
         """
         self.obj_ut._send_options_message = Mock()
-        self.obj_ut.client_connection_made()
+        self.obj_ut.client_connection_made(Mock())
         self.obj_ut._send_options_message.assert_called_with()
 
     @patch('twisted.internet.reactor.connectTCP')
@@ -168,7 +168,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.add_connection()
         self.obj_ut.is_closed = False
         self.obj_ut.close()
-        self.obj_ut.connector.disconnect.assert_called_with()
+
         self.assertTrue(self.obj_ut.connected_event.is_set())
         self.assertTrue(self.obj_ut.error_all_requests.called)
 
@@ -217,6 +217,8 @@ class TestTwistedConnection(unittest.TestCase):
         Verifiy that push() calls transport.write(data).
         """
         self.obj_ut.add_connection()
+        transport_mock = Mock()
+        self.obj_ut.transport = transport_mock
         self.obj_ut.push('123 pickup')
         self.mock_reactor_cft.assert_called_with(
-            self.obj_ut.connector.transport.write, '123 pickup')
+            transport_mock.write, '123 pickup')

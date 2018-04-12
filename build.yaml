@@ -118,13 +118,19 @@ build:
       export PATH=$JAVA_HOME/bin:$PATH
       export PYTHONPATH=""
 
+      # Install latest setuptools
+      pip install --upgrade pip
+      pip install -U setuptools
+
       pip install git+https://github.com/pcmanus/ccm.git
       # Install dependencies
-      sudo apt-get install -y libev4 libev-dev
+      sudo apt-get install -y libev4 libev-dev libssl-dev
 
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
       pip install nose-exclude
+      pip install service_identity
+
       FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
         FORCE_CYTHON=True

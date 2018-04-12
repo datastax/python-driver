@@ -87,3 +87,6 @@ This is only an example to show how to pass the ssl parameters. Consider reading
 the `python ssl documentation <https://docs.python.org/2/library/ssl.html#ssl.wrap_socket>`_ for
 your configuration. For further reading, Andrew Mussey has published a thorough guide on
 `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.
+
+*Note*: In case the twisted event loop is used pyOpenSSL must be installed or an exception will be risen. Also
+to set the ``ssl_version`` and ``cert_reqs`` in ``ssl_opts`` the appropriate constants from pyOpenSSL are expected.
