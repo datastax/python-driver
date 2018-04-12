@@ -98,3 +98,8 @@ class ContainsOperator(EqualsOperator):
 class LikeOperator(EqualsOperator):
     symbol = "LIKE"
     cql_symbol = 'LIKE'
+
+
+class IsNotNullOperator(EqualsOperator):
+    symbol = "IS NOT NULL"
+    cql_symbol = 'IS NOT NULL'

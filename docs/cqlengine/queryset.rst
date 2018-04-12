@@ -199,6 +199,14 @@ In addition to simple equal to queries, cqlengine also supports querying with ot
 
         q = Automobile.objects.filter(model__like='%Civic%').allow_filtering()
 
+:attr:`IS NOT NULL (IsNotNull(column_name)) <query.QueryOperator.IsNotNullOperator>`
+
+    The IS NOT NULL operator is not yet supported for C*.
+
+    .. code-block:: python
+
+        q = Automobile.objects.filter(IsNotNull('model'))
+
     Limitations:
     - Currently, cqlengine does not support SASI index creation. To use this feature,
       you need to create the SASI index using the core driver.
