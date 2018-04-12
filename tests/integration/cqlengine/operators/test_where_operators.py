@@ -28,6 +28,7 @@ from cassandra import InvalidRequest
 
 from tests.integration.cqlengine.base import TestQueryUpdateModel, BaseCassEngTestCase
 from tests.integration.cqlengine.operators import check_lookup
+from tests.integration import greaterthanorequalcass30
 
 import six
 
@@ -88,6 +89,7 @@ class TestIsNotNull(BaseCassEngTestCase):
             "WHERE \"text\" IS NOT NULL AND \"partition\" = %(0)s LIMIT 10000"
         )
 
+    @greaterthanorequalcass30
     def test_is_not_null_execution(self):
         """
         Verify that CQL statements have correct syntax when executed
