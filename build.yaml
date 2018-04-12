@@ -25,7 +25,7 @@ schedules:
     branches:
       include: [/python.*/]
     env_vars: |
-      EVENT_LOOP_MANAGER='twisted'
+      EVENT_LOOP_MANAGER='libev'
       EXCLUDE_LONG=1
     matrix:
       exclude:
