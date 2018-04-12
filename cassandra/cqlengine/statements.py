@@ -21,7 +21,7 @@ from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import UnicodeMixin
 from cassandra.cqlengine.functions import QueryValue
-from cassandra.cqlengine.operators import BaseWhereOperator, InOperator, EqualsOperator
+from cassandra.cqlengine.operators import BaseWhereOperator, InOperator, EqualsOperator, IsNotNullOperator
 
 
 class StatementException(Exception):
@@ -136,6 +136,24 @@ class WhereClause(BaseClause):
             ctx[str(self.context_id)] = InQuoter(self.value)
         else:
             self.query_value.update_context(ctx)
+
+
+class IsNotNullClause(WhereClause):
+    def __init__(self, field):
+        super(IsNotNullClause, self).__init__(field, IsNotNullOperator(), '')
+
+    def __unicode__(self):
+        field = ('"{0}"' if self.quote_field else '{0}').format(self.field)
+        return u'{0} {1}'.format(field, self.operator)
+
+    def update_context(self, ctx):
+        pass
+
+    def get_context_size(self):
+        return 0
+
+# alias for convenience
+IsNotNull = IsNotNullClause
 
 
 class AssignmentClause(BaseClause):
