@@ -62,7 +62,7 @@ class TestWhereOperators(unittest.TestCase):
 
 
 class TestIsNotNull(BaseCassEngTestCase):
-    def test_is_not_nul_to_cql(self):
+    def test_is_not_null_to_cql(self):
         """
         Verify that IsNotNull is converted correctly to CQL
 
