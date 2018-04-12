@@ -78,15 +78,15 @@ class TestIsNotNull(BaseCassEngTestCase):
         # The * is not expanded because there are no referred fields
         self.assertEqual(
             str(TestQueryUpdateModel.filter(IsNotNull("text")).limit(2)),
-            "SELECT * FROM cqlengine_test.test_query_update_model WHERE \"text\" IS NOT NULL LIMIT 2"
+            'SELECT * FROM cqlengine_test.test_query_update_model WHERE "text" IS NOT NULL LIMIT 2'
         )
 
         # We already know partition so cqlengine doesn't query for it
         self.assertEqual(
             str(TestQueryUpdateModel.filter(IsNotNull("text"), partition=uuid4())),
-            "SELECT \"cluster\", \"count\", \"text\", \"text_set\", "
-            "\"text_list\", \"text_map\" FROM cqlengine_test.test_query_update_model "
-            "WHERE \"text\" IS NOT NULL AND \"partition\" = %(0)s LIMIT 10000"
+            'SELECT "cluster", "count", "text", "text_set", '
+            '"text_list", "text_map" FROM cqlengine_test.test_query_update_model '
+            'WHERE "text" IS NOT NULL AND "partition" = %(0)s LIMIT 10000'
         )
 
     @greaterthanorequalcass30
