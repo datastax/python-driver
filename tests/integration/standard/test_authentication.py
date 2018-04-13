@@ -20,7 +20,7 @@ from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
     set_default_cass_ip
-from tests.integration.util import assert_quiescent_pool_state
+from tests.integration.util import assert_quiescent_pool_state, assert_quiescent_pool_state_with_wait
 
 try:
     import unittest2 as unittest
@@ -93,7 +93,7 @@ class AuthenticationTests(unittest.TestCase):
             session = cluster.connect()
             try:
                 self.assertTrue(session.execute('SELECT release_version FROM system.local'))
-                assert_quiescent_pool_state(self, cluster)
+                assert_quiescent_pool_state_with_wait(self, cluster, wait=1)
                 for pool in session.get_pools():
                     connection, _ = pool.borrow_connection(timeout=0)
                     self.assertEqual(connection.authenticator.server_authenticator_class, 'org.apache.cassandra.auth.PasswordAuthenticator')
@@ -102,7 +102,7 @@ class AuthenticationTests(unittest.TestCase):
                 cluster.shutdown()
         finally:
             root_session.execute('DROP USER %s', user)
-            assert_quiescent_pool_state(self, root_session.cluster)
+            assert_quiescent_pool_state_with_wait(self, root_session.cluster, wait=1)
             root_session.cluster.shutdown()
 
     def test_connect_wrong_pwd(self):
