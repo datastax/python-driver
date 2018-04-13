@@ -20,6 +20,7 @@ Other
 * Add DSE smoke test to OSS driver tests (PYTHON-894)
 * Document long compilation times and workarounds (PYTHON-868)
 * Improve error for batch WriteTimeouts (PYTHON-941)
+* Deprecate ResultSet indexing (PYTHON-945)
 
 3.13.0
 ======
