@@ -199,7 +199,7 @@ In addition to simple equal to queries, cqlengine also supports querying with ot
 
         q = Automobile.objects.filter(model__like='%Civic%').allow_filtering()
 
-:attr:`IS NOT NULL (IsNotNull(column_name)) <query.QueryOperator.IsNotNullOperator>`
+:attr:`IS NOT NULL (IsNotNull(column_name)) <statement.IsNotNull>`
 
     The IS NOT NULL operator is not yet supported for C*.
 
