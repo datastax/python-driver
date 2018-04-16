@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-import six
 
 
 class NullHandler(logging.Handler):
@@ -280,7 +279,7 @@ WriteType.name_to_value = {
 }
 
 
-WriteType.value_to_name = {v: k for k, v in six.iteritems(WriteType.name_to_value)}
+WriteType.value_to_name = {v: k for k, v in WriteType.name_to_value.items()}
 
 
 class SchemaChangeType(object):
