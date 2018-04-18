@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from binascii import unhexlify
-from bisect import bisect_right
+from bisect import bisect_left
 from collections import defaultdict, Mapping
 from functools import total_ordering
 from hashlib import md5
@@ -1486,10 +1486,7 @@ class TokenMap(object):
             tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
 
         if tokens_to_hosts:
-            # token range ownership is exclusive on the LHS (the start token), so
-            # we use bisect_right, which, in the case of a tie/exact match,
-            # picks an insertion point to the right of the existing match
-            point = bisect_right(self.ring, token)
+            point = bisect_left(self.ring, token)
             if point == len(self.ring):
                 return tokens_to_hosts[self.ring[0]]
             else:
