@@ -1485,6 +1485,8 @@ class TokenMap(object):
             self.rebuild_keyspace(keyspace, build_if_absent=True)
             tokens_to_hosts = self.tokens_to_hosts_by_ks.get(keyspace, None)
 
+        # The values in self.ring correspond to the end of the
+        # token range up to and including the value listed.
         if tokens_to_hosts:
             point = bisect_left(self.ring, token)
             if point == len(self.ring):
