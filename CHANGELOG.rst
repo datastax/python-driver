@@ -3,6 +3,7 @@
 Bug Fixes
 ---------
 * Tokenmap.get_replicas returns the wrong value if token coincides with the end of the range (PYTHON-978)
+* Python Driver fails with "more than 255 arguments" python exception when > 255 columns specified in query response (PYTHON-893)
 
 3.14.0
 ======
