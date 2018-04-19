@@ -26,10 +26,11 @@ try:
 except ImportError:
     twistedreactor = TwistedConnection = None  # NOQA
 
-
 from cassandra.connection import _Frame
 
 from tests.unit.io.utils import TimerTestMixin
+from tests.unit import driver_context
+
 
 class TestTwistedTimer(TimerTestMixin, unittest.TestCase):
     """
@@ -66,7 +67,7 @@ class TestTwistedProtocol(unittest.TestCase):
         self.tr.connector.factory = twistedreactor.TwistedConnectionClientFactory(
             self.mock_connection)
         self.obj_ut = twistedreactor.TwistedConnectionProtocol()
-        self.tr.protocol = self.obj_ut
+        self.tr.ll = self.obj_ut
 
     def tearDown(self):
         pass
@@ -126,8 +127,10 @@ class TestTwistedConnection(unittest.TestCase):
         self.reactor_run_patcher = patch('twisted.internet.reactor.run')
         self.mock_reactor_cft = self.reactor_cft_patcher.start()
         self.mock_reactor_run = self.reactor_run_patcher.start()
-        self.obj_ut = twistedreactor.TwistedConnection('1.2.3.4',
-                                                       cql_version='3.0.1')
+        self.obj_ut = twistedreactor.TwistedConnection(
+            driver_context.protocol_handler,
+            '1.2.3.4',
+            cql_version='3.0.1')
 
     def tearDown(self):
         self.reactor_cft_patcher.stop()
