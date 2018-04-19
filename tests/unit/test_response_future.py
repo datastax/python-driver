@@ -41,10 +41,16 @@ class ResponseFutureTests(unittest.TestCase):
         s.cluster._default_row_factory = lambda *x: list(x)
         return s
 
+    def make_pool(self):
+        pool = Mock()
+        pool.is_shutdown = False
+        pool.borrow_connection.return_value = [Mock(), Mock()]
+        return pool
+
     def make_session(self):
         session = self.make_basic_session()
         session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
-        session._pools.get.return_value.is_shutdown = False
+        session._pools.get.return_value = self.make_pool()
         return session
 
     def make_response_future(self, session):
@@ -131,7 +137,9 @@ class ResponseFutureTests(unittest.TestCase):
         rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
-        result = Mock(spec=ReadTimeoutErrorMessage, info={})
+        result = Mock(spec=ReadTimeoutErrorMessage,
+                      info={"data_retrieved": "", "required_responses":2,
+                            "received_responses":1, "consistency": 1})
         rf._set_result(None, None, None, result)
 
         self.assertRaises(Exception, rf.result)
@@ -146,7 +154,9 @@ class ResponseFutureTests(unittest.TestCase):
         rf = ResponseFuture(session, message, query, 1)
         rf.send_request()
 
-        result = Mock(spec=WriteTimeoutErrorMessage, info={})
+        result = Mock(spec=WriteTimeoutErrorMessage,
+                      info={"write_type": 1, "required_responses":2,
+                            "received_responses":1, "consistency": 1})
         rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
@@ -158,9 +168,12 @@ class ResponseFutureTests(unittest.TestCase):
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
         rf = ResponseFuture(session, message, query, 1)
+        rf._query_retries = 1
         rf.send_request()
 
-        result = Mock(spec=UnavailableErrorMessage, info={})
+        result = Mock(spec=UnavailableErrorMessage,
+                      info={"required_replicas":2, "alive_replicas": 1,
+                            "consistency": 1})
         rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
@@ -297,7 +310,10 @@ class ResponseFutureTests(unittest.TestCase):
         session = self.make_basic_session()
         session.cluster._default_load_balancing_policy.make_query_plan.return_value = ['ip1', 'ip2']
         # first return a pool with is_shutdown=True, then is_shutdown=False
-        session._pools.get.side_effect = [Mock(is_shutdown=True), Mock(is_shutdown=False)]
+        pool_shutdown = self.make_pool()
+        pool_shutdown.is_shutdown = True
+        pool_ok = self.make_pool()
+        session._pools.get.side_effect = [pool_shutdown, pool_ok]
 
         rf = self.make_response_future(session)
         rf.send_request()
@@ -360,16 +376,19 @@ class ResponseFutureTests(unittest.TestCase):
         pool.borrow_connection.return_value = (connection, 1)
 
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
         rf = ResponseFuture(session, message, query, 1)
+        rf._query_retries = 1
         rf.send_request()
 
         rf.add_errback(self.assertIsInstance, Exception)
 
-        result = Mock(spec=UnavailableErrorMessage, info={})
+        result = Mock(spec=UnavailableErrorMessage,
+                      info={"required_replicas":2, "alive_replicas": 1,
+                            "consistency": 1})
+        result.to_exception.return_value = Exception()
+
         rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
@@ -425,7 +444,9 @@ class ResponseFutureTests(unittest.TestCase):
         rf.add_errback(callback2, arg2, **kwargs2)
 
         expected_exception = Unavailable("message", 1, 2, 3)
-        result = Mock(spec=UnavailableErrorMessage, info={'something': 'here'})
+        result = Mock(spec=UnavailableErrorMessage,
+                      info={"required_replicas": 2, "alive_replicas": 1,
+                            "consistency": 1})
         result.to_exception.return_value = expected_exception
         rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
@@ -436,19 +457,20 @@ class ResponseFutureTests(unittest.TestCase):
     def test_add_callbacks(self):
         session = self.make_session()
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
-        query.retry_policy = Mock()
-        query.retry_policy.on_unavailable.return_value = (RetryPolicy.RETHROW, None)
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
 
         # test errback
         rf = ResponseFuture(session, message, query, 1)
+        rf._query_retries = 1
         rf.send_request()
 
         rf.add_callbacks(
             callback=self.assertEqual, callback_args=([{'col': 'val'}],),
             errback=self.assertIsInstance, errback_args=(Exception,))
 
-        result = Mock(spec=UnavailableErrorMessage, info={})
+        result = Mock(spec=UnavailableErrorMessage,
+                      info={"required_replicas":2, "alive_replicas": 1, "consistency": 1})
+        result.to_exception.return_value = Exception()
         rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
