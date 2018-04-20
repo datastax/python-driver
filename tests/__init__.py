@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,12 +71,15 @@ elif "eventlet" in EVENT_LOOP_MANAGER:
 
     from cassandra.io.eventletreactor import EventletConnection
     connection_class = EventletConnection
-elif "async" in EVENT_LOOP_MANAGER:
+elif "asyncore" in EVENT_LOOP_MANAGER:
     from cassandra.io.asyncorereactor import AsyncoreConnection
     connection_class = AsyncoreConnection
 elif "twisted" in EVENT_LOOP_MANAGER:
     from cassandra.io.twistedreactor import TwistedConnection
     connection_class = TwistedConnection
+elif "asyncio" in EVENT_LOOP_MANAGER:
+    from cassandra.io.asyncioreactor import AsyncioConnection
+    connection_class = AsyncioConnection
 
 else:
     try:
@@ -86,8 +89,19 @@ else:
         connection_class = None
 
 
-MONKEY_PATCH_LOOP = bool(os.getenv('MONKEY_PATCH_LOOP', False))
+# If set to to true this will force the Cython tests to run regardless of whether they are installed
+cython_env = os.getenv('VERIFY_CYTHON', "False")
 
-notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adequate for windows")
+
+VERIFY_CYTHON = False
+
+if(cython_env == 'True'):
+    VERIFY_CYTHON = True
+
+
+def is_windows():
+    return "Windows" in platform.system()
+
+
+notwindows = unittest.skipUnless(not is_windows(), "This test is not adequate for windows")
 notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")
-notmonkeypatch = unittest.skipUnless(MONKEY_PATCH_LOOP, "Skipping this test because monkey patching is required")

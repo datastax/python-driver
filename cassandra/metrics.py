@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@ log = logging.getLogger(__name__)
 class Metrics(object):
     """
     A collection of timers and counters for various performance metrics.
+
+    Timer metrics are represented as floating point seconds.
     """
 
     request_timer = None
@@ -35,17 +37,17 @@ class Metrics(object):
     A :class:`greplin.scales.PmfStat` timer for requests. This is a dict-like
     object with the following keys:
 
-      * count - number of requests that have been timed
-      * min - min latency
-      * max - max latency
-      * mean - mean latency
-      * stdev - standard deviation for latencies
-      * median - median latency
-      * 75percentile - 75th percentile latencies
-      * 97percentile - 97th percentile latencies
-      * 98percentile - 98th percentile latencies
-      * 99percentile - 99th percentile latencies
-      * 999percentile - 99.9th percentile latencies
+    * count - number of requests that have been timed
+    * min - min latency
+    * max - max latency
+    * mean - mean latency
+    * stddev - standard deviation for latencies
+    * median - median latency
+    * 75percentile - 75th percentile latencies
+    * 95percentile - 95th percentile latencies
+    * 98percentile - 98th percentile latencies
+    * 99percentile - 99th percentile latencies
+    * 999percentile - 99.9th percentile latencies
     """
 
     connection_errors = None

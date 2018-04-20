@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,3 +98,8 @@ class ContainsOperator(EqualsOperator):
 class LikeOperator(EqualsOperator):
     symbol = "LIKE"
     cql_symbol = 'LIKE'
+
+
+class IsNotNullOperator(EqualsOperator):
+    symbol = "IS NOT NULL"
+    cql_symbol = 'IS NOT NULL'

@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ except ImportError:
     import unittest  # noqa
 
 import logging
+from packaging.version import Version
+
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
@@ -356,7 +358,7 @@ class InconsistentTable(BaseCassEngTestCase):
         sync_table(BaseInconsistent)
         sync_table(ChangedInconsistent)
         self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
-        if CASSANDRA_VERSION >= '2.1':
+        if CASSANDRA_VERSION >= Version('2.1'):
             sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
             mock_handler.reset()
             sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)

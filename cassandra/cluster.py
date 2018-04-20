@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ from copy import copy
 from functools import partial, wraps
 from itertools import groupby, count
 import logging
+from warnings import warn
 from random import random
 import six
 from six.moves import filter, range, queue as Queue
@@ -217,10 +218,10 @@ class ExecutionProfile(object):
 
     Some example implementations:
 
-        - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
-        - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
-        - :func:`cassandra.query.dict_factory` - return a result row as a dict
-        - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
+    - :func:`cassandra.query.tuple_factory` - return a result row as a tuple
+    - :func:`cassandra.query.named_tuple_factory` - return a result row as a named tuple
+    - :func:`cassandra.query.dict_factory` - return a result row as a dict
+    - :func:`cassandra.query.ordered_dict_factory` - return a result row as an OrderedDict
     """
 
     speculative_execution_policy = None
@@ -531,6 +532,7 @@ class Cluster(object):
     * :class:`cassandra.io.eventletreactor.EventletConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.twistedreactor.TwistedConnection`
+    * EXPERIMENTAL: :class:`cassandra.io.asyncioreactor.AsyncioConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.
@@ -539,6 +541,11 @@ class Cluster(object):
 
     If ``gevent`` or ``eventlet`` monkey-patching is detected, the corresponding
     connection class will be used automatically.
+
+    ``AsyncioConnection``, which uses the ``asyncio`` module in the Python
+    standard library, is also available, but currently experimental. Note that
+    it requires ``asyncio`` features that were only introduced in the 3.4 line
+    in 3.4.6, and in the 3.5 line in 3.5.1.
     """
 
     control_connection_timeout = 2.0
@@ -799,7 +806,7 @@ class Cluster(object):
         if self._contact_points_explicit:
             default_lbp_profiles = self.profile_manager._profiles_without_explicit_lbps()
             if default_lbp_profiles:
-                log.warn(
+                log.warning(
                     'Cluster.__init__ called with contact_points '
                     'specified, but load-balancing policies are not '
                     'specified in some ExecutionProfiles. In the next '
@@ -928,7 +935,7 @@ class Cluster(object):
             self._contact_points_explicit and not
             profile._load_balancing_policy_explicit)
         if contact_points_but_no_lbp:
-            log.warn(
+            log.warning(
                 'Tried to add an ExecutionProfile with name {name}. '
                 '{self} was explicitly configured with contact_points, but '
                 '{ep} was not explicitly configured with a '
@@ -1624,6 +1631,7 @@ class Session(object):
     keyspace = None
     is_shutdown = False
 
+
     max_trace_wait = 2.0
     """
     The maximum amount of time (in seconds) the driver will wait for trace
@@ -2075,8 +2083,13 @@ class Session(object):
         self.shutdown()
 
     def __del__(self):
-        # Ensure all connections are closed, in case the Session object is deleted by the GC
-        self.shutdown()
+        try:
+            # Ensure all connections are closed, in case the Session object is deleted by the GC
+            self.shutdown()
+        except:
+            # Ignore all errors. Shutdown errors can be caught by the user
+            # when cluster.shutdown() is called explicitly.
+            pass
 
     def add_or_renew_pool(self, host, is_host_addition):
         """
@@ -3081,12 +3094,12 @@ class ResponseFuture(object):
         self.prepared_statement = prepared_statement
         self._callback_lock = Lock()
         self._start_time = start_time or time.time()
+        self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self._make_query_plan()
         self._event = Event()
         self._errors = {}
         self._callbacks = []
         self._errbacks = []
-        self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self.attempted_hosts = []
         self._start_timer()
 
@@ -3110,22 +3123,37 @@ class ResponseFuture(object):
         if self._timer:
             self._timer.cancel()
 
-    def _on_timeout(self):
+    def _on_timeout(self, _attempts=0):
+        """
+        Called when the request associated with this ResponseFuture times out.
 
-        try:
-            self._connection._requests.pop(self._req_id)
-        # This prevents the race condition of the
-        # event loop thread just receiving the waited message
-        # If it arrives after this, it will be ignored
-        except KeyError:
+        This function may reschedule itself. The ``_attempts`` parameter tracks
+        the number of times this has happened. This parameter should only be
+        set in those cases, where ``_on_timeout`` reschedules itself.
+        """
+        # PYTHON-853: for short timeouts, we sometimes race with our __init__
+        if self._connection is None and _attempts < 3:
+            self._timer = self.session.cluster.connection_class.create_timer(
+                0.01,
+                partial(self._on_timeout, _attempts=_attempts + 1)
+            )
             return
 
-        pool = self.session._pools.get(self._current_host)
-        if pool and not pool.is_shutdown:
-            with self._connection.lock:
-                self._connection.request_ids.append(self._req_id)
+        if self._connection is not None:
+            try:
+                self._connection._requests.pop(self._req_id)
+            # This prevents the race condition of the
+            # event loop thread just receiving the waited message
+            # If it arrives after this, it will be ignored
+            except KeyError:
+                return
 
-            pool.return_connection(self._connection)
+            pool = self.session._pools.get(self._current_host)
+            if pool and not pool.is_shutdown:
+                with self._connection.lock:
+                    self._connection.request_ids.append(self._req_id)
+
+                pool.return_connection(self._connection)
 
         errors = self._errors
         if not errors:
@@ -3142,6 +3170,18 @@ class ResponseFuture(object):
     def _on_speculative_execute(self):
         self._timer = None
         if not self._event.is_set():
+
+            # PYTHON-836, the speculative queries must be after
+            # the query is sent from the main thread, otherwise the
+            # query from the main thread may raise NoHostAvailable
+            # if the _query_plan has been exhausted by the specualtive queries.
+            # This also prevents a race condition accessing the iterator.
+            # We reschedule this call until the main thread has succeeded
+            # making a query
+            if not self.attempted_hosts:
+                self._timer = self.session.cluster.connection_class.create_timer(0.01, self._on_speculative_execute)
+                return
+
             if self._time_remaining is not None:
                 if self._time_remaining <= 0:
                     self._on_timeout()
@@ -3845,6 +3885,26 @@ class ResultSet(object):
         return self._current_rows[0] if self._current_rows else None
 
     def __iter__(self):
+        if self._list_mode:
+            return iter(self._current_rows)
+        self._page_iter = iter(self._current_rows)
+        return self
+
+    def next(self):
+        try:
+            return next(self._page_iter)
+        except StopIteration:
+            if not self.response_future.has_more_pages:
+                if not self._list_mode:
+                    self._current_rows = []
+                raise
+
+        self.fetch_next_page()
+        self._page_iter = iter(self._current_rows)
+
+        return next(self._page_iter)
+
+    def __iter__(self):
         return iter(ResultSetIterator(self))
 
     def fetch_next_page(self):
@@ -3870,6 +3930,31 @@ class ResultSet(object):
         except TypeError:
             self._current_rows = [result] if result else []
 
+    def _fetch_all(self):
+        self._current_rows = list(self)
+        self._page_iter = None
+
+    def _enter_list_mode(self, operator):
+        if self._list_mode:
+            return
+        if self._page_iter:
+            raise RuntimeError("Cannot use %s when results have been iterated." % operator)
+        if self.response_future.has_more_pages:
+            log.warning("Using %s on paged results causes entire result set to be materialized.", operator)
+        self._fetch_all()  # done regardless of paging status in case the row factory produces a generator
+        self._list_mode = True
+
+    def __eq__(self, other):
+        self._enter_list_mode("equality operator")
+        return self._current_rows == other
+
+    def __getitem__(self, i):
+        if i == 0:
+            warn("ResultSet indexing support will be removed in 4.0. Consider using "
+                 "ResultSet.one() to get a single row.", DeprecationWarning)
+        self._enter_list_mode("index operator")
+        return self._current_rows[i]
+
     def __nonzero__(self):
         return bool(self._current_rows)
 
@@ -3894,13 +3979,20 @@ class ResultSet(object):
         """
         For LWT results, returns whether the transaction was applied.
 
-        Result is indeterminate if called on a result that was not an LWT request.
+        Result is indeterminate if called on a result that was not an LWT request or on
+        a :class:`.query.BatchStatement` containing LWT. In the latter case either all the batch
+        succeeds or fails.
 
-        Only valid when one of tne of the internal row factories is in use.
+        Only valid when one of the of the internal row factories is in use.
         """
         if self.response_future.row_factory not in (named_tuple_factory, dict_factory, tuple_factory):
-            raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factsory,))
-        if len(self.current_rows) != 1:
+            raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factory,))
+
+        is_batch_statement = isinstance(self.response_future.query, BatchStatement)
+        if is_batch_statement and (not self.column_names or self.column_names[0] != "[applied]"):
+            raise RuntimeError("No LWT were present in the BatchStatement")
+
+        if not is_batch_statement and len(self.current_rows) != 1:
             raise RuntimeError("LWT result should have exactly one row. This has %d." % (len(self.current_rows)))
 
         row = self.current_rows[0]

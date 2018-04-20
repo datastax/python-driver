@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,22 +18,25 @@ try:
 except ImportError:
     import unittest # noqa
 
-from tests.unit.io.utils import TimerConnectionTests
-from tests import notpypy, MONKEY_PATCH_LOOP, notmonkeypatch
+from tests.unit.io.utils import TimerTestMixin
+from tests import notpypy, EVENT_LOOP_MANAGER
 
 from eventlet import monkey_patch
+from mock import patch
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
 except ImportError:
     EventletConnection = None  # noqa
 
-skip_condition = EventletConnection is None or MONKEY_PATCH_LOOP != "eventlet"
+skip_condition = EventletConnection is None or EVENT_LOOP_MANAGER != "eventlet"
 # There are some issues with some versions of pypy and eventlet
 @notpypy
 @unittest.skipIf(skip_condition, "Skipping the eventlet tests because it's not installed")
-@notmonkeypatch
-class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
+class EventletTimerTest(TimerTestMixin, unittest.TestCase):
+
+    connection_class = EventletConnection
+
     @classmethod
     def setUpClass(cls):
         # This is run even though the class is skipped, so we need
@@ -43,10 +46,34 @@ class EventletTimerTest(unittest.TestCase, TimerConnectionTests):
 
         # This is being added temporarily due to a bug in eventlet:
         # https://github.com/eventlet/eventlet/issues/401
-        import eventlet; eventlet.sleep()
+        import eventlet
+        eventlet.sleep()
         monkey_patch()
-        cls.connection_class = EventletConnection
+        # cls.connection_class = EventletConnection
+
         EventletConnection.initialize_reactor()
+        assert EventletConnection._timers is not None
+
+    def setUp(self):
+        socket_patcher = patch('eventlet.green.socket.socket')
+        self.addCleanup(socket_patcher.stop)
+        socket_patcher.start()
+
+        super(EventletTimerTest, self).setUp()
+
+        recv_patcher = patch.object(self.connection._socket,
+                                    'recv',
+                                    return_value=b'')
+        self.addCleanup(recv_patcher.stop)
+        recv_patcher.start()
+
+    @property
+    def create_timer(self):
+        return self.connection.create_timer
+
+    @property
+    def _timers(self):
+        return self.connection._timers
 
     # There is no unpatching because there is not a clear way
     # of doing it reliably

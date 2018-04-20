@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout,
 from cassandra.protocol import ConfigurationException
 
 try:
+    from ccmlib.dse_cluster import DseCluster
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
@@ -90,24 +91,34 @@ def _tuple_version(version_string):
     return tuple([int(p) for p in version_string.split('.')])
 
 
+def _get_dse_version_from_cass(cass_version):
+    if cass_version.startswith('2.1'):
+        dse_ver = "4.8.15"
+    elif cass_version.startswith('3.0'):
+        dse_ver = "5.0.12"
+    elif cass_version.startswith('3.10') or cass_version.startswith('3.11'):
+        dse_ver = "5.1.7"
+    elif cass_version.startswith('4.0'):
+        dse_ver = "6.0"
+    else:
+        log.error("Unknown cassandra version found {0}, defaulting to 2.1".format(cass_version))
+        dse_ver = "2.1"
+    return dse_ver
+
+
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
 SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 
-# If set to to true this will force the Cython tests to run regardless of whether they are installed
-cython_env = os.getenv('VERIFY_CYTHON', "False")
-
-
-VERIFY_CYTHON = False
-
-if(cython_env == 'True'):
-    VERIFY_CYTHON = True
-
-default_cassandra_version = '2.2.0'
-
 CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
-CASSANDRA_VERSION = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
+
+default_cassandra_version = '3.11'
+CASSANDRA_VERSION = Version(os.getenv('CASSANDRA_VERSION', default_cassandra_version))
+
+default_dse_version = _get_dse_version_from_cass(CASSANDRA_VERSION.base_version)
+
+DSE_VERSION = Version(os.getenv('DSE_VERSION', default_dse_version))
 
 CCM_KWARGS = {}
 if CASSANDRA_DIR:
@@ -140,16 +151,15 @@ def set_default_beta_flag_true():
 
 
 def get_default_protocol():
-    version = Version(CASSANDRA_VERSION)
-    if version >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0'):
         set_default_beta_flag_true()
         return 5
-    elif version >= Version('2.2'):
+    elif CASSANDRA_VERSION >= Version('2.2'):
         return 4
-    elif version >= Version('2.1'):
+    elif CASSANDRA_VERSION >= Version('2.1'):
         return 3
-    elif version >= Version('2.0'):
-        raise Exception("Cassandra Version 2.0 not supported anymore")
+    elif CASSANDRA_VERSION >= Version('2.0'):
+        return 2
     else:
         raise Exception("Running tests with an unsupported Cassandra version: {0}".format(CASSANDRA_VERSION))
 
@@ -163,19 +173,18 @@ def get_supported_protocol_versions():
     3.X -> 4, 3
     3.10 -> 5(beta),4,3
 `   """
-    version = Version(CASSANDRA_VERSION)
-    if version >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0'):
         return (3, 4, 5)
-    elif version >= Version('3.10'):
+    elif CASSANDRA_VERSION >= Version('3.10'):
         return (3, 4)
-    elif version >= Version('3.0'):
+    elif CASSANDRA_VERSION >= Version('3.0'):
         return (3, 4)
-    elif version >= Version('2.2'):
-        return (3, 4)
-    elif version >= Version('2.1'):
-        return (3,)
-    elif version >= Version('2.0'):
-        raise Exception("Cassandra Version 2.0 not supported anymore")
+    elif CASSANDRA_VERSION >= Version('2.2'):
+        return (1, 2, 3, 4)
+    elif CASSANDRA_VERSION >= Version('2.1'):
+        return (1, 2, 3)
+    elif CASSANDRA_VERSION >= Version('2.0'):
+        return (1, 2)
     else:
         raise Exception("Cassandra Version not supported anymore")
 
@@ -194,44 +203,56 @@ def get_unsupported_upper_protocol():
     supported by the version of C* running
     """
 
-    if Version(CASSANDRA_VERSION) >= Version('2.2'):
+    if CASSANDRA_VERSION >= Version('2.2'):
         return None
-    if Version(CASSANDRA_VERSION) >= Version('2.1'):
+    if CASSANDRA_VERSION >= Version('2.1'):
         return 4
-    elif Version(CASSANDRA_VERSION) >= Version('2.0'):
-        raise Exception("Cassandra Version 2.0 not supported anymore")
+    elif CASSANDRA_VERSION >= Version('2.0'):
+        return 3
     else:
         return None
+
 
 default_protocol_version = get_default_protocol()
 
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
-local = unittest.skipUnless(CASSANDRA_IP.startswith("127.0.0."), 'Tests only runs against local C*')
+
+def local_decorator_creator():
+    if not CASSANDRA_IP.startswith("127.0.0."):
+        return unittest.skip('Tests only runs against local C*')
+
+    def _id_and_mark(f):
+        f.local = True
+
+    return _id_and_mark
+
+local = local_decorator_creator()
+notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
 protocolv5 = unittest.skipUnless(5 in get_supported_protocol_versions(), 'Protocol versions less than 5 are not supported')
 
-greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= '2.2', 'Cassandra version 2.2 or greater required')
-greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= '3.0', 'Cassandra version 3.0 or greater required')
-greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= '3.6', 'Cassandra version 3.6 or greater required')
-greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= '3.10', 'Cassandra version 3.10 or greater required')
-greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= '3.11', 'Cassandra version 3.10 or greater required')
-greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
-lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= '4.0', 'Cassandra version 4.0 or greater required')
-lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < '3.0', 'Cassandra version less then 3.0 required')
+greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= Version('2.2'), 'Cassandra version 2.2 or greater required')
+greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.0'), 'Cassandra version 3.0 or greater required')
+greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.6'), 'Cassandra version 3.6 or greater required')
+greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.10'), 'Cassandra version 3.10 or greater required')
+greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.11'), 'Cassandra version 3.10 or greater required')
+greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
+lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
+lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
-requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "async" in EVENT_LOOP_MANAGER,
+requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "asyncore" in EVENT_LOOP_MANAGER,
                                                "This test is not suitible for environments with large clock granularity")
-requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1", "Simulacron jar hasn't been specified or C* version is 2.0")
+requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
 
 
 def wait_for_node_socket(node, timeout):
     binary_itf = node.network_interfaces['binary']
     if not common.check_socket_listening(binary_itf, timeout=timeout):
-        log.warn("Unable to connect to binary socket for node " + node.name)
+        log.warning("Unable to connect to binary socket for node " + node.name)
     else:
         log.debug("Node %s is up and listening " % (node.name,))
 
@@ -286,7 +307,7 @@ def remove_cluster():
                 return
             except OSError:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
                 tries += 1
                 time.sleep(1)
@@ -304,12 +325,19 @@ def is_current_cluster(cluster_name, node_counts):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
-                configuration_options={}):
+                configuration_options={}, dse_cluster=False, dse_options={}):
     set_default_cass_ip()
 
-    if ccm_options is None:
-        ccm_options = CCM_KWARGS
+    if ccm_options is None and dse_cluster:
+        ccm_options = {"version": DSE_VERSION}
+    elif ccm_options is None:
+        ccm_options = CCM_KWARGS.copy()
+
     cassandra_version = ccm_options.get('version', CASSANDRA_VERSION)
+    dse_version = ccm_options.get('version', DSE_VERSION)
+
+    if 'version' in ccm_options:
+        ccm_options['version'] = ccm_options['version'].base_version
 
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
@@ -336,19 +364,38 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
             CCM_CLUSTER.set_configuration_options(configuration_options)
         except Exception:
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
 
             log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
-            CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
-            CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-            if cassandra_version >= '2.2':
-                CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                if cassandra_version >= '3.0':
+
+            if dse_cluster:
+                CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
+                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+                CCM_CLUSTER.set_configuration_options({'batch_size_warn_threshold_in_kb': 5})
+                if dse_version >= Version('5.0'):
+                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-            common.switch_cluster(path, cluster_name)
-            CCM_CLUSTER.set_configuration_options(configuration_options)
-            CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+                if 'spark' in workloads:
+                    config_options = {"initial_spark_worker_resources": 0.1}
+                    CCM_CLUSTER.set_dse_configuration_options(config_options)
+                common.switch_cluster(path, cluster_name)
+                CCM_CLUSTER.set_configuration_options(configuration_options)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+
+                CCM_CLUSTER.set_dse_configuration_options(dse_options)
+            else:
+                log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
+                CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
+                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+                if cassandra_version >= Version('2.2'):
+                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+                    if cassandra_version >= Version('3.0'):
+                        CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                common.switch_cluster(path, cluster_name)
+                CCM_CLUSTER.set_configuration_options(configuration_options)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+
     try:
         jvm_args = []
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
@@ -406,12 +453,12 @@ def execute_until_pass(session, query):
         try:
             return session.execute(query)
         except (ConfigurationException, AlreadyExists, InvalidRequest):
-            log.warn("Received already exists from query {0}   not exiting".format(query))
+            log.warning("Received already exists from query {0}   not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
             tries += 1
 
@@ -424,12 +471,12 @@ def execute_with_long_wait_retry(session, query, timeout=30):
         try:
             return session.execute(query, timeout=timeout)
         except (ConfigurationException, AlreadyExists):
-            log.warn("Received already exists from query {0}    not exiting".format(query))
+            log.warning("Received already exists from query {0}    not exiting".format(query))
             # keyspace/table was already created/dropped
             return
         except (OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure):
             ex_type, ex, tb = sys.exc_info()
-            log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+            log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
             del tb
             tries += 1
 
@@ -456,12 +503,12 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
     try:
         execute_with_long_wait_retry(session, "DROP KEYSPACE {0}".format(keyspace_name))
     except:
-        log.warn("Error encountered when droping keyspace {0}".format(keyspace_name))
+        log.warning("Error encountered when droping keyspace {0}".format(keyspace_name))
         ex_type, ex, tb = sys.exc_info()
-        log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+        log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
         del tb
     finally:
-        log.warn("Shutting down cluster")
+        log.warning("Shutting down cluster")
         cluster.shutdown()
 
 
@@ -619,6 +666,22 @@ class MockLoggingHandler(logging.Handler):
             if sub_string in msg:
                 count+=1
         return count
+
+    def set_module_name(self, module_name):
+        """
+        This is intended to be used doing:
+        with MockLoggingHandler().set_module_name(connection.__name__) as mock_handler:
+        """
+        self.module_name = module_name
+        return self
+
+    def __enter__(self):
+        self.logger = logging.getLogger(self.module_name)
+        self.logger.addHandler(self)
+        return self
+
+    def __exit__(self, *args):
+        pass
 
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):

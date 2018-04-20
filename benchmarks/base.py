@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,6 +55,14 @@ try:
     have_libev = True
     supported_reactors.append(LibevConnection)
 except ImportError as exc:
+    pass
+
+have_asyncio = False
+try:
+    from cassandra.io.asyncioreactor import AsyncioConnection
+    have_asyncio = True
+    supported_reactors.append(AsyncioConnection)
+except (ImportError, SyntaxError):
     pass
 
 have_twisted = False
@@ -216,6 +224,8 @@ def parse_options():
                       help='number of operations [default: %default]')
     parser.add_option('--asyncore-only', action='store_true', dest='asyncore_only',
                       help='only benchmark with asyncore connections')
+    parser.add_option('--asyncio-only', action='store_true', dest='asyncio_only',
+                      help='only benchmark with asyncio connections')
     parser.add_option('--libev-only', action='store_true', dest='libev_only',
                       help='only benchmark with libev connections')
     parser.add_option('--twisted-only', action='store_true', dest='twisted_only',
@@ -248,10 +258,12 @@ def parse_options():
     try:
         log.setLevel(_log_levels[level])
     except KeyError:
-        log.warn("Unknown log level specified: %s; specify one of %s", options.log_level, _log_levels.keys())
+        log.warning("Unknown log level specified: %s; specify one of %s", options.log_level, _log_levels.keys())
 
     if options.asyncore_only:
         options.supported_reactors = [AsyncoreConnection]
+    elif options.asyncio_only:
+        options.supported_reactors = [AsyncioConnection]
     elif options.libev_only:
         if not have_libev:
             log.error("libev is not available")
