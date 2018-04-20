@@ -41,7 +41,7 @@ from cassandra.marshal import varint_unpack
 from cassandra.protocol import QueryMessage
 from cassandra.query import dict_factory, bind_params, Statement
 from cassandra.util import OrderedDict
-from cassandra.pool import HostDistance
+from cassandra.hosts import HostDistance
 
 
 log = logging.getLogger(__name__)
