@@ -20,7 +20,6 @@ from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery, DMLQuery
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import execute_count, mock_execute_async
-from cassandra.cqlengine.query import BatchType as cqlengine_BatchType
 from cassandra.query import BatchType as cassandra_BatchType
 
 
@@ -255,31 +254,3 @@ class BatchTypeQueryTests(BaseCassEngTestCase):
 
         obj = TestMultiKeyModel.objects(partition=1)
         self.assertEqual(2, len(obj))
-
-    @execute_count(4)
-    def test_cqlengine_batch_type(self):
-        """
-        Tests the different types of `class: cassandra.cqlengine.query.BatchType`
-
-        @since 3.13
-        @jira_ticket PYTHON-88
-        @expected_result batch query succeeds and the results
-        are correctly readen
-
-        @test_category query
-        """
-        with BatchQuery(batch_type=cqlengine_BatchType.Unlogged) as b:
-            TestMultiKeyModel.batch(b).create(partition=1, cluster=1)
-            TestMultiKeyModel.batch(b).create(partition=1, cluster=2)
-
-        obj = TestMultiKeyModel.objects(partition=1)
-        self.assertEqual(2, len(obj))
-
-        with BatchQuery(batch_type=cqlengine_BatchType.Counter) as b:
-            CounterBatchQueryModel.batch(b).create(k=1, v=1)
-            CounterBatchQueryModel.batch(b).create(k=1, v=2)
-            CounterBatchQueryModel.batch(b).create(k=1, v=10)
-
-        obj = CounterBatchQueryModel.objects(k=1)
-        self.assertEqual(1, len(obj))
-        self.assertEqual(obj[0].v, 13)
