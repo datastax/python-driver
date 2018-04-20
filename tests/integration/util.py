@@ -16,24 +16,20 @@ from tests.integration import PROTOCOL_VERSION
 import time
 
 
-def assert_quiescent_pool_state_with_wait(test_case, cluster, wait):
+def assert_quiescent_pool_state(test_case, cluster, wait=None):
     """
-    This function is useful for waiting before checking the pool state.
-    assert_quiescent_pool_state checks that none of the requests ids have got lost.
-    However the callback corresponding to a request_id is called before the request_id
-    is returned back to the pool, therfore
+    Checking the quiescent pool state checks that none of the requests ids have
+    been lost. However, the callback corresponding to a request_id is called
+    before the request_id is returned back to the pool, therefore
 
     session.execute("SELECT * from system.local")
     assert_quiescent_pool_state(self, session.cluster)
 
-    might fail because when execute comes back the request_id hasn't yet been
-    returned to the pool, therefore the wait.
+    (with no wait) might fail because when execute comes back the request_id
+    hasn't yet been returned to the pool, therefore the wait.
     """
-    time.sleep(wait)
-    assert_quiescent_pool_state(test_case, cluster)
-
-
-def assert_quiescent_pool_state(test_case, cluster):
+    if wait is not None:
+        time.sleep(wait)
 
     for session in cluster.sessions:
         pool_states = session.get_pool_state().values()
