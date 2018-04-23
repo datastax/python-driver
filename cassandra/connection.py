@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,8 +64,8 @@ else:
     # The compress and decompress functions we need were moved from the lz4 to
     # the lz4.block namespace, so we try both here.
     try:
-        lz4_block = lz4.block
-    except AttributeError:
+        from lz4 import block as lz4_block
+    except ImportError:
         lz4_block = lz4
 
     # Cassandra writes the uncompressed message length in big endian order,
@@ -718,6 +718,12 @@ class Connection(object):
         if self.is_defunct:
             return
         if isinstance(startup_response, ReadyMessage):
+            if self.authenticator:
+                log.warning("An authentication challenge was not sent, "
+                            "this is suspicious because the driver expects "
+                            "authentication (configured authenticator = %s)",
+                            self.authenticator.__class__.__name__)
+
             log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.host)
             if self._compressor:
                 self.compressor = self._compressor

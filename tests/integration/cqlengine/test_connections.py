@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -514,6 +514,7 @@ class BaseConnectionTestNoDefault(object):
         conn.register_connection('cluster', [CASSANDRA_IP])
         test_queryset.TestModel.__queryset__ = ModelQuerySetNew
         test_queryset.IndexedTestModel.__queryset__ = ModelQuerySetNew
+        test_queryset.CustomIndexedTestModel.__queryset__ = ModelQuerySetNew
         test_queryset.IndexedCollectionsTestModel.__queryset__ = ModelQuerySetNew
         test_queryset.TestMultiClusteringModel.__queryset__ = ModelQuerySetNew
 

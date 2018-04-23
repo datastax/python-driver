@@ -14,7 +14,9 @@ from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_P
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtocolHandler
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
-from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, VERIFY_CYTHON, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass21
+
+from tests import VERIFY_CYTHON
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass21
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)

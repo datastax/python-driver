@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,6 @@ class ConnectionTest(unittest.TestCase):
             stream_id,
             message_class.opcode  # opcode
         ]))
-
 
     def make_options_body(self):
         options_buf = BytesIO()
@@ -108,9 +107,6 @@ class ConnectionTest(unittest.TestCase):
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-
         options_buf = BytesIO()
         write_stringmultimap(options_buf, {
             'CQL_VERSION': ['7.8.9'],
@@ -160,9 +156,6 @@ class ConnectionTest(unittest.TestCase):
         locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
         locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
 
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
-
         # the server only supports snappy
         options_buf = BytesIO()
         write_stringmultimap(options_buf, {
@@ -189,9 +182,6 @@ class ConnectionTest(unittest.TestCase):
         locally_supported_compressions.pop('snappy', None)
         locally_supported_compressions['lz4'] = ('lz4compress', 'lz4decompress')
         locally_supported_compressions['snappy'] = ('snappycompress', 'snappydecompress')
-
-        # read in a SupportedMessage response
-        header = self.make_header_prefix(SupportedMessage)
 
         # the server only supports snappy
         options_buf = BytesIO()
@@ -412,6 +402,14 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         holder.return_connection.assert_has_calls(
             [call(connection)] * get_holders.call_count)
 
+
+class LZ4Tests(unittest.TestCase):
+    def test_lz4_is_correctly_imported(self):
+        try:
+            import lz4
+        except ImportError:
+            return
+        from lz4 import block as lz4_block
 
 class TimerTest(unittest.TestCase):
 

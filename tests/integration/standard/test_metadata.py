@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import difflib
 import six
 import sys
 import time
+from packaging.version import Version
 from mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
@@ -28,19 +29,16 @@ from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor
 from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
 from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate,  protect_name, protect_names,
-                                RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,)
+                                RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,
+                                group_keys_by_replica, NO_VALID_REPLICA)
 
-from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
+from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
                                greaterthanorequalcass30, lessthancass30, local)
 
-from tests.integration import greaterthancass21
-
 def setup_module():
     use_singledc()
-    global CASS_SERVER_VERSION
-    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
 class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
@@ -75,7 +73,7 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         @test_category metadata
         """
         for host in self.cluster.metadata.all_hosts():
-            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
+            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION.base_version))
 
 
 @local
@@ -206,7 +204,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
         cc = self.cluster.control_connection._connection
-        parser = get_schema_parser(cc, str(CASS_SERVER_VERSION[0]), 1)
+        parser = get_schema_parser(cc, CASSANDRA_VERSION.base_version, 1)
 
         for option in tablemeta.options:
             self.assertIn(option, parser.recognized_table_options)
@@ -343,9 +341,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         self.check_create_statement(tablemeta, create_statement)
 
+    @lessthancass30
     def test_cql_compatibility(self):
-        if CASS_SERVER_VERSION >= (3, 0):
-            raise unittest.SkipTest("cql compatibility does not apply Cassandra 3.0+")
 
         # having more than one non-PK column is okay if there aren't any
         # clustering columns
@@ -412,8 +409,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn('CREATE INDEX e_index', statement)
 
     def test_collection_indexes(self):
-        if CASS_SERVER_VERSION < (2, 1, 0):
-            raise unittest.SkipTest("Secondary index on collections were introduced in Cassandra 2.1")
 
         self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
                              % (self.keyspace_name, self.function_table_name))
@@ -428,11 +423,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
                              % (self.keyspace_name, self.function_table_name))
 
         tablemeta = self.get_table_metadata()
-        target = ' (b)' if CASS_SERVER_VERSION < (3, 0) else 'values(b))'  # explicit values in C* 3+
+        target = ' (b)' if CASSANDRA_VERSION < Version("3.0") else 'values(b))'  # explicit values in C* 3+
         self.assertIn(target, tablemeta.export_as_string())
 
         # test full indexes on frozen collections, if available
-        if CASS_SERVER_VERSION >= (2, 1, 3):
+        if CASSANDRA_VERSION >= Version("2.1.3"):
             self.session.execute("DROP TABLE %s.%s" % (self.keyspace_name, self.function_table_name))
             self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b frozen<map<text, text>>)"
                                  % (self.keyspace_name, self.function_table_name))
@@ -447,7 +442,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         create_statement += " WITH compression = {}"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
-        expected = "compression = {}" if CASS_SERVER_VERSION < (3, 0) else "compression = {'enabled': 'false'}"
+        expected = "compression = {}" if CASSANDRA_VERSION < Version("3.0") else "compression = {'enabled': 'false'}"
         self.assertIn(expected, tablemeta.export_as_string())
 
     def test_non_size_tiered_compaction(self):
@@ -618,6 +613,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthanorequalcass30
     def test_refresh_metadata_for_mv(self):
         """
         test for synchronously refreshing materialized view metadata
@@ -636,9 +632,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
 
@@ -705,7 +698,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
 
         cluster2.shutdown()
-
 
     def test_refresh_user_function_metadata(self):
         """
@@ -785,6 +777,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthanorequalcass30
     def test_multiple_indices(self):
         """
         test multiple indices on the same column.
@@ -797,8 +790,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b map<text, int>)".format(self.keyspace_name, self.function_table_name))
         self.session.execute("CREATE INDEX index_1 ON {0}.{1}(b)".format(self.keyspace_name, self.function_table_name))
@@ -958,122 +949,6 @@ class TestCodeCoverage(unittest.TestCase):
                                                          lineterm=''))
             self.fail(diff_string)
 
-    def test_export_keyspace_schema_udts(self):
-        """
-        Test udt exports
-        """
-
-        if sys.version_info[0:2] != (2, 7):
-            raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        session.execute("""
-            CREATE KEYSPACE export_udts
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
-            AND durable_writes = true;
-        """)
-        session.execute("""
-            CREATE TYPE export_udts.street (
-                street_number int,
-                street_name text)
-        """)
-        session.execute("""
-            CREATE TYPE export_udts.zip (
-                zipcode int,
-                zip_plus_4 int)
-        """)
-        session.execute("""
-            CREATE TYPE export_udts.address (
-                street_address frozen<street>,
-                zip_code frozen<zip>)
-        """)
-        session.execute("""
-            CREATE TABLE export_udts.users (
-            user text PRIMARY KEY,
-            addresses map<text, frozen<address>>)
-        """)
-
-        expected_prefix = """CREATE KEYSPACE export_udts WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
-
-CREATE TYPE export_udts.street (
-    street_number int,
-    street_name text
-);
-
-CREATE TYPE export_udts.zip (
-    zipcode int,
-    zip_plus_4 int
-);
-
-CREATE TYPE export_udts.address (
-    street_address frozen<street>,
-    zip_code frozen<zip>
-);
-
-CREATE TABLE export_udts.users (
-    user text PRIMARY KEY,
-    addresses map<text, frozen<address>>"""
-
-        self.assert_startswith_diff(cluster.metadata.keyspaces['export_udts'].export_as_string(), expected_prefix)
-
-        table_meta = cluster.metadata.keyspaces['export_udts'].tables['users']
-
-        expected_prefix = """CREATE TABLE export_udts.users (
-    user text PRIMARY KEY,
-    addresses map<text, frozen<address>>"""
-
-        self.assert_startswith_diff(table_meta.export_as_string(), expected_prefix)
-
-        cluster.shutdown()
-
-    @greaterthancass21
-    def test_case_sensitivity(self):
-        """
-        Test that names that need to be escaped in CREATE statements are
-        """
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        ksname = 'AnInterestingKeyspace'
-        cfname = 'AnInterestingTable'
-
-        session.execute("DROP KEYSPACE IF EXISTS {0}".format(ksname))
-        session.execute("""
-            CREATE KEYSPACE "%s"
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
-            """ % (ksname,))
-        session.execute("""
-            CREATE TABLE "%s"."%s" (
-                k int,
-                "A" int,
-                "B" int,
-                "MyColumn" int,
-                PRIMARY KEY (k, "A"))
-            WITH CLUSTERING ORDER BY ("A" DESC)
-            """ % (ksname, cfname))
-        session.execute("""
-            CREATE INDEX myindex ON "%s"."%s" ("MyColumn")
-            """ % (ksname, cfname))
-        session.execute("""
-            CREATE INDEX "AnotherIndex" ON "%s"."%s" ("B")
-            """ % (ksname, cfname))
-
-        ksmeta = cluster.metadata.keyspaces[ksname]
-        schema = ksmeta.export_as_string()
-        self.assertIn('CREATE KEYSPACE "AnInterestingKeyspace"', schema)
-        self.assertIn('CREATE TABLE "AnInterestingKeyspace"."AnInterestingTable"', schema)
-        self.assertIn('"A" int', schema)
-        self.assertIn('"B" int', schema)
-        self.assertIn('"MyColumn" int', schema)
-        self.assertIn('PRIMARY KEY (k, "A")', schema)
-        self.assertIn('WITH CLUSTERING ORDER BY ("A" DESC)', schema)
-        self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
-        self.assertIn('CREATE INDEX "AnotherIndex" ON "AnInterestingKeyspace"."AnInterestingTable" ("B")', schema)
-        cluster.shutdown()
-
     def test_already_exists_exceptions(self):
         """
         Ensure AlreadyExists exception is thrown when hit
@@ -1134,261 +1009,6 @@ CREATE TABLE export_udts.users (
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
             self.assertEqual(set(get_replicas('test2rf', token)), set([owners[(i + 1) % 3], owners[(i + 2) % 3]]))
             self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
-        cluster.shutdown()
-
-    @local
-    def test_legacy_tables(self):
-
-        if CASS_SERVER_VERSION < (2, 1, 0):
-            raise unittest.SkipTest('Test schema output assumes 2.1.0+ options')
-
-        if CASS_SERVER_VERSION >= (2, 2, 0):
-            raise unittest.SkipTest('Cannot test cli script on Cassandra 2.2.0+')
-
-        if sys.version_info[0:2] != (2, 7):
-            raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
-
-        cli_script = """CREATE KEYSPACE legacy
-WITH placement_strategy = 'SimpleStrategy'
-AND strategy_options = {replication_factor:1};
-
-USE legacy;
-
-CREATE COLUMN FAMILY simple_no_col
- WITH comparator = UTF8Type
- AND key_validation_class = UUIDType
- AND default_validation_class = UTF8Type;
-
-CREATE COLUMN FAMILY simple_with_col
- WITH comparator = UTF8Type
- and key_validation_class = UUIDType
- and default_validation_class = UTF8Type
- AND column_metadata = [
- {column_name: col_with_meta, validation_class: UTF8Type}
- ];
-
-CREATE COLUMN FAMILY composite_partition_no_col
- WITH comparator = UTF8Type
- AND key_validation_class = 'CompositeType(UUIDType,UTF8Type)'
- AND default_validation_class = UTF8Type;
-
-CREATE COLUMN FAMILY composite_partition_with_col
- WITH comparator = UTF8Type
- AND key_validation_class = 'CompositeType(UUIDType,UTF8Type)'
- AND default_validation_class = UTF8Type
- AND column_metadata = [
- {column_name: col_with_meta, validation_class: UTF8Type}
- ];
-
-CREATE COLUMN FAMILY nested_composite_key
- WITH comparator = UTF8Type
- and key_validation_class = 'CompositeType(CompositeType(UUIDType,UTF8Type), LongType)'
- and default_validation_class = UTF8Type
- AND column_metadata = [
- {column_name: full_name, validation_class: UTF8Type}
- ];
-
-create column family composite_comp_no_col
-  with column_type = 'Standard'
-  and comparator = 'DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType,s=>org.apache.cassandra.db.marshal.UTF8Type,b=>org.apache.cassandra.db.marshal.BytesType)'
-  and default_validation_class = 'BytesType'
-  and key_validation_class = 'BytesType'
-  and read_repair_chance = 0.0
-  and dclocal_read_repair_chance = 0.1
-  and gc_grace = 864000
-  and min_compaction_threshold = 4
-  and max_compaction_threshold = 32
-  and compaction_strategy = 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'
-  and caching = 'KEYS_ONLY'
-  and cells_per_row_to_cache = '0'
-  and default_time_to_live = 0
-  and speculative_retry = 'NONE'
-  and comment = 'Stores file meta data';
-
-create column family composite_comp_with_col
-  with column_type = 'Standard'
-  and comparator = 'DynamicCompositeType(t=>org.apache.cassandra.db.marshal.TimeUUIDType,s=>org.apache.cassandra.db.marshal.UTF8Type,b=>org.apache.cassandra.db.marshal.BytesType)'
-  and default_validation_class = 'BytesType'
-  and key_validation_class = 'BytesType'
-  and read_repair_chance = 0.0
-  and dclocal_read_repair_chance = 0.1
-  and gc_grace = 864000
-  and min_compaction_threshold = 4
-  and max_compaction_threshold = 32
-  and compaction_strategy = 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'
-  and caching = 'KEYS_ONLY'
-  and cells_per_row_to_cache = '0'
-  and default_time_to_live = 0
-  and speculative_retry = 'NONE'
-  and comment = 'Stores file meta data'
-  and column_metadata = [
-    {column_name : 'b@6d616d6d616a616d6d61',
-    validation_class : BytesType,
-    index_name : 'idx_one',
-    index_type : 0},
-    {column_name : 'b@6869746d65776974686d75736963',
-    validation_class : BytesType,
-    index_name : 'idx_two',
-    index_type : 0}]
-  and compression_options = {'sstable_compression' : 'org.apache.cassandra.io.compress.LZ4Compressor'};"""
-
-        # note: the inner key type for legacy.nested_composite_key
-        # (org.apache.cassandra.db.marshal.CompositeType(org.apache.cassandra.db.marshal.UUIDType, org.apache.cassandra.db.marshal.UTF8Type))
-        # is a bit strange, but it replays in CQL with desired results
-        expected_string = """CREATE KEYSPACE legacy WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
-
-/*
-Warning: Table legacy.composite_comp_with_col omitted because it has constructs not compatible with CQL (was created via legacy API).
-
-Approximate structure, for reference:
-(this should not be used to reproduce this schema)
-
-CREATE TABLE legacy.composite_comp_with_col (
-    key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
-    "b@6869746d65776974686d75736963" blob,
-    "b@6d616d6d616a616d6d61" blob,
-    PRIMARY KEY (key, column1)
-) WITH CLUSTERING ORDER BY (column1 ASC)
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = 'Stores file meta data'
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-CREATE INDEX idx_two ON legacy.composite_comp_with_col ("b@6869746d65776974686d75736963");
-CREATE INDEX idx_one ON legacy.composite_comp_with_col ("b@6d616d6d616a616d6d61");
-*/
-
-CREATE TABLE legacy.nested_composite_key (
-    key 'org.apache.cassandra.db.marshal.CompositeType(org.apache.cassandra.db.marshal.UUIDType, org.apache.cassandra.db.marshal.UTF8Type)',
-    key2 bigint,
-    full_name text,
-    PRIMARY KEY ((key, key2))
-) WITH caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-
-CREATE TABLE legacy.composite_partition_with_col (
-    key uuid,
-    key2 text,
-    col_with_meta text,
-    PRIMARY KEY ((key, key2))
-) WITH caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-
-CREATE TABLE legacy.composite_partition_no_col (
-    key uuid,
-    key2 text,
-    column1 text,
-    value text,
-    PRIMARY KEY ((key, key2), column1)
-) WITH CLUSTERING ORDER BY (column1 ASC)
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-
-CREATE TABLE legacy.simple_with_col (
-    key uuid PRIMARY KEY,
-    col_with_meta text
-) WITH caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-
-CREATE TABLE legacy.simple_no_col (
-    key uuid,
-    column1 text,
-    value text,
-    PRIMARY KEY (key, column1)
-) WITH CLUSTERING ORDER BY (column1 ASC)
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';
-
-CREATE TABLE legacy.composite_comp_no_col (
-    key blob,
-    column1 'org.apache.cassandra.db.marshal.DynamicCompositeType(b=>org.apache.cassandra.db.marshal.BytesType, s=>org.apache.cassandra.db.marshal.UTF8Type, t=>org.apache.cassandra.db.marshal.TimeUUIDType)',
-    value blob,
-    PRIMARY KEY (key, column1)
-) WITH CLUSTERING ORDER BY (column1 ASC)
-    AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-    AND comment = 'Stores file meta data'
-    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = 'NONE';"""
-
-        ccm = get_cluster()
-        livenodes = [node for node in list(ccm.nodelist()) if node.is_live()]
-        livenodes[0].run_cli(cli_script)
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
-
-        legacy_meta = cluster.metadata.keyspaces['legacy']
-        print(legacy_meta.export_as_string())
-        self.assert_equal_diff(legacy_meta.export_as_string(), expected_string)
-
-        session.execute('DROP KEYSPACE legacy')
-
         cluster.shutdown()
 
 
@@ -2035,16 +1655,12 @@ class BadMetaTest(unittest.TestCase):
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
-        cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
+        cls.parser_class = get_schema_parser(connection, CASSANDRA_VERSION.base_version, timeout=20).__class__
         cls.cluster.control_connection.reconnect = Mock()
 
     @classmethod
     def teardown_class(cls):
         drop_keyspace_shutdown_cluster(cls.keyspace_name, cls.session, cls.cluster)
-
-    def _skip_if_not_version(self, version):
-        if CASS_SERVER_VERSION < version:
-            raise unittest.SkipTest("Requires server version >= %s" % (version,))
 
     def test_bad_keyspace(self):
         with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
@@ -2071,7 +1687,6 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
     def test_bad_user_type(self):
-        self._skip_if_not_version((2, 1, 0))
         self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name)
         with patch.object(self.parser_class, '_build_user_type', side_effect=self.BadMetaException):
             self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
@@ -2080,7 +1695,6 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
     def test_bad_user_function(self):
-        self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS %s (key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
@@ -2092,7 +1706,6 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
     def test_bad_user_aggregate(self):
-        self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS sum_int (key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
@@ -2132,11 +1745,10 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(s=>org.apache.cassandra.db.marshal.UTF8Type,i=>org.apache.cassandra.db.marshal.Int32Type)'" in dct_table.as_cql_query().replace(" ", ""))
 
 
+@greaterthanorequalcass30
 class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
         self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
@@ -2212,12 +1824,8 @@ class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
 
+@greaterthanorequalcass30
 class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
-    def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
-        super(MaterializedViewMetadataTestComplex, self).setUp()
-
     def test_create_view_metadata(self):
         """
         test to ensure that materialized view metadata is properly constructed
@@ -2516,3 +2124,50 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
         self.assertEqual(value_column.name, 'the Value')
+
+class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(rf=1, create_class_table=True)
+        cls.table_two_pk = "table_with_two_pk"
+        cls.session.execute(
+            '''
+            CREATE TABLE {0}.{1} (
+                k_one int,
+                k_two int,
+                v int,
+                PRIMARY KEY ((k_one, k_two))
+            )'''.format(cls.ks_name, cls.table_two_pk)
+        )
+
+    def test_group_keys_by_host(self):
+        """
+        Test to ensure group_keys_by_host functions as expected. It is tried
+        with a table with a single field for the partition key and a table
+        with two fields for the partition key
+        @since 3.13
+        @jira_ticket PYTHON-647
+        @expected_result group_keys_by_host return the expected value
+
+        @test_category metadata
+        """
+        stmt = """SELECT * FROM {}.{}
+                         WHERE k_one = ? AND k_two = ? """.format(self.ks_name, self.table_two_pk)
+        keys = ((1, 2), (2, 2), (2, 3), (3, 4))
+        self._assert_group_keys_by_host(keys, self.table_two_pk, stmt)
+
+        stmt = """SELECT * FROM {}.{}
+                                 WHERE k = ? """.format(self.ks_name, self.ks_name)
+        keys = ((1, ), (2, ), (2, ), (3, ))
+        self._assert_group_keys_by_host(keys, self.ks_name, stmt)
+
+    def _assert_group_keys_by_host(self, keys, table_name, stmt):
+        keys_per_host = group_keys_by_replica(self.session, self.ks_name, table_name, keys)
+        self.assertNotIn(NO_VALID_REPLICA, keys_per_host)
+
+        prepared_stmt = self.session.prepare(stmt)
+        for key in keys:
+            routing_key = prepared_stmt.bind(key).routing_key
+            hosts = self.cluster.metadata.get_replicas(self.ks_name, routing_key)
+            self.assertEqual(1, len(hosts)) # RF is 1 for this keyspace
+            self.assertIn(key, keys_per_host[hosts[0]])

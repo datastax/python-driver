@@ -1,30 +1,81 @@
 4.0.0
 =====
+Features
+--------
+* cqlengine: Remove default limit on QuerySets (PYTHON-517)
+* cqlengine: asynchronous execution support (PYTHON-605)
+* cqlengine: disallow Counter create, save operations (PYTHON-497)
+* cqlengine: Makes Model._table_name_ case sensitive (PYTHON-855)
+
+
+Other
+-----
+* Deprecate ResultSet indexing (PYTHON-945)
+* Cassandra 2.0 support removal (PYTHON-716)
+* cqlengine: remove the negative indices slicing support in ModelQuerySet (PYTHON-875)
+* Remove legacy execution parameters (PYTHON-876)
+* PreparedStatement.column_metadata should be renamed to bind_metadata (PYTHON-884)
+* Support cassandra.query.BatchType with cqlengine BatchQuery (PYTHON-888)
+* cqlengine: Remove Model.__default_ttl__ (PYTHON-889)
+* Remove Cluster.set_meta_refresh_enabled (PYTHON-890)
+
+
+3.14.0
+======
 
 Features
 --------
 * Add one() function to the ResultSet API (PYTHON-947)
-* cqlengine: asynchronous execution support (PYTHON-605)
-* cqlengine: Makes Model._table_name_ case sensitive (PYTHON-855)
+* Create an utility function to fetch concurrently many keys from the same replica (PYTHON-647)
+* Allow filter queries with fields that have an index managed outside of cqlengine (PYTHON-966)
+* Twisted SSL Support (PYTHON-343)
+* Support IS NOT NULL operator in cqlengine (PYTHON-968)
+
+Other
+-----
+* Fix Broken Links in Docs (PYTHON-916)
+* Reevaluate MONKEY_PATCH_LOOP in test codebase (PYTHON-903)
+* Remove CASS_SERVER_VERSION and replace it for CASSANDRA_VERSION in tests (PYTHON-910)
+* Refactor CASSANDRA_VERSION to a some kind of version object (PYTHON-915)
+* Log warning when driver configures an authenticator, but server does not request authentication (PYTHON-940)
+* Warn users when using the deprecated Session.default_consistency_level (PYTHON-953)
+* Add DSE smoke test to OSS driver tests (PYTHON-894)
+* Document long compilation times and workarounds (PYTHON-868)
+* Improve error for batch WriteTimeouts (PYTHON-941)
+
+3.13.0
+======
+January 30, 2018
+
+Features
+--------
 * cqlengine: LIKE filter operator (PYTHON-512)
-* cqlengine: Remove default limit on QuerySets (PYTHON-517)
 
 Bug Fixes
 ---------
 * Calling next() on a ResultSet throws an exception (PYTHON-463)
 * Support retry_policy in PreparedStatement (PYTHON-861)
 * cqlengine: Remove cassandra.cqlengine.query.BatchType in favor of cassandra.query.BatchType (PYTHON-888)
+* AttributeError: 'NoneType' object has no attribute 'add_timer' (PYTHON-862)
+* Support retry_policy in PreparedStatement (PYTHON-861)
+* __del__ method in Session is throwing an exception (PYTHON-813)
+* LZ4 import issue with recent versions (PYTHON-897)
+* ResponseFuture._connection can be None when returning request_id (PYTHON-853)
+* ResultSet.was_applied doesn't support batch with LWT statements (PYTHON-848)
 
 Other
 -----
-* Cassandra 2.0 support removal (PYTHON-716)
-* PreparedStatement.column_metadata should be renamed to bind_metadata (PYTHON-884)
-* Remove Cluster.set_meta_refresh_enabled (PYTHON-890)
-* Remove legacy execution parameters (PYTHON-876)
 * Remove basic equality and indexing support of ResultSet (PYTHON-945)
-* cqlengine: disallow Counter create, save operations (PYTHON-497)
-* cqlengine: remove the negative indices slicing support in ModelQuerySet (PYTHON-875)
-* cqlengine: Remove Model.__default_ttl__ (PYTHON-889)
+* cqlengine: avoid warning when unregistering connection on shutdown (PYTHON-865)
+* Fix DeprecationWarning of log.warn (PYTHON-846)
+* Fix example_mapper.py for python3 (PYTHON-860)
+* Possible deadlock on cassandra.concurrent.execute_concurrent (PYTHON-768)
+* Add some known deprecated warnings for 4.x (PYTHON-877)
+* Remove copyright dates from copyright notices (PYTHON-863)
+* Remove "Experimental" tag from execution profiles documentation (PYTHON-840)
+* request_timer metrics descriptions are slightly incorrect (PYTHON-885)
+* Remove "Experimental" tag from cqlengine connections documentation (PYTHON-892)
+* Set in documentation default consistency for operations is LOCAL_ONE (PYTHON-901)
 
 3.12.0
 ======
@@ -40,6 +91,8 @@ Features
 * Include hash of result set metadata in prepared stmt id (PYTHON-808)
 * Add NO_COMPACT startup option (PYTHON-839)
 * Add new exception type for CDC (PYTHON-837)
+* Allow 0ms in ConstantSpeculativeExecutionPolicy (PYTHON-836)
+* Add asyncio reactor (PYTHON-507)
 
 Bug Fixes
 ---------

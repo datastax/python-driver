@@ -1,7 +1,7 @@
-Execution Profiles (experimental)
-=================================
+Execution Profiles
+==================
 
-Execution profiles are an experimental API aimed at making it easier to execute requests in different ways within
+Execution profiles aim at making it easier to execute requests in different ways within
 a single connected ``Session``. Execution profiles are being introduced to deal with the exploding number of
 configuration options, especially as the database platform evolves more complex workloads.
 

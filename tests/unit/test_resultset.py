@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ try:
 except ImportError:
     import unittest # noqa
 
-from mock import Mock, PropertyMock
+from mock import Mock, PropertyMock, patch
 
 from cassandra.cluster import ResultSet
 
@@ -123,3 +123,10 @@ class ResultSetTests(unittest.TestCase):
         for applied in (True, False):
             rs = ResultSet(Mock(row_factory=row_factory), [{'[applied]': applied}])
             self.assertEqual(rs.was_applied, applied)
+
+    def test_one(self):
+        # no pages
+        first, second = Mock(), Mock()
+        rs = ResultSet(Mock(has_more_pages=False), [first, second])
+
+        self.assertEqual(rs.one(), first)

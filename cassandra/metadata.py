@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ import six
 from six.moves import zip
 import sys
 from threading import RLock
+import struct
+import random
 
 murmur3 = None
 try:
@@ -37,8 +39,10 @@ import cassandra.cqltypes as types
 from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
 from cassandra.protocol import QueryMessage
-from cassandra.query import dict_factory, bind_params
+from cassandra.query import dict_factory, bind_params, Statement
 from cassandra.util import OrderedDict
+from cassandra.hosts import HostDistance
+
 
 log = logging.getLogger(__name__)
 
@@ -2560,3 +2564,52 @@ def _cql_from_cass_type(cass_type):
         return cass_type.subtypes[0].cql_parameterized_type()
     else:
         return cass_type.cql_parameterized_type()
+
+
+NO_VALID_REPLICA = object()
+
+
+def group_keys_by_replica(session, keyspace, table, keys):
+    """
+    Returns a :class:`dict` with the keys grouped per host. This can be
+    used to more accurately group by IN clause or to batch the keys per host.
+
+    If a valid replica is not found for a particular key it will be grouped under
+    :class:`~.NO_VALID_REPLICA`
+
+    Example usage::
+        result = group_keys_by_replica(
+                     session, "system", "peers",
+                     (("127.0.0.1", ), ("127.0.0.2", ))
+                 )
+    """
+    cluster = session.cluster
+
+    partition_keys = cluster.metadata.keyspaces[keyspace].tables[table].partition_key
+
+    serializers = list(types._cqltypes[partition_key.cql_type] for partition_key in partition_keys)
+    keys_per_host = defaultdict(list)
+    distance = cluster._default_load_balancing_policy.distance
+
+    for key in keys:
+        serialized_key = [serializer.serialize(pk, cluster.protocol_version)
+                          for serializer, pk in zip(serializers, key)]
+        if len(serialized_key) == 1:
+            routing_key = serialized_key[0]
+        else:
+            routing_key = b"".join(struct.pack(">H%dsB" % len(p), len(p), p, 0) for p in serialized_key)
+        all_replicas = cluster.metadata.get_replicas(keyspace, routing_key)
+        # First check if there are local replicas
+        valid_replicas = [host for host in all_replicas if
+                          host.is_up and distance(host) == HostDistance.LOCAL]
+        if not valid_replicas:
+            valid_replicas = [host for host in all_replicas if host.is_up]
+
+        if valid_replicas:
+            keys_per_host[random.choice(valid_replicas)].append(key)
+        else:
+            # We will group under this statement all the keys for which
+            # we haven't found a valid replica
+            keys_per_host[NO_VALID_REPLICA].append(key)
+
+    return dict(keys_per_host)

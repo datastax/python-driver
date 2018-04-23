@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ class SimulacronClient(object):
 
         request = Request("http://{}/{}{}".format(
             self.admin_addr, query.path, query.fetch_url_params()), data=data)
-        request.get_method = lambda: 'POST'
+        request.get_method = lambda: query.method
         request.add_header("Content-Type", 'application/json')
         request.add_header("Content-Length", len(data))
 
@@ -115,8 +115,8 @@ class SimulacronClient(object):
         This information has to be primed for the test harness to run
         """
         system_local_row = {}
-        system_local_row["cql_version"] = CASSANDRA_VERSION
-        system_local_row["release_version"] = CASSANDRA_VERSION + "-SNAPSHOT"
+        system_local_row["cql_version"] = CASSANDRA_VERSION.base_version
+        system_local_row["release_version"] = CASSANDRA_VERSION.base_version + "-SNAPSHOT"
         column_types = {"cql_version": "ascii", "release_version": "ascii"}
         system_local = PrimeQuery("SELECT cql_version, release_version FROM system.local",
                                   rows=[system_local_row],
@@ -142,9 +142,13 @@ NO_THEN = object()
 
 class SimulacronRequest(object):
     def fetch_json(self):
-        raise NotImplementedError()
+        return {}
 
     def fetch_url_params(self):
+        return ""
+
+    @property
+    def method(self):
         raise NotImplementedError()
 
 
@@ -174,6 +178,44 @@ class PrimeOptions(SimulacronRequest):
 
     def fetch_url_params(self):
         return ""
+
+    @property
+    def method(self):
+        return "POST"
+
+
+class RejectType():
+    UNBIND = "UNBIND"
+    STOP = "STOP"
+    REJECT_STARTUP = "REJECT_STARTUP"
+
+
+class RejectConnections(SimulacronRequest):
+    """
+    Class used for making simulacron reject new connections
+    """
+    def __init__(self, reject_type, cluster_name=DEFAULT_CLUSTER):
+        self.path = "listener/{}".format(cluster_name)
+        self.reject_type = reject_type
+
+    def fetch_url_params(self):
+        return "?type={0}".format(self.reject_type)
+
+    @property
+    def method(self):
+        return "DELETE"
+
+
+class AcceptConnections(SimulacronRequest):
+    """
+    Class used for making simulacron reject new connections
+    """
+    def __init__(self, cluster_name=DEFAULT_CLUSTER):
+        self.path = "listener/{}".format(cluster_name)
+
+    @property
+    def method(self):
+        return "PUT"
 
 
 class PrimeQuery(SimulacronRequest):
@@ -228,6 +270,9 @@ class PrimeQuery(SimulacronRequest):
     def fetch_url_params(self):
         return ""
 
+    @property
+    def method(self):
+        return "POST"
 
 class ClusterQuery(SimulacronRequest):
     """
@@ -251,6 +296,9 @@ class ClusterQuery(SimulacronRequest):
         return "?cassandra_version={0}&data_centers={1}&name={2}".\
             format(self.cassandra_version, self.data_centers, self.cluster_name)
 
+    @property
+    def method(self):
+        return "POST"
 
 def prime_driver_defaults():
     """
@@ -260,7 +308,7 @@ def prime_driver_defaults():
     client_simulacron.prime_server_versions()
 
 
-def prime_cluster(data_centers="3", version=None, cluster_name=DEFAULT_CLUSTER):
+def prime_cluster(data_centers="3", version=CASSANDRA_VERSION, cluster_name=DEFAULT_CLUSTER):
     """
     Creates a new cluster in the simulacron server
     :param cluster_name: name of the cluster
@@ -268,7 +316,7 @@ def prime_cluster(data_centers="3", version=None, cluster_name=DEFAULT_CLUSTER):
     datacenters of 2 nodes and three nodes
     :param version: C* version
     """
-    version = version or CASSANDRA_VERSION
+    version = version or CASSANDRA_VERSION.base_version
     cluster_query = ClusterQuery(cluster_name, version, data_centers)
     client_simulacron = SimulacronClient()
     response = client_simulacron.submit_request(cluster_query)
@@ -284,7 +332,7 @@ def start_and_prime_singledc(cluster_name=DEFAULT_CLUSTER):
     return start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, cluster_name=cluster_name)
 
 
-def start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, version=None, cluster_name=DEFAULT_CLUSTER):
+def start_and_prime_cluster_defaults(number_of_dc=1, nodes_per_dc=3, version=CASSANDRA_VERSION, cluster_name=DEFAULT_CLUSTER):
     """
     :param number_of_dc: number of datacentes
     :param nodes_per_dc: number of nodes per datacenter

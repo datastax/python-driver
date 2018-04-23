@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@ except ImportError:
     import unittest  # noqa
 
 from datetime import datetime
-import time
-from uuid import uuid1, uuid4
+from uuid import uuid4
+from packaging.version import Version
 import uuid
 
-from cassandra.cluster import Session
+from cassandra.cluster import Cluster, Session
 from cassandra import InvalidRequest
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.connection import NOT_SET
@@ -41,8 +41,8 @@ from cassandra.cqlengine import statements
 from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
-from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass21
-from tests.integration.cqlengine import execute_count
+from tests.integration import CASSANDRA_VERSION, greaterthancass21, greaterthanorequalcass30
+from tests.integration.cqlengine import execute_count, DEFAULT_KEYSPACE
 from tests.integration.cqlengine import mock_execute_async
 
 
@@ -80,6 +80,14 @@ class IndexedTestModel(Model):
     description = columns.Text()
     expected_result = columns.Integer()
     test_result = columns.Integer(index=True)
+
+
+class CustomIndexedTestModel(Model):
+
+    test_id = columns.Integer(primary_key=True)
+    description = columns.Text(custom_index=True)
+    indexed = columns.Text(index=True)
+    data = columns.Text()
 
 
 class IndexedCollectionsTestModel(Model):
@@ -314,9 +322,11 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         super(BaseQuerySetUsage, cls).setUpClass()
         drop_table(TestModel)
         drop_table(IndexedTestModel)
+        drop_table(CustomIndexedTestModel)
 
         sync_table(TestModel)
         sync_table(IndexedTestModel)
+        sync_table(CustomIndexedTestModel)
         sync_table(TestMultiClusteringModel)
 
         TestModel.objects.create(test_id=0, attempt_id=0, description='try1', expected_result=5, test_result=30)
@@ -352,7 +362,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         IndexedTestModel.objects.create(test_id=11, attempt_id=3, description='try12', expected_result=75,
                                         test_result=45)
 
-        if(CASSANDRA_VERSION >= '2.1'):
+        if CASSANDRA_VERSION >= Version('2.1'):
             drop_table(IndexedCollectionsTestModel)
             sync_table(IndexedCollectionsTestModel)
             IndexedCollectionsTestModel.objects.create(test_id=12, attempt_id=3, description='list12', expected_result=75,
@@ -374,6 +384,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         super(BaseQuerySetUsage, cls).tearDownClass()
         drop_table(TestModel)
         drop_table(IndexedTestModel)
+        drop_table(CustomIndexedTestModel)
         drop_table(TestMultiClusteringModel)
 
 
@@ -753,6 +764,41 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         q = IndexedCollectionsTestModel.objects.filter(test_map__contains=13)
         self.assertEqual(q.count(), 0)
 
+    def test_custom_indexed_field_can_be_queried(self):
+        """
+        Tests that queries on an custom indexed field will work without any primary key relations specified
+        """
+
+        with self.assertRaises(query.QueryException):
+            list(CustomIndexedTestModel.objects.filter(data='test'))  # not custom indexed
+
+        # It should return InvalidRequest if target an indexed columns
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(indexed='test', data='test'))
+
+        # It should return InvalidRequest if target an indexed columns
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(description='test', data='test'))
+
+        # equals operator, server error since there is no real index, but it passes
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(description='test'))
+
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(test_id=1, description='test'))
+
+        # gte operator, server error since there is no real index, but it passes
+        # this can't work with a secondary index
+        with self.assertRaises(InvalidRequest):
+            list(CustomIndexedTestModel.objects.filter(description__gte='test'))
+
+        with Cluster().connect() as session:
+            session.execute("CREATE INDEX custom_index_cqlengine ON {}.{} (description)".
+                            format(DEFAULT_KEYSPACE, CustomIndexedTestModel._table_name))
+
+        list(CustomIndexedTestModel.objects.filter(description='test'))
+        list(CustomIndexedTestModel.objects.filter(test_id=1, description='test'))
+
 
 class TestQuerySetDelete(BaseQuerySetUsage):
 
@@ -781,7 +827,7 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         with self.assertRaises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
 
-    @unittest.skipIf(CASSANDRA_VERSION < '3.0', "range deletion was introduce in C* 3.0, currently running {0}".format(CASSANDRA_VERSION))
+    @greaterthanorequalcass30
     @execute_count(18)
     def test_range_deletion(self):
         """
