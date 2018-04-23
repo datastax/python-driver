@@ -109,10 +109,13 @@ class Metadata(object):
     token_map = None
     """ A :class:`~.TokenMap` instance describing the ring topology. """
 
-    def __init__(self):
+    context = None
+
+    def __init__(self, context):
         self.keyspaces = {}
         self._hosts = {}
         self._hosts_lock = RLock()
+        self.context = context
 
     def export_schema_as_string(self):
         """
@@ -124,7 +127,7 @@ class Metadata(object):
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
         server_version = self.get_host(connection.host).release_version
-        parser = get_schema_parser(connection, server_version, timeout)
+        parser = get_schema_parser(connection, server_version, timeout, context=self.context)
 
         if not target_type:
             self._rebuild_all(parser)
@@ -1624,9 +1627,10 @@ class TriggerMetadata(object):
 
 class _SchemaParser(object):
 
-    def __init__(self, connection, timeout):
+    def __init__(self, connection, timeout, context):
         self.connection = connection
         self.timeout = timeout
+        self.context = context
 
     def _handle_results(self, success, result):
         if success:
@@ -1639,7 +1643,7 @@ class _SchemaParser(object):
         return result[0] if result else None
 
     def _query_build_rows(self, query_string, build_func):
-        query = QueryMessage(query=query_string, consistency_level=ConsistencyLevel.ONE)
+        query = QueryMessage(query=query_string, consistency_level=ConsistencyLevel.ONE, context=self.context)
         responses = self.connection.wait_for_responses((query), timeout=self.timeout, fail_on_error=False)
         (success, response) = responses[0]
         if success:
@@ -1689,8 +1693,8 @@ class SchemaParserV22(_SchemaParser):
         "compression",
         "default_time_to_live")
 
-    def __init__(self, connection, timeout):
-        super(SchemaParserV22, self).__init__(connection, timeout)
+    def __init__(self, connection, timeout, context):
+        super(SchemaParserV22, self).__init__(connection, timeout, context)
         self.keyspaces_result = []
         self.tables_result = []
         self.columns_result = []
@@ -1737,9 +1741,9 @@ class SchemaParserV22(_SchemaParser):
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
         where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col,), (keyspace, table), _encoder)
-        cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
-        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
+        cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl, context=self.context)
+        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl, context=self.context)
+        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl, context=self.context)
         (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
             = self.connection.wait_for_responses(cf_query, col_query, triggers_query, timeout=self.timeout, fail_on_error=False)
         table_result = self._handle_results(cf_success, cf_result)
@@ -2050,13 +2054,13 @@ class SchemaParserV22(_SchemaParser):
     def _query_all(self):
         cl = ConsistencyLevel.ONE
         queries = [
-            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
+            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl, context=self.context)
         ]
 
         responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
@@ -2179,8 +2183,8 @@ class SchemaParserV3(SchemaParserV22):
         'read_repair_chance',
         'speculative_retry')
 
-    def __init__(self, connection, timeout):
-        super(SchemaParserV3, self).__init__(connection, timeout)
+    def __init__(self, connection, timeout, context):
+        super(SchemaParserV3, self).__init__(connection, timeout, context)
         self.indexes_result = []
         self.keyspace_table_index_rows = defaultdict(lambda: defaultdict(list))
         self.keyspace_view_rows = defaultdict(list)
@@ -2195,15 +2199,15 @@ class SchemaParserV3(SchemaParserV22):
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
         where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
-        cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl)
-        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-        indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl)
-        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
+        cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl, context=self.context)
+        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl, context=self.context)
+        indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl, context=self.context)
+        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl, context=self.context)
 
         # in protocol v4 we don't know if this event is a view or a table, so we look for both
         where_clause = bind_params(" WHERE keyspace_name = %s AND view_name = %s", (keyspace, table), _encoder)
         view_query = QueryMessage(query=self._SELECT_VIEWS + where_clause,
-                                  consistency_level=cl)
+                                  consistency_level=cl, context=self.context)
         (cf_success, cf_result), (col_success, col_result), (indexes_sucess, indexes_result), \
         (triggers_success, triggers_result), (view_success, view_result) \
             = self.connection.wait_for_responses(cf_query, col_query, indexes_query, triggers_query, view_query,
@@ -2356,15 +2360,15 @@ class SchemaParserV3(SchemaParserV22):
     def _query_all(self):
         cl = ConsistencyLevel.ONE
         queries = [
-            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TABLES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_INDEXES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIEWS, consistency_level=cl)
+            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_TABLES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_INDEXES, consistency_level=cl, context=self.context),
+            QueryMessage(query=self._SELECT_VIEWS, consistency_level=cl, context=self.context)
         ]
 
         responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
@@ -2545,14 +2549,14 @@ class MaterializedViewMetadata(object):
         return self.as_cql_query(formatted=True) + ";"
 
 
-def get_schema_parser(connection, server_version, timeout):
+def get_schema_parser(connection, server_version, timeout, context):
     server_major_version = int(server_version.split('.')[0])
     if server_major_version >= 3:
-        return SchemaParserV3(connection, timeout)
+        return SchemaParserV3(connection, timeout, context=context)
     else:
         # we could further specialize by version. Right now just refactoring the
         # multi-version parser we have as of C* 2.2.0rc1.
-        return SchemaParserV22(connection, timeout)
+        return SchemaParserV22(connection, timeout, context=context)
 
 
 def _cql_from_cass_type(cass_type):
