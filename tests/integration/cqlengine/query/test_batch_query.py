@@ -220,7 +220,7 @@ class BatchTypeQueryTests(BaseCassEngTestCase):
         drop_table(TestMultiKeyModel)
         drop_table(CounterBatchQueryModel)
 
-    @execute_count(6)
+    @execute_count(4)
     def test_cassandra_batch_type(self):
         """
         Tests the different types of `class: cassandra.query.BatchType`
@@ -238,15 +238,6 @@ class BatchTypeQueryTests(BaseCassEngTestCase):
 
         obj = TestMultiKeyModel.objects(partition=1)
         self.assertEqual(2, len(obj))
-
-        with BatchQuery(batch_type=cassandra_BatchType.COUNTER) as b:
-            CounterBatchQueryModel.batch(b).create(k=1, v=1)
-            CounterBatchQueryModel.batch(b).create(k=1, v=2)
-            CounterBatchQueryModel.batch(b).create(k=1, v=10)
-
-        obj = CounterBatchQueryModel.objects(k=1)
-        self.assertEqual(1, len(obj))
-        self.assertEqual(obj[0].v, 13)
 
         with BatchQuery(batch_type=cassandra_BatchType.LOGGED) as b:
             TestMultiKeyModel.batch(b).create(partition=1, cluster=1)

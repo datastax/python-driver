@@ -28,7 +28,7 @@ from cassandra.cqlengine.models import Model
 from uuid import uuid4
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.connection import get_session
-from tests.integration import CASSANDRA_VERSION, greaterthancass20
+from tests.integration import CASSANDRA_VERSION
 
 
 class BaseTTLTest(BaseCassEngTestCase):

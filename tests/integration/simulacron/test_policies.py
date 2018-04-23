@@ -384,6 +384,8 @@ class RetryPolicyTests(unittest.TestCase):
 
     def set_cluster(self, retry_policy):
         self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
-                          default_retry_policy=retry_policy)
+                               execution_profiles={
+                                   EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=retry_policy)}
+                               )
         self.session = self.cluster.connect(wait_for_all_pools=True)
         self.addCleanup(self.cluster.shutdown)

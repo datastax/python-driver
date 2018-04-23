@@ -358,10 +358,12 @@ class ConnectionTests(SimulacronBase):
         listener = TrackDownListener()
 
         cluster = Cluster(['127.0.0.1'],
-                          load_balancing_policy=RoundRobinPolicy(),
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
                           idle_heartbeat_interval=idle_heartbeat_interval,
-                          executor_threads=16)
+                          executor_threads=16,
+                          execution_profiles={
+                              EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())}
+                          )
         session = cluster.connect(wait_for_all_pools=True)
 
         cluster.register_listener(listener)
