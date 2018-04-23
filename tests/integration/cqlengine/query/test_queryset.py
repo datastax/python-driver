@@ -41,7 +41,7 @@ from cassandra.cqlengine import statements
 from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
-from tests.integration import CASSANDRA_VERSION, greaterthancass21
+from tests.integration import CASSANDRA_VERSION, greaterthancass21, greaterthanorequalcass30
 from tests.integration.cqlengine import execute_count, DEFAULT_KEYSPACE
 from tests.integration.cqlengine import mock_execute_async
 
@@ -827,6 +827,7 @@ class TestQuerySetDelete(BaseQuerySetUsage):
         with self.assertRaises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
 
+    @greaterthanorequalcass30
     @execute_count(18)
     def test_range_deletion(self):
         """

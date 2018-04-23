@@ -180,13 +180,13 @@ def get_supported_protocol_versions():
     elif CASSANDRA_VERSION >= Version('3.0'):
         return (3, 4)
     elif CASSANDRA_VERSION >= Version('2.2'):
-        return (1, 2, 3, 4)
+        return (3, 4)
     elif CASSANDRA_VERSION >= Version('2.1'):
-        return (1, 2, 3)
+        return (3, )
     elif CASSANDRA_VERSION >= Version('2.0'):
-        return (1, 2)
+        raise Exception("Cassandra Version 2.0 not supported anymore")
     else:
-        raise Exception("Cassandra Version not supported anymore")
+        raise Exception("Cassandra Version {} not supported anymore".format(CASSANDRA_VERSION))
 
 def get_unsupported_lower_protocol():
     """
