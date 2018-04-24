@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -114,6 +114,13 @@ class Column(object):
     bool flag, indicates an index should be created for this column
     """
 
+    custom_index = False
+    """
+    bool flag, indicates an index is managed outside of cqlengine. This is
+    useful if you want to do filter queries on fields that have custom
+    indexes.
+    """
+
     db_field = None
     """
     the fieldname this field will map to in the database
@@ -161,10 +168,12 @@ class Column(object):
                  required=False,
                  clustering_order=None,
                  discriminator_column=False,
-                 static=False):
+                 static=False,
+                 custom_index=False):
         self.partition_key = partition_key
         self.primary_key = partition_key or primary_key
         self.index = index
+        self.custom_index = custom_index
         self.db_field = db_field
         self.default = default
         self.required = required
@@ -285,6 +294,10 @@ class Column(object):
     def db_index_name(self):
         """ Returns the name of the cql index """
         return 'index_{0}'.format(self.db_field_name)
+
+    @property
+    def has_index(self):
+        return self.index or self.custom_index
 
     @property
     def cql(self):

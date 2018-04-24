@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 12, 0, 'post0')
+__version_info__ = (3, 14, 0)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -202,6 +202,75 @@ class ProtocolVersion(object):
         return version >= cls.V5
 
 
+class WriteType(object):
+    """
+    For usage with :class:`.RetryPolicy`, this describe a type
+    of write operation.
+    """
+
+    SIMPLE = 0
+    """
+    A write to a single partition key. Such writes are guaranteed to be atomic
+    and isolated.
+    """
+
+    BATCH = 1
+    """
+    A write to multiple partition keys that used the distributed batch log to
+    ensure atomicity.
+    """
+
+    UNLOGGED_BATCH = 2
+    """
+    A write to multiple partition keys that did not use the distributed batch
+    log. Atomicity for such writes is not guaranteed.
+    """
+
+    COUNTER = 3
+    """
+    A counter write (for one or multiple partition keys). Such writes should
+    not be replayed in order to avoid overcount.
+    """
+
+    BATCH_LOG = 4
+    """
+    The initial write to the distributed batch log that Cassandra performs
+    internally before a BATCH write.
+    """
+
+    CAS = 5
+    """
+    A lighweight-transaction write, such as "DELETE ... IF EXISTS".
+    """
+
+    VIEW = 6
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete MV operations.
+    """
+
+    CDC = 7
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete CDC operations.
+    """
+
+
+WriteType.name_to_value = {
+    'SIMPLE': WriteType.SIMPLE,
+    'BATCH': WriteType.BATCH,
+    'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
+    'COUNTER': WriteType.COUNTER,
+    'BATCH_LOG': WriteType.BATCH_LOG,
+    'CAS': WriteType.CAS,
+    'VIEW': WriteType.VIEW,
+    'CDC': WriteType.CDC
+}
+
+
+WriteType.value_to_name = {v: k for k, v in WriteType.name_to_value.items()}
+
+
 class SchemaChangeType(object):
     DROPPED = 'DROPPED'
     CREATED = 'CREATED'
@@ -328,14 +397,21 @@ class Timeout(RequestExecutionException):
     the operation
     """
 
-    def __init__(self, summary_message, consistency=None, required_responses=None, received_responses=None):
+    def __init__(self, summary_message, consistency=None, required_responses=None,
+                 received_responses=None, **kwargs):
         self.consistency = consistency
         self.required_responses = required_responses
         self.received_responses = received_responses
-        Exception.__init__(self, summary_message + ' info=' +
-                           repr({'consistency': consistency_value_to_name(consistency),
-                                 'required_responses': required_responses,
-                                 'received_responses': received_responses}))
+
+        if "write_type" in kwargs:
+            kwargs["write_type"] = WriteType.value_to_name[kwargs["write_type"]]
+
+        info = {'consistency': consistency_value_to_name(consistency),
+                'required_responses': required_responses,
+                'received_responses': received_responses}
+        info.update(kwargs)
+
+        Exception.__init__(self, summary_message + ' info=' + repr(info))
 
 
 class ReadTimeout(Timeout):
@@ -376,6 +452,7 @@ class WriteTimeout(Timeout):
     """
 
     def __init__(self, message, write_type=None, **kwargs):
+        kwargs["write_type"] = write_type
         Timeout.__init__(self, message, **kwargs)
         self.write_type = write_type
 

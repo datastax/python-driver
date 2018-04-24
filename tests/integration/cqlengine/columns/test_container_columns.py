@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import six
 import sys
 import traceback
 from uuid import uuid4
+from packaging.version import Version
 
 from cassandra import WriteTimeout, OperationTimedOut
 
@@ -241,7 +242,7 @@ class TestListColumn(BaseCassEngTestCase):
                 break
             except WriteTimeout:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
         self.assertRaises(ValidationError, TestListModel.create, **{'text_list': [str(uuid4()) for _ in range(65536)]})
 
@@ -405,7 +406,7 @@ class TestMapColumn(BaseCassEngTestCase):
                 break
             except WriteTimeout:
                 ex_type, ex, tb = sys.exc_info()
-                log.warn("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
+                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
         self.assertRaises(ValidationError, TestMapModel.create, **{'text_map': dict((str(uuid4()), i) for i in range(65536))})
 
@@ -527,7 +528,7 @@ class TestTupleColumn(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         # Skip annotations don't seem to skip class level teradown and setup methods
-        if(CASSANDRA_VERSION >= '2.1'):
+        if CASSANDRA_VERSION >= Version('2.1'):
             drop_table(TestTupleModel)
             sync_table(TestTupleModel)
 
@@ -718,7 +719,7 @@ class TestNestedType(BaseCassEngTestCase):
     @classmethod
     def setUpClass(cls):
         # Skip annotations don't seem to skip class level teradown and setup methods
-        if(CASSANDRA_VERSION >= '2.1'):
+        if CASSANDRA_VERSION >= Version('2.1'):
             drop_table(TestNestedModel)
             sync_table(TestNestedModel)
 

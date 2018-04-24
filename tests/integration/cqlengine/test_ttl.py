@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+
+from packaging.version import Version
 
 from cassandra import InvalidRequest
 from cassandra.cqlengine.management import sync_table, drop_table
@@ -53,14 +55,14 @@ class BaseDefaultTTLTest(BaseCassEngTestCase):
 
     @classmethod
     def setUpClass(cls):
-        if CASSANDRA_VERSION >= '2.0':
+        if CASSANDRA_VERSION >= Version('2.0'):
             super(BaseDefaultTTLTest, cls).setUpClass()
             sync_table(TestDefaultTTLModel)
             sync_table(UUID_int_text_model)
 
     @classmethod
     def tearDownClass(cls):
-        if CASSANDRA_VERSION >= '2.0':
+        if CASSANDRA_VERSION >= Version('2.0'):
             super(BaseDefaultTTLTest, cls).tearDownClass()
             drop_table(TestDefaultTTLModel)
             drop_table(UUID_int_text_model)
@@ -151,7 +153,6 @@ class TTLBlindUpdateTest(BaseTTLTest):
         self.assertIn("USING TTL", query)
 
 
-@unittest.skipIf(CASSANDRA_VERSION < '2.0', "default_time_to_Live was introduce in C* 2.0, currently running {0}".format(CASSANDRA_VERSION))
 class TTLDefaultTest(BaseDefaultTTLTest):
     def get_default_ttl(self, table_name):
         session = get_session()

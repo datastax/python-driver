@@ -107,8 +107,12 @@
 
    .. automethod:: refresh_nodes
 
-.. autoclass:: ExecutionProfile
+.. autoclass:: ExecutionProfile (load_balancing_policy=<object object>, retry_policy=None, consistency_level=LOCAL_ONE, serial_consistency_level=None, request_timeout=10.0, row_factory=<function tuple_factory>, speculative_execution_policy=None)
    :members:
+   :exclude-members: consistency_level
+
+   .. autoattribute:: consistency_level
+      :annotation: = LOCAL_ONE
 
 .. autodata:: EXEC_PROFILE_DEFAULT
    :annotation:

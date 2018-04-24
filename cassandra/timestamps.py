@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ class MonotonicTimestampGenerator(object):
                 (diff >= self.warning_threshold * 1e6) and
                 (since_last_warn >= self.warning_interval * 1e6))
         if warn:
-            log.warn(
+            log.warning(
                 "Clock skew detected: current tick ({now}) was {diff} "
                 "microseconds behind the last generated timestamp "
                 "({last}), returned timestamps will be artificially "

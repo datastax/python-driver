@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,15 +27,16 @@ from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
 from cassandra.policies import HostStateListener, RoundRobinPolicy
-from tests.integration import (CASSANDRA_VERSION, PROTOCOL_VERSION,
-                               requiressimulacron)
+from cassandra.io.asyncorereactor import AsyncoreConnection
+from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
 from tests.integration.util import assert_quiescent_pool_state
 from tests.integration.simulacron import SimulacronBase
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
                                                 start_and_prime_cluster_defaults,
                                                 start_and_prime_singledc,
-                                                clear_queries)
+                                                clear_queries, RejectConnections,
+                                                RejectType, AcceptConnections)
 
 
 class TrackDownListener(HostStateListener):
@@ -44,6 +45,15 @@ class TrackDownListener(HostStateListener):
 
     def on_down(self, host):
         self.hosts_marked_down.append(host)
+
+    def on_up(self, host):
+        pass
+
+    def on_add(self, host):
+        pass
+
+    def on_remove(self, host):
+        pass
 
 class ThreadTracker(ThreadPoolExecutor):
     called_functions = []
@@ -86,7 +96,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_timeout = 5
         idle_heartbeat_interval = 1
 
-        start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc, CASSANDRA_VERSION)
+        start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc)
 
         listener = TrackDownListener()
         executor = ThreadTracker(max_workers=8)
@@ -220,7 +230,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_timeout = 1
         idle_heartbeat_interval = 5
 
-        simulacron_cluster = start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc, CASSANDRA_VERSION)
+        simulacron_cluster = start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc)
 
         dc_ids = sorted(simulacron_cluster.data_center_ids)
         last_host = dc_ids.pop()
@@ -328,3 +338,49 @@ class ConnectionTests(SimulacronBase):
 
         self.assertEqual(listener.hosts_marked_down, [])
         assert_quiescent_pool_state(self, cluster)
+
+    def test_can_shutdown_asyncoreconnection_subclass(self):
+        start_and_prime_singledc()
+        class ExtendedConnection(AsyncoreConnection):
+            pass
+
+        cluster = Cluster(contact_points=["127.0.0.2"],
+                          connection_class=ExtendedConnection)
+        cluster.connect()
+        cluster.shutdown()
+
+    def test_driver_recovers_nework_isolation(self):
+        start_and_prime_singledc()
+
+        idle_heartbeat_timeout = 3
+        idle_heartbeat_interval = 1
+
+        listener = TrackDownListener()
+
+        cluster = Cluster(['127.0.0.1'],
+                          idle_heartbeat_timeout=idle_heartbeat_timeout,
+                          idle_heartbeat_interval=idle_heartbeat_interval,
+                          executor_threads=16,
+                          execution_profiles={
+                              EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())}
+                          )
+        session = cluster.connect(wait_for_all_pools=True)
+
+        cluster.register_listener(listener)
+
+        prime_request(PrimeOptions(then=NO_THEN))
+        prime_request(RejectConnections(RejectType.REJECT_STARTUP))
+
+        time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval) * 2)
+
+        for host in cluster.metadata.all_hosts():
+            self.assertIn(host, listener.hosts_marked_down)
+
+        self.assertRaises(NoHostAvailable, session.execute, "SELECT * from system.local")
+
+        clear_queries()
+        prime_request(AcceptConnections())
+
+        time.sleep(idle_heartbeat_timeout + idle_heartbeat_interval + 2)
+
+        self.assertIsNotNone(session.execute("SELECT * from system.local"))

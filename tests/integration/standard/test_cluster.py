@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ from mock import Mock, call, patch
 import time
 from uuid import uuid4
 import logging
+import warnings
+from packaging.version import Version
 
 import cassandra
 from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, ResultSetIterator, \
@@ -34,6 +36,8 @@ from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
 from cassandra import ConsistencyLevel
 from cassandra.hosts import Host
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
+from cassandra.auth import PlainTextAuthProvider, SaslAuthProvider
+from cassandra import connection
 
 from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
@@ -46,6 +50,7 @@ import sys
 
 def setup_module():
     use_singledc()
+    warnings.simplefilter("always")
 
 
 class IgnoredHostPolicy(RoundRobinPolicy):
@@ -237,10 +242,10 @@ class ClusterTests(unittest.TestCase):
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
         # Make sure the correct protocol was selected by default
-        if CASSANDRA_VERSION >= '2.2':
+        if CASSANDRA_VERSION >= Version('2.2'):
             self.assertEqual(updated_protocol_version, 4)
             self.assertEqual(updated_cluster_version, 4)
-        elif CASSANDRA_VERSION >= '2.1':
+        elif CASSANDRA_VERSION >= Version('2.1'):
             self.assertEqual(updated_protocol_version, 3)
             self.assertEqual(updated_cluster_version, 3)
         else:
@@ -591,6 +596,20 @@ class ClusterTests(unittest.TestCase):
         else:
             raise Exception("get_query_trace didn't raise TraceUnavailable after {} tries".format(max_retry_count))
 
+    def test_one_returns_none(self):
+        """
+        Test ResulSet.one returns None if no rows where found
+
+        @since 3.14
+        @jira_ticket PYTHON-947
+        @expected_result ResulSet.one is None
+
+        @test_category query
+        """
+        with Cluster() as cluster:
+            session = cluster.connect()
+            self.assertIsNone(session.execute("SELECT * from system.local WHERE key='madeup_key'").one())
+
     def test_string_coverage(self):
         """
         Ensure str(future) returns without error
@@ -609,6 +628,57 @@ class ClusterTests(unittest.TestCase):
         self.assertIn(query, str(future))
         self.assertIn('result', str(future))
         cluster.shutdown()
+
+    def test_can_connect_with_plainauth(self):
+        """
+        Verify that we can connect setting PlainTextAuthProvider against a
+        C* server without authentication set. We also verify a warning is
+        issued per connection. This test is here instead of in test_authentication.py
+        because the C* server running in that module has auth set.
+
+        @since 3.14
+        @jira_ticket PYTHON-940
+        @expected_result we can connect, query C* and warning are issued
+
+        @test_category auth
+        """
+        auth_provider = PlainTextAuthProvider(
+            username="made_up_username",
+            password="made_up_password"
+        )
+        self._warning_are_issued_when_auth(auth_provider)
+
+    def test_can_connect_with_sslauth(self):
+        """
+        Verify that we can connect setting SaslAuthProvider against a
+        C* server without authentication set. We also verify a warning is
+        issued per connection. This test is here instead of in test_authentication.py
+        because the C* server running in that module has auth set.
+
+        @since 3.14
+        @jira_ticket PYTHON-940
+        @expected_result we can connect, query C* and warning are issued
+
+        @test_category auth
+        """
+        sasl_kwargs = {'service': 'cassandra',
+                       'mechanism': 'PLAIN',
+                       'qops': ['auth'],
+                       'username': "made_up_username",
+                       'password': "made_up_password"}
+
+        auth_provider = SaslAuthProvider(**sasl_kwargs)
+        self._warning_are_issued_when_auth(auth_provider)
+
+    def _warning_are_issued_when_auth(self, auth_provider):
+        with MockLoggingHandler().set_module_name(connection.__name__) as mock_handler:
+            with Cluster(auth_provider=auth_provider) as cluster:
+                session = cluster.connect()
+                self.assertIsNotNone(session.execute("SELECT * from system.local"))
+
+            # Three conenctions to nodes plus the control connection
+            self.assertEqual(4, mock_handler.get_message_count('warning',
+                                                               "An authentication challenge was not sent"))
 
     def test_idle_heartbeat(self):
         interval = 2

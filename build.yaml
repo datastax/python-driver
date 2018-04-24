@@ -5,6 +5,17 @@ schedules:
       include: [master]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
+      EXCLUDE_LONG=1
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
+
+  nightly_master:
+    schedule: nightly
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
         - python: [3.4, 3.6]
@@ -15,6 +26,7 @@ schedules:
       include: [/python.*/, '4.x']
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
+      EXCLUDE_LONG=1
     matrix:
       exclude:
         - python: [3.4, 3.6]
@@ -44,12 +56,22 @@ schedules:
     env_vars: |
       EVENT_LOOP_MANAGER='eventlet'
 
+  weekly_asyncio:
+    schedule: 0 22 * * 6
+    branches:
+      include: [master]
+    env_vars: |
+      EVENT_LOOP_MANAGER='asyncio'
+    matrix:
+      exclude:
+        - python: [2.7]
+
   weekly_async:
     schedule: 0 10 * * 7
     branches:
       include: [master]
     env_vars: |
-      EVENT_LOOP_MANAGER='async'
+      EVENT_LOOP_MANAGER='asyncore'
 
   weekly_twister:
     schedule: 0 14 * * 7
@@ -96,6 +118,10 @@ build:
       export PATH=$JAVA_HOME/bin:$PATH
       export PYTHONPATH=""
 
+      # Install latest setuptools
+      pip install --upgrade pip
+      pip install -U setuptools
+
       pip install git+https://github.com/pcmanus/ccm.git
       # Install dependencies
       sudo apt-get install -y libev4 libev-dev
@@ -103,6 +129,8 @@ build:
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
       pip install nose-exclude
+      pip install service_identity
+
       FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
         FORCE_CYTHON=True
@@ -146,8 +174,8 @@ build:
       # it takes too much time for the whole matrix to build with cython
       if [[ $CYTHON == 'CYTHON' ]]; then
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml tests/unit/ || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
-        MONKEY_PATCH_LOOP=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
+        EVENT_LOOP_MANAGER=eventlet VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
+        EVENT_LOOP_MANAGER=gevent VERIFY_CYTHON=1 nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
 
       fi
 
@@ -162,7 +190,9 @@ build:
       echo "==========RUNNING INTEGRATION TESTS=========="
       EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
-      echo "==========RUNNING LONG INTEGRATION TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      if [ -z "$EXCLUDE_LONG" ]; then
+        echo "==========RUNNING LONG INTEGRATION TESTS=========="
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+      fi
   - xunit:
     - "*_results.xml"

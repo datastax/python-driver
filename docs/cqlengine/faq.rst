@@ -14,9 +14,9 @@ Statement Ordering is not supported by CQL3 batches. Therefore,
 once cassandra needs resolving conflict(Updating the same column in one batch),
 The algorithm below would be used.
 
- * If timestamps are different, pick the column with the largest timestamp (the value being a regular column or a tombstone)
- * If timestamps are the same, and one of the columns in a tombstone ('null') - pick the tombstone
- * If timestamps are the same, and none of the columns are tombstones, pick the column with the largest value
+* If timestamps are different, pick the column with the largest timestamp (the value being a regular column or a tombstone)
+* If timestamps are the same, and one of the columns in a tombstone ('null') - pick the tombstone
+* If timestamps are the same, and none of the columns are tombstones, pick the column with the largest value
 
 Below is an example to show this scenario.
 

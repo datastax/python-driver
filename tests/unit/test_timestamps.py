@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -131,12 +131,12 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         tsg._last_warn = 12
 
         tsg._next_timestamp(20, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 0)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 0)
         tsg._next_timestamp(16, tsg.last)
 
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 1)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
         self.assertLastCallArgRegex(
-            self.patched_timestamp_log.warn.call_args,
+            self.patched_timestamp_log.warning.call_args,
             r'Clock skew detected:.*\b16\b.*\b4\b.*\b20\b'
         )
 
@@ -154,7 +154,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
 
         no_warn_tsg.last = 100
         no_warn_tsg._next_timestamp(99, no_warn_tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 0)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 0)
 
     def test_warning_threshold_respected_no_logging(self):
         """
@@ -171,7 +171,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last, tsg._last_warn = 100, 97
         tsg._next_timestamp(98, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 0)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 0)
 
     def test_warning_threshold_respected_logs(self):
         """
@@ -189,7 +189,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last, tsg._last_warn = 100, 97
         tsg._next_timestamp(98, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 1)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
 
     def test_warning_interval_respected_no_logging(self):
         """
@@ -207,10 +207,10 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last = 100
         tsg._next_timestamp(70, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 1)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
 
         tsg._next_timestamp(71, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 1)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
 
     def test_warning_interval_respected_logs(self):
         """
@@ -229,10 +229,10 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last = 100
         tsg._next_timestamp(70, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 1)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
 
         tsg._next_timestamp(72, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warn.call_args_list), 2)
+        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 2)
 
 
 class TestTimestampGeneratorMultipleThreads(unittest.TestCase):

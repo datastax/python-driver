@@ -1,4 +1,4 @@
-# Copyright 2013-2017 DataStax, Inc.
+# Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
 from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
-from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, get_server_versions, \
+from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
     USE_CASS_EXTERNAL, greaterthanorequalcass40
 from tests import notwindows
@@ -47,8 +47,6 @@ def setup_module():
         ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
     setup_keyspace()
-    global CASS_SERVER_VERSION
-    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
 class QueryTests(BasicSharedKeyspaceUnitTestCase):
@@ -822,11 +820,20 @@ class LightweightTransactionTests(unittest.TestCase):
                 v int )'''
         self.session.execute(ddl)
 
+        ddl = '''
+            CREATE TABLE test3rf.lwt_clustering (
+                k int,
+                c int,
+                v int,
+                PRIMARY KEY (k, c))'''
+        self.session.execute(ddl)
+
     def tearDown(self):
         """
         Shutdown cluster
         """
         self.session.execute("DROP TABLE test3rf.lwt")
+        self.session.execute("DROP TABLE test3rf.lwt_clustering")
         self.cluster.shutdown()
 
     def test_no_connection_refused_on_timeout(self):
@@ -871,6 +878,119 @@ class LightweightTransactionTests(unittest.TestCase):
 
         # Make sure test passed
         self.assertTrue(received_timeout)
+
+    def test_was_applied_batch_stmt(self):
+        """
+        Test to ensure `:attr:cassandra.cluster.ResultSet.was_applied` works as expected
+        with Batchstatements.
+
+        For both type of batches verify was_applied has the correct result
+        under different scenarios:
+            - If on LWT fails the rest of the statements fail including normal UPSERTS
+            - If on LWT fails the rest of the statements fail
+            - All the queries succeed
+
+        @since 3.14
+        @jira_ticket PYTHON-848
+        @expected_result `:attr:cassandra.cluster.ResultSet.was_applied` is updated as
+        expected
+
+        @test_category query
+        """
+        for batch_type in (BatchType.UNLOGGED, BatchType.LOGGED):
+            batch_statement = BatchStatement(batch_type)
+            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 1, 10);",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 2, 10);"], [None] * 3)
+            result = self.session.execute(batch_statement)
+            #self.assertTrue(result.was_applied)
+
+            # Should fail since (0, 0, 10) have already been written
+            # The non conditional insert shouldn't be written as well
+            batch_statement = BatchStatement(batch_type)
+            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 4, 10);",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 4)
+            result = self.session.execute(batch_statement)
+            self.assertFalse(result.was_applied)
+
+            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+            # Verify the non conditional insert hasn't been inserted
+            self.assertEqual(len(all_rows.current_rows), 3)
+
+            # Should fail since (0, 0, 10) have already been written
+            batch_statement = BatchStatement(batch_type)
+            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 3)
+            result = self.session.execute(batch_statement)
+            self.assertFalse(result.was_applied)
+
+            # Should fail since (0, 0, 10) have already been written
+            batch_statement.add("INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;")
+            result = self.session.execute(batch_statement)
+            self.assertFalse(result.was_applied)
+
+            # Should succeed
+            batch_statement = BatchStatement(batch_type)
+            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 4, 10) IF NOT EXISTS;",
+                                     "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 3)
+
+            result = self.session.execute(batch_statement)
+            self.assertTrue(result.was_applied)
+
+            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+            for i, row in enumerate(all_rows):
+                self.assertEqual((0, i, 10), (row[0], row[1], row[2]))
+
+            self.session.execute("TRUNCATE TABLE test3rf.lwt_clustering")
+
+    def test_empty_batch_statement(self):
+        """
+        Test to ensure `:attr:cassandra.cluster.ResultSet.was_applied` works as expected
+        with empty Batchstatements.
+
+        @since 3.14
+        @jira_ticket PYTHON-848
+        @expected_result an Exception is raised
+        expected
+
+        @test_category query
+        """
+        batch_statement = BatchStatement()
+        results = self.session.execute(batch_statement)
+        with self.assertRaises(RuntimeError):
+            results.was_applied
+
+    @unittest.skip("Skipping until PYTHON-943 is resolved")
+    def test_was_applied_batch_string(self):
+        batch_statement = BatchStatement(BatchType.LOGGED)
+        batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 1, 10);",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 2, 10);"], [None] * 3)
+        self.session.execute(batch_statement)
+
+        batch_str = """
+                    BEGIN unlogged batch
+                        INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;
+                        INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 1, 10) IF NOT EXISTS;
+                        INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 2, 10) IF NOT EXISTS;
+                    APPLY batch;
+                    """
+        result = self.session.execute(batch_str)
+        self.assertFalse(result.was_applied)
+
+        batch_str = """
+                    BEGIN unlogged batch
+                        INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;
+                        INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 4, 10) IF NOT EXISTS;
+                        INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;
+                    APPLY batch;
+                    """
+        result = self.session.execute(batch_str)
+        self.assertTrue(result.was_applied)
 
 
 class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
@@ -955,11 +1075,8 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         self.assertEqual(batch.routing_key, self.prepared.bind((1, 0)).routing_key)
 
 
+@greaterthanorequalcass30
 class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
-
-    def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
     def test_mv_filtering(self):
         """

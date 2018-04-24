@@ -21,7 +21,7 @@ addons:
     - libev-dev
 
 install:
-  - pip install tox-travis
+  - pip install tox-travis lz4
 
 script:
   - |
@@ -33,4 +33,5 @@ script:
       exit 1
     fi
   - tox
-  - tox -e patched_loops
+  - tox -e gevent_loop
+  - tox -e eventlet_loop
