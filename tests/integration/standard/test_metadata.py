@@ -1172,8 +1172,8 @@ CREATE TABLE export_udts.users (
 
         for i, token in enumerate(ring):
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
-            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[(i + 1) % 3], owners[(i + 2) % 3]]))
-            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
+            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[i], owners[(i + 1) % 3]]))
+            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[i]]))
         cluster.shutdown()
 
 
