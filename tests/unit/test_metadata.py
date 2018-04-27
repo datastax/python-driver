@@ -312,8 +312,7 @@ class GetReplicasTest(unittest.TestCase):
         token_map = TokenMap(token_klass, token_to_primary_replica, tokens, metadata)
 
         # tokens match node tokens exactly
-        for i, token in enumerate(tokens):
-            expected_host = hosts[(i + 1) % len(hosts)]
+        for token, expected_host in zip(tokens, hosts):
             replicas = token_map.get_replicas("ks", token)
             self.assertEqual(set(replicas), {expected_host})
 
