@@ -13,8 +13,23 @@
 # limitations under the License.
 
 from tests.integration import PROTOCOL_VERSION
+import time
 
-def assert_quiescent_pool_state(test_case, cluster):
+
+def assert_quiescent_pool_state(test_case, cluster, wait=None):
+    """
+    Checking the quiescent pool state checks that none of the requests ids have
+    been lost. However, the callback corresponding to a request_id is called
+    before the request_id is returned back to the pool, therefore
+
+    session.execute("SELECT * from system.local")
+    assert_quiescent_pool_state(self, session.cluster)
+
+    (with no wait) might fail because when execute comes back the request_id
+    hasn't yet been returned to the pool, therefore the wait.
+    """
+    if wait is not None:
+        time.sleep(wait)
 
     for session in cluster.sessions:
         pool_states = session.get_pool_state().values()
@@ -32,4 +47,3 @@ def assert_quiescent_pool_state(test_case, cluster):
             test_case.assertEqual(len(req_ids), len(set(req_ids)))
             test_case.assertEqual(connection.highest_request_id, len(req_ids) - 1)
             test_case.assertEqual(connection.highest_request_id, max(req_ids))
-

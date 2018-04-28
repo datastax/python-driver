@@ -21,9 +21,15 @@ Other
 * cqlengine: Remove Model.__default_ttl__ (PYTHON-889)
 * Remove Cluster.set_meta_refresh_enabled (PYTHON-890)
 
+3.15.0
+======
+Bug Fixes
+---------
+* Tokenmap.get_replicas returns the wrong value if token coincides with the end of the range (PYTHON-978)
 
 3.14.0
 ======
+April 17, 2018
 
 Features
 --------

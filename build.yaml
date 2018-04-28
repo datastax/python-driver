@@ -146,17 +146,6 @@ build:
       echo "Installing simulacron"
       pushd ~
 
-      if [ ! -d "simulacron" ] ; then
-        git clone git@github.com:datastax/simulacron.git
-        cd simulacron
-        git clone git@github.com:datastax/native-protocol.git
-        cd native-protocol
-        mvn clean install
-        cd ../..
-      fi
-      cd simulacron
-      mvn clean install -DskipTests=true
-      ls standalone/target
       SIMULACRON_JAR=`find \`pwd\` -name "simulacron-standalone-*.jar"`
       echo "SIMULACRON_JAR: $SIMULACRON_JAR"
 
