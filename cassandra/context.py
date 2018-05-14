@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.registry import MessageCodecRegistry
+from cassandra.registry import ProtocolVersionRegistry, MessageCodecRegistry
 from cassandra.protocol import ProtocolHandler
 
 __all__ = ['DriverContext']
@@ -46,16 +46,20 @@ class SingletonProvider(object):
 
 class DriverContext(object):
 
+    _protocol_version_registry = None
     _message_codec_registry = None
     # the default protocol handler
     _protocol_handler = None
 
     def __init__(self):
-        self._message_codec_registry = SingletonProvider(MessageCodecRegistry.factory)
+        self._protocol_version_registry = SingletonProvider(ProtocolVersionRegistry.factory)
+        self._message_codec_registry = SingletonProvider(
+            MessageCodecRegistry.factory,
+            self.protocol_version_registry)
         self._protocol_handler = SingletonProvider(
             ProtocolHandler,
-            self._message_codec_registry().encoders,
-            self._message_codec_registry().decoders)
+            self.message_codec_registry.encoders,
+            self.message_codec_registry.decoders)
 
     @property
     def message_codec_registry(self):
@@ -64,3 +68,7 @@ class DriverContext(object):
     @property
     def protocol_handler(self):
         return self._protocol_handler()
+
+    @property
+    def protocol_version_registry(self):
+        return self._protocol_version_registry()

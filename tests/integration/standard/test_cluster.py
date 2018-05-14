@@ -45,10 +45,11 @@ from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
     get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40, \
-    BasicSharedKeyspaceUnitTestCase
+    BasicSharedKeyspaceUnitTestCase, driver_context
 from tests.integration.util import assert_quiescent_pool_state
 import sys
 
+MAX_SUPPORTED = driver_context.protocol_version_registry.max_supported()
 
 def setup_module():
     use_singledc()
@@ -239,7 +240,7 @@ class ClusterTests(unittest.TestCase):
         """
 
         cluster = Cluster()
-        self.assertLessEqual(cluster.protocol_version,  cassandra.ProtocolVersion.MAX_SUPPORTED)
+        self.assertLessEqual(cluster.protocol_version,  MAX_SUPPORTED)
         session = cluster.connect()
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
@@ -345,9 +346,9 @@ class ClusterTests(unittest.TestCase):
         """
         Ensure that auth_providers are always callable
         """
-        self.assertRaises(TypeError, Cluster, auth_provider=1, protocol_version=1)
+        self.assertRaises(TypeError, Cluster, auth_provider=1, protocol_version=4)
         c = Cluster(protocol_version=1)
-        self.assertRaises(TypeError, setattr, c, 'auth_provider', 1)
+        self.assertRaises(TypeError, setattr, c, 'auth_provider', 4)
 
     def test_conviction_policy_factory_is_callable(self):
         """
@@ -1474,7 +1475,7 @@ class BetaProtocolTest(unittest.TestCase):
         @test_category connection
         """
 
-        cluster = Cluster(protocol_version=cassandra.ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=False)
+        cluster = Cluster(protocol_version=MAX_SUPPORTED, allow_beta_protocol_version=False)
         try:
             with self.assertRaises(NoHostAvailable):
                 cluster.connect()
@@ -1492,8 +1493,8 @@ class BetaProtocolTest(unittest.TestCase):
 
         @test_category connection
         """
-        cluster = Cluster(protocol_version=cassandra.ProtocolVersion.MAX_SUPPORTED, allow_beta_protocol_version=True)
+        cluster = Cluster(protocol_version=MAX_SUPPORTED, allow_beta_protocol_version=True)
         session = cluster.connect()
-        self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.MAX_SUPPORTED)
+        self.assertEqual(cluster.protocol_version, MAX_SUPPORTED)
         self.assertTrue(session.execute("select release_version from system.local")[0])
         cluster.shutdown()

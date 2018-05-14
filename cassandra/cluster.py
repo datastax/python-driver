@@ -769,6 +769,10 @@ class Cluster(object):
         self.compression = compression
 
         if protocol_version is not _NOT_SET:
+            if protocol_version not in self._context. \
+                    protocol_version_registry.supported_versions():
+                raise ValueError("Protocol version %d is not supported "
+                                 "by this driver." % (protocol_version,))
             self.protocol_version = protocol_version
             self._protocol_version_explicit = True
         self.allow_beta_protocol_version = allow_beta_protocol_version
@@ -971,12 +975,12 @@ class Cluster(object):
         """
         kwargs = self._make_connection_kwargs(address, kwargs)
         return self.connection_class.factory(
-            self._context.protocol_handler, address, self.connect_timeout,
+            self._context, address, self.connect_timeout,
             *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
         kwargs = self._make_connection_kwargs(host.address, kwargs)
-        return partial(self.connection_class.factory, self._context.protocol_handler, host.address,
+        return partial(self.connection_class.factory, self._context, host.address,
                        self.connect_timeout, *args, **kwargs)
 
     def _make_connection_kwargs(self, address, kwargs_dict):
@@ -999,10 +1003,11 @@ class Cluster(object):
         if self._protocol_version_explicit:
             raise DriverException("ProtocolError returned from server while using explicitly set client protocol_version %d" % (previous_version,))
 
-        new_version = ProtocolVersion.get_lower_supported(previous_version)
-        if new_version < ProtocolVersion.MIN_SUPPORTED:
+        new_version = self._context.protocol_version_registry.get_lower_supported(previous_version)
+        min_supported = self._context.protocol_version_registry.min_supported()
+        if new_version < min_supported:
             raise DriverException(
-                "Cannot downgrade protocol version below minimum supported version: %d" % (ProtocolVersion.MIN_SUPPORTED,))
+                "Cannot downgrade protocol version below minimum supported version: %d" % (min_supported,))
 
         log.warning("Downgrading core protocol version from %d to %d for %s. "
                     "To avoid this, it is best practice to explicitly set Cluster(protocol_version) to the version supported by your cluster. "
@@ -1583,7 +1588,8 @@ class Cluster(object):
         try:
             connection = self.connection_factory(host.address)
             statements = self._prepared_statements.values()
-            if ProtocolVersion.uses_keyspace_flag(self.protocol_version):
+            if self._context.protocol_version_registry. \
+                    protocol_version.uses_keyspace_flag(self.protocol_version):
                 # V5 protocol and higher, no need to set the keyspace
                 chunks = []
                 for i in range(0, len(statements), 10):
@@ -1884,9 +1890,11 @@ class Session(object):
         else:
             timestamp = None
 
+        has_keyspace_flag = self._context.protocol_version_registry. \
+            protocol_version.uses_keyspace_flag(self._protocol_version)
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
-            statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
+            statement_keyspace = query.keyspace if has_keyspace_flag else None
             if parameters:
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
@@ -1901,7 +1909,7 @@ class Session(object):
                 timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata),
                 result_metadata_id=prepared_statement.result_metadata_id)
         elif isinstance(query, BatchStatement):
-            statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
+            statement_keyspace = query.keyspace if has_keyspace_flag else None
             message = BatchMessage(
                 query.batch_type, query._statements_and_parameters, cl,
                 serial_cl, timestamp, statement_keyspace)
@@ -3452,8 +3460,11 @@ class ResponseFuture(object):
 
                     current_keyspace = self._connection.keyspace
                     prepared_keyspace = prepared_statement.keyspace
-                    if not ProtocolVersion.uses_keyspace_flag(self.session.cluster.protocol_version) \
-                            and prepared_keyspace  and current_keyspace != prepared_keyspace:
+                    has_keyspace_flag = self.session._context. \
+                        protocol_version_registry.protocol_version. \
+                            uses_keyspace_flag(self.session.cluster.protocol_version)
+                    if not has_keyspace_flag \
+                            and prepared_keyspace and current_keyspace != prepared_keyspace:
                         self._set_final_exception(
                             ValueError("The Session's current keyspace (%s) does "
                                        "not match the keyspace the statement was "
@@ -3464,7 +3475,7 @@ class ResponseFuture(object):
                     log.debug("Re-preparing unrecognized prepared statement against host %s: %s",
                               host, prepared_statement.query_string)
                     prepared_keyspace = prepared_statement.keyspace \
-                        if ProtocolVersion.uses_keyspace_flag(self.session.cluster.protocol_version) else None
+                            if has_keyspace_flag else None
                     prepare_message = PrepareMessage(query=prepared_statement.query_string,
                                                      keyspace=prepared_keyspace)
                     # since this might block, run on the executor to avoid hanging

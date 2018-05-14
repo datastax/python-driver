@@ -203,8 +203,7 @@ class Connection(object):
 
     cql_version = None
     no_compact = False
-    protocol_version = ProtocolVersion.MAX_SUPPORTED
-    protocol_handler = None
+    protocol_version = None
 
     keyspace = None
     compression = True
@@ -257,9 +256,11 @@ class Connection(object):
 
     _check_hostname = False
 
-    def __init__(self, protocol_handler, host='127.0.0.1', port=9042, authenticator=None,
+    _context = None
+
+    def __init__(self, context, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
-                 cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED,
+                 cql_version=None, protocol_version=None,
                  is_control_connection=False, user_type_map=None, connect_timeout=None,
                  allow_beta_protocol_version=False, no_compact=False):
         self.host = host
@@ -269,8 +270,9 @@ class Connection(object):
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
-        self.protocol_handler = protocol_handler
-        self.protocol_version = protocol_version
+        self._context = context
+        self.protocol_version = protocol_version \
+            or context.protocol_version_registry.max_supported() # wondering if this default was ever used?
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self.connect_timeout = connect_timeout
@@ -318,7 +320,7 @@ class Connection(object):
         raise NotImplementedError()
 
     @classmethod
-    def factory(cls, protocol_handler, host, timeout, *args, **kwargs):
+    def factory(cls, context, host, timeout, *args, **kwargs):
         """
         A factory function which returns connections which have
         succeeded in connecting and are ready for service (or
@@ -326,7 +328,7 @@ class Connection(object):
         """
         start = time.time()
         kwargs['connect_timeout'] = timeout
-        conn = cls(protocol_handler, host, *args, **kwargs)
+        conn = cls(context, host, *args, **kwargs)
         elapsed = time.time() - start
         conn.connected_event.wait(timeout - elapsed)
         if conn.last_error:
@@ -461,7 +463,7 @@ class Connection(object):
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.host)
 
-        protocol_handler = protocol_handler or self.protocol_handler
+        protocol_handler = protocol_handler or self._context.protocol_handler
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
 
@@ -551,7 +553,7 @@ class Connection(object):
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
-            if version > ProtocolVersion.MAX_SUPPORTED:
+            if version > self._context.protocol_version_registry.max_supported():
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3
             # this frame header struct is everything after the version byte
@@ -593,7 +595,7 @@ class Connection(object):
         stream_id = header.stream
         if stream_id < 0:
             callback = None
-            decoder = self.protocol_handler.decode_message
+            decoder = self._context.protocol_handler.decode_message
             result_metadata = None
         else:
             try:

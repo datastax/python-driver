@@ -128,7 +128,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.mock_reactor_cft = self.reactor_cft_patcher.start()
         self.mock_reactor_run = self.reactor_run_patcher.start()
         self.obj_ut = twistedreactor.TwistedConnection(
-            driver_context.protocol_handler,
+            driver_context,
             '1.2.3.4',
             cql_version='3.0.1')
 

@@ -32,12 +32,15 @@ from cassandra.policies import RetryPolicy
 from cassandra.hosts import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
 
+from tests.unit import driver_context
+
 
 class ResponseFutureTests(unittest.TestCase):
 
     def make_basic_session(self):
         s = Mock(spec=Session)
         s.cluster._default_row_factory = lambda *x: list(x)
+        s._context = driver_context
         return s
 
     def make_pool(self):

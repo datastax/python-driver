@@ -37,12 +37,13 @@ from tests.unit import driver_context
 class ConnectionTest(unittest.TestCase):
 
     def make_connection(self):
-        c = Connection('1.2.3.4')
+        c = Connection(driver_context, '1.2.3.4')
         c._socket = Mock()
         c._socket.send.side_effect = lambda x: len(x)
         return c
 
-    def make_header_prefix(self, message_class, version=Connection.protocol_version, stream_id=0):
+    def make_header_prefix(self, message_class, stream_id=0,
+        version=driver_context.protocol_version_registry.max_non_beta_supported()):
         return six.binary_type().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)

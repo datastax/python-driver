@@ -155,7 +155,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         execute_with_long_wait_retry(session, query_one)
         execute_with_long_wait_retry(session, query_two)
 
-        with mock.patch('cassandra.protocol.ProtocolVersion.uses_int_query_flags', new=mock.Mock(return_value=int_flag)):
+        with mock.patch('cassandra.ProtocolVersion.uses_int_query_flags', new=mock.Mock(return_value=int_flag)):
             future = self._send_query_message(session, 10,
                                               consistency_level=ConsistencyLevel.ONE, fetch_size=1)
 
