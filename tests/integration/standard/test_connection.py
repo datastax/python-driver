@@ -38,6 +38,7 @@ from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDR
     requiresmallclockgranularity, greaterthancass20
 try:
     from cassandra.io.libevreactor import LibevConnection
+    import cassandra.io.libevreactor
 except ImportError:
     LibevConnection = None
 
@@ -392,25 +393,12 @@ class ConnectionTests(object):
                 break
         self.assertTrue(exception_thrown)
 
-
-class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
-
-    klass = AsyncoreConnection
-
-    def setUp(self):
-        if is_monkey_patched():
-            raise unittest.SkipTest("Can't test asyncore with monkey patching")
-        ConnectionTests.setUp(self)
-
     def test_subclasses_share_loop(self):
         class C1(AsyncoreConnection):
             pass
 
         class C2(AsyncoreConnection):
             pass
-
-        cassandra.io.asyncorereactor._global_loop._cleanup()
-        cassandra.io.asyncorereactor._global_loop = None
 
         clusterC1 = Cluster(connection_class=C1)
         clusterC1.connect(wait_for_all_pools=True)
@@ -420,14 +408,35 @@ class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
         self.addCleanup(clusterC1.shutdown)
         self.addCleanup(clusterC2.shutdown)
 
-        event_loops_threads = [thread for thread in threading.enumerate() if
-                               thread.name == "cassandra_driver_event_loop"]
-        self.assertEqual(len(event_loops_threads), 1)
+        self.assertEqual(len(get_eventloop_threads(self.event_loop_name)), 1)
+
+
+def get_eventloop_threads(name):
+    import threading
+    event_loops_threads = [thread for thread in threading.enumerate() if name == thread.name]
+
+    return event_loops_threads
+
+
+class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
+
+    klass = AsyncoreConnection
+    event_loop_name = "cassandra_driver_event_loop"
+
+    def setUp(self):
+        if is_monkey_patched():
+            raise unittest.SkipTest("Can't test asyncore with monkey patching")
+        ConnectionTests.setUp(self)
+
+    def clean_global_loop(self):
+        cassandra.io.asyncorereactor._global_loop._cleanup()
+        cassandra.io.asyncorereactor._global_loop = None
 
 
 class LibevConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = LibevConnection
+    event_loop_name = "event_loop"
 
     def setUp(self):
         if is_monkey_patched():
@@ -436,3 +445,7 @@ class LibevConnectionTests(ConnectionTests, unittest.TestCase):
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')
         ConnectionTests.setUp(self)
+
+    def clean_global_loop(self):
+        cassandra.io.libevreactor._global_loop._cleanup()
+        cassandra.io.libevreactor._global_loop = None
