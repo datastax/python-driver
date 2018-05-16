@@ -29,7 +29,9 @@ from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT, Protoc
                                   ConnectionException)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
-                                SupportedMessage, ProtocolHandler)
+                                SupportedMessage)
+
+from tests.unit import driver_context
 
 
 class ConnectionTest(unittest.TestCase):
@@ -103,7 +105,8 @@ class ConnectionTest(unittest.TestCase):
 
     def test_unsupported_cql_version(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response,
+            driver_context.protocol_handler.decode_message, [])}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
@@ -123,7 +126,8 @@ class ConnectionTest(unittest.TestCase):
 
     def test_prefer_lz4_compression(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response,
+            driver_context.protocol_handler.decode_message, [])}
         c.defunct = Mock()
         c.cql_version = "3.0.3"
 
@@ -146,7 +150,8 @@ class ConnectionTest(unittest.TestCase):
 
     def test_requested_compression_not_available(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response,
+            driver_context.protocol_handler.decode_message, [])}
         c.defunct = Mock()
         # request lz4 compression
         c.compression = "lz4"
@@ -173,7 +178,8 @@ class ConnectionTest(unittest.TestCase):
 
     def test_use_requested_compression(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message, [])}
+        c._requests = {0: (c._handle_options_response,
+            driver_context.protocol_handler.decode_message, [])}
         c.defunct = Mock()
         # request snappy compression
         c.compression = "snappy"
@@ -197,7 +203,8 @@ class ConnectionTest(unittest.TestCase):
 
     def test_disable_compression(self, *args):
         c = self.make_connection()
-        c._requests = {0: (c._handle_options_response, ProtocolHandler.decode_message)}
+        c._requests = {0: (c._handle_options_response,
+            driver_context.protocol_handler.decode_message)}
         c.defunct = Mock()
         # disable compression
         c.compression = False

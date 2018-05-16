@@ -127,7 +127,7 @@
 
    .. autoattribute:: encoder
 
-   .. autoattribute:: client_protocol_handler
+   .. autoattribute:: protocol_handler_class
 
    .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload])
 

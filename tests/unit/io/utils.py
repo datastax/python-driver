@@ -18,6 +18,7 @@ from cassandra.marshal import int32_pack, uint8_pack, uint32_pack, uint16_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
 from tests import is_monkey_patched
+from tests.unit import driver_context
 
 from functools import wraps
 import six
@@ -145,6 +146,7 @@ class TimerTestMixin(object):
 
     def setUp(self):
         self.connection = self.connection_class(
+            driver_context.protocol_handler,
             connect_timeout=5
         )
 
@@ -202,7 +204,10 @@ class ReactorTestMixin(object):
         return binary_type().join(header)
 
     def make_connection(self):
-        c = self.connection_class('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
+        c = self.connection_class(
+            driver_context.protocol_handler,
+            '1.2.3.4',
+            cql_version='3.0.1', connect_timeout=5)
         mocket = Mock()
         mocket.send.side_effect = lambda x: len(x)
         self.set_socket(c, mocket)

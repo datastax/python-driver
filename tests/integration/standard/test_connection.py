@@ -34,7 +34,7 @@ from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateList
 
 from tests import is_monkey_patched
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDRA_IP, local, \
-    requiresmallclockgranularity
+    requiresmallclockgranularity, driver_context
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -204,7 +204,10 @@ class ConnectionTests(object):
         for i in range(5):
             try:
                 contact_point = CASSANDRA_IP
-                conn = self.klass.factory(host=contact_point, timeout=timeout, protocol_version=PROTOCOL_VERSION)
+                conn = self.klass.factory(
+                    driver_context.protocol_handler,
+                    host=contact_point, timeout=timeout,
+                    protocol_version=PROTOCOL_VERSION)
                 break
             except (OperationTimedOut, NoHostAvailable, ConnectionShutdown) as e:
                 continue
