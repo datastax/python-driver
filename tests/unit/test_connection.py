@@ -417,10 +417,16 @@ class LZ4Tests(unittest.TestCase):
             import lz4
         except ImportError:
             return
-        from lz4 import block as lz4_block
+        else:
+            try:
+                from lz4 import block as lz4_block
+            except ImportError:
+                lz4_block = lz4
+            lz4_block.compress
+            lz4_block.decompress
+
 
 class TimerTest(unittest.TestCase):
-
     def test_timer_collision(self):
         # simple test demonstrating #466
         # same timeout, comparison will defer to the Timer object itself
