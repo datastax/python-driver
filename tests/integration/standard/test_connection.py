@@ -20,12 +20,13 @@ except ImportError:
 from functools import partial
 from six.moves import range
 import sys
+import threading
 from threading import Thread, Event
 import time
-import weakref
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
+import cassandra.io.asyncorereactor
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
@@ -400,6 +401,28 @@ class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
         ConnectionTests.setUp(self)
+
+    def test_subclasses_share_loop(self):
+        class C1(AsyncoreConnection):
+            pass
+
+        class C2(AsyncoreConnection):
+            pass
+
+        cassandra.io.asyncorereactor._global_loop._cleanup()
+        cassandra.io.asyncorereactor._global_loop = None
+
+        clusterC1 = Cluster(connection_class=C1)
+        clusterC1.connect(wait_for_all_pools=True)
+
+        clusterC2 = Cluster(connection_class=C2)
+        clusterC2.connect(wait_for_all_pools=True)
+        self.addCleanup(clusterC1.shutdown)
+        self.addCleanup(clusterC2.shutdown)
+
+        event_loops_threads = [thread for thread in threading.enumerate() if
+                               thread.name == "cassandra_driver_event_loop"]
+        self.assertEqual(len(event_loops_threads), 1)
 
 
 class LibevConnectionTests(ConnectionTests, unittest.TestCase):
