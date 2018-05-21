@@ -1,3 +1,12 @@
+3.17.0
+======
+NOT RELEASED
+
+Other
+-----
+* Fail faster on incorrect lz4 import (PYTHON-1042)
+
+
 3.16.0
 ======
 November 12, 2018
