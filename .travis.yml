@@ -17,6 +17,7 @@ addons:
     - build-essential
     - python-dev
     - pypy-dev
+    - libc-ares-dev
     - libev4
     - libev-dev
 
