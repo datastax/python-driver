@@ -1149,7 +1149,6 @@ def cython_protocol_handler(colparser):
 
     return CythonProtocolHandler
 
-
 if HAVE_CYTHON:
     from cassandra.obj_parser import ListParser, LazyParser
     ProtocolHandler = cython_protocol_handler(ListParser())
