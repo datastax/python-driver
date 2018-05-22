@@ -4,7 +4,6 @@ nose
 mock!=1.1.*
 ccm>=2.0
 unittest2
-PyYAML
 pytz
 sure
 pure-sasl
