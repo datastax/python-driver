@@ -1142,23 +1142,20 @@ def cython_protocol_handler(colparser):
     """
     from cassandra.row_parser import make_decode_results_rows
 
-    class FastResultMessage(ResultMessage):
-        """
-        Cython version of Result Message that has a faster implementation of
-        decode_results_row.
-        """
-
-        class Codec(ResultMessage.Codec):
-            col_parser = colparser
-            decode_results_rows = classmethod(make_decode_results_rows(colparser))
-
     def make_cython_fast_decoder(decoder):
-        CustomFastResultMessage = type(
-            'CustomFastResultMessage',
-            FastResultMessage.__bases__,
-            dict(FastResultMessage.__dict__))
-        CustomFastResultMessage.Codec.decode = decoder
-        return CustomFastResultMessage.Codec.decode
+        class FastResultMessage(ResultMessage):
+            """
+            Cython version of Result Message that has a faster implementation of
+            decode_results_row.
+            """
+
+            class Codec(ResultMessage.Codec):
+                col_parser = colparser
+                decode = classmethod(decoder)
+                decode_results_rows = classmethod(make_decode_results_rows(colparser))
+
+        return FastResultMessage.Codec.decode
+
 
     class CythonProtocolHandler(_ProtocolHandler):
         def __init__(self, context):

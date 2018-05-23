@@ -45,7 +45,6 @@ class MyDriverContext(DriverContext):
         self._protocol_handler = SingletonProvider(ProtocolHandler, self)
 
 
-
 class ContextTests(unittest.TestCase):
     def test_context_can_be_passed(self):
         context = DriverContext()
@@ -59,11 +58,9 @@ class ContextTests(unittest.TestCase):
 
     def _customized_context_with_protocol(self, context, protocol_class):
         for protocol_version in get_supported_protocol_versions():
-            context = context
             context.add_decoder(protocol_version, MyResultMessageCodec.opcode, MyResultMessageCodec.decode)
 
-            with Cluster(protocol_version=protocol_version, context=context,
-                         allow_beta_protocol_version=True) as cluster:
+            with Cluster(protocol_version=protocol_version, context=context) as cluster:
                 session = cluster.connect()
                 session.protocol_handler_class = protocol_class
                 results = session.execute("SELECT key, host_id, partitioner from system.local")
