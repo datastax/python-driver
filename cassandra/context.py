@@ -56,10 +56,7 @@ class DriverContext(object):
         self._message_codec_registry = SingletonProvider(
             MessageCodecRegistry.factory,
             self.protocol_version_registry)
-        self._protocol_handler = SingletonProvider(
-            ProtocolHandler,
-            self.message_codec_registry.encoders,
-            self.message_codec_registry.decoders)
+        self._protocol_handler = SingletonProvider(ProtocolHandler, self)
 
     @property
     def message_codec_registry(self):

@@ -194,11 +194,10 @@ class CustomTestRawRowType(_ProtocolHandler):
     This is the a custom protocol handler that will substitute the the
     customResultMesageRowRaw Result message for our own implementation
     """
-    def __init__(self, encoders, decoders):
-        decoders = copy.deepcopy(decoders)
-        for version in decoders:
-            decoders[version][CustomResultMessageRaw.opcode] = CustomResultMessageRaw.Codec.decode
-        super(CustomTestRawRowType, self).__init__(encoders, decoders)
+    def __init__(self, context):
+        super(CustomTestRawRowType, self).__init__(context)
+        for version in self.message_decoders:
+            self.message_decoders[version][CustomResultMessageRaw.opcode] = CustomResultMessageRaw.Codec.decode
 
 
 class CustomResultMessageTracked(ResultMessage):
@@ -233,10 +232,7 @@ class CustomProtocolHandlerResultMessageTracked(_ProtocolHandler):
     This is the a custom protocol handler that will substitute the the
     CustomTestRawRowTypeTracked Result message for our own implementation
     """
-    def __init__(self, encoders, decoders):
-        decoders = copy.deepcopy(decoders)
-        for version in decoders:
-            decoders[version][CustomResultMessageTracked.opcode] = CustomResultMessageTracked.Codec.decode
-        super(CustomProtocolHandlerResultMessageTracked, self).__init__(encoders, decoders)
-
-
+    def __init__(self, context):
+        super(CustomProtocolHandlerResultMessageTracked, self).__init__(context)
+        for version in self.message_decoders:
+            self.message_decoders[version][CustomResultMessageTracked.opcode] = CustomResultMessageTracked.Codec.decode

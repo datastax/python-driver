@@ -19,7 +19,7 @@ except ImportError:
 
 from cassandra.registry import MessageCodecRegistry
 from cassandra.cluster import Cluster
-from cassandra.context import DriverContext
+from cassandra.context import DriverContext, SingletonProvider
 from cassandra.protocol import ProtocolHandler, ResultMessage
 from cassandra.protocol import NumpyProtocolHandler, LazyProtocolHandler, HAVE_CYTHON, HAVE_NUMPY
 
@@ -30,7 +30,7 @@ from nose import SkipTest
 
 class MyResultMessageCodec(ResultMessage.Codec):
     @classmethod
-    def decode(cls, f, protocol_version, user_type_map, result_metadata, *args):
+    def decode(cls, f, protocol_version, user_type_map, result_metadata, *args, **kwargs):
         result_message = ResultMessage.Codec.decode(f, protocol_version, user_type_map, result_metadata, *args)
         colnames, parsed_rows = result_message.results
         # We are only going to modify it for the query requesting this columns
@@ -40,40 +40,10 @@ class MyResultMessageCodec(ResultMessage.Codec):
 
 
 class MyDriverContext(DriverContext):
-    def __init__(self):
-        self.codec_registry = MessageCodecRegistry.factory()
-        self.handler = ProtocolHandler(self.codec_registry.encoders,
-                                                 self.codec_registry.decoders)
-
     def add_decoder(self, protocol_version, opcode, decode):
-        self.codec_registry.add_decoder(protocol_version,
-                                                 opcode,
-                                                 decode)
-        self.handler = ProtocolHandler(self.codec_registry.encoders,
-                                                 self.codec_registry.decoders)
+        self.message_codec_registry.add_decoder(protocol_version, opcode, decode)
+        self._protocol_handler = SingletonProvider(ProtocolHandler, self)
 
-    @property
-    def protocol_handler(self):
-        return self.handler
-
-    @property
-    def message_codec_registry(self):
-        return self.codec_registry
-
-
-if HAVE_CYTHON:
-    class LazyDriverContext(MyDriverContext):
-        def __init__(self):
-            self.codec_registry = MessageCodecRegistry.factory()
-            self.handler = LazyProtocolHandler(self.codec_registry.encoders,
-                                                    self.codec_registry.decoders)
-
-if HAVE_NUMPY:
-    class NumpyDriverContext(MyDriverContext):
-        def __init__(self):
-            self.codec_registry = MessageCodecRegistry.factory()
-            self.handler = LazyProtocolHandler(self.codec_registry.encoders,
-                                                    self.codec_registry.decoders)
 
 
 class ContextTests(unittest.TestCase):
@@ -87,20 +57,13 @@ class ContextTests(unittest.TestCase):
     def test_customized_context(self):
         self._customized_context_with_protocol(MyDriverContext(), ProtocolHandler)
 
-    @if_cython
-    def test_customized_context_lazy(self):
-        self._customized_context_with_protocol(LazyDriverContext(), LazyProtocolHandler)
-
-    @if_numpy
-    def test_customized_context_numpy(self):
-        self._customized_context_with_protocol(NumpyDriverContext(), NumpyProtocolHandler)
-
     def _customized_context_with_protocol(self, context, protocol_class):
         for protocol_version in get_supported_protocol_versions():
             context = context
             context.add_decoder(protocol_version, MyResultMessageCodec.opcode, MyResultMessageCodec.decode)
 
-            with Cluster(protocol_version=protocol_version, context=context) as cluster:
+            with Cluster(protocol_version=protocol_version, context=context,
+                         allow_beta_protocol_version=True) as cluster:
                 session = cluster.connect()
                 session.protocol_handler_class = protocol_class
                 results = session.execute("SELECT key, host_id, partitioner from system.local")

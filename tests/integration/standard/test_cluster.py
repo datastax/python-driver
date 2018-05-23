@@ -347,8 +347,8 @@ class ClusterTests(unittest.TestCase):
         Ensure that auth_providers are always callable
         """
         self.assertRaises(TypeError, Cluster, auth_provider=1, protocol_version=4)
-        c = Cluster(protocol_version=1)
-        self.assertRaises(TypeError, setattr, c, 'auth_provider', 4)
+        c = Cluster(protocol_version=4)
+        self.assertRaises(TypeError, setattr, c, 'auth_provider', 1)
 
     def test_conviction_policy_factory_is_callable(self):
         """

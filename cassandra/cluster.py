@@ -1782,9 +1782,7 @@ class Session(object):
     @protocol_handler_class.setter
     def protocol_handler_class(self, value):
         self._protocol_handler_class = value
-        self._protocol_handler = self._protocol_handler_class(
-            self._context.message_codec_registry.encoders,
-            self._context.message_codec_registry.decoders)
+        self._protocol_handler = self._protocol_handler_class(self._context)
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
         """

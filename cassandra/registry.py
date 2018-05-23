@@ -110,15 +110,9 @@ class MessageCodecRegistry(object):
                 "protocol version '{1}'".format(opcode, protocol_version))
 
     def add_encoder(self, protocol_version, opcode, encoder):
-        encoder = partial(
-            encoder,
-            protocol_version_registry=self._protocol_version_registry)
         return self._add(self.encoders, protocol_version, opcode, encoder)
 
     def add_decoder(self, protocol_version, opcode, decoder):
-        decoder = partial(
-            decoder,
-            protocol_version_registry=self._protocol_version_registry)
         return self._add(self.decoders, protocol_version, opcode, decoder)
 
     def get_encoder(self, protocol_version, opcode):

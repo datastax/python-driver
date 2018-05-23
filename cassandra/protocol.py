@@ -1002,9 +1002,13 @@ class _ProtocolHandler(object):
     result decoding implementations.
     """
 
-    def __init__(self, encoders, decoders):
-        self.message_encoders = encoders
-        self.message_decoders = decoders
+    _context = None
+
+    def __init__(self, context):
+        self._context = context
+        # these can be overriden if needed
+        self.message_encoders = copy.deepcopy(context.message_codec_registry.encoders)
+        self.message_decoders = copy.deepcopy(context.message_codec_registry.decoders)
 
     def encode_message(self, msg, stream_id, protocol_version, compressor, allow_beta_protocol_version):
         """
@@ -1028,7 +1032,8 @@ class _ProtocolHandler(object):
         except KeyError:
             raise UnsupportedOperation("Unsupported opcode %d in protocol %d", msg.opcode, protocol_version)
 
-        encoder(body, msg, protocol_version)
+        encoder(body, msg, protocol_version,
+                protocol_version_registry=self._context.protocol_version_registry)
         body = body.getvalue()
 
         if compressor and len(body) > 0:
@@ -1103,7 +1108,8 @@ class _ProtocolHandler(object):
             decoder = self.message_decoders[protocol_version][opcode]
         except KeyError:
             raise UnsupportedOperation("Unsupported opcode %d in protocol %d", opcode, protocol_version)
-        msg = decoder(body, protocol_version, user_type_map, result_metadata)
+        msg = decoder(body, protocol_version, user_type_map, result_metadata,
+                      protocol_version_registry=self._context.protocol_version_registry)
         msg.stream_id = stream_id
         msg.trace_id = trace_id
         msg.custom_payload = custom_payload
@@ -1141,16 +1147,26 @@ def cython_protocol_handler(colparser):
         Cython version of Result Message that has a faster implementation of
         decode_results_row.
         """
+
         class Codec(ResultMessage.Codec):
             col_parser = colparser
             decode_results_rows = classmethod(make_decode_results_rows(colparser))
 
+    def make_cython_fast_decoder(decoder):
+        CustomFastResultMessage = type(
+            'CustomFastResultMessage',
+            FastResultMessage.__bases__,
+            dict(FastResultMessage.__dict__))
+        CustomFastResultMessage.Codec.decode = decoder
+        return CustomFastResultMessage.Codec.decode
+
     class CythonProtocolHandler(_ProtocolHandler):
-        def __init__(self, encoders, decoders):
-            super(CythonProtocolHandler, self).__init__(encoders, decoders)
-            self.message_decoders = copy.deepcopy(self.message_decoders)
+        def __init__(self, context):
+            super(CythonProtocolHandler, self).__init__(context)
             for v in self.message_decoders:
-                self.message_decoders[v][ResultMessage.opcode] = FastResultMessage.Codec.decode
+                self.message_decoders[v][ResultMessage.opcode] = make_cython_fast_decoder(
+                    self.message_decoders[v][ResultMessage.opcode]
+                )
 
     return CythonProtocolHandler
 
