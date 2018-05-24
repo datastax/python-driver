@@ -91,7 +91,7 @@ class MessageTest(unittest.TestCase):
         """
         message = PrepareMessage("a")
         io = Mock()
-        for version in ProtocolVersion.VERSIONS:
+        for version in ProtocolVersion.SUPPORTED_VERSIONS:
             PrepareMessage.encode(io, message, version, **self.CODEC_KWARGS)
             if ProtocolVersion.uses_prepare_flags(version):
                 self.assertEqual(len(io.write.mock_calls), 3)
@@ -103,7 +103,7 @@ class MessageTest(unittest.TestCase):
         message = PrepareMessage("a", keyspace='ks')
         io = Mock()
 
-        for version in ProtocolVersion.VERSIONS:
+        for version in ProtocolVersion.SUPPORTED_VERSIONS:
             if ProtocolVersion.uses_keyspace_flag(version):
                 PrepareMessage.encode(io, message, version, **self.CODEC_KWARGS)
                 self._check_calls(io, [

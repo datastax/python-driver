@@ -272,7 +272,7 @@ class Connection(object):
         self.cql_version = cql_version
         self._context = context
         self.protocol_version = protocol_version \
-            or context.protocol_version_registry.max_supported() # wondering if this default was ever used?
+            or context.protocol_version_registry.max_supported() # wondering if this default was ever used except in tests?
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self.connect_timeout = connect_timeout

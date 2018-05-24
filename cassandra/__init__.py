@@ -148,7 +148,7 @@ class ProtocolVersion(object):
     v5, in beta from 3.x+
     """
 
-    VERSIONS = (V5, V4, V3)
+    SUPPORTED_VERSIONS = (V5, V4, V3)
     """A tuple of all protocol versions."""
 
     BETA_VERSIONS = (V5,)
@@ -157,24 +157,24 @@ class ProtocolVersion(object):
     """
 
     @classmethod
-    def uses_int_query_flags(cls, protocol_version):
-        return protocol_version >= cls.V5
+    def uses_int_query_flags(cls, version):
+        return version >= cls.V5
 
     @classmethod
-    def uses_prepare_flags(cls, protocol_version):
-        return protocol_version >= cls.V5
+    def uses_prepare_flags(cls, version):
+        return version >= cls.V5
 
     @classmethod
-    def uses_prepared_metadata(cls, protocol_version):
-        return protocol_version >= cls.V5
+    def uses_prepared_metadata(cls, version):
+        return version >= cls.V5
 
     @classmethod
-    def uses_error_code_map(cls, protocol_version):
-        return protocol_version >= cls.V5
+    def uses_error_code_map(cls, version):
+        return version >= cls.V5
 
     @classmethod
-    def uses_keyspace_flag(cls, protocol_version):
-        return protocol_version >= cls.V5
+    def uses_keyspace_flag(cls, version):
+        return version >= cls.V5
 
 
 class WriteType(object):

@@ -81,7 +81,7 @@ class ProtocolVersionRegistry(object):
         :param protocol_versions: All protocol versions to register, including beta ones.
         :param beta_versions: The list of beta versions.
         """
-        return cls(protocol_versions or cls.protocol_version.VERSIONS,
+        return cls(protocol_versions or cls.protocol_version.SUPPORTED_VERSIONS,
                    beta_versions or cls.protocol_version.BETA_VERSIONS)
 
 
@@ -89,10 +89,7 @@ class MessageCodecRegistry(object):
     encoders = None
     decoders = None
 
-    _protocol_version_registry = None
-
     def __init__(self, protocol_version_registry):
-        self._protocol_version_registry = protocol_version_registry
         self.encoders = defaultdict(dict)
         self.decoders = defaultdict(dict)
 
