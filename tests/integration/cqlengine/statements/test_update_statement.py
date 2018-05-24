@@ -69,6 +69,11 @@ class UpdateStatementTests(unittest.TestCase):
         us.add_update(Set(Text, db_field='a'), set((1,)), 'add')
         self.assertEqual(six.text_type(us), 'UPDATE table SET "a" = "a" + %(0)s')
 
+    def test_update_set_with_none(self):
+        us = UpdateStatement('table')
+        us.add_update(Set(Text, db_field='a'), None)
+        self.assertTrue(us.assignments)
+
     def test_update_empty_set_add_does_not_assign(self):
         us = UpdateStatement('table')
         us.add_update(Set(Text, db_field='a'), set(), 'add')
@@ -78,6 +83,11 @@ class UpdateStatementTests(unittest.TestCase):
         us = UpdateStatement('table')
         us.add_update(Set(Text, db_field='a'), set(), 'remove')
         self.assertFalse(us.assignments)
+
+    def test_update_list_with_none(self):
+        us = UpdateStatement('table')
+        us.add_update(List(Text, db_field='a'), None, previous=[1])
+        self.assertTrue(us.assignments)
 
     def test_update_list_prepend_with_empty_list(self):
         us = UpdateStatement('table')

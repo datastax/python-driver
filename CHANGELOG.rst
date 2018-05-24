@@ -9,6 +9,7 @@ Features
 * cqlengine: asynchronous execution support (PYTHON-605)
 * cqlengine: disallow Counter create, save operations (PYTHON-497)
 * cqlengine: Makes Model._table_name_ case sensitive (PYTHON-855)
+* cqlengine: Remove two-phase query when deleting values (PYTHON-506)
 
 
 Other

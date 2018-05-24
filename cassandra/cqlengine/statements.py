@@ -214,6 +214,11 @@ class SetUpdateClause(ContainerUpdateClause):
     _additions = None
     _removals = None
 
+    @property
+    def _is_assignment(self):
+        return not (self._additions or self._removals or
+                self._operation or self.value == self.previous)
+
     def __unicode__(self):
         qs = []
         ctx_id = self.context_id
@@ -222,7 +227,7 @@ class SetUpdateClause(ContainerUpdateClause):
                 self._additions is None and
                 self._removals is None):
             qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
-        if self._assignments is not None:
+        if self._is_assignment:
             qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
             ctx_id += 1
         if self._additions is not None:
@@ -253,11 +258,11 @@ class SetUpdateClause(ContainerUpdateClause):
         if not self._analyzed:
             self._analyze()
         if (self.previous is None and
-                not self._assignments and
+                not self._is_assignment and
                 self._additions is None and
                 self._removals is None):
             return 1
-        return int(bool(self._assignments)) + int(bool(self._additions)) + int(bool(self._removals))
+        return int(bool(self._is_assignment)) + int(bool(self._additions)) + int(bool(self._removals))
 
     def update_context(self, ctx):
         if not self._analyzed:
@@ -268,7 +273,7 @@ class SetUpdateClause(ContainerUpdateClause):
                 self._additions is None and
                 self._removals is None):
             ctx[str(ctx_id)] = set()
-        if self._assignments is not None:
+        if self._is_assignment:
             ctx[str(ctx_id)] = self._assignments
             ctx_id += 1
         if self._additions is not None:
@@ -286,12 +291,17 @@ class ListUpdateClause(ContainerUpdateClause):
     _append = None
     _prepend = None
 
+    @property
+    def _is_assignment(self):
+        return not (self._append or self._prepend or
+                    self._operation or self.value == self.previous)
+
     def __unicode__(self):
         if not self._analyzed:
             self._analyze()
         qs = []
         ctx_id = self.context_id
-        if self._assignments is not None:
+        if self._is_assignment:
             qs += ['"{0}" = %({1})s'.format(self.field, ctx_id)]
             ctx_id += 1
 
@@ -307,13 +317,13 @@ class ListUpdateClause(ContainerUpdateClause):
     def get_context_size(self):
         if not self._analyzed:
             self._analyze()
-        return int(self._assignments is not None) + int(bool(self._append)) + int(bool(self._prepend))
+        return int(self._is_assignment) + int(bool(self._append)) + int(bool(self._prepend))
 
     def update_context(self, ctx):
         if not self._analyzed:
             self._analyze()
         ctx_id = self.context_id
-        if self._assignments is not None:
+        if self._is_assignment:
             ctx[str(ctx_id)] = self._assignments
             ctx_id += 1
         if self._prepend is not None:
@@ -388,7 +398,9 @@ class MapUpdateClause(ContainerUpdateClause):
             if self.previous is None:
                 self._updates = sorted([k for k, v in self.value.items()])
             else:
-                self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+                if self.value:
+                    self._updates = sorted([k for k, v in self.value.items() if v != self.previous.get(k)]) or None
+
         self._analyzed = True
 
     def get_context_size(self):
@@ -399,7 +411,7 @@ class MapUpdateClause(ContainerUpdateClause):
     def update_context(self, ctx):
         ctx_id = self.context_id
         if self.is_assignment:
-            ctx[str(ctx_id)] = {}
+            ctx[str(ctx_id)] = {} if self.value is None else self.value
         elif self._removals is not None:
             ctx[str(ctx_id)] = self._removals
         else:
@@ -413,7 +425,7 @@ class MapUpdateClause(ContainerUpdateClause):
     def is_assignment(self):
         if not self._analyzed:
             self._analyze()
-        return self.previous is None and not self._updates and not self._removals
+        return not self._updates and not self._removals
 
     def __unicode__(self):
         qs = []
@@ -831,7 +843,8 @@ class UpdateStatement(AssignmentStatement):
             clause = CounterUpdateClause(column.db_field_name, value, previous)
         else:
             clause = AssignmentClause(column.db_field_name, value)
-        if clause.get_context_size():  # this is to exclude map removals from updates. Can go away if we drop support for C* < 1.2.4 and remove two-phase updates
+
+        if clause.get_context_size():
             self._add_assignment_clause(clause)
 
 

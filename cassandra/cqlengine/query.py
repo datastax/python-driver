@@ -1291,7 +1291,6 @@ class ModelQuerySet(AbstractQuerySet):
         if not values:
             return
 
-        nulled_columns = set()
         updated_columns = set()
         us = UpdateStatement(self.column_family_name, where=self._where, ttl=self._ttl,
                              timestamp=self._timestamp, conditionals=self._conditional, if_exists=self._if_exists)
@@ -1314,25 +1313,13 @@ class ModelQuerySet(AbstractQuerySet):
                 # we should not provide default values in this use case.
                 val = col.validate(val)
 
-            if val is None:
-                nulled_columns.add(col_name)
-                continue
-
             us.add_update(col, val, operation=col_op)
             updated_columns.add(col_name)
 
-        futures = []
-        if us.assignments:
-            futures.append(self._execute_async(us))
+        if not us.assignments:
+            return CQLEngineFuture()
 
-        if nulled_columns:
-            delete_conditional = [condition for condition in self._conditional
-                                  if condition.field not in updated_columns] if self._conditional else None
-            ds = DeleteStatement(self.column_family_name, fields=nulled_columns,
-                                 where=self._where, conditionals=delete_conditional, if_exists=self._if_exists)
-            futures.append(self._execute_async(ds))
-
-        return CQLEngineFutureWaiter(futures)
+        return self._execute_async(us)
 
     def update(self, **values):
         """
@@ -1481,20 +1468,20 @@ class DMLQuery(object):
         self._batch = batch_obj
         return self
 
-    def _delete_null_columns_async(self, conditionals=None):
+    def _delete_map_keys_async(self, conditionals=None):
         """
-        executes a delete query to remove columns that have changed to null
+        executes a delete query to remove map keys that have changed to null.
+
+        Doing map keys deletion in two phases allow us to update a map collection
+        without creating a tombstone.
         """
         ds = DeleteStatement(self.column_family_name, conditionals=conditionals, if_exists=self._if_exists)
         deleted_fields = False
         static_only = True
+
         for _, v in self.instance._values.items():
             col = v.column
-            if v.deleted:
-                ds.add_field(col.db_field_name)
-                deleted_fields = True
-                static_only &= col.static
-            elif isinstance(col, columns.Map):
+            if isinstance(col, columns.Map):
                 uc = MapDeleteClause(col.db_field_name, v.value, v.previous_value)
                 if uc.get_context_size() > 0:
                     ds.add_field(uc)
@@ -1509,11 +1496,11 @@ class DMLQuery(object):
         else:
             return CQLEngineFuture()
 
-    def _delete_null_columns(self, conditionals=None):
+    def _delete_map_keys(self, conditionals=None):
         """
         executes a delete query to remove columns that have changed to null
         """
-        return self._delete_null_columns_async(conditionals=conditionals).result()
+        return self._delete_map_keys_async(conditionals=conditionals).result()
 
     def update_async(self):
         """
@@ -1541,10 +1528,7 @@ class DMLQuery(object):
                 val = getattr(self.instance, name, None)
                 val_mgr = self.instance._values[name]
 
-                if val is None:
-                    continue
-
-                if not val_mgr.changed and not isinstance(col, columns.Counter):
+                if not (val_mgr.changed or val_mgr.deleted) and not isinstance(col, columns.Counter):
                     continue
 
                 static_changed_only = static_changed_only and col.static
@@ -1552,7 +1536,6 @@ class DMLQuery(object):
                 updated_columns.add(col.db_field_name)
 
         futures = []
-
         if statement.assignments:
             for name, col in self.model._primary_keys.items():
                 # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
@@ -1565,7 +1548,7 @@ class DMLQuery(object):
             # remove conditions on fields that have been updated
             delete_conditionals = [condition for condition in self._conditional
                                    if condition.field not in updated_columns] if self._conditional else None
-            futures.append(self._delete_null_columns_async(delete_conditionals))
+            futures.append(self._delete_map_keys_async(delete_conditionals))
 
         return CQLEngineFutureWaiter(futures)
 
@@ -1591,7 +1574,6 @@ class DMLQuery(object):
         if self.instance._has_counter:
             raise CQLEngineException("Counters can only be updated. Use the 'update' mechanism instead.")
 
-        nulled_fields = set()
         if self.instance._can_update():
             return self.update_async()
         else:
@@ -1603,9 +1585,8 @@ class DMLQuery(object):
                 if static_save_only and not col.static and not col.partition_key:
                     continue
                 val = getattr(self.instance, name, None)
-                if col._val_is_null(val):
-                    if self.instance._values[name].changed:
-                        nulled_fields.add(col.db_field_name)
+                if (col._val_is_null(val) and
+                    not (self.instance._values[name].changed or self.instance._values[name].deleted)):
                     continue
                 if col.has_default and not self.instance._values[name].changed:
                     # Ensure default columns included in a save() are marked as explicit, to get them *persisted* properly
@@ -1614,17 +1595,10 @@ class DMLQuery(object):
 
         # skip query execution if it's empty
         # caused by pointless update queries
-        if insert.is_empty and static_save_only:
+        if insert.is_empty:
             return CQLEngineFuture()
 
-        futures = []
-        if not insert.is_empty:
-            futures.append(self._execute_async(insert))
-        # delete any nulled columns
-        if not static_save_only:
-            futures.append(self._delete_null_columns_async())
-
-        return CQLEngineFutureWaiter(futures)
+        return self._execute_async(insert)
 
     def save(self):
         """

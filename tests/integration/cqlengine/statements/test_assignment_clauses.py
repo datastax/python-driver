@@ -49,21 +49,22 @@ class SetUpdateClauseTests(unittest.TestCase):
         self.assertEqual(ctx, {'0': set((1, 2))})
 
     def test_null_update(self):
-        """ tests setting a set to None creates an empty update statement """
+        """ tests setting a set to None creates an update statement """
         c = SetUpdateClause('s', None, previous=set((1, 2)))
         c._analyze()
         c.set_context_id(0)
 
+        self.assertTrue(c._is_assignment)
         self.assertIsNone(c._assignments)
         self.assertIsNone(c._additions)
         self.assertIsNone(c._removals)
 
-        self.assertEqual(c.get_context_size(), 0)
-        self.assertEqual(str(c), '')
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = %(0)s')
 
         ctx = {}
         c.update_context(ctx)
-        self.assertEqual(ctx, {})
+        self.assertEqual(ctx, {'0': None})
 
     def test_no_update(self):
         """ tests an unchanged value creates an empty update statement """
@@ -166,6 +167,23 @@ class ListUpdateClauseTests(unittest.TestCase):
         ctx = {}
         c.update_context(ctx)
         self.assertEqual(ctx, {'0': [1, 2, 3]})
+
+    def test_update_to_none(self):
+        c = ListUpdateClause('s', None, previous=[1, 2, 3])
+        c._analyze()
+        c.set_context_id(0)
+
+        self.assertTrue(c._is_assignment)
+        self.assertIsNone(c._assignments)
+        self.assertIsNone(c._append)
+        self.assertIsNone(c._prepend)
+
+        self.assertEqual(c.get_context_size(), 1)
+        self.assertEqual(str(c), '"s" = %(0)s')
+
+        ctx = {}
+        c.update_context(ctx)
+        self.assertEqual(ctx, {'0': None})
 
     def test_update_from_empty(self):
         c = ListUpdateClause('s', [1, 2, 3], previous=[])
