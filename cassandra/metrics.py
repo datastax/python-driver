@@ -20,7 +20,7 @@ try:
 except ImportError:
     raise ImportError(
         "The scales library is required for metrics support: "
-        "https://pypi.python.org/pypi/scales")
+        "https://pypi.org/project/scales/")
 
 log = logging.getLogger(__name__)
 

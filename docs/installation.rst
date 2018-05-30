@@ -10,7 +10,7 @@ Linux, OSX, and Windows are supported.
 
 Installation through pip
 ------------------------
-`pip <https://pypi.python.org/pypi/pip>`_ is the suggested tool for installing
+`pip <https://pypi.org/project/pip/>`_ is the suggested tool for installing
 packages.  It will handle installing all Python dependencies for the driver at
 the same time as the driver itself.  To install the driver*::
 
