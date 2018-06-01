@@ -39,9 +39,9 @@ and ``NumpyProtocolHandler``. They can be used as follows:
 
     from cassandra.protocol import NumpyProtocolHandler, LazyProtocolHandler
     from cassandra.query import tuple_factory
-    s.protocol_handler_class = LazyProtocolHandler   # for a result iterator
+    s.client_protocol_handler = LazyProtocolHandler   # for a result iterator
     s.row_factory = tuple_factory  #required for Numpy results
-    s.protocol_handler_class = NumpyProtocolHandler  # for a dict of NumPy arrays as result
+    s.client_protocol_handler = NumpyProtocolHandler  # for a dict of NumPy arrays as result
 
 These protocol handlers comprise different parsers, and return results as described below:
 

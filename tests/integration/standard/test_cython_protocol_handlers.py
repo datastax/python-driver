@@ -16,7 +16,7 @@ from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtoc
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 
 from tests import VERIFY_CYTHON
-from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass21
+from tests.integration import use_singledc, PROTOCOL_VERSION, notprotocolv1, drop_keyspace_shutdown_cluster, BasicSharedKeyspaceUnitTestCase, execute_with_retry_tolerant, greaterthancass21
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -69,7 +69,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION,
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="testspace")
-        session.protocol_handler_class = LazyProtocolHandler
+        session.client_protocol_handler = LazyProtocolHandler
         session.default_fetch_size = 2
 
         self.assertLess(session.default_fetch_size, self.N_ITEMS)
@@ -100,7 +100,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION,
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="testspace")
-        session.protocol_handler_class = NumpyProtocolHandler
+        session.client_protocol_handler = NumpyProtocolHandler
         session.default_fetch_size = 2
 
         expected_pages = (self.N_ITEMS + session.default_fetch_size - 1) // session.default_fetch_size
@@ -184,7 +184,7 @@ def get_data(protocol_handler):
     session = cluster.connect(keyspace="testspace")
 
     # use our custom protocol handler
-    session.protocol_handler_class = protocol_handler
+    session.client_protocol_handler = protocol_handler
 
     results = session.execute("SELECT * FROM test_table")
     cluster.shutdown()
@@ -225,7 +225,7 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
         @test_category data_types:serialization
         """
         s = self.session
-        s.protocol_handler_class = NumpyProtocolHandler
+        s.client_protocol_handler = NumpyProtocolHandler
 
         table = "%s.%s" % (self.keyspace_name, self.function_table_name)
         create_table_with_all_types(table, s, 10)
