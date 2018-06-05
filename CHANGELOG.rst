@@ -4,6 +4,10 @@ Bug Fixes
 ---------
 * Tokenmap.get_replicas returns the wrong value if token coincides with the end of the range (PYTHON-978)
 
+Other
+-----
+* Use global variable for libev loops so it can be subclassed (PYTHON-973)
+
 3.14.0
 ======
 April 17, 2018
