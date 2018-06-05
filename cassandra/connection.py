@@ -37,7 +37,8 @@ if 'gevent.monkey' in sys.modules:
 else:
     from six.moves.queue import Queue, Empty  # noqa
 
-from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
+from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut
+from cassandra.context import DefaultDriverContext
 from cassandra.marshal import int32_pack
 from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessage,
                                 StartupMessage, ErrorMessage,
@@ -258,11 +259,11 @@ class Connection(object):
 
     _context = None
 
-    def __init__(self, context, host='127.0.0.1', port=9042, authenticator=None,
+    def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=None,
                  is_control_connection=False, user_type_map=None, connect_timeout=None,
-                 allow_beta_protocol_version=False, no_compact=False):
+                 allow_beta_protocol_version=False, no_compact=False, context=None):
         self.host = host
         self.port = port
         self.authenticator = authenticator
@@ -270,7 +271,7 @@ class Connection(object):
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
-        self._context = context
+        self._context = context or DefaultDriverContext()
         self.protocol_version = protocol_version \
             or context.protocol_version_registry.max_supported
         self.is_control_connection = is_control_connection
@@ -320,7 +321,7 @@ class Connection(object):
         raise NotImplementedError()
 
     @classmethod
-    def factory(cls, context, host, timeout, *args, **kwargs):
+    def factory(cls, host, timeout, *args, **kwargs):
         """
         A factory function which returns connections which have
         succeeded in connecting and are ready for service (or
@@ -328,7 +329,7 @@ class Connection(object):
         """
         start = time.time()
         kwargs['connect_timeout'] = timeout
-        conn = cls(context, host, *args, **kwargs)
+        conn = cls(host, *args, **kwargs)
         elapsed = time.time() - start
         conn.connected_event.wait(timeout - elapsed)
         if conn.last_error:

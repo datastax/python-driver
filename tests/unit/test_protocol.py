@@ -12,10 +12,6 @@ from tests.unit import driver_context
 
 class MessageTest(unittest.TestCase):
 
-    CODEC_KWARGS = {
-        'protocol_version_registry': driver_context.protocol_version_registry
-    }
-
     def test_prepare_message(self):
         """
         Test to check the appropriate calls are made
@@ -29,11 +25,12 @@ class MessageTest(unittest.TestCase):
         message = PrepareMessage("a")
         io = Mock()
 
-        PrepareMessage.encode(io, message, 4, **self.CODEC_KWARGS)
+        codec = PrepareMessage.Codec(driver_context)
+        codec.encode(io, message, 4)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',)])
 
         io.reset_mock()
-        PrepareMessage.encode(io, message, 5, **self.CODEC_KWARGS)
+        codec.encode(io, message, 5)
 
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x00\x00\x00',)])
 
@@ -41,12 +38,13 @@ class MessageTest(unittest.TestCase):
         message = ExecuteMessage('1', [], 4)
         io = Mock()
 
-        ExecuteMessage.encode(io, message, 4, **self.CODEC_KWARGS)
+        codec = ExecuteMessage.Codec(driver_context)
+        codec.encode(io, message, 4)
         self._check_calls(io, [(b'\x00\x01',), (b'1',), (b'\x00\x04',), (b'\x01',), (b'\x00\x00',)])
 
         io.reset_mock()
         message.result_metadata_id = 'foo'
-        ExecuteMessage.encode(io, message, 5, **self.CODEC_KWARGS)
+        codec.encode(io, message, 5)
 
         self._check_calls(io, [(b'\x00\x01',), (b'1',),
                                (b'\x00\x03',), (b'foo',),
@@ -66,11 +64,12 @@ class MessageTest(unittest.TestCase):
         message = QueryMessage("a", 3)
         io = Mock()
 
-        QueryMessage.encode(io, message, 4, **self.CODEC_KWARGS)
+        codec = QueryMessage.Codec(driver_context)
+        codec.encode(io, message, 4)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00',)])
 
         io.reset_mock()
-        QueryMessage.encode(io, message, 5, **self.CODEC_KWARGS)
+        codec.encode(io, message, 5)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00\x00\x00\x00',)])
 
     def _check_calls(self, io, expected):
@@ -90,9 +89,10 @@ class MessageTest(unittest.TestCase):
         @test_category connection
         """
         message = PrepareMessage("a")
+        codec = PrepareMessage.Codec(driver_context)
         io = Mock()
         for version in ProtocolVersion.SUPPORTED_VERSIONS:
-            PrepareMessage.encode(io, message, version, **self.CODEC_KWARGS)
+            codec.encode(io, message, version)
             if ProtocolVersion.uses_prepare_flags(version):
                 self.assertEqual(len(io.write.mock_calls), 3)
             else:
@@ -103,9 +103,10 @@ class MessageTest(unittest.TestCase):
         message = PrepareMessage("a", keyspace='ks')
         io = Mock()
 
+        codec = PrepareMessage.Codec(driver_context)
         for version in ProtocolVersion.SUPPORTED_VERSIONS:
             if ProtocolVersion.uses_keyspace_flag(version):
-                PrepareMessage.encode(io, message, version, **self.CODEC_KWARGS)
+                codec.encode(io, message, version)
                 self._check_calls(io, [
                     (b'\x00\x00\x00\x01',),
                     (b'a',),
@@ -115,15 +116,16 @@ class MessageTest(unittest.TestCase):
                 ])
             else:
                 with self.assertRaises(UnsupportedOperation):
-                    PrepareMessage.encode(io, message, version, **self.CODEC_KWARGS)
+                    codec.encode(io, message, version)
             io.reset_mock()
 
     def test_keyspace_flag_raises_before_v5(self):
         keyspace_message = QueryMessage('a', consistency_level=3, keyspace='ks')
         io = Mock(name='io')
 
+        codec = QueryMessage.Codec(driver_context)
         with self.assertRaisesRegexp(UnsupportedOperation, 'Keyspaces.*set'):
-            QueryMessage.encode(io, keyspace_message, protocol_version=4, **self.CODEC_KWARGS)
+            codec.encode(io, keyspace_message, protocol_version=4)
         io.assert_not_called()
 
     def test_keyspace_written_with_length(self):
@@ -136,7 +138,8 @@ class MessageTest(unittest.TestCase):
         ]
 
         message = QueryMessage('a', consistency_level=3, keyspace='ks')
-        QueryMessage.encode(io, message, protocol_version=5, **self.CODEC_KWARGS)
+        codec = QueryMessage.Codec(driver_context)
+        codec.encode(io, message, protocol_version=5)
         self._check_calls(io, base_expected + [
             (b'\x00\x02',),  # length of keyspace string
             (b'ks',),
@@ -145,7 +148,7 @@ class MessageTest(unittest.TestCase):
         io.reset_mock()
 
         message = QueryMessage('a', consistency_level=3, keyspace='keyspace')
-        QueryMessage.encode(io, message, protocol_version=5, **self.CODEC_KWARGS)
+        codec.encode(io, message, protocol_version=5)
         self._check_calls(io, base_expected + [
             (b'\x00\x08',),  # length of keyspace string
             (b'keyspace',),
@@ -163,7 +166,8 @@ class MessageTest(unittest.TestCase):
             consistency_level=3,
             keyspace='ks'
         )
-        BatchMessage.encode(io, batch, protocol_version=5, **self.CODEC_KWARGS)
+        codec = BatchMessage.Codec(driver_context)
+        codec.encode(io, batch, protocol_version=5)
         self._check_calls(io,
             ((b'\x00',), (b'\x00\x03',), (b'\x00',),
              (b'\x00\x00\x00\x06',), (b'stmt a',),

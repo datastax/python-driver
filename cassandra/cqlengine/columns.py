@@ -19,7 +19,8 @@ import six
 from uuid import UUID as _UUID
 
 from cassandra import util
-from cassandra.cqltypes import SimpleDateType, _cqltypes, UserType
+from cassandra.context import DefaultDriverContext
+from cassandra.cqltypes import SimpleDateType, UserType
 from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.functions import get_total_seconds
 from cassandra.util import Duration as _Duration
@@ -316,7 +317,7 @@ class Column(object):
 
     @property
     def cql_type(self):
-        return _cqltypes[self.db_type]
+        return DefaultDriverContext().type_registry.lookup_by_typename(self.db_type)
 
 
 class Blob(Column):
@@ -799,7 +800,9 @@ class BaseCollectionColumn(Column):
 
     @property
     def cql_type(self):
-        return _cqltypes[self.__class__.__name__.lower()].apply_parameters([c.cql_type for c in self.types])
+        type_name = self.__class__.__name__.lower()
+        return DefaultDriverContext().type_registry.lookup(type_name). \
+            apply_parameters([c.cql_type for c in self.types])
 
 
 class Tuple(BaseCollectionColumn):

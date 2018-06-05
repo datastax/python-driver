@@ -29,9 +29,10 @@ from tests import if_cython, if_numpy
 from nose import SkipTest
 
 class MyResultMessageCodec(ResultMessage.Codec):
-    @classmethod
-    def decode(cls, f, protocol_version, user_type_map, result_metadata, *args, **kwargs):
-        result_message = ResultMessage.Codec.decode(f, protocol_version, user_type_map, result_metadata, *args)
+    def decode(self, f, protocol_version, user_type_map, result_metadata, *args):
+        result_message = ResultMessage.Codec.decode(
+            self, f, protocol_version, user_type_map, result_metadata, *args)
+
         colnames, parsed_rows = result_message.results
         # We are only going to modify it for the query requesting this columns
         if colnames == ["key", "host_id", "partitioner"]:
@@ -58,7 +59,8 @@ class ContextTests(unittest.TestCase):
 
     def _customized_context_with_protocol(self, context, protocol_class):
         for protocol_version in get_supported_protocol_versions():
-            context.add_decoder(protocol_version, MyResultMessageCodec.opcode, MyResultMessageCodec.decode)
+            codec = MyResultMessageCodec(context)
+            context.add_decoder(protocol_version, ResultMessage.opcode, codec)
 
             with Cluster(protocol_version=protocol_version, context=context) as cluster:
                 session = cluster.connect()

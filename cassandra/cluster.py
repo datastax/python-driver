@@ -70,7 +70,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
-from cassandra.context import DriverContext
+from cassandra.context import DriverContext, DefaultDriverContext
 
 
 def _is_eventlet_monkey_patched():
@@ -745,7 +745,9 @@ class Cluster(object):
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
-        self._context = context or DriverContext()
+        if context and not isinstance(context, DriverContext):
+            raise ValueError("context should be an instance of the DriverContext class")
+        self._context = context or DefaultDriverContext()
 
         if contact_points is not None:
             if contact_points is _NOT_SET:
@@ -847,7 +849,7 @@ class Cluster(object):
         # let Session objects be GC'ed (and shutdown) when the user no longer
         # holds a reference.
         self.sessions = WeakSet()
-        self.metadata = Metadata()
+        self.metadata = Metadata(context=self._context)
         self.control_connection = None
         self._prepared_statements = WeakValueDictionary()
         self._prepared_statement_lock = Lock()
@@ -974,13 +976,11 @@ class Cluster(object):
         Intended for internal use only.
         """
         kwargs = self._make_connection_kwargs(address, kwargs)
-        return self.connection_class.factory(
-            self._context, address, self.connect_timeout,
-            *args, **kwargs)
+        return self.connection_class.factory(address, self.connect_timeout, *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
         kwargs = self._make_connection_kwargs(host.address, kwargs)
-        return partial(self.connection_class.factory, self._context, host.address,
+        return partial(self.connection_class.factory, host.address,
                        self.connect_timeout, *args, **kwargs)
 
     def _make_connection_kwargs(self, address, kwargs_dict):
@@ -996,6 +996,7 @@ class Cluster(object):
         kwargs_dict.setdefault('user_type_map', self._user_types)
         kwargs_dict.setdefault('allow_beta_protocol_version', self.allow_beta_protocol_version)
         kwargs_dict.setdefault('no_compact', self.no_compact)
+        kwargs_dict.setdefault('context', self._context)
 
         return kwargs_dict
 
@@ -1735,7 +1736,9 @@ class Session(object):
     _context = None
 
     def __init__(self, cluster, hosts, keyspace=None, context=None):
-        self._context = context or DriverContext()
+        if context and not isinstance(context, DriverContext):
+            raise ValueError("context should be an instance of the DriverContext class")
+        self._context = context or DefaultDriverContext()
 
         self.cluster = cluster
         self.hosts = hosts

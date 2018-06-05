@@ -19,12 +19,12 @@ from cassandra.deserializers import make_deserializers
 include "ioutils.pyx"
 
 def make_decode_results_rows(ColumnParser colparser):
-    def decode_results_rows(cls, f, int protocol_version, user_type_map, result_metadata):
+    def decode_results_rows(self, f, int protocol_version, user_type_map, result_metadata):
         """
         Parse protocol data given as a BytesIO f into a set of columns (e.g. list of tuples)
         This is used as the decode_results_rows method of (Fast)ResultMessage
         """
-        paging_state, column_metadata, result_metadata_id = cls.decode_results_metadata(f, user_type_map)
+        paging_state, column_metadata, result_metadata_id = self.decode_results_metadata(f, user_type_map)
 
         column_metadata = column_metadata or result_metadata
 

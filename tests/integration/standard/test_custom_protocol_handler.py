@@ -17,7 +17,8 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.protocol import ProtocolHandler, _ProtocolHandler, ResultMessage, QueryMessage, UUIDType, read_int
+from cassandra.protocol import ProtocolHandler, _ProtocolHandler, ResultMessage, QueryMessage, read_int
+from cassandra.cqltypes import UUIDType
 from cassandra.query import tuple_factory, SimpleStatement
 from cassandra.cluster import Cluster, ResponseFuture, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra import ProtocolVersion, ConsistencyLevel
@@ -119,7 +120,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         for expected, actual in zip(params, results):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
-        self.assertEqual(len(CustomResultMessageTracked.Codec.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
+        self.assertEqual(len(session._protocol_handler.codec.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
         cluster.shutdown()
 
     @greaterthanorequalcass30
@@ -175,15 +176,15 @@ class CustomResultMessageRaw(ResultMessage):
     """
 
     class Codec(ResultMessage.Codec):
-        my_type_codes = ResultMessage.Codec.type_codes.copy()
-        my_type_codes[0xc] = UUIDType
-        type_codes = my_type_codes
+        def __init__(self, context):
+            self.type_registry = context.type_registry
+            self.type_codes = self.type_registry.type_codes.copy()
+            self.type_codes[0xc] = UUIDType
 
-        @classmethod
-        def decode_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-            paging_state, column_metadata, result_metadata_id = cls.decode_results_metadata(f, user_type_map)
+        def decode_results_rows(self, f, protocol_version, user_type_map, result_metadata):
+            paging_state, column_metadata, result_metadata_id = self.decode_results_metadata(f, user_type_map)
             rowcount = read_int(f)
-            rows = [cls.decode_row(f, len(column_metadata)) for _ in range(rowcount)]
+            rows = [self.decode_row(f, len(column_metadata)) for _ in range(rowcount)]
             colnames = [c[2] for c in column_metadata]
             coltypes = [c[3] for c in column_metadata]
             return paging_state, coltypes, (colnames, rows), result_metadata_id
@@ -197,7 +198,8 @@ class CustomTestRawRowType(_ProtocolHandler):
     def __init__(self, context):
         super(CustomTestRawRowType, self).__init__(context)
         for version in self.message_decoders:
-            self.message_decoders[version][CustomResultMessageRaw.opcode] = CustomResultMessageRaw.Codec.decode
+            codec = CustomResultMessageRaw.Codec(context)
+            self.message_decoders[version][CustomResultMessageRaw.opcode] = codec
 
 
 class CustomResultMessageTracked(ResultMessage):
@@ -207,19 +209,19 @@ class CustomResultMessageTracked(ResultMessage):
     """
 
     class Codec(ResultMessage.Codec):
-        my_type_codes = ResultMessage.Codec.type_codes.copy()
-        my_type_codes[0xc] = UUIDType
-        type_codes = my_type_codes
-        checked_rev_row_set = set()
+        def __init__(self, context):
+            self.type_registry = context.type_registry
+            self.type_codes = self.type_registry.type_codes.copy()
+            self.type_codes[0xc] = UUIDType
+            self.checked_rev_row_set = set()
 
-        @classmethod
-        def decode_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-            paging_state, column_metadata, result_metadata_id = cls.decode_results_metadata(f, user_type_map)
+        def decode_results_rows(self, f, protocol_version, user_type_map, result_metadata):
+            paging_state, column_metadata, result_metadata_id = self.decode_results_metadata(f, user_type_map)
             rowcount = read_int(f)
-            rows = [cls.decode_row(f, len(column_metadata)) for _ in range(rowcount)]
+            rows = [self.decode_row(f, len(column_metadata)) for _ in range(rowcount)]
             colnames = [c[2] for c in column_metadata]
             coltypes = [c[3] for c in column_metadata]
-            cls.checked_rev_row_set.update(coltypes)
+            self.checked_rev_row_set.update(coltypes)
             parsed_rows = [
                 tuple(ctype.from_binary(val, protocol_version)
                     for ctype, val in zip(coltypes, row))
@@ -234,5 +236,6 @@ class CustomProtocolHandlerResultMessageTracked(_ProtocolHandler):
     """
     def __init__(self, context):
         super(CustomProtocolHandlerResultMessageTracked, self).__init__(context)
+        self.codec = CustomResultMessageTracked.Codec(context)
         for version in self.message_decoders:
-            self.message_decoders[version][CustomResultMessageTracked.opcode] = CustomResultMessageTracked.Codec.decode
+            self.message_decoders[version][CustomResultMessageTracked.opcode] = self.codec

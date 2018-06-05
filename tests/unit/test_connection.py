@@ -37,7 +37,7 @@ from tests.unit import driver_context
 class ConnectionTest(unittest.TestCase):
 
     def make_connection(self):
-        c = Connection(driver_context, '1.2.3.4')
+        c = Connection('1.2.3.4', context=driver_context)
         c._socket = Mock()
         c._socket.send.side_effect = lambda x: len(x)
         return c
