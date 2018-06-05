@@ -770,7 +770,7 @@ class Cluster(object):
 
         if protocol_version is not _NOT_SET:
             if protocol_version not in self._context. \
-                    protocol_version_registry.supported_versions():
+                    protocol_version_registry.supported_versions:
                 raise ValueError("Protocol version %d is not supported "
                                  "by this driver." % (protocol_version,))
             self.protocol_version = protocol_version
@@ -1004,7 +1004,7 @@ class Cluster(object):
             raise DriverException("ProtocolError returned from server while using explicitly set client protocol_version %d" % (previous_version,))
 
         new_version = self._context.protocol_version_registry.get_lower_supported(previous_version)
-        min_supported = self._context.protocol_version_registry.min_supported()
+        min_supported = self._context.protocol_version_registry.min_supported
         if new_version < min_supported:
             raise DriverException(
                 "Cannot downgrade protocol version below minimum supported version: %d" % (min_supported,))

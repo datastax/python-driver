@@ -25,54 +25,45 @@ class ProtocolVersionRegistry(object):
     # default versions and support definition
     protocol_version = ProtocolVersion
 
-    _beta_protocol_versions = None
-    """A list of registered beta protocol versions"""
+    supported_versions = None
+    """A tuple of supported protocol versions"""
 
-    _supported_versions = None
-    """A list of supported protocol versions"""
+    beta_versions = None
+    """A tuple of registered beta protocol versions"""
 
     def __init__(self, protocol_versions, beta_versions=None):
-        self._supported_versions = sorted(protocol_versions, reverse=True)
-        self._beta_protocol_versions = tuple(beta_versions or [])
+        self.supported_versions = sorted(protocol_versions, reverse=True)
+        self.beta_versions = tuple(beta_versions or [])
 
-    def supported_versions(self):
-        """
-        Return a tuple of all supported protocol versions.
-        """
-        return self._supported_versions
-
-    def beta_versions(self):
-        """
-        Return a tuple of all beta protocol versions.
-        """
-        return self._beta_protocol_versions
-
+    @property
     def min_supported(self):
         """
         Return the minimum protocol version supported by this driver.
         """
-        return min(self.supported_versions())
+        return min(self.supported_versions)
 
+    @property
     def max_supported(self):
         """
         Return the maximum protocol version supported by this driver.
         """
-        return max(self.supported_versions())
+        return max(self.supported_versions)
 
     def get_lower_supported(self, previous_version):
         """
         Return the lower supported protocol version. Beta versions are omitted.
         """
         try:
-            version = next(v for v in sorted(self.supported_versions(), reverse=True) if
+            version = next(v for v in sorted(self.supported_versions, reverse=True) if
                            not v.is_beta and v < previous_version)
         except StopIteration:
             version = None
 
         return version
 
+    @property
     def max_non_beta_supported(self):
-        return max(v for v in self.supported_versions() if v not in self.beta_versions())
+        return max(v for v in self.supported_versions if v not in self.beta_versions)
 
     @classmethod
     def factory(cls, protocol_versions=None, beta_versions=None):
@@ -123,7 +114,7 @@ class MessageCodecRegistry(object):
         """Factory to construct the default message codec registry"""
 
         registry = cls(protocol_version_registry)
-        for v in protocol_version_registry.supported_versions():
+        for v in protocol_version_registry.supported_versions:
             for message in [
                 StartupMessage,
                 RegisterMessage,

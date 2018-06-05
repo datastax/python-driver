@@ -141,7 +141,7 @@ class UnmarshalTest(unittest.TestCase):
         # int, tuple(sign, digits, exp), float
         converted_types = (10001, (0, (1, 0, 0, 0, 0, 1), -3), 100.1, -87.629798)
 
-        for proto_ver in range(1, driver_context.protocol_version_registry.max_supported()):
+        for proto_ver in range(1, driver_context.protocol_version_registry.max_supported:
             for n in converted_types:
                 expected = Decimal(n)
                 self.assertEqual(DecimalType.from_binary(DecimalType.to_binary(n, proto_ver), proto_ver), expected)

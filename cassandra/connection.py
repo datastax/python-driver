@@ -272,7 +272,7 @@ class Connection(object):
         self.cql_version = cql_version
         self._context = context
         self.protocol_version = protocol_version \
-            or context.protocol_version_registry.max_supported() # wondering if this default was ever used except in tests?
+            or context.protocol_version_registry.max_supported
         self.is_control_connection = is_control_connection
         self.user_type_map = user_type_map
         self.connect_timeout = connect_timeout
@@ -553,7 +553,7 @@ class Connection(object):
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
-            if version > self._context.protocol_version_registry.max_supported():
+            if version > self._context.protocol_version_registry.max_supported:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3
             # this frame header struct is everything after the version byte

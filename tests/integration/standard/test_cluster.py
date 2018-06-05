@@ -49,7 +49,7 @@ from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_version
 from tests.integration.util import assert_quiescent_pool_state
 import sys
 
-MAX_SUPPORTED = driver_context.protocol_version_registry.max_supported()
+MAX_SUPPORTED = driver_context.protocol_version_registry.max_supported
 
 def setup_module():
     use_singledc()
