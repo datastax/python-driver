@@ -55,7 +55,7 @@ class ProtocolVersionRegistry(object):
         """
         try:
             version = next(v for v in sorted(self.supported_versions, reverse=True) if
-                           not v.is_beta and v < previous_version)
+                           v not in self.beta_versions and v < previous_version)
         except StopIteration:
             version = None
 
