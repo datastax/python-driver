@@ -43,7 +43,7 @@ except ImportError:
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, SchemaTargetType,
-                       DriverException, ProtocolVersion)
+                       DriverException, ProtocolVersion, ProtocolConstants)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -56,9 +56,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 PrepareMessage, ExecuteMessage,
                                 PreparedQueryNotFound,
                                 IsBootstrappingErrorMessage,
-                                BatchMessage, RESULT_KIND_PREPARED,
-                                RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
-                                RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler)
+                                BatchMessage, ProtocolHandler)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -2490,9 +2488,12 @@ class ControlConnection(object):
         self_weakref = weakref.ref(self, partial(_clear_watcher, weakref.proxy(connection)))
         try:
             connection.register_watchers({
-                "TOPOLOGY_CHANGE": partial(_watch_callback, self_weakref, '_handle_topology_change'),
-                "STATUS_CHANGE": partial(_watch_callback, self_weakref, '_handle_status_change'),
-                "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change')
+                ProtocolConstants.EventType.TOPOLOGY_CHANGE:
+                    partial(_watch_callback, self_weakref, '_handle_topology_change'),
+                ProtocolConstants.EventType.STATUS_CHANGE:
+                    partial(_watch_callback, self_weakref, '_handle_status_change'),
+                ProtocolConstants.EventType.SCHEMA_CHANGE:
+                    partial(_watch_callback, self_weakref, '_handle_schema_change')
             }, register_timeout=self._timeout)
 
             sel_peers = self._SELECT_PEERS if self._token_meta_enabled else self._SELECT_PEERS_NO_TOKENS
@@ -2757,11 +2758,12 @@ class ControlConnection(object):
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
         addr = self._translate_address(event["address"][0])
-        if change_type == "NEW_NODE" or change_type == "MOVED_NODE":
+        if change_type == ProtocolConstants.TopologyChangeType.NEW_NODE or \
+                change_type == ProtocolConstants.TopologyChangeType.MOVED_NODE:
             if self._topology_event_refresh_window >= 0:
                 delay = self._delay_for_event_type('topology_change', self._topology_event_refresh_window)
                 self._cluster.scheduler.schedule_unique(delay, self._refresh_nodes_if_not_up, addr)
-        elif change_type == "REMOVED_NODE":
+        elif change_type == ProtocolConstants.TopologyChangeType.REMOVED_NODE:
             host = self._cluster.metadata.get_host(addr)
             self._cluster.scheduler.schedule_unique(0, self._cluster.remove_host, host)
 
@@ -2769,14 +2771,14 @@ class ControlConnection(object):
         change_type = event["change_type"]
         addr = self._translate_address(event["address"][0])
         host = self._cluster.metadata.get_host(addr)
-        if change_type == "UP":
+        if change_type == ProtocolConstants.StatusChangeType.UP:
             delay = self._delay_for_event_type('status_change', self._status_event_refresh_window)
             if host is None:
                 # this is the first time we've seen the node
                 self._cluster.scheduler.schedule_unique(delay, self.refresh_node_list_and_token_map)
             else:
                 self._cluster.scheduler.schedule_unique(delay, self._cluster.on_up, host)
-        elif change_type == "DOWN":
+        elif change_type == ProtocolConstants.StatusChangeType.DOWN:
             # Note that there is a slight risk we can receive the event late and thus
             # mark the host down even though we already had reconnected successfully.
             # But it is unlikely, and don't have too much consequence since we'll try reconnecting
@@ -3379,7 +3381,7 @@ class ResponseFuture(object):
             self._custom_payload = getattr(response, 'custom_payload', None)
 
             if isinstance(response, ResultMessage):
-                if response.kind == RESULT_KIND_SET_KEYSPACE:
+                if response.kind == ProtocolConstants.ResultKind.SET_KEYSPACE:
                     session = getattr(self, 'session', None)
                     # since we're running on the event loop thread, we need to
                     # use a non-blocking method for setting the keyspace on
@@ -3391,7 +3393,7 @@ class ResponseFuture(object):
                     if session:
                         session._set_keyspace_for_all_pools(
                             response.results, self._set_keyspace_completed)
-                elif response.kind == RESULT_KIND_SCHEMA_CHANGE:
+                elif response.kind == ProtocolConstants.ResultKind.SCHEMA_CHANGE:
                     # refresh the schema before responding, but do it in another
                     # thread instead of the event loop thread
                     self.is_schema_agreed = False
@@ -3401,7 +3403,7 @@ class ResponseFuture(object):
                         self, connection, **response.results)
                 else:
                     results = getattr(response, 'results', None)
-                    if results is not None and response.kind == RESULT_KIND_ROWS:
+                    if results is not None and response.kind == ProtocolConstants.ResultKind.ROWS:
                         self._paging_state = response.paging_state
                         self._col_types = response.col_types
                         self._col_names = results[0]
@@ -3545,7 +3547,7 @@ class ResponseFuture(object):
             return
 
         if isinstance(response, ResultMessage):
-            if response.kind == RESULT_KIND_PREPARED:
+            if response.kind == ProtocolConstants.ResultKind.PREPARED:
                 if self.prepared_statement:
                     # result metadata is the only thing that could have
                     # changed from an alter

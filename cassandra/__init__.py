@@ -26,67 +26,230 @@ __version_info__ = (4, 0, 'dev0')
 __version__ = '.'.join(map(str, __version_info__))
 
 
+class ProtocolConstants(object):
+
+    class Version(object):
+        V3 = 3
+        V4 = 4
+        V5 = 5
+
+    class Opcode(object):
+        ERROR = 0x00
+        STARTUP = 0x01
+        READY = 0x02
+        AUTHENTICATE = 0x03
+        OPTIONS = 0x05
+        SUPPORTED = 0x06
+        QUERY = 0x07
+        RESULT = 0x08
+        PREPARE = 0x09
+        EXECUTE = 0x0A
+        REGISTER = 0x0B
+        EVENT = 0X0C
+        BATCH = 0x0D
+        AUTH_CHALLENGE = 0x0E
+        AUTH_RESPONSE = 0x0F
+        AUTH_SUCCESS = 0x10
+
+    class ErrorCode(object):
+        SERVER_ERROR = 0x0000
+        PROTOCOL_ERROR = 0x000A
+        AUTH_ERROR = 0x0100
+        UNAVAILABLE = 0x1000
+        OVERLOADED = 0x1001
+        IS_BOOTSTRAPPING = 0x1002
+        TRUNCATE_ERROR = 0x1003
+        WRITE_TIMEOUT = 0x1100
+        READ_TIMEOUT = 0x1200
+        READ_FAILURE = 0x1300
+        FUNCTION_FAILURE = 0x1400
+        WRITE_FAILURE = 0x1500
+        SYNTAX_ERROR = 0x2000
+        UNAUTHORIZED = 0x2100
+        INVALID = 0x2200
+        CONFIG_ERROR = 0x2300
+        ALREADY_EXISTS = 0x2400
+        UNPREPARED = 0x2500
+        CDC_WRITE_FAILURE = 0x1600
+
+    class ResultKind(object):
+        VOID = 0x0001
+        ROWS = 0x0002
+        SET_KEYSPACE = 0x0003
+        PREPARED = 0x0004
+        SCHEMA_CHANGE = 0x0005
+
+    class ConsistencyLevel(object):
+        ANY = 0x0000
+        ONE = 0x0001
+        TWO = 0x0002
+        THREE = 0x0003
+        QUORUM = 0x0004
+        ALL = 0x0005
+        LOCAL_QUORUM = 0x0006
+        EACH_QUORUM = 0x0007
+        SERIAL = 0x0008
+        LOCAL_SERIAL = 0x0009
+        LOCAL_ONE = 0x000A
+
+    class DataType(object):
+        CUSTOM = 0x0000
+        ASCII = 0x0001
+        BIGINT = 0x0002
+        BLOB = 0x0003
+        BOOLEAN = 0x0004
+        COUNTER = 0x0005
+        DECIMAL = 0x0006
+        DOUBLE = 0x0007
+        FLOAT = 0x0008
+        INT = 0x0009
+        TEXT = 0x000A
+        TIMESTAMP = 0x000B
+        UUID = 0x000C
+        VARCHAR = 0x000D
+        VARINT = 0x000E
+        TIMEUUID = 0x000F
+        INET = 0x0010
+        DATE = 0x0011
+        TIME = 0x0012
+        SMALLINT = 0x0013
+        TINYINT = 0x0014
+        DURATION = 0x0015
+        LIST = 0x0020
+        MAP = 0x0021
+        SET = 0x0022
+        UDT = 0x0030
+        TUPLE = 0x0031
+
+    class WriteType(object):
+        SIMPLE = "SIMPLE"
+        BATCH = "BATCH"
+        UNLOGGED_BATCH = "UNLOGGED_BATCH"
+        COUNTER = "COUNTER"
+        BATCH_LOG = "BATCH_LOG"
+        VIEW = "VIEW"
+        CDC = "CDC"
+        CAS = "CAS"
+
+    class BatchType(object):
+        LOGGED = 0x00
+        UNLOGGED = 0x01
+        COUNTER = 0x02
+
+    class EventType(object):
+        TOPOLOGY_CHANGE = "TOPOLOGY_CHANGE"
+        STATUS_CHANGE = "STATUS_CHANGE"
+        SCHEMA_CHANGE = "SCHEMA_CHANGE"
+
+    class SchemaChangeType(object):
+        CREATED = "CREATED"
+        UPDATED = "UPDATED"
+        DROPPED = "DROPPED"
+
+    class SchemaChangeTarget(object):
+        KEYSPACE = "KEYSPACE"
+        TABLE = "TABLE"
+        TYPE = "TYPE"
+        FUNCTION = "FUNCTION"
+        AGGREGATE = "AGGREGATE"
+
+    class TopologyChangeType(object):
+        NEW_NODE = "NEW_NODE"
+        MOVED_NODE = "MOVED_NODE"
+        REMOVED_NODE = "REMOVED_NODE"
+
+    class StatusChangeType(object):
+        UP = "UP"
+        DOWN = "DOWN"
+
+    class FrameFlag(object):
+        COMPRESSED = 0x01
+        TRACING = 0x02
+        CUSTOM_PAYLOAD = 0x04
+        WARNING = 0x08
+        USE_BETA = 0x10
+
+    class QueryFlag(object):
+        VALUES = 0x01
+        SKIP_METADATA = 0x02
+        PAGE_SIZE = 0x04
+        PAGING_STATE = 0x08
+        SERIAL_CONSISTENCY = 0x10
+        DEFAULT_TIMESTAMP = 0x20
+        VALUE_NAMES = 0x40  # not used
+        WITH_KEYSPACE = 0x80
+
+    class PrepareFlag(object):
+        WITH_KEYSPACE = 0x01
+
+    class RowsFlag(object):
+        GLOBAL_TABLES_SPEC = 0x01
+        HAS_MORE_PAGES = 0x02
+        NO_METADATA = 0x04
+        METADATA_CHANGED = 0x08
+
+
 class ConsistencyLevel(object):
     """
     Spcifies how many replicas must respond for an operation to be considered
     a success.  By default, ``ONE`` is used for all operations.
     """
 
-    ANY = 0
+    ANY = ProtocolConstants.ConsistencyLevel.ANY
     """
     Only requires that one replica receives the write *or* the coordinator
     stores a hint to replay later. Valid only for writes.
     """
 
-    ONE = 1
+    ONE = ProtocolConstants.ConsistencyLevel.ONE
     """
     Only one replica needs to respond to consider the operation a success
     """
 
-    TWO = 2
+    TWO = ProtocolConstants.ConsistencyLevel.TWO
     """
     Two replicas must respond to consider the operation a success
     """
 
-    THREE = 3
+    THREE = ProtocolConstants.ConsistencyLevel.THREE
     """
     Three replicas must respond to consider the operation a success
     """
 
-    QUORUM = 4
+    QUORUM = ProtocolConstants.ConsistencyLevel.QUORUM
     """
     ``ceil(RF/2)`` replicas must respond to consider the operation a success
     """
 
-    ALL = 5
+    ALL = ProtocolConstants.ConsistencyLevel.ALL
     """
     All replicas must respond to consider the operation a success
     """
 
-    LOCAL_QUORUM = 6
+    LOCAL_QUORUM = ProtocolConstants.ConsistencyLevel.LOCAL_QUORUM
     """
     Requires a quorum of replicas in the local datacenter
     """
 
-    EACH_QUORUM = 7
+    EACH_QUORUM = ProtocolConstants.ConsistencyLevel.EACH_QUORUM
     """
     Requires a quorum of replicas in each datacenter
     """
 
-    SERIAL = 8
+    SERIAL = ProtocolConstants.ConsistencyLevel.SERIAL
     """
     For conditional inserts/updates that utilize Cassandra's lightweight
     transactions, this requires consensus among all replicas for the
     modified data.
     """
 
-    LOCAL_SERIAL = 9
+    LOCAL_SERIAL = ProtocolConstants.ConsistencyLevel.LOCAL_SERIAL
     """
     Like :attr:`~ConsistencyLevel.SERIAL`, but only requires consensus
     among replicas in the local datacenter.
     """
 
-    LOCAL_ONE = 10
+    LOCAL_ONE = ProtocolConstants.ConsistencyLevel.LOCAL_ONE
     """
     Sends a request only to replicas in the local datacenter and waits for
     one response.
@@ -129,21 +292,21 @@ class ProtocolVersion(object):
     """
     Defines native protocol versions supported by this driver.
     """
-    V3 = 3
+    V3 = ProtocolConstants.Version.V3
     """
     v3, supported in Cassandra 2.1-->3.x+;
     added support for protocol-level client-side timestamps (see :attr:`.Session.use_client_timestamp`),
     serial consistency levels for :class:`~.BatchStatement`, and an improved connection pool.
     """
 
-    V4 = 4
+    V4 = ProtocolConstants.Version.V4
     """
     v4, supported in Cassandra 2.2-->3.x+;
     added a number of new types, server warnings, new failure messages, and custom payloads. Details in the
     `project docs <https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec>`_
     """
 
-    V5 = 5
+    V5 = ProtocolConstants.Version.V5
     """
     v5, in beta from 3.x+
     """
@@ -183,81 +346,66 @@ class WriteType(object):
     of write operation.
     """
 
-    SIMPLE = 0
+    SIMPLE = ProtocolConstants.WriteType.SIMPLE
     """
     A write to a single partition key. Such writes are guaranteed to be atomic
     and isolated.
     """
 
-    BATCH = 1
+    BATCH = ProtocolConstants.WriteType.BATCH
     """
     A write to multiple partition keys that used the distributed batch log to
     ensure atomicity.
     """
 
-    UNLOGGED_BATCH = 2
+    UNLOGGED_BATCH = ProtocolConstants.WriteType.UNLOGGED_BATCH
     """
     A write to multiple partition keys that did not use the distributed batch
     log. Atomicity for such writes is not guaranteed.
     """
 
-    COUNTER = 3
+    COUNTER = ProtocolConstants.WriteType.COUNTER
     """
     A counter write (for one or multiple partition keys). Such writes should
     not be replayed in order to avoid overcount.
     """
 
-    BATCH_LOG = 4
+    BATCH_LOG = ProtocolConstants.WriteType.BATCH_LOG
     """
     The initial write to the distributed batch log that Cassandra performs
     internally before a BATCH write.
     """
 
-    CAS = 5
+    CAS = ProtocolConstants.WriteType.CAS
     """
     A lighweight-transaction write, such as "DELETE ... IF EXISTS".
     """
 
-    VIEW = 6
+    VIEW = ProtocolConstants.WriteType.VIEW
     """
     This WriteType is only seen in results for requests that were unable to
     complete MV operations.
     """
 
-    CDC = 7
+    CDC = ProtocolConstants.WriteType.CDC
     """
     This WriteType is only seen in results for requests that were unable to
     complete CDC operations.
     """
 
 
-WriteType.name_to_value = {
-    'SIMPLE': WriteType.SIMPLE,
-    'BATCH': WriteType.BATCH,
-    'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
-    'COUNTER': WriteType.COUNTER,
-    'BATCH_LOG': WriteType.BATCH_LOG,
-    'CAS': WriteType.CAS,
-    'VIEW': WriteType.VIEW,
-    'CDC': WriteType.CDC
-}
-
-
-WriteType.value_to_name = {v: k for k, v in WriteType.name_to_value.items()}
-
-
 class SchemaChangeType(object):
-    DROPPED = 'DROPPED'
-    CREATED = 'CREATED'
-    UPDATED = 'UPDATED'
+    DROPPED = ProtocolConstants.SchemaChangeType.DROPPED
+    CREATED = ProtocolConstants.SchemaChangeType.CREATED
+    UPDATED = ProtocolConstants.SchemaChangeType.UPDATED
 
 
 class SchemaTargetType(object):
-    KEYSPACE = 'KEYSPACE'
-    TABLE = 'TABLE'
-    TYPE = 'TYPE'
-    FUNCTION = 'FUNCTION'
-    AGGREGATE = 'AGGREGATE'
+    KEYSPACE = ProtocolConstants.SchemaChangeTarget.KEYSPACE
+    TABLE = ProtocolConstants.SchemaChangeTarget.TABLE
+    TYPE = ProtocolConstants.SchemaChangeTarget.TYPE
+    FUNCTION = ProtocolConstants.SchemaChangeTarget.FUNCTION
+    AGGREGATE = ProtocolConstants.SchemaChangeTarget.AGGREGATE
 
 
 class SignatureDescriptor(object):
@@ -377,9 +525,6 @@ class Timeout(RequestExecutionException):
         self.consistency = consistency
         self.required_responses = required_responses
         self.received_responses = received_responses
-
-        if "write_type" in kwargs:
-            kwargs["write_type"] = WriteType.value_to_name[kwargs["write_type"]]
 
         info = {'consistency': consistency_value_to_name(consistency),
                 'required_responses': required_responses,

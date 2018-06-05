@@ -26,7 +26,7 @@ import time
 import six
 from six.moves import range, zip
 
-from cassandra import ConsistencyLevel, OperationTimedOut
+from cassandra import ConsistencyLevel, OperationTimedOut, ProtocolConstants
 from cassandra.util import unix_time_from_uuid1
 from cassandra.encoder import Encoder
 import cassandra.encoder
@@ -651,9 +651,9 @@ class BatchType(object):
         return "BatchType.%s" % (self.name, )
 
 
-BatchType.LOGGED = BatchType("LOGGED", 0)
-BatchType.UNLOGGED = BatchType("UNLOGGED", 1)
-BatchType.COUNTER = BatchType("COUNTER", 2)
+BatchType.LOGGED = BatchType("LOGGED", ProtocolConstants.BatchType.LOGGED)
+BatchType.UNLOGGED = BatchType("UNLOGGED", ProtocolConstants.BatchType.UNLOGGED)
+BatchType.COUNTER = BatchType("COUNTER", ProtocolConstants.BatchType.COUNTER)
 
 
 class BatchStatement(Statement):
