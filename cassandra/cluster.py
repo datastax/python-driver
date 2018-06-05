@@ -1738,6 +1738,7 @@ class Session(object):
         self._metrics = cluster.metrics
         self._request_init_callbacks = []
         self._protocol_version = self.cluster.protocol_version
+
         self.encoder = Encoder()
 
         # create connection pools in parallel

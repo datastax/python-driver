@@ -461,8 +461,7 @@ class Connection(object):
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
         self._requests[request_id] = (cb, decoder, result_metadata)
-        msg = encoder(msg, request_id, self.protocol_version, compressor=self.compressor,
-                      allow_beta_protocol_version=self.allow_beta_protocol_version)
+        msg = encoder(msg, request_id, self.protocol_version, compressor=self.compressor, allow_beta_protocol_version=self.allow_beta_protocol_version)
         self.push(msg)
         return len(msg)
 
@@ -601,10 +600,8 @@ class Connection(object):
                 self.request_ids.append(stream_id)
 
         try:
-            response = decoder(
-                header.version, self.user_type_map, stream_id,
-                header.flags, header.opcode, body, self.decompressor, result_metadata
-            )
+            response = decoder(header.version, self.user_type_map, stream_id,
+                               header.flags, header.opcode, body, self.decompressor, result_metadata)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
                           "%s; buffer: %r", header, self._iobuf.getvalue())

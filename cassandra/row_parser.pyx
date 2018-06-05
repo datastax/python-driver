@@ -18,20 +18,21 @@ from cassandra.deserializers import make_deserializers
 
 include "ioutils.pyx"
 
-def make_decode_results_rows(ColumnParser colparser):
-    def decode_results_rows(cls, f, int protocol_version, user_type_map, result_metadata):
+def make_recv_results_rows(ColumnParser colparser):
+    def recv_results_rows(cls, f, int protocol_version, user_type_map, result_metadata):
         """
         Parse protocol data given as a BytesIO f into a set of columns (e.g. list of tuples)
-        This is used as the decode_results_rows method of (Fast)ResultMessage
+        This is used as the recv_results_rows method of (Fast)ResultMessage
         """
-        paging_state, column_metadata, result_metadata_id = cls.decode_results_metadata(f, user_type_map)
+        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
 
         column_metadata = column_metadata or result_metadata
 
         colnames = [c[2] for c in column_metadata]
         coltypes = [c[3] for c in column_metadata]
 
-        desc = ParseDesc(colnames, coltypes, make_deserializers(coltypes), protocol_version)
+        desc = ParseDesc(colnames, coltypes, make_deserializers(coltypes),
+                         protocol_version)
         reader = BytesIOReader(f.read())
         try:
             parsed_rows = colparser.parse_rows(reader, desc)
@@ -46,4 +47,4 @@ def make_decode_results_rows(ColumnParser colparser):
 
         return (paging_state, coltypes, (colnames, parsed_rows), result_metadata_id)
 
-    return decode_results_rows
+    return recv_results_rows
