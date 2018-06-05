@@ -17,7 +17,6 @@ from collections import namedtuple
 import logging
 import socket
 from uuid import UUID
-import copy
 
 import six
 from six.moves import range
@@ -1110,6 +1109,65 @@ class _ProtocolHandler(object):
 
         return msg
 
+# Message Encoder/Decoder registration
+# This is temporary and will be removed by the DriverContext
+_message_encoders = {}
+_message_decoders = {}
+
+versions = (ProtocolVersion.V3, ProtocolVersion.V4, ProtocolVersion.V5)
+
+for v in versions:
+    _message_encoders[v] = {}
+    _message_decoders[v] = {}
+
+    for m in [
+        StartupMessage,
+        RegisterMessage,
+        BatchMessage,
+        QueryMessage,
+        ExecuteMessage,
+        PrepareMessage,
+        OptionsMessage,
+        AuthResponseMessage,
+    ]:
+        _message_encoders[v][m.opcode] = m.encode
+
+    error_decoders = [(e.error_code, e.decode) for e in [
+        UnavailableErrorMessage,
+        ReadTimeoutErrorMessage,
+        WriteTimeoutErrorMessage,
+        IsBootstrappingErrorMessage,
+        OverloadedErrorMessage,
+        UnauthorizedErrorMessage,
+        ServerError,
+        ProtocolException,
+        BadCredentials,
+        TruncateError,
+        ReadFailureMessage,
+        FunctionFailureMessage,
+        WriteFailureMessage,
+        CDCWriteException,
+        SyntaxException,
+        InvalidRequestException,
+        ConfigurationException,
+        PreparedQueryNotFound,
+        AlreadyExistsException
+    ]]
+
+    for m in [
+        ReadyMessage,
+        EventMessage.Codec,
+        ResultMessage.Codec,
+        AuthenticateMessage,
+        AuthSuccessMessage,
+        AuthChallengeMessage,
+        SupportedMessage,
+        ErrorMessage.Codec(error_decoders)
+
+    ]:
+
+        _message_decoders[v][m.opcode] = m.decode
+
 
 def cython_protocol_handler(colparser):
     """
@@ -1140,14 +1198,12 @@ def cython_protocol_handler(colparser):
             col_parser = colparser
             decode_results_rows = classmethod(make_decode_results_rows(colparser))
 
-    class CythonProtocolHandler(_ProtocolHandler):
-        def __init__(self, encoders, decoders):
-            super(CythonProtocolHandler, self).__init__(encoders, decoders)
-            self.message_decoders = copy.deepcopy(self.message_decoders)
-            for v in self.message_decoders:
-                self.message_decoders[v][ResultMessage.opcode] = FastResultMessage.Codec.decode
+    cython_message_decoders = {}
+    for v in versions:
+        cython_message_decoders[v] = _message_decoders[v].copy()
+        cython_message_decoders[v][ResultMessage.opcode] = FastResultMessage.Codec.decode
 
-    return CythonProtocolHandler
+    return _ProtocolHandler(encoders=_message_encoders, decoders=cython_message_decoders)
 
 if HAVE_CYTHON:
     from cassandra.obj_parser import ListParser, LazyParser
@@ -1155,7 +1211,7 @@ if HAVE_CYTHON:
     LazyProtocolHandler = cython_protocol_handler(LazyParser())
 else:
     # Use Python-based ProtocolHandler
-    ProtocolHandler = _ProtocolHandler
+    ProtocolHandler = _ProtocolHandler(encoders=_message_encoders, decoders=_message_decoders)
     LazyProtocolHandler = None
 
 

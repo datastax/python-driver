@@ -12,7 +12,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.context import DriverContext
-
-# Default driver context used for some unit tests
-driver_context = DriverContext()

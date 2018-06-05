@@ -23,8 +23,6 @@ Upgrading to 4.0
   - Session.default_serial_consistency_level
   - Session.row_factory
 
-* :attr:`Session.client_protocol_handler` is renamed to :attr:`Session.protocol_handler_class`
-
 ResultSet
 ~~~~~~~~~
 
