@@ -24,11 +24,11 @@ class MessageTest(unittest.TestCase):
         message = PrepareMessage("a")
         io = Mock()
 
-        PrepareMessage.encode(io, message, 4)
+        message.send_body(io, 4)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',)])
 
         io.reset_mock()
-        PrepareMessage.encode(io, message, 5)
+        message.send_body(io, 5)
 
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x00\x00\x00',)])
 
@@ -36,12 +36,12 @@ class MessageTest(unittest.TestCase):
         message = ExecuteMessage('1', [], 4)
         io = Mock()
 
-        ExecuteMessage.encode(io, message, 4)
+        message.send_body(io, 4)
         self._check_calls(io, [(b'\x00\x01',), (b'1',), (b'\x00\x04',), (b'\x01',), (b'\x00\x00',)])
 
         io.reset_mock()
         message.result_metadata_id = 'foo'
-        ExecuteMessage.encode(io, message, 5)
+        message.send_body(io, 5)
 
         self._check_calls(io, [(b'\x00\x01',), (b'1',),
                                (b'\x00\x03',), (b'foo',),
@@ -61,11 +61,11 @@ class MessageTest(unittest.TestCase):
         message = QueryMessage("a", 3)
         io = Mock()
 
-        QueryMessage.encode(io, message, 4)
+        message.send_body(io, 4)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00',)])
 
         io.reset_mock()
-        QueryMessage.encode(io, message, 5)
+        message.send_body(io, 5)
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00\x00\x00\x00',)])
 
     def _check_calls(self, io, expected):
@@ -87,7 +87,7 @@ class MessageTest(unittest.TestCase):
         message = PrepareMessage("a")
         io = Mock()
         for version in ProtocolVersion.SUPPORTED_VERSIONS:
-            PrepareMessage.encode(io, message, version)
+            message.send_body(io, version)
             if ProtocolVersion.uses_prepare_flags(version):
                 self.assertEqual(len(io.write.mock_calls), 3)
             else:
@@ -100,7 +100,7 @@ class MessageTest(unittest.TestCase):
 
         for version in ProtocolVersion.SUPPORTED_VERSIONS:
             if ProtocolVersion.uses_keyspace_flag(version):
-                PrepareMessage.encode(io, message, version)
+                message.send_body(io, version)
                 self._check_calls(io, [
                     (b'\x00\x00\x00\x01',),
                     (b'a',),
@@ -110,7 +110,7 @@ class MessageTest(unittest.TestCase):
                 ])
             else:
                 with self.assertRaises(UnsupportedOperation):
-                    PrepareMessage.encode(io, message, version)
+                    message.send_body(io, version)
             io.reset_mock()
 
     def test_keyspace_flag_raises_before_v5(self):
@@ -118,7 +118,7 @@ class MessageTest(unittest.TestCase):
         io = Mock(name='io')
 
         with self.assertRaisesRegexp(UnsupportedOperation, 'Keyspaces.*set'):
-            QueryMessage.encode(io, keyspace_message, protocol_version=4)
+            keyspace_message.send_body(io, protocol_version=4)
         io.assert_not_called()
 
     def test_keyspace_written_with_length(self):
@@ -130,8 +130,9 @@ class MessageTest(unittest.TestCase):
             (b'\x00\x00\x00\x80',),  # options w/ keyspace flag
         ]
 
-        message = QueryMessage('a', consistency_level=3, keyspace='ks')
-        QueryMessage.encode(io, message, protocol_version=5)
+        QueryMessage('a', consistency_level=3, keyspace='ks').send_body(
+            io, protocol_version=5
+        )
         self._check_calls(io, base_expected + [
             (b'\x00\x02',),  # length of keyspace string
             (b'ks',),
@@ -139,8 +140,9 @@ class MessageTest(unittest.TestCase):
 
         io.reset_mock()
 
-        message = QueryMessage('a', consistency_level=3, keyspace='keyspace')
-        QueryMessage.encode(io, message, protocol_version=5)
+        QueryMessage('a', consistency_level=3, keyspace='keyspace').send_body(
+            io, protocol_version=5
+        )
         self._check_calls(io, base_expected + [
             (b'\x00\x08',),  # length of keyspace string
             (b'keyspace',),
@@ -158,7 +160,7 @@ class MessageTest(unittest.TestCase):
             consistency_level=3,
             keyspace='ks'
         )
-        BatchMessage.encode(io, batch, protocol_version=5)
+        batch.send_body(io, protocol_version=5)
         self._check_calls(io,
             ((b'\x00',), (b'\x00\x03',), (b'\x00',),
              (b'\x00\x00\x00\x06',), (b'stmt a',),
