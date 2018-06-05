@@ -22,8 +22,6 @@ import socket
 import platform
 import os
 
-from cassandra.protocol import HAVE_CYTHON, HAVE_NUMPY
-
 log = logging.getLogger()
 log.setLevel('DEBUG')
 # if nose didn't already attach a log handler, add one here
@@ -107,5 +105,3 @@ def is_windows():
 
 notwindows = unittest.skipUnless(not is_windows(), "This test is not adequate for windows")
 notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")
-if_cython = unittest.skipUnless(HAVE_CYTHON, "Cython extensions needed for this tests")
-if_numpy = unittest.skipUnless(HAVE_NUMPY, "Numpy needed for this tests")
