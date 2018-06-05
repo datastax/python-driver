@@ -33,6 +33,7 @@ from subprocess import call
 from itertools import groupby
 import six
 
+from cassandra.context import DriverContext
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, \
     AlreadyExists, InvalidRequest
 
@@ -61,6 +62,8 @@ if not os.path.exists(path):
 cass_version = None
 cql_version = None
 
+# Default DriverContext used in some tests
+driver_context = DriverContext()
 
 def get_server_versions():
     """
@@ -229,7 +232,6 @@ def local_decorator_creator():
     return _id_and_mark
 
 local = local_decorator_creator()
-notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
 protocolv5 = unittest.skipUnless(5 in get_supported_protocol_versions(), 'Protocol versions less than 5 are not supported')

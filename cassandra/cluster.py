@@ -70,6 +70,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
+from cassandra.context import DriverContext
 
 
 def _is_eventlet_monkey_patched():
@@ -651,6 +652,8 @@ class Cluster(object):
     documentation for :meth:`Session.timestamp_generator`.
     """
 
+    _context = None
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -734,13 +737,16 @@ class Cluster(object):
                  allow_beta_protocol_version=False,
                  timestamp_generator=None,
                  idle_heartbeat_timeout=30,
-                 no_compact=False):
+                 no_compact=False,
+                 context=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
+        self._context = context or DriverContext()
+
         if contact_points is not None:
             if contact_points is _NOT_SET:
                 self._contact_points_explicit = False
@@ -964,11 +970,14 @@ class Cluster(object):
         Intended for internal use only.
         """
         kwargs = self._make_connection_kwargs(address, kwargs)
-        return self.connection_class.factory(address, self.connect_timeout, *args, **kwargs)
+        return self.connection_class.factory(
+            self._context.protocol_handler, address, self.connect_timeout,
+            *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
         kwargs = self._make_connection_kwargs(host.address, kwargs)
-        return partial(self.connection_class.factory, host.address, self.connect_timeout, *args, **kwargs)
+        return partial(self.connection_class.factory, self._context.protocol_handler, host.address,
+                       self.connect_timeout, *args, **kwargs)
 
     def _make_connection_kwargs(self, address, kwargs_dict):
         if self._auth_provider_callable:
@@ -1098,7 +1107,7 @@ class Cluster(object):
         self.shutdown()
 
     def _new_session(self, keyspace):
-        session = Session(self, self.metadata.all_hosts(), keyspace)
+        session = Session(self, self.metadata.all_hosts(), keyspace, context=self._context)
         self._session_register_user_types(session)
         self.sessions.add(session)
         return session
@@ -1710,24 +1719,18 @@ class Session(object):
     .. versionadded:: 2.1.0
     """
 
-    client_protocol_handler = ProtocolHandler
-    """
-    Specifies a protocol handler that will be used for client-initiated requests (i.e. no
-    internal driver requests). This can be used to override or extend features such as
-    message or type ser/des.
-
-    The default pure python implementation is :class:`cassandra.protocol.ProtocolHandler`.
-
-    When compiled with Cython, there are also built-in faster alternatives. See :ref:`faster_deser`
-    """
-
+    _protocol_handler_class = ProtocolHandler
+    _protocol_handler = None
     _lock = None
     _pools = None
     _profile_manager = None
     _metrics = None
     _request_init_callbacks = None
+    _context = None
 
-    def __init__(self, cluster, hosts, keyspace=None):
+    def __init__(self, cluster, hosts, keyspace=None, context=None):
+        self._context = context or DriverContext()
+
         self.cluster = cluster
         self.hosts = hosts
         self.keyspace = keyspace
@@ -1757,6 +1760,26 @@ class Session(object):
             if self.keyspace:
                 msg += " using keyspace '%s'" % self.keyspace
             raise NoHostAvailable(msg, [h.address for h in hosts])
+
+    @property
+    def protocol_handler_class(self):
+        """
+        Specifies a protocol handler that will be used for client-initiated requests (i.e. no
+        internal driver requests). This can be used to override or extend features such as
+        message or type ser/des.
+
+        The default pure python implementation is :class:`cassandra.protocol.ProtocolHandler`.
+
+        When compiled with Cython, there are also built-in faster alternatives. See :ref:`faster_deser`
+        """
+        return self._protocol_handler_class
+
+    @protocol_handler_class.setter
+    def protocol_handler_class(self, value):
+        self._protocol_handler_class = value
+        self._protocol_handler = self._protocol_handler_class(
+            self._context.message_codec_registry.encoders,
+            self._context.message_codec_registry.decoders)
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
         """
@@ -1830,7 +1853,6 @@ class Session(object):
 
         """
         future = self._create_response_future(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state)
-        future._protocol_handler = self.client_protocol_handler
         self._on_request(future)
         future.send_request()
         return future
@@ -3075,13 +3097,14 @@ class ResponseFuture(object):
     _custom_payload = None
     _warnings = None
     _timer = None
-    _protocol_handler = ProtocolHandler
+
     _spec_execution_plan = NoSpeculativeExecutionPlan()
 
     _warned_timeout = False
 
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None,
-                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None, speculative_execution_plan=None):
+                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None,
+                 speculative_execution_plan=None):
         self.session = session
         # TODO: normalize handling of retry policy and row factory
         self.row_factory = row_factory or session.cluster._default_row_factory
@@ -3238,10 +3261,9 @@ class ResponseFuture(object):
             if cb is None:
                 cb = partial(self._set_result, host, connection, pool)
 
-            self.request_encoded_size = connection.send_msg(message, request_id, cb=cb,
-                                                            encoder=self._protocol_handler.encode_message,
-                                                            decoder=self._protocol_handler.decode_message,
-                                                            result_metadata=result_meta)
+            self.request_encoded_size = connection.send_msg(
+                message, request_id, cb=cb, result_metadata=result_meta,
+                protocol_handler=self.session._protocol_handler)
             self.attempted_hosts.append(host)
             return request_id
         except NoConnectionsAvailable as exc:

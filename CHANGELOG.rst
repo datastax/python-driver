@@ -3,6 +3,7 @@
 
 Features
 --------
+* Introduce the DriverContext (PYTHON-958)
 * Make protocol messages pluggable (PYTHON-956)
 * cqlengine: Remove default limit on QuerySets (PYTHON-517)
 * cqlengine: asynchronous execution support (PYTHON-605)
