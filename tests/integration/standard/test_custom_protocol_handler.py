@@ -17,7 +17,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.protocol import ProtocolHandler, ResultMessage, QueryMessage, UUIDType, read_int
+from cassandra.protocol import ProtocolHandler, _ProtocolHandler, ResultMessage, QueryMessage, UUIDType, read_int
 from cassandra.query import tuple_factory, SimpleStatement
 from cassandra.cluster import Cluster, ResponseFuture, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra import ProtocolVersion, ConsistencyLevel
@@ -28,6 +28,7 @@ from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYP
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
 
+import copy
 import uuid
 import mock
 
@@ -76,7 +77,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
         # use our custom protocol handlder
 
-        session.client_protocol_handler = CustomTestRawRowType
+        # TODO temporary
+        from cassandra.protocol import _message_encoders, _message_decoders
+        session.client_protocol_handler = CustomTestRawRowType(_message_encoders, _message_decoders)
         result = session.execute("SELECT schema_version FROM system.local").one()
         raw_value = result[0]
         self.assertTrue(isinstance(raw_value, binary_type))
@@ -107,7 +110,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION,
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="custserdes")
-        session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
+        # TODO temporary
+        from cassandra.protocol import _message_encoders, _message_decoders
+        session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked(_message_encoders, _message_decoders)
 
         colnames = create_table_with_all_types("alltypes", session, 1)
         columns_string = ", ".join(colnames)
@@ -118,7 +123,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         for expected, actual in zip(params, results):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
-        self.assertEqual(len(CustomResultMessageTracked.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
+        self.assertEqual(len(CustomResultMessageTracked.Codec.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
         cluster.shutdown()
 
     @greaterthanorequalcass30
@@ -172,28 +177,32 @@ class CustomResultMessageRaw(ResultMessage):
     This is a custom Result Message that is used to return raw results, rather then
     results which contain objects.
     """
-    my_type_codes = ResultMessage.type_codes.copy()
-    my_type_codes[0xc] = UUIDType
-    type_codes = my_type_codes
 
-    @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-            paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
+    class Codec(ResultMessage.Codec):
+        my_type_codes = ResultMessage.Codec.type_codes.copy()
+        my_type_codes[0xc] = UUIDType
+        type_codes = my_type_codes
+
+        @classmethod
+        def decode_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
+            paging_state, column_metadata, result_metadata_id = cls.decode_results_metadata(f, user_type_map)
             rowcount = read_int(f)
-            rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
+            rows = [cls.decode_row(f, len(column_metadata)) for _ in range(rowcount)]
             colnames = [c[2] for c in column_metadata]
             coltypes = [c[3] for c in column_metadata]
             return paging_state, coltypes, (colnames, rows), result_metadata_id
 
 
-class CustomTestRawRowType(ProtocolHandler):
+class CustomTestRawRowType(_ProtocolHandler):
     """
     This is the a custom protocol handler that will substitute the the
     customResultMesageRowRaw Result message for our own implementation
     """
-    my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
-    my_opcodes[CustomResultMessageRaw.opcode] = CustomResultMessageRaw
-    message_types_by_opcode = my_opcodes
+    def __init__(self, encoders, decoders):
+        decoders = copy.deepcopy(decoders)
+        for version in decoders:
+            decoders[version][CustomResultMessageRaw.opcode] = CustomResultMessageRaw.Codec.decode
+        super(CustomTestRawRowType, self).__init__(encoders, decoders)
 
 
 class CustomResultMessageTracked(ResultMessage):
@@ -201,33 +210,37 @@ class CustomResultMessageTracked(ResultMessage):
     This is a custom Result Message that is use to track what primitive types
     have been processed when it receives results
     """
-    my_type_codes = ResultMessage.type_codes.copy()
-    my_type_codes[0xc] = UUIDType
-    type_codes = my_type_codes
-    checked_rev_row_set = set()
 
-    @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
-        rowcount = read_int(f)
-        rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
-        colnames = [c[2] for c in column_metadata]
-        coltypes = [c[3] for c in column_metadata]
-        cls.checked_rev_row_set.update(coltypes)
-        parsed_rows = [
-            tuple(ctype.from_binary(val, protocol_version)
-                  for ctype, val in zip(coltypes, row))
-            for row in rows]
-        return paging_state, coltypes, (colnames, parsed_rows), result_metadata_id
+    class Codec(ResultMessage.Codec):
+        my_type_codes = ResultMessage.Codec.type_codes.copy()
+        my_type_codes[0xc] = UUIDType
+        type_codes = my_type_codes
+        checked_rev_row_set = set()
+
+        @classmethod
+        def decode_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
+            paging_state, column_metadata, result_metadata_id = cls.decode_results_metadata(f, user_type_map)
+            rowcount = read_int(f)
+            rows = [cls.decode_row(f, len(column_metadata)) for _ in range(rowcount)]
+            colnames = [c[2] for c in column_metadata]
+            coltypes = [c[3] for c in column_metadata]
+            cls.checked_rev_row_set.update(coltypes)
+            parsed_rows = [
+                tuple(ctype.from_binary(val, protocol_version)
+                    for ctype, val in zip(coltypes, row))
+                for row in rows]
+            return paging_state, coltypes, (colnames, parsed_rows), result_metadata_id
 
 
-class CustomProtocolHandlerResultMessageTracked(ProtocolHandler):
+class CustomProtocolHandlerResultMessageTracked(_ProtocolHandler):
     """
     This is the a custom protocol handler that will substitute the the
     CustomTestRawRowTypeTracked Result message for our own implementation
     """
-    my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
-    my_opcodes[CustomResultMessageTracked.opcode] = CustomResultMessageTracked
-    message_types_by_opcode = my_opcodes
+    def __init__(self, encoders, decoders):
+        decoders = copy.deepcopy(decoders)
+        for version in decoders:
+            decoders[version][CustomResultMessageTracked.opcode] = CustomResultMessageTracked.Codec.decode
+        super(CustomProtocolHandlerResultMessageTracked, self).__init__(encoders, decoders)
 
 
