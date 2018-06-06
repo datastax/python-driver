@@ -146,7 +146,7 @@ class TimerTestMixin(object):
 
     def setUp(self):
         self.connection = self.connection_class(
-            driver_context.protocol_handler,
+            driver_context,
             connect_timeout=5
         )
 
@@ -205,7 +205,7 @@ class ReactorTestMixin(object):
 
     def make_connection(self):
         c = self.connection_class(
-            driver_context.protocol_handler,
+            driver_context,
             '1.2.3.4',
             cql_version='3.0.1', connect_timeout=5)
         mocket = Mock()

@@ -155,7 +155,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         execute_with_long_wait_retry(session, query_one)
         execute_with_long_wait_retry(session, query_two)
 
-        with mock.patch('cassandra.protocol.ProtocolVersion.uses_int_query_flags', new=mock.Mock(return_value=int_flag)):
+        with mock.patch('cassandra.ProtocolVersion.uses_int_query_flags', new=mock.Mock(return_value=int_flag)):
             future = self._send_query_message(session, 10,
                                               consistency_level=ConsistencyLevel.ONE, fetch_size=1)
 
@@ -194,11 +194,10 @@ class CustomTestRawRowType(_ProtocolHandler):
     This is the a custom protocol handler that will substitute the the
     customResultMesageRowRaw Result message for our own implementation
     """
-    def __init__(self, encoders, decoders):
-        decoders = copy.deepcopy(decoders)
-        for version in decoders:
-            decoders[version][CustomResultMessageRaw.opcode] = CustomResultMessageRaw.Codec.decode
-        super(CustomTestRawRowType, self).__init__(encoders, decoders)
+    def __init__(self, context):
+        super(CustomTestRawRowType, self).__init__(context)
+        for version in self.message_decoders:
+            self.message_decoders[version][CustomResultMessageRaw.opcode] = CustomResultMessageRaw.Codec.decode
 
 
 class CustomResultMessageTracked(ResultMessage):
@@ -233,10 +232,7 @@ class CustomProtocolHandlerResultMessageTracked(_ProtocolHandler):
     This is the a custom protocol handler that will substitute the the
     CustomTestRawRowTypeTracked Result message for our own implementation
     """
-    def __init__(self, encoders, decoders):
-        decoders = copy.deepcopy(decoders)
-        for version in decoders:
-            decoders[version][CustomResultMessageTracked.opcode] = CustomResultMessageTracked.Codec.decode
-        super(CustomProtocolHandlerResultMessageTracked, self).__init__(encoders, decoders)
-
-
+    def __init__(self, context):
+        super(CustomProtocolHandlerResultMessageTracked, self).__init__(context)
+        for version in self.message_decoders:
+            self.message_decoders[version][CustomResultMessageTracked.opcode] = CustomResultMessageTracked.Codec.decode

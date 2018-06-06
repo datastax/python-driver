@@ -149,37 +149,12 @@ class ProtocolVersion(object):
     """
 
     SUPPORTED_VERSIONS = (V5, V4, V3)
-    """
-    A tuple of all supported protocol versions
-    """
+    """A tuple of all protocol versions."""
 
     BETA_VERSIONS = (V5,)
     """
     A tuple of all beta protocol versions
     """
-
-    MIN_SUPPORTED = min(SUPPORTED_VERSIONS)
-    """
-    Minimum protocol version supported by this driver.
-    """
-
-    MAX_SUPPORTED = max(SUPPORTED_VERSIONS)
-    """
-    Maximum protocol versioni supported by this driver.
-    """
-
-    @classmethod
-    def get_lower_supported(cls, previous_version):
-        """
-        Return the lower supported protocol version. Beta versions are omitted.
-        """
-        try:
-            version = next(v for v in sorted(ProtocolVersion.SUPPORTED_VERSIONS, reverse=True) if
-                           v not in ProtocolVersion.BETA_VERSIONS and v < previous_version)
-        except StopIteration:
-            version = 0
-
-        return version
 
     @classmethod
     def uses_int_query_flags(cls, version):

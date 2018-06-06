@@ -12,17 +12,75 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import partial
 from collections import defaultdict
 
 from cassandra import ProtocolVersion
 from cassandra.protocol import *
 
 
+class ProtocolVersionRegistry(object):
+    """Default implementation of the ProtocolVersionRegistry"""
+
+    # default versions and support definition
+    protocol_version = ProtocolVersion
+
+    supported_versions = None
+    """A tuple of supported protocol versions"""
+
+    beta_versions = None
+    """A tuple of registered beta protocol versions"""
+
+    def __init__(self, protocol_versions, beta_versions=None):
+        self.supported_versions = sorted(protocol_versions, reverse=True)
+        self.beta_versions = tuple(beta_versions or [])
+
+    @property
+    def min_supported(self):
+        """
+        Return the minimum protocol version supported by this driver.
+        """
+        return min(self.supported_versions)
+
+    @property
+    def max_supported(self):
+        """
+        Return the maximum protocol version supported by this driver.
+        """
+        return max(self.supported_versions)
+
+    def get_lower_supported(self, previous_version):
+        """
+        Return the lower supported protocol version. Beta versions are omitted.
+        """
+        try:
+            version = next(v for v in sorted(self.supported_versions, reverse=True) if
+                           v not in self.beta_versions and v < previous_version)
+        except StopIteration:
+            version = None
+
+        return version
+
+    @property
+    def max_non_beta_supported(self):
+        return max(v for v in self.supported_versions if v not in self.beta_versions)
+
+    @classmethod
+    def factory(cls, protocol_versions=None, beta_versions=None):
+        """"Factory to construct the default protocol version registry
+
+        :param protocol_versions: All protocol versions to register, including beta ones.
+        :param beta_versions: The list of beta versions.
+        """
+        return cls(protocol_versions or cls.protocol_version.SUPPORTED_VERSIONS,
+                   beta_versions or cls.protocol_version.BETA_VERSIONS)
+
+
 class MessageCodecRegistry(object):
     encoders = None
     decoders = None
 
-    def __init__(self):
+    def __init__(self, protocol_version_registry):
         self.encoders = defaultdict(dict)
         self.decoders = defaultdict(dict)
 
@@ -52,13 +110,11 @@ class MessageCodecRegistry(object):
         return self._get(self.decoders, protocol_version, opcode)
 
     @classmethod
-    def factory(cls):
+    def factory(cls, protocol_version_registry):
         """Factory to construct the default message codec registry"""
 
-        registry = cls()
-        # TODO will be get from the DriverContext protocol version registry later
-        protocol_versions = (ProtocolVersion.V3, ProtocolVersion.V4, ProtocolVersion.V5)
-        for v in protocol_versions:
+        registry = cls(protocol_version_registry)
+        for v in protocol_version_registry.supported_versions:
             for message in [
                 StartupMessage,
                 RegisterMessage,
