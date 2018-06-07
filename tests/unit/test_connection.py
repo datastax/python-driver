@@ -43,7 +43,7 @@ class ConnectionTest(unittest.TestCase):
         return c
 
     def make_header_prefix(self, message_class, stream_id=0,
-        version=driver_context.protocol_version_registry.max_non_beta_supported:
+        version=driver_context.protocol_version_registry.max_non_beta_supported):
         return six.binary_type().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
