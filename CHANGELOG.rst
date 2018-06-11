@@ -26,6 +26,10 @@ Bug Fixes
 ---------
 * Tokenmap.get_replicas returns the wrong value if token coincides with the end of the range (PYTHON-978)
 
+Other
+-----
+* Use global variable for libev loops so it can be subclassed (PYTHON-973)
+
 3.14.0
 ======
 April 17, 2018
@@ -37,6 +41,7 @@ Features
 * Allow filter queries with fields that have an index managed outside of cqlengine (PYTHON-966)
 * Twisted SSL Support (PYTHON-343)
 * Support IS NOT NULL operator in cqlengine (PYTHON-968)
+* Asyncore reactors should use a global variable instead of a class variable for the event loop (PYTHON-697)
 
 Other
 -----
