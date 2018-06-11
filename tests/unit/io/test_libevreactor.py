@@ -35,7 +35,6 @@ class LibevConnectionTest(ReactorTestMixin, unittest.TestCase):
 
     connection_class = LibevConnection
     socket_attr_name = '_socket'
-    loop_attr_name = '_libevloop'
     null_handle_function_args = None, 0
 
     def setUp(self):
@@ -62,7 +61,7 @@ class LibevConnectionTest(ReactorTestMixin, unittest.TestCase):
         Test for asserting that watchers are closed in LibevConnection
 
         This test simulates a process termination without calling cluster.shutdown(), which would trigger
-        LibevConnection._libevloop._cleanup. It will check the watchers have been closed
+        _global_loop._cleanup. It will check the watchers have been closed
         Finally it will restore the LibevConnection reactor so it doesn't affect
         the rest of the tests
 
@@ -72,24 +71,25 @@ class LibevConnectionTest(ReactorTestMixin, unittest.TestCase):
 
         @test_category connection
         """
-        with patch.object(LibevConnection._libevloop, "_thread"),\
-             patch.object(LibevConnection._libevloop, "notify"):
+        from cassandra.io.libevreactor import _global_loop
+        with patch.object(_global_loop, "_thread"),\
+             patch.object(_global_loop, "notify"):
 
             self.make_connection()
 
             # We have to make a copy because the connections shouldn't
             # be alive when we verify them
-            live_connections = set(LibevConnection._libevloop._live_conns)
+            live_connections = set(_global_loop._live_conns)
 
             # This simulates the process ending without cluster.shutdown()
             # being called, then with atexit _cleanup for libevreactor would
             # be called
-            libev__cleanup(weakref.ref(LibevConnection._libevloop))
+            libev__cleanup(_global_loop)
             for conn in live_connections:
                 self.assertTrue(conn._write_watcher.stop.mock_calls)
                 self.assertTrue(conn._read_watcher.stop.mock_calls)
 
-        LibevConnection._libevloop._shutdown = False
+        _global_loop._shutdown = False
 
 
 class LibevTimerPatcher(unittest.TestCase):
@@ -125,7 +125,8 @@ class LibevTimerTest(TimerTestMixin, LibevTimerPatcher):
 
     @property
     def _timers(self):
-        return self.connection._libevloop._timers
+        from cassandra.io.libevreactor import _global_loop
+        return _global_loop._timers
 
     def make_connection(self):
         c = LibevConnection('1.2.3.4', cql_version='3.0.1')
