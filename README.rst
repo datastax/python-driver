@@ -6,7 +6,7 @@ DataStax Python Driver for Apache Cassandra
 
 A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (2.1+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
 
-The driver supports Python 2.7, 3.3, 3.4, 3.5, and 3.6.
+The driver supports Python 2.7, 3.4, 3.5, and 3.6.
 
 If you require compatibility with DataStax Enterprise, use the `DataStax Enterprise Python Driver <http://docs.datastax.com/en/developer/python-dse-driver/>`_.
 
