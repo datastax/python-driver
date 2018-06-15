@@ -17,7 +17,7 @@ except ImportError:
     import unittest  # noqa
 
 from tests.integration.simulacron import SimulacronCluster
-from tests.integration import requiressimulacron
+from tests.integration import (requiressimulacron, PROTOCOL_VERSION)
 from tests.integration.simulacron.utils import prime_query
 
 from cassandra import WriteTimeout, WriteType, ConsistencyLevel
@@ -55,3 +55,19 @@ class ClusterTests(SimulacronCluster):
         self.assertIn(consistency, str(wt))
         self.assertIn(str(received_responses), str(wt))
         self.assertIn(str(required_responses), str(wt))
+
+    def test_connection_with_one_unresolvable_contact_point(self):
+        self.cluster.shutdown()
+
+        # shouldn't raise anything due to name resolution failures
+        Cluster(['127.0.0.1', 'doesntresolve.becauseitcant'],
+                protocol_version=PROTOCOL_VERSION,
+                compression=False)
+
+    def test_connection_with_only_unresolvable_contact_points(self):
+        self.cluster.shutdown()
+
+        # shouldn't raise anything due to name resolution failures
+        Cluster(['doesntresolve.becauseitcant'],
+                protocol_version=PROTOCOL_VERSION,
+                compression=False)
