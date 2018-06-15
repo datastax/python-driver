@@ -192,6 +192,19 @@ def default_lbp_factory():
     return DCAwareRoundRobinPolicy()
 
 
+def _addrinfo_or_none(contact_point, port):
+    """
+    A helper function that wraps socket.getaddrinfo and returns None
+    when it fails to, e.g. resolve one of the hostnames. Used to address
+    PYTHON-895.
+    """
+    try:
+        return socket.getaddrinfo(contact_point, port,
+                                  socket.AF_UNSPEC, socket.SOCK_STREAM)
+    except (socket.error, socket.herror, socket.gaierror, socket.timeout):
+        return None
+
+
 class ExecutionProfile(object):
     load_balancing_policy = None
     """
@@ -824,8 +837,12 @@ class Cluster(object):
 
         self.port = port
 
-        self.contact_points_resolved = [endpoint[4][0] for a in self.contact_points
-                                        for endpoint in socket.getaddrinfo(a, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+        self.contact_points_resolved = [
+            endpoint[4][0]
+            for point in self.contact_points
+            for endpoint in _addrinfo_or_none(point, self.port)
+            if endpoint is not None
+        ]
 
         self.compression = compression
 
