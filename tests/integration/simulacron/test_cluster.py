@@ -21,6 +21,8 @@ from tests.integration import requiressimulacron
 from tests.integration.simulacron.utils import prime_query
 
 from cassandra import WriteTimeout, WriteType, ConsistencyLevel
+from cassandra.cluster import Cluster
+
 
 @requiressimulacron
 class ClusterTests(SimulacronCluster):

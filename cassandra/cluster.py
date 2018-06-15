@@ -86,6 +86,7 @@ def _is_gevent_monkey_patched():
     import gevent.socket
     return socket.socket is gevent.socket.socket
 
+
 # default to gevent when we are monkey patched with gevent, eventlet when
 # monkey patched with eventlet, otherwise if libev is available, use that as
 # the default because it's fastest. Otherwise, use asyncore.
@@ -180,6 +181,7 @@ def _shutdown_clusters():
     clusters = _clusters_for_shutdown.copy()  # copy because shutdown modifies the global set "discard"
     for cluster in clusters:
         cluster.shutdown()
+
 
 atexit.register(_shutdown_clusters)
 
