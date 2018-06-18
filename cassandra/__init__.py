@@ -686,3 +686,13 @@ class UnsupportedOperation(DriverException):
     for more details.
     """
     pass
+
+
+class UnresolvableContactPoints(DriverException):
+    """
+    The driver was unable to resolve any provided hostnames.
+
+    Note that this is *not* raised when a :class:`.Cluster` is created with no
+    contact points, only when lookup fails for all hosts
+    """
+    pass

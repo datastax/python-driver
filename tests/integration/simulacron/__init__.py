@@ -35,20 +35,25 @@ class SimulacronBase(unittest.TestCase):
 
 
 class SimulacronCluster(SimulacronBase):
+
+    cluster, connect = None, True
+
     @classmethod
     def setUpClass(cls):
         if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
 
         start_and_prime_singledc()
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
-        cls.session = cls.cluster.connect(wait_for_all_pools=True)
+        if cls.connect:
+            cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
+            cls.session = cls.cluster.connect(wait_for_all_pools=True)
 
     @classmethod
     def tearDownClass(cls):
         if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
 
-        cls.cluster.shutdown()
+        if cls.cluster:
+            cls.cluster.shutdown()
         stop_simulacron()
 

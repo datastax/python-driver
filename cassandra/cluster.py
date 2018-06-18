@@ -43,7 +43,8 @@ except ImportError:
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
-                       SchemaTargetType, DriverException, ProtocolVersion)
+                       SchemaTargetType, DriverException, ProtocolVersion,
+                       UnresolvableContactPoints)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -201,8 +202,24 @@ def _addrinfo_or_none(contact_point, port):
     try:
         return socket.getaddrinfo(contact_point, port,
                                   socket.AF_UNSPEC, socket.SOCK_STREAM)
-    except (socket.error, socket.herror, socket.gaierror, socket.timeout):
+    except socket.gaierror:
+        log.debug('Could not resolve hostname "{}" '
+                  'with port {}'.format(contact_point, port))
         return None
+
+
+def _resolve_contact_points(contact_points, port):
+    resolved = tuple(_addrinfo_or_none(p, port)
+                     for p in contact_points)
+
+    if resolved and all((x is None for x in resolved)):
+        raise UnresolvableContactPoints(contact_points, port)
+
+    resolved = tuple(r for r in resolved if r is not None)
+
+    return [endpoint[4][0]
+            for addrinfo in resolved
+            for endpoint in addrinfo]
 
 
 class ExecutionProfile(object):
@@ -837,12 +854,8 @@ class Cluster(object):
 
         self.port = port
 
-        self.contact_points_resolved = [
-            endpoint[4][0]
-            for point in self.contact_points
-            for endpoint in _addrinfo_or_none(point, self.port)
-            if endpoint is not None
-        ]
+        self.contact_points_resolved = _resolve_contact_points(self.contact_points,
+                                                               self.port)
 
         self.compression = compression
 

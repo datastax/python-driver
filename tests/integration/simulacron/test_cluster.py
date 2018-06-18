@@ -20,7 +20,8 @@ from tests.integration.simulacron import SimulacronCluster
 from tests.integration import (requiressimulacron, PROTOCOL_VERSION)
 from tests.integration.simulacron.utils import prime_query
 
-from cassandra import WriteTimeout, WriteType, ConsistencyLevel
+from cassandra import (WriteTimeout, WriteType,
+                       ConsistencyLevel, UnresolvableContactPoints)
 from cassandra.cluster import Cluster
 
 
@@ -56,18 +57,24 @@ class ClusterTests(SimulacronCluster):
         self.assertIn(str(received_responses), str(wt))
         self.assertIn(str(required_responses), str(wt))
 
-    def test_connection_with_one_unresolvable_contact_point(self):
-        self.cluster.shutdown()
 
+@requiressimulacron
+class ClusterDNSResolutionTests(SimulacronCluster):
+
+    connect = False
+
+    def tearDown(self):
+        if self.cluster:
+            self.cluster.shutdown()
+
+    def test_connection_with_one_unresolvable_contact_point(self):
         # shouldn't raise anything due to name resolution failures
-        Cluster(['127.0.0.1', 'doesntresolve.becauseitcant'],
-                protocol_version=PROTOCOL_VERSION,
-                compression=False)
+        self.cluster = Cluster(['127.0.0.1', 'dns.invalid'],
+                               protocol_version=PROTOCOL_VERSION,
+                               compression=False)
 
     def test_connection_with_only_unresolvable_contact_points(self):
-        self.cluster.shutdown()
-
-        # shouldn't raise anything due to name resolution failures
-        Cluster(['doesntresolve.becauseitcant'],
-                protocol_version=PROTOCOL_VERSION,
-                compression=False)
+        with self.assertRaises(UnresolvableContactPoints):
+            self.cluster = Cluster(['dns.invalid'],
+                                   protocol_version=PROTOCOL_VERSION,
+                                   compression=False)
