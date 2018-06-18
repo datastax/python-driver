@@ -1118,7 +1118,6 @@ class Cluster(object):
         if not_done:
             raise OperationTimedOut("Failed to create all new connection pools in the %ss timeout.")
 
-
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
 
@@ -2061,7 +2060,6 @@ class Session(object):
     .. versionadded:: 3.8.0
     """
 
-
     encoder = None
     """
     A :class:`~cassandra.encoder.Encoder` instance that will be used when
@@ -2250,7 +2248,6 @@ class Session(object):
             row_factory = execution_profile.row_factory
             load_balancing_policy = execution_profile.load_balancing_policy
             spec_exec_policy = execution_profile.speculative_execution_policy
-
 
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:

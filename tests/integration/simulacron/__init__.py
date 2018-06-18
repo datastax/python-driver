@@ -56,4 +56,3 @@ class SimulacronCluster(SimulacronBase):
         if cls.cluster:
             cls.cluster.shutdown()
         stop_simulacron()
-
