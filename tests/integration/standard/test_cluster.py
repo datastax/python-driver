@@ -200,23 +200,31 @@ class ClusterTests(unittest.TestCase):
 
         @test_category connection
         """
+        def cleanup():
+            """
+            When this test fails, the inline .shutdown() calls don't get
+            called, so we register this as a cleanup.
+            """
+            self.cluster_to_shutdown.shutdown()
+        self.addCleanup(cleanup)
+
         # Test with empty list
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster_to_shutdown = Cluster(protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(cluster, [])
-        cluster.shutdown()
+            Session(self.cluster_to_shutdown, [])
+        self.cluster_to_shutdown.shutdown()
 
         # Test with only invalid
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster_to_shutdown = Cluster(protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(cluster, [Host("1.2.3.4", SimpleConvictionPolicy)])
-        cluster.shutdown()
+            Session(self.cluster_to_shutdown, [Host("1.2.3.4", SimpleConvictionPolicy)])
+        self.cluster_to_shutdown.shutdown()
 
         # Test with valid and invalid hosts
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        Session(cluster, [Host(x, SimpleConvictionPolicy) for x in
-                                      ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
-        cluster.shutdown()
+        self.cluster_to_shutdown = Cluster(protocol_version=PROTOCOL_VERSION)
+        Session(self.cluster_to_shutdown, [Host(x, SimpleConvictionPolicy) for x in
+                                           ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
+        self.cluster_to_shutdown.shutdown()
 
     def test_protocol_negotiation(self):
         """
