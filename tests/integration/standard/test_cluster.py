@@ -513,7 +513,6 @@ class ClusterTests(unittest.TestCase):
         new_schema_ver = uuid4()
         session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (new_schema_ver,))
 
-
         try:
             agreement_timeout = 1
 
@@ -645,7 +644,6 @@ class ClusterTests(unittest.TestCase):
                 break
         else:
             raise Exception("get_query_trace didn't raise TraceUnavailable after {} tries".format(max_retry_count))
-
 
         for i in range(max_retry_count):
             future = session.execute_async(statement, trace=True)
@@ -1234,6 +1232,7 @@ class LocalHostAdressTranslator(AddressTranslator):
     def translate(self, addr):
         new_addr = self.addr_map.get(addr)
         return new_addr
+
 
 @local
 class TestAddressTranslation(unittest.TestCase):
