@@ -85,7 +85,7 @@ class ClusterTests(unittest.TestCase):
         """
         ingored_host_policy = IgnoredHostPolicy(["127.0.0.2", "127.0.0.3"])
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=ingored_host_policy)
-        session = cluster.connect()
+        cluster.connect()
         for host in cluster.metadata.all_hosts():
             if str(host) == "127.0.0.1":
                 self.assertTrue(host.is_up)
@@ -420,7 +420,7 @@ class ClusterTests(unittest.TestCase):
 
     def test_refresh_schema(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        cluster.connect()
 
         original_meta = cluster.metadata.keyspaces
         # full schema refresh, with wait
@@ -432,7 +432,7 @@ class ClusterTests(unittest.TestCase):
 
     def test_refresh_schema_keyspace(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        cluster.connect()
 
         original_meta = cluster.metadata.keyspaces
         original_system_meta = original_meta['system']
@@ -448,7 +448,7 @@ class ClusterTests(unittest.TestCase):
 
     def test_refresh_schema_table(self):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        session = cluster.connect()
+        cluster.connect()
 
         original_meta = cluster.metadata.keyspaces
         original_system_meta = original_meta['system']
@@ -542,7 +542,7 @@ class ClusterTests(unittest.TestCase):
             # cluster agreement bypass
             c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0)
             start_time = time.time()
-            s = c.connect()
+            c.connect()
             end_time = time.time()
             self.assertLess(end_time - start_time, refresh_threshold)
             self.assertTrue(c.metadata.keyspaces)
@@ -786,7 +786,7 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
 
         # include additional sessions
-        session2 = cluster.connect(wait_for_all_pools=True)
+        cluster.connect(wait_for_all_pools=True)
 
         holders = cluster.get_connection_holders()
         self.assertIn(cluster.control_connection, holders)
@@ -805,7 +805,7 @@ class ClusterTests(unittest.TestCase):
         # heartbeat disabled with '0'
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)
         self.assertEqual(cluster.idle_heartbeat_interval, 0)
-        session = cluster.connect()
+        cluster.connect()
 
         # let two heatbeat intervals pass (first one had startup messages in it)
         time.sleep(2 * Cluster.idle_heartbeat_interval)
@@ -821,7 +821,7 @@ class ClusterTests(unittest.TestCase):
         # Ensure that in_flight and request_ids quiesce after cluster operations
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=0)  # no idle heartbeat here, pool management is tested in test_idle_heartbeat
         session = cluster.connect()
-        session2 = cluster.connect()
+        cluster.connect()
 
         # prepare
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
@@ -936,7 +936,7 @@ class ClusterTests(unittest.TestCase):
             session = cluster.connect(wait_for_all_pools=True)
 
             # default is DCA RR for all hosts
-            expected_hosts = set(cluster.metadata.all_hosts())
+            set(cluster.metadata.all_hosts())
             rr1_queried_hosts = set()
             rr2_queried_hosts = set()
 
@@ -962,7 +962,7 @@ class ClusterTests(unittest.TestCase):
         with Cluster() as cluster:
             session = cluster.connect()
             cluster.add_execution_profile("ta1", ta1)
-            rs = session.execute(query, execution_profile='ta1')
+            session.execute(query, execution_profile='ta1')
 
     def test_clone_shared_lbp(self):
         """
