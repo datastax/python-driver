@@ -251,7 +251,7 @@ class ClusterTests(unittest.TestCase):
         """
 
         cluster = Cluster()
-        self.assertLessEqual(cluster.protocol_version,  cassandra.ProtocolVersion.MAX_SUPPORTED)
+        self.assertLessEqual(cluster.protocol_version, cassandra.ProtocolVersion.MAX_SUPPORTED)
         session = cluster.connect()
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
@@ -582,7 +582,7 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
 
-        result = session.execute( "SELECT * FROM system.local", trace=True)
+        result = session.execute("SELECT * FROM system.local", trace=True)
         self._check_trace(result.get_query_trace())
 
         query = "SELECT * FROM system.local"
@@ -759,7 +759,7 @@ class ClusterTests(unittest.TestCase):
                     connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
 
         # let two heatbeat intervals pass (first one had startup messages in it)
-        time.sleep(2 * interval + interval/2)
+        time.sleep(2 * interval + interval / 2)
 
         connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
 
