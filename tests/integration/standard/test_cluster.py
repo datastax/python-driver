@@ -161,14 +161,16 @@ class ClusterTests(unittest.TestCase):
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-        result = execute_until_pass(session,
+        result = execute_until_pass(
+            session,
             """
             CREATE KEYSPACE clustertests
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
         self.assertFalse(result)
 
-        result = execute_with_long_wait_retry(session,
+        result = execute_with_long_wait_retry(
+            session,
             """
             CREATE TABLE clustertests.cf0 (
                 a text,
@@ -1133,8 +1135,10 @@ class ClusterTests(unittest.TestCase):
         available_hosts = [host for host in ["127.0.0.1", "127.0.0.2", "127.0.0.3"] if host != only_replica]
         with Cluster(contact_points=available_hosts,
                      protocol_version=PROTOCOL_VERSION,
-                     load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
-                     predicate=lambda host: host.address != only_replica)) as cluster:
+                     load_balancing_policy=HostFilterPolicy(
+                         RoundRobinPolicy(),
+                         predicate=lambda host: host.address != only_replica)
+                     ) as cluster:
 
             session = cluster.connect(wait_for_all_pools=True)
             prepared = session.prepare("""SELECT * from test1rf.table_with_big_key
@@ -1274,15 +1278,19 @@ class TestAddressTranslation(unittest.TestCase):
             self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
         c.shutdown()
 
+
 @local
 class ContextManagementTest(unittest.TestCase):
     load_balancing_policy = HostFilterPolicy(
         RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
     )
-    cluster_kwargs = {'execution_profiles': {EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=
-                                                                                    load_balancing_policy)},
-                      'schema_metadata_enabled': False,
-                      'token_metadata_enabled': False}
+    cluster_kwargs = {
+        'execution_profiles': {
+            EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=load_balancing_policy)
+        },
+        'schema_metadata_enabled': False,
+        'token_metadata_enabled': False
+    }
 
     def test_no_connect(self):
         """
