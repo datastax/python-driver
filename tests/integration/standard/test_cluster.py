@@ -17,33 +17,40 @@ try:
 except ImportError:
     import unittest  # noqa
 
+import logging
+import sys
+import time
+import warnings
 from collections import deque
 from copy import copy
-from mock import Mock, call, patch
-import time
 from uuid import uuid4
-import logging
-import warnings
+
+from mock import Mock, call, patch
 from packaging.version import Version
 
 import cassandra
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
-from cassandra.concurrent import execute_concurrent
-from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
-                                RetryPolicy, SimpleConvictionPolicy, HostDistance,
-                                AddressTranslator, TokenAwarePolicy, HostFilterPolicy)
-from cassandra import ConsistencyLevel
-
-from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
+from cassandra import ConsistencyLevel, connection
 from cassandra.auth import PlainTextAuthProvider, SaslAuthProvider
-from cassandra import connection
-
+from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
+                               NoHostAvailable)
+from cassandra.concurrent import execute_concurrent
+from cassandra.policies import (AddressTranslator,
+                                ExponentialReconnectionPolicy, HostDistance,
+                                HostFilterPolicy, RetryPolicy,
+                                RoundRobinPolicy, SimpleConvictionPolicy,
+                                TokenAwarePolicy)
+from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 from tests import notwindows
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
-    execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
-    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40
+from tests.integration import (CASSANDRA_IP, CASSANDRA_VERSION,
+                               PROTOCOL_VERSION, MockLoggingHandler,
+                               execute_until_pass,
+                               execute_with_long_wait_retry, get_node,
+                               get_server_versions,
+                               get_unsupported_lower_protocol,
+                               get_unsupported_upper_protocol,
+                               greaterthanorequalcass30, lessthanorequalcass40,
+                               local, protocolv5, use_singledc)
 from tests.integration.util import assert_quiescent_pool_state
-import sys
 
 
 def setup_module():
