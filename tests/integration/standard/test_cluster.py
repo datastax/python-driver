@@ -369,7 +369,8 @@ class ClusterTests(unittest.TestCase):
         """
         Check for v2 auth_provider compliance
         """
-        bad_auth_provider = lambda x: {'username': 'foo', 'password': 'bar'}
+        def bad_auth_provider(_):
+            return {'username': 'foo', 'password': 'bar'}
         self.assertRaises(TypeError, Cluster, auth_provider=bad_auth_provider, protocol_version=2)
         c = Cluster(protocol_version=2)
         self.assertRaises(TypeError, setattr, c, 'auth_provider', bad_auth_provider)
