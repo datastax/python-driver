@@ -27,14 +27,13 @@ import warnings
 from packaging.version import Version
 
 import cassandra
-from cassandra.cluster import Cluster, Session, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
                                 AddressTranslator, TokenAwarePolicy, HostFilterPolicy)
 from cassandra import ConsistencyLevel
 
-from cassandra.pool import Host
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 from cassandra.auth import PlainTextAuthProvider, SaslAuthProvider
 from cassandra import connection
@@ -200,23 +199,31 @@ class ClusterTests(unittest.TestCase):
 
         @test_category connection
         """
+        def cleanup():
+            """
+            When this test fails, the inline .shutdown() calls don't get
+            called, so we register this as a cleanup.
+            """
+            self.cluster_to_shutdown.shutdown()
+        self.addCleanup(cleanup)
+
         # Test with empty list
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster_to_shutdown = Cluster([], protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(cluster, [])
-        cluster.shutdown()
+            self.cluster_to_shutdown.connect()
+        self.cluster_to_shutdown.shutdown()
 
         # Test with only invalid
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster_to_shutdown = Cluster(('1.2.3.4',), protocol_version=PROTOCOL_VERSION)
         with self.assertRaises(NoHostAvailable):
-            Session(cluster, [Host("1.2.3.4", SimpleConvictionPolicy)])
-        cluster.shutdown()
+            self.cluster_to_shutdown.connect()
+        self.cluster_to_shutdown.shutdown()
 
         # Test with valid and invalid hosts
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
-        Session(cluster, [Host(x, SimpleConvictionPolicy) for x in
-                                      ("127.0.0.1", "127.0.0.2", "1.2.3.4")])
-        cluster.shutdown()
+        self.cluster_to_shutdown = Cluster(("127.0.0.1", "127.0.0.2", "1.2.3.4"),
+                                           protocol_version=PROTOCOL_VERSION)
+        self.cluster_to_shutdown.connect()
+        self.cluster_to_shutdown.shutdown()
 
     def test_protocol_negotiation(self):
         """
