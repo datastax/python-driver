@@ -50,6 +50,8 @@ class DriverContext(object):
     _protocol_handler = None
 
     def __init__(self):
+        # This file requires delayed imports because the DefaultDriverContext
+        # class is also imported from various components in the code.
         from cassandra.protocol import ProtocolHandler
         from cassandra import registry
         self._protocol_version_registry = SingletonProvider(
@@ -81,3 +83,4 @@ class DriverContext(object):
 
 
 DefaultDriverContext = SingletonProvider(DriverContext.factory)
+"""Default DriverContext provider"""

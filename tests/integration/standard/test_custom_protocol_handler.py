@@ -177,9 +177,7 @@ class CustomResultMessageRaw(ResultMessage):
 
     class Codec(ResultMessage.Codec):
         def __init__(self, context):
-            self.type_registry = context.type_registry
-            self.type_codes = self.type_registry.type_codes.copy()
-            self.type_codes[0xc] = UUIDType
+            self.context = context
 
         def decode_results_rows(self, f, protocol_version, user_type_map, result_metadata):
             paging_state, column_metadata, result_metadata_id = self.decode_results_metadata(f, user_type_map)
@@ -210,9 +208,7 @@ class CustomResultMessageTracked(ResultMessage):
 
     class Codec(ResultMessage.Codec):
         def __init__(self, context):
-            self.type_registry = context.type_registry
-            self.type_codes = self.type_registry.type_codes.copy()
-            self.type_codes[0xc] = UUIDType
+            self.context = context
             self.checked_rev_row_set = set()
 
         def decode_results_rows(self, f, protocol_version, user_type_map, result_metadata):

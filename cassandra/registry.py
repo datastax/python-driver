@@ -196,7 +196,7 @@ class MessageCodecRegistry(object):
             ]:
                 registry.add_encoder(v, message.opcode, message.Codec(context))
 
-            error_decoders = [(e.error_code, e.Codec(e)) for e in [
+            error_decoders = [(e.error_code, e.Codec()) for e in [
                 UnavailableErrorMessage,
                 ReadTimeoutErrorMessage,
                 WriteTimeoutErrorMessage,
@@ -216,7 +216,7 @@ class MessageCodecRegistry(object):
                 AlreadyExistsException
             ]]
 
-            error_decoders += [(e.error_code, e.Codec(e, context)) for e in [
+            error_decoders += [(e.error_code, e.Codec(context)) for e in [
                 ReadFailureMessage,
                 WriteFailureMessage
             ]]

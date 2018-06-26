@@ -141,14 +141,19 @@ class ErrorMessage(MessageBase, Exception):
             return ErrorMessage(code=code, message=msg, info=None)
 
 
+class ErrorMessageSubTypeWithCodecMeta(type):
+    def __init__(cls, name, bases, clsdict):
+        super(ErrorMessageSubTypeWithCodecMeta, cls).__init__(name, bases, clsdict)
+        cls.Codec = type("Codec", (cls.Codec,), {})
+        cls.Codec.error_class = cls
+
+
+@six.add_metaclass(ErrorMessageSubTypeWithCodecMeta)
 class ErrorMessageSub(ErrorMessage):
     error_code = None
 
     class Codec(object):
         error_class = None
-
-        def __init__(self, error_class):
-            self.error_class = error_class
 
         def decode_error_info(self, f, protocol_version):
             pass
@@ -254,8 +259,8 @@ class ReadFailureMessage(RequestExecutionException):
     class Codec(ErrorMessageSub.Codec):
         protocol_version_registry = None
 
-        def __init__(self, error_class, context):
-            ErrorMessageSub.Codec.__init__(self, error_class)
+        def __init__(self, context):
+            ErrorMessageSub.Codec.__init__(self)
             self.protocol_version_registry = context.protocol_version_registry
 
         def decode_error_info(self, f, protocol_version):
@@ -310,8 +315,8 @@ class WriteFailureMessage(RequestExecutionException):
     class Codec(ErrorMessageSub.Codec):
         protocol_version_registry = None
 
-        def __init__(self, error_class, context):
-            ErrorMessageSub.Codec.__init__(self, error_class)
+        def __init__(self, context):
+            ErrorMessageSub.Codec.__init__(self)
             self.protocol_version_registry = context.protocol_version_registry
 
         def decode_error_info(self, f, protocol_version):
@@ -623,11 +628,8 @@ class ResultMessage(MessageBase):
         NO_METADATA_FLAG = 0x0004
         METADATA_ID_FLAG = 0x0008
 
-        type_codes = None
-
         def __init__(self, context):
-            self.type_registry = context.type_registry
-            self.protocol_version_registry = context.protocol_version_registry
+            self.context = context
 
         def decode(self, f, protocol_version, user_type_map, result_metadata, *args):
             kind = read_int(f)
@@ -644,7 +646,7 @@ class ResultMessage(MessageBase):
             elif kind == RESULT_KIND_PREPARED:
                 results = self.decode_results_prepared(f, protocol_version, user_type_map)
             elif kind == RESULT_KIND_SCHEMA_CHANGE:
-                results = self.decode_results_schema_change(f)
+                results = self.decode_results_schema_change(f, protocol_version)
             else:
                 raise DriverException("Unknown RESULT kind: %d" % kind)
             return ResultMessage(kind, results, paging_state, col_types)
@@ -676,7 +678,7 @@ class ResultMessage(MessageBase):
 
         def decode_results_prepared(self, f, protocol_version, user_type_map):
             query_id = read_binary_string(f)
-            if self.protocol_version_registry.protocol_version. \
+            if self.context.protocol_version_registry.protocol_version. \
                     uses_prepared_metadata(protocol_version):
                 result_metadata_id = read_binary_string(f)
             else:
@@ -747,15 +749,16 @@ class ResultMessage(MessageBase):
             _, result_metadata, result_metadata_id = self.decode_results_metadata(f, user_type_map)
             return bind_metadata, pk_indexes, result_metadata, result_metadata_id
 
-        @staticmethod
-        def decode_results_schema_change(f):
-            # TODO get the codec properly now
-            return EventMessage.Codec().decode_schema_change(f)
+        def decode_results_schema_change(self, f, protocol_version):
+            # get the EventMessage codec from registry
+            codec = self.context.message_codec_registry.get_decoder(
+                protocol_version, EventMessage.opcode)
+            return codec.decode_schema_change(f)
 
         def read_type(self, f, user_type_map):
             optid = read_short(f)
             try:
-                typeclass = self.type_registry.type_codes[optid]
+                typeclass = self.context.type_registry.type_codes[optid]
             except KeyError:
                 raise NotSupportedError("Unknown data type code 0x%04x. Have to skip"
                                         " entire result set." % (optid,))
@@ -781,7 +784,7 @@ class ResultMessage(MessageBase):
                 typeclass = specialized_type
             elif typeclass == CustomType:
                 classname = read_string(f)
-                typeclass = self.type_registry.lookup(classname)
+                typeclass = self.context.type_registry.lookup(classname)
 
             return typeclass
 
@@ -1194,7 +1197,7 @@ def cython_protocol_handler(colparser):
     """
     from cassandra.row_parser import make_decode_results_rows
 
-    def make_cython_fast_decoder(context, codec):
+    def make_cython_fast_codec(context, codec):
         class FastResultMessageCodec(codec.__class__):
             col_parser = colparser
             decode_results_rows = make_decode_results_rows(colparser)
@@ -1205,7 +1208,7 @@ def cython_protocol_handler(colparser):
         def __init__(self, context):
             super(CythonProtocolHandler, self).__init__(context)
             for v in self.message_decoders:
-                self.message_decoders[v][ResultMessage.opcode] = make_cython_fast_decoder(
+                self.message_decoders[v][ResultMessage.opcode] = make_cython_fast_codec(
                     context,
                     self.message_decoders[v][ResultMessage.opcode]
                 )
