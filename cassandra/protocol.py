@@ -144,7 +144,17 @@ class ErrorMessage(MessageBase, Exception):
 class ErrorMessageSubTypeWithCodecMeta(type):
     def __init__(cls, name, bases, clsdict):
         super(ErrorMessageSubTypeWithCodecMeta, cls).__init__(name, bases, clsdict)
-        cls.Codec = type("Codec", (cls.Codec,), {})
+        # Make unique subclass of the superclass's `.Codec` if necessary
+        # e.g. if you're defining `class FooMessage(ErrorMessageSub)` without its own
+        # `.Codec`, this will subclass `ErrorMessageSub.Codec` so that
+        # `FooMessage.Codec` and `ErrorMessageSub.Codec` are different objects.
+        if 'Codec' not in clsdict:
+            class Codec(cls.Codec):
+                pass
+            cls.Codec = Codec
+
+        # If we hadn't created a Codec subclass above, we could be altering a `Codec` that
+        # `cls` inherited
         cls.Codec.error_class = cls
 
 
