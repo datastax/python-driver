@@ -4271,7 +4271,7 @@ class ResultSet(object):
     def fetch_next_page(self):
         """
         Manually, synchronously fetch the next page. Supplied for manually retrieving pages
-        and inspecting :meth:`~.current_page`. It is not necessary to call this when iterating
+        and inspecting :attr:`~.current_rows`. It is not necessary to call this when iterating
         through results; paging happens implicitly in iteration.
         """
         if self.response_future.has_more_pages:
