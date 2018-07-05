@@ -39,7 +39,7 @@ import cassandra.cqltypes as types
 from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
 from cassandra.protocol import QueryMessage
-from cassandra.query import dict_factory, bind_params, Statement
+from cassandra.query import dict_factory, bind_params
 from cassandra.util import OrderedDict
 from cassandra.pool import HostDistance
 
@@ -408,9 +408,9 @@ class _UnknownStrategy(ReplicationStrategy):
         self.options_map['class'] = self.name
 
     def __eq__(self, other):
-        return (isinstance(other, _UnknownStrategy)
-                and self.name == other.name
-                and self.options_map == other.options_map)
+        return (isinstance(other, _UnknownStrategy) and
+                self.name == other.name and
+                self.options_map == other.options_map)
 
     def export_for_schema(self):
         """
@@ -658,11 +658,11 @@ class KeyspaceMetadata(object):
         Returns a CQL query string that can be used to recreate the entire keyspace,
         including user-defined types and tables.
         """
-        cql = "\n\n".join([self.as_cql_query() + ';']
-                         + self.user_type_strings()
-                         + [f.export_as_string() for f in self.functions.values()]
-                         + [a.export_as_string() for a in self.aggregates.values()]
-                         + [t.export_as_string() for t in self.tables.values()])
+        cql = "\n\n".join([self.as_cql_query() + ';'] +
+                          self.user_type_strings() +
+                          [f.export_as_string() for f in self.functions.values()] +
+                          [a.export_as_string() for a in self.aggregates.values()] +
+                          [t.export_as_string() for t in self.tables.values()])
         if self._exc_info:
             import traceback
             ret = "/*\nWarning: Keyspace %s is incomplete because of an error processing metadata.\n" % \
@@ -1530,6 +1530,7 @@ class Token(object):
         return "<%s: %s>" % (self.__class__.__name__, self.value)
     __str__ = __repr__
 
+
 MIN_LONG = -(2 ** 63)
 MAX_LONG = (2 ** 63) - 1
 
@@ -1870,8 +1871,8 @@ class SchemaParserV22(_SchemaParser):
                     is_compact = False
                     has_value = False
                     clustering_size = num_column_name_components - 2
-                elif (len(column_aliases) == num_column_name_components - 1
-                      and issubclass(last_col, types.UTF8Type)):
+                elif (len(column_aliases) == num_column_name_components - 1 and
+                      issubclass(last_col, types.UTF8Type)):
                     # aliases?
                     is_compact = False
                     has_value = False
@@ -2064,11 +2065,11 @@ class SchemaParserV22(_SchemaParser):
         ]
 
         responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
-        (ks_success, ks_result), (table_success, table_result), \
-        (col_success, col_result), (types_success, types_result), \
-        (functions_success, functions_result), \
-        (aggregates_success, aggregates_result), \
-        (triggers_success, triggers_result) = responses
+        ((ks_success, ks_result), (table_success, table_result),
+         (col_success, col_result), (types_success, types_result),
+         (functions_success, functions_result),
+         (aggregates_success, aggregates_result),
+         (triggers_success, triggers_result)) = responses
 
         self.keyspaces_result = self._handle_results(ks_success, ks_result)
         self.tables_result = self._handle_results(table_success, table_result)
@@ -2208,10 +2209,13 @@ class SchemaParserV3(SchemaParserV22):
         where_clause = bind_params(" WHERE keyspace_name = %s AND view_name = %s", (keyspace, table), _encoder)
         view_query = QueryMessage(query=self._SELECT_VIEWS + where_clause,
                                   consistency_level=cl)
-        (cf_success, cf_result), (col_success, col_result), (indexes_sucess, indexes_result), \
-        (triggers_success, triggers_result), (view_success, view_result) \
-            = self.connection.wait_for_responses(cf_query, col_query, indexes_query, triggers_query, view_query,
-                                                 timeout=self.timeout, fail_on_error=False)
+        ((cf_success, cf_result), (col_success, col_result),
+         (indexes_sucess, indexes_result), (triggers_success, triggers_result),
+         (view_success, view_result)) = (
+             self.connection.wait_for_responses(
+                 cf_query, col_query, indexes_query, triggers_query,
+                 view_query, timeout=self.timeout, fail_on_error=False)
+        )
         table_result = self._handle_results(cf_success, cf_result)
         col_result = self._handle_results(col_success, col_result)
         if table_result:
@@ -2372,13 +2376,13 @@ class SchemaParserV3(SchemaParserV22):
         ]
 
         responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
-        (ks_success, ks_result), (table_success, table_result), \
-        (col_success, col_result), (types_success, types_result), \
-        (functions_success, functions_result), \
-        (aggregates_success, aggregates_result), \
-        (triggers_success, triggers_result), \
-        (indexes_success, indexes_result), \
-        (views_success, views_result) = responses
+        ((ks_success, ks_result), (table_success, table_result),
+         (col_success, col_result), (types_success, types_result),
+         (functions_success, functions_result),
+         (aggregates_success, aggregates_result),
+         (triggers_success, triggers_result),
+         (indexes_success, indexes_result),
+         (views_success, views_result)) = responses
 
         self.keyspaces_result = self._handle_results(ks_success, ks_result)
         self.tables_result = self._handle_results(table_success, table_result)
@@ -2408,6 +2412,10 @@ class SchemaParserV3(SchemaParserV22):
     @staticmethod
     def _schema_type_to_cql(type_string):
         return type_string
+
+
+class SchemaParserV4(SchemaParserV3):
+    pass
 
 
 class TableMetadataV3(TableMetadata):
@@ -2529,12 +2537,12 @@ class MaterializedViewMetadata(object):
 
         properties = TableMetadataV3._property_string(formatted, self.clustering_key, self.options)
 
-        ret = "CREATE MATERIALIZED VIEW %(keyspace)s.%(name)s AS%(sep)s" \
-               "SELECT %(selected_cols)s%(sep)s" \
-               "FROM %(keyspace)s.%(base_table)s%(sep)s" \
-               "WHERE %(where_clause)s%(sep)s" \
-               "PRIMARY KEY %(pk)s%(sep)s" \
-               "WITH %(properties)s" % locals()
+        ret = ("CREATE MATERIALIZED VIEW %(keyspace)s.%(name)s AS%(sep)s"
+               "SELECT %(selected_cols)s%(sep)s"
+               "FROM %(keyspace)s.%(base_table)s%(sep)s"
+               "WHERE %(where_clause)s%(sep)s"
+               "PRIMARY KEY %(pk)s%(sep)s"
+               "WITH %(properties)s") % locals()
 
         if self.extensions:
             registry = _RegisteredExtensionType._extension_registry
@@ -2551,6 +2559,8 @@ class MaterializedViewMetadata(object):
 
 def get_schema_parser(connection, server_version, timeout):
     server_major_version = int(server_version.split('.')[0])
+    if server_major_version >= 4:
+        return SchemaParserV4(connection, timeout)
     if server_major_version >= 3:
         return SchemaParserV3(connection, timeout)
     else:
