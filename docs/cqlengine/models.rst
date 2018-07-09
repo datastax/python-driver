@@ -201,7 +201,7 @@ are only created, presisted, and queried via table Models. A short example to in
 
     users.create(name="Joe", addr=address(street="Easy St.", zipcode=99999))
     user = users.objects(name="Joe")[0]
-    print user.name, user.addr
+    print(user.name, user.addr)
     # Joe address(street=u'Easy St.', zipcode=99999)
 
 UDTs are modeled by inheriting :class:`~.usertype.UserType`, and setting column type attributes. Types are then used in defining

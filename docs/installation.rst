@@ -108,7 +108,7 @@ Verifying your Installation
 ---------------------------
 To check if the installation was successful, you can run::
 
-    python -c 'import cassandra; print cassandra.__version__'
+    python -c 'import cassandra; print(cassandra.__version__)'
 
 It should print something like "2.7.0".
 
