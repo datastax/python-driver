@@ -18,6 +18,7 @@ Other
 -----
 * Fail faster on incorrect lz4 import (PYTHON-1042)
 * Bump Cython dependency version to 0.29 (PYTHON-1036)
+* Convert print statement to print function in docs and comments
 
 Deprecations
 ------------

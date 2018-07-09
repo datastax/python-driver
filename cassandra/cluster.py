@@ -1091,7 +1091,7 @@ class Cluster(object):
             # results will include Address instances
             results = session.execute("SELECT * FROM users")
             row = results[0]
-            print row.id, row.location.street, row.location.zipcode
+            print(row.id, row.location.street, row.location.zipcode)
 
         """
         if self.protocol_version < 3:

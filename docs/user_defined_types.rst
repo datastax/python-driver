@@ -39,7 +39,7 @@ instance through :meth:`.Cluster.register_user_type`:
     # results will include Address instances
     results = session.execute("SELECT * FROM users")
     row = results[0]
-    print row.id, row.location.street, row.location.zipcode
+    print(row.id, row.location.street, row.location.zipcode)
 
 Using UDTs Without Registering Them
 -----------------------------------
@@ -79,7 +79,7 @@ for the UDT:
     results = session.execute("SELECT * FROM users")
     first_row = results[0]
     address = first_row.location
-    print address  # prints "Address(street='123 Main St.', zipcode=78723)"
+    print(address)  # prints "Address(street='123 Main St.', zipcode=78723)"
     street = address.street
     zipcode = address.street
 
