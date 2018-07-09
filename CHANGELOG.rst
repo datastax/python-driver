@@ -9,6 +9,7 @@ Bug Fixes
 Other
 -----
 * Use global variable for libev loops so it can be subclassed (PYTHON-973)
+* Convert print statement to print function in docs and comments
 
 3.14.0
 ======
