@@ -2064,12 +2064,16 @@ class SchemaParserV22(_SchemaParser):
             QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
         ]
 
-        responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
-        ((ks_success, ks_result), (table_success, table_result),
-         (col_success, col_result), (types_success, types_result),
+        ((ks_success, ks_result),
+         (table_success, table_result),
+         (col_success, col_result),
+         (types_success, types_result),
          (functions_success, functions_result),
          (aggregates_success, aggregates_result),
-         (triggers_success, triggers_result)) = responses
+         (triggers_success, triggers_result)) = (
+             self.connection.wait_for_responses(*queries, timeout=self.timeout,
+                                                fail_on_error=False)
+        )
 
         self.keyspaces_result = self._handle_results(ks_success, ks_result)
         self.tables_result = self._handle_results(table_success, table_result)
@@ -2375,14 +2379,17 @@ class SchemaParserV3(SchemaParserV22):
             QueryMessage(query=self._SELECT_VIEWS, consistency_level=cl)
         ]
 
-        responses = self.connection.wait_for_responses(*queries, timeout=self.timeout, fail_on_error=False)
-        ((ks_success, ks_result), (table_success, table_result),
-         (col_success, col_result), (types_success, types_result),
+        ((ks_success, ks_result),
+         (table_success, table_result),
+         (col_success, col_result),
+         (types_success, types_result),
          (functions_success, functions_result),
          (aggregates_success, aggregates_result),
          (triggers_success, triggers_result),
          (indexes_success, indexes_result),
-         (views_success, views_result)) = responses
+         (views_success, views_result)) = self.connection.wait_for_responses(
+             *queries, timeout=self.timeout, fail_on_error=False
+        )
 
         self.keyspaces_result = self._handle_results(ks_success, ks_result)
         self.tables_result = self._handle_results(table_success, table_result)
