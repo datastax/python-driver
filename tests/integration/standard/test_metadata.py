@@ -470,8 +470,10 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cql = table_meta.export_as_string()
         self.assertIn("'tombstone_threshold': '0.3'", cql)
         self.assertIn("LeveledCompactionStrategy", cql)
-        self.assertNotIn("min_threshold", cql)
-        self.assertNotIn("max_threshold", cql)
+        # formerly legacy options; reintroduced in 4.0
+        if CASSANDRA_VERSION < Version('4.0'):
+            self.assertNotIn("min_threshold", cql)
+            self.assertNotIn("max_threshold", cql)
 
     def test_refresh_schema_metadata(self):
         """

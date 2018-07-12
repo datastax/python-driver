@@ -2415,7 +2415,15 @@ class SchemaParserV3(SchemaParserV22):
 
 
 class SchemaParserV4(SchemaParserV3):
-    pass
+
+    recognized_table_options = tuple(
+        opt for opt in
+        SchemaParserV3.recognized_table_options
+        if opt not in (
+            # removed in V4: CASSANDRA-13910
+            'dclocal_read_repair_chance', 'read_repair_chance'
+        )
+    )
 
 
 class TableMetadataV3(TableMetadata):
