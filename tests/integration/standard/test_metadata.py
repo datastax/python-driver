@@ -17,7 +17,9 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from collections import defaultdict
 import difflib
+import logging
 import six
 import sys
 import time
@@ -36,9 +38,12 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
                                get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30, local,
-                               greaterthancass20)
+                               greaterthancass20, greaterthanorequalcass40)
 
 from tests.integration import greaterthancass21
+
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -2334,7 +2339,7 @@ class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
 
         stmt = """SELECT * FROM {}.{}
                                  WHERE k = ? """.format(self.ks_name, self.ks_name)
-        keys = ((1, ), (2, ), (2, ), (3, ))
+        keys = ((1,), (2,), (2,), (3,))
         self._assert_group_keys_by_host(keys, self.ks_name, stmt)
 
     def _assert_group_keys_by_host(self, keys, table_name, stmt):
@@ -2347,3 +2352,72 @@ class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
             hosts = self.cluster.metadata.get_replicas(self.ks_name, routing_key)
             self.assertEqual(1, len(hosts))  # RF is 1 for this keyspace
             self.assertIn(key, keys_per_host[hosts[0]])
+
+
+class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
+    virtual_ks_names = ('system_virtual_schema', 'system_views')
+
+    virtual_ks_structure = {
+        'system_views': {
+            # map from table names to sets of column names for unordered
+            # comparison
+            'caches': {'capacity_bytes', 'entry_count', 'hit_count',
+                       'hit_ratio', 'name', 'recent_hit_rate_per_second',
+                       'recent_request_rate_per_second', 'request_count',
+                       'size_bytes'},
+            'clients': {'address', 'connection_stage', 'driver_name',
+                        'driver_version', 'hostname', 'port',
+                        'protocol_version', 'request_count',
+                        'ssl_cipher_suite', 'ssl_enabled', 'ssl_protocol',
+                        'username'},
+            'sstable_tasks': {'keyspace_name', 'kind', 'progress',
+                              'table_name', 'task_id', 'total', 'unit'},
+            'thread_pools': {'active_tasks', 'active_tasks_limit',
+                             'blocked_tasks', 'blocked_tasks_all_time',
+                             'completed_tasks', 'name', 'pending_tasks'}
+        },
+        'system_virtual_schema': {
+            'columns': {'clustering_order', 'column_name',
+                        'column_name_bytes', 'keyspace_name', 'kind',
+                        'position', 'table_name', 'type'},
+            'keyspaces': {'keyspace_name'},
+            'tables': {'comment', 'keyspace_name', 'table_name'}
+        }
+    }
+
+    def test_existing_keyspaces_have_correct_virtual_tags(self):
+        for name, ks in self.cluster.metadata.keyspaces.items():
+            if name in self.virtual_ks_names:
+                self.assertTrue(
+                    ks.virtual,
+                    'incorrect .virtual value for {}'.format(name)
+                )
+            else:
+                self.assertFalse(
+                    ks.virtual,
+                    'incorrect .virtual value for {}'.format(name)
+                )
+
+    @greaterthanorequalcass40
+    def test_expected_keyspaces_exist_and_are_virtual(self):
+        for name in self.virtual_ks_names:
+            self.assertTrue(
+                self.cluster.metadata.keyspaces[name].virtual,
+                'incorrect .virtual value for {}'.format(name)
+            )
+
+    @greaterthanorequalcass40
+    def test_virtual_keyspaces_have_expected_schema_structure(self):
+        self.maxDiff = None
+
+        ingested_virtual_ks_structure = defaultdict(dict)
+        for ks_name, ks in self.cluster.metadata.keyspaces.items():
+            if not ks.virtual:
+                continue
+            for tab_name, tab in ks.tables.items():
+                ingested_virtual_ks_structure[ks_name][tab_name] = set(
+                    tab.columns.keys()
+                )
+
+        self.assertDictEqual(ingested_virtual_ks_structure,
+                             self.virtual_ks_structure)
