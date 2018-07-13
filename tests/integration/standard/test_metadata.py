@@ -28,7 +28,7 @@ from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor
 
 from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
-from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate,  protect_name, protect_names,
+from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate, protect_name, protect_names,
                                 RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,
                                 group_keys_by_replica, NO_VALID_REPLICA)
 
@@ -39,6 +39,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                greaterthancass20)
 
 from tests.integration import greaterthancass21
+
 
 def setup_module():
     use_singledc()
@@ -79,11 +80,12 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         for host in self.cluster.metadata.all_hosts():
             self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION.base_version))
 
+
 @local
 class MetaDataRemovalTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1','127.0.0.2', '127.0.0.3', '126.0.0.186'])
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1', '127.0.0.2', '127.0.0.3', '126.0.0.186'])
         self.cluster.connect()
 
     def tearDown(self):
@@ -1912,7 +1914,10 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
 
         # Format can very slightly between versions, strip out whitespace for consistency sake
-        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(s=>org.apache.cassandra.db.marshal.UTF8Type,i=>org.apache.cassandra.db.marshal.Int32Type)'" in dct_table.as_cql_query().replace(" ", ""))
+        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
+                        "s=>org.apache.cassandra.db.marshal.UTF8Type,"
+                        "i=>org.apache.cassandra.db.marshal.Int32Type)'"
+                        in dct_table.as_cql_query().replace(" ", ""))
 
 
 @greaterthanorequalcass30
@@ -1963,7 +1968,7 @@ class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"] )
+        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
 
         self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.keyspace_name))
         self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
@@ -2295,6 +2300,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(value_column)
         self.assertEqual(value_column.name, 'the Value')
 
+
 class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
     @classmethod
     def setUpClass(cls):
@@ -2339,5 +2345,5 @@ class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
         for key in keys:
             routing_key = prepared_stmt.bind(key).routing_key
             hosts = self.cluster.metadata.get_replicas(self.ks_name, routing_key)
-            self.assertEqual(1, len(hosts)) # RF is 1 for this keyspace
+            self.assertEqual(1, len(hosts))  # RF is 1 for this keyspace
             self.assertIn(key, keys_per_host[hosts[0]])
