@@ -9,6 +9,7 @@ Bug Fixes
 Other
 -----
 * Use global variable for libev loops so it can be subclassed (PYTHON-973)
+* Update SchemaParser for V4 (PYTHON-1006)
 
 3.14.0
 ======
