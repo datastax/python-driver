@@ -237,7 +237,7 @@ class AsyncoreLoop(object):
                 self._loop_lock.release()
 
         if should_start:
-            self._thread = Thread(target=self._run_loop, name="cassandra_driver_event_loop")
+            self._thread = Thread(target=self._run_loop, name="asyncore_cassandra_driver_event_loop")
             self._thread.daemon = True
             self._thread.start()
 

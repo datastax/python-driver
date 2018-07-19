@@ -128,7 +128,7 @@ class TwistedLoop(object):
         with self._lock:
             if not reactor.running:
                 self._thread = Thread(target=reactor.run,
-                                      name="cassandra_driver_event_loop",
+                                      name="cassandra_driver_twisted_event_loop",
                                       kwargs={'installSignalHandlers': False})
                 self._thread.daemon = True
                 self._thread.start()
