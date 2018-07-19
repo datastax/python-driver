@@ -1,12 +1,12 @@
-
 try:
     from cassandra.io.asyncioreactor import AsyncioConnection
     import asynctest
     ASYNCIO_AVAILABLE = True
 except (ImportError, SyntaxError):
+    AysncioConnection = None
     ASYNCIO_AVAILABLE = False
 
-from tests import is_monkey_patched
+from tests import is_monkey_patched, connection_class
 from tests.unit.io.utils import TimerCallback, TimerTestMixin
 
 from mock import patch
@@ -14,20 +14,29 @@ from mock import patch
 import unittest
 import time
 
+skip_me = (is_monkey_patched() or
+           (not ASYNCIO_AVAILABLE) or
+           (connection_class is not AsyncioConnection))
 
+
+@unittest.skipIf(is_monkey_patched(), 'runtime is monkey patched for another reactor')
+@unittest.skipIf(connection_class is not AsyncioConnection,
+                 'not running asyncio tests; current connection_class is {}'.format(connection_class))
 @unittest.skipUnless(ASYNCIO_AVAILABLE, "asyncio is not available for this runtime")
 class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if is_monkey_patched() or not ASYNCIO_AVAILABLE:
+        if skip_me:
             return
         cls.connection_class = AsyncioConnection
         AsyncioConnection.initialize_reactor()
 
     @classmethod
     def tearDownClass(cls):
-        if ASYNCIO_AVAILABLE:
+        if skip_me:
+            return
+        if ASYNCIO_AVAILABLE and AsyncioConnection._loop:
             AsyncioConnection._loop.stop()
 
     @property
@@ -39,6 +48,8 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
         raise RuntimeError('no TimerManager for AsyncioConnection')
 
     def setUp(self):
+        if skip_me:
+            return
         socket_patcher = patch('socket.socket')
         self.addCleanup(socket_patcher.stop)
         socket_patcher.start()
