@@ -18,11 +18,13 @@ except ImportError:
     import unittest  # noqa
 
 from functools import partial
+import logging
 from six.moves import range
 import sys
 import threading
 from threading import Thread, Event
 import time
+from unittest import SkipTest
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
@@ -41,6 +43,9 @@ try:
     import cassandra.io.libevreactor
 except ImportError:
     LibevConnection = None
+
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -394,10 +399,14 @@ class ConnectionTests(object):
         self.assertTrue(exception_thrown)
 
     def test_subclasses_share_loop(self):
-        class C1(AsyncoreConnection):
+
+        if self.klass not in (AsyncoreConnection, LibevConnection):
+            raise SkipTest
+
+        class C1(self.klass):
             pass
 
-        class C2(AsyncoreConnection):
+        class C2(self.klass):
             pass
 
         clusterC1 = Cluster(connection_class=C1)
@@ -412,8 +421,10 @@ class ConnectionTests(object):
 
 
 def get_eventloop_threads(name):
-    import threading
-    event_loops_threads = [thread for thread in threading.enumerate() if name == thread.name]
+    all_threads = list(threading.enumerate())
+    log.debug('all threads: {}'.format(all_threads))
+    log.debug('all names: {}'.format([thread.name for thread in all_threads]))
+    event_loops_threads = [thread for thread in all_threads if name == thread.name]
 
     return event_loops_threads
 
@@ -421,7 +432,7 @@ def get_eventloop_threads(name):
 class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = AsyncoreConnection
-    event_loop_name = "cassandra_driver_event_loop"
+    event_loop_name = "asyncore_cassandra_driver_event_loop"
 
     def setUp(self):
         if is_monkey_patched():
