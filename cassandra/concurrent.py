@@ -245,7 +245,8 @@ pipeline_sentinel = object()
 
 class WritePipeline(object):
     def __init__(self, session, max_concurrency=None,
-                 max_pending_statements=5000, error_handler=None):
+                 max_pending_statements=5000, error_handler=None,
+                 hold_futures=False):
         # the Cassandra session object
         self.session = session
 
@@ -260,10 +261,15 @@ class WritePipeline(object):
                 self.max_concurrency = 100
 
         # set the number of maximum amount of unformed statements
+        # ignore the maximum size of pending statements if set to None/0/False
         self.max_pending_statements = max_pending_statements
 
         # use a custom error_handler function upon future.result() errors
         self.error_handler = error_handler
+
+        # hold futures for the ReadPipeline superclass
+        self.hold_futures = hold_futures
+        self.futures = Queue()
 
         # store all pending PreparedStatements along with matching args/kwargs
         self.statements = Queue()
@@ -342,6 +348,9 @@ class WritePipeline(object):
             future.add_callbacks(self.__future_callback,
                                  self.__future_callback)
 
+            if self.hold_futures:
+                self.futures.put(future)
+
     def execute(self, *args, **kwargs):
         # to ensure maximum throughput, only interact with PreparedStatements
         # as is the best practice
@@ -351,7 +360,9 @@ class WritePipeline(object):
 
         # if the soft maximum size of pending statements has been exceeded,
         # wait until all pending statements and in-flight futures have returned
-        if self.statements.qsize() > self.max_pending_statements:
+        # ignore the maximum size of pending statements if set to None/0/False
+        if self.max_pending_statements \
+                and self.statements.qsize() > self.max_pending_statements:
             self.confirm()
 
         # reset the self.completed_futures Event and block on self.confirm()
@@ -367,3 +378,40 @@ class WritePipeline(object):
     def confirm(self):
         # block until all pending statements and in-flight futures have returned
         self.completed_futures.wait()
+
+
+class ReadPipeline(WritePipeline):
+    def __init__(self, *args, **kwargs):
+        if 'max_pending_statements' in kwargs:
+            raise ValueError('A custom max_pending_statements value is'
+                             ' not supported for the ReadPipeline.')
+
+        # set max_pending_statements to None to avoid mid-loop confirms() since
+        # we need the user to call on results() in order to catch all pending
+        # future.results()
+        kwargs['max_pending_statements'] = None
+
+        # ensure we hold onto the read futures for later consumption
+        kwargs['hold_futures'] = True
+
+        super(ReadPipeline, self).__init__(*args, **kwargs)
+
+    def __enter__(self):
+        # do not implement a with-block since reads should always be returned
+        # to the user
+        raise NotImplementedError
+
+    def __exit__(self, *args, **kwargs):
+        # not needed since we do not implement a with-block
+        raise NotImplementedError
+
+    def confirm(self):
+        # reads should always be returned to the user, not simply checked for
+        # communication exceptions
+        raise NotImplementedError
+
+    def results(self):
+        # TODO: never overfill the self.futures(), but still massage pending statements
+        for future in self.futures:
+            self.__maximize_in_flight_futures()
+            yield future.results()
