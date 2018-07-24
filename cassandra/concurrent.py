@@ -260,7 +260,9 @@ class WritePipeline(object):
             else:
                 self.max_concurrency = 100
 
-        # set the number of maximum amount of unformed statements
+        # set the maximum number of unsent write requests before the Pipeline
+        # blocks to ensure that all in-flight write requests have been
+        # processed and confirmed to not have thrown any exceptions.
         # ignore the maximum size of pending statements if set to None/0/False
         self.max_pending_statements = max_pending_statements
 
@@ -301,17 +303,20 @@ class WritePipeline(object):
             if isinstance(previous_result, BaseException):
                 log.error('Error on statement: %r', previous_result)
 
-                # if an self.error_handler has been defined, handle appropriately
+                # if an self.error_handler has been defined,
+                # handle appropriately
                 if self.error_handler:
                     self.error_handler(previous_result)
                 else:
                     # else, raise the seen future.result() exception
                     raise previous_result
 
-            # ensure that the last statement within self.statements is not being processed
+            # ensure that the last statement within self.statements is not
+            # being processed
             self.executing_lock.acquire()
 
-            # if there are no more pending statements and all in-flight futures have returned...
+            # if there are no more pending statements and all in-flight
+            # futures have returned...
             if self.statements.empty() \
                     and next(self.num_finished) >= self.num_started:
                 # ... set self.completed_futures to True
@@ -376,7 +381,8 @@ class WritePipeline(object):
         self.__maximize_in_flight_futures()
 
     def confirm(self):
-        # block until all pending statements and in-flight futures have returned
+        # block until all pending statements and in-flight futures
+        # have returned
         self.completed_futures.wait()
 
 
@@ -411,7 +417,18 @@ class ReadPipeline(WritePipeline):
         raise NotImplementedError
 
     def results(self):
-        # TODO: never overfill the self.futures(), but still massage pending statements
+        """
+        Iterate over and return all read request `future.results()`.
+
+        :return: An iterator of Cassandra `ResultSets`, which in turn are
+                 iterators over the rows from a query result.
+        :rtype: iter(cassandra.cluster.ResultSet)
+        """
         for future in self.futures:
+            # always ensure that at least one future has been queued.
+            # useful for cases where `max_unconsumed_read_responses == 0`
             self.__maximize_in_flight_futures()
+
+            # yield the ResultSet which in turn is another iterator over the
+            # rows within the query's result
             yield future.results()
