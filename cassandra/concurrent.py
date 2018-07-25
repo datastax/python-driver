@@ -240,42 +240,49 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
     return execute_concurrent(session, zip(cycle((statement,)), parameters), *args, **kwargs)
 
 
-pipeline_sentinel = object()
+# a sentinel to detect if a kwarg was using the default value or was passed
+# a real result
+RESULT_SENTINEL = object()
+
+# a sentinel to detect if a kwarg was using the default value or was passed
+# a user-defined parameter
+PROTOCOL_DEFAULT = object()
 
 
 class WritePipeline(object):
-    def __init__(self, session, max_concurrency=None,
-                 max_pending_write_requests=5000,
+    def __init__(self, session,
+                 max_in_flight_requests=PROTOCOL_DEFAULT,
+                 max_unconfirmed_write_requests=5000,
                  max_unconsumed_read_responses=False,
                  error_handler=None):
         # the Cassandra session object
         self.session = session
 
-        # set max_concurrency if provided
-        if max_concurrency:
-            self.max_concurrency = max_concurrency
+        # set max_in_flight_requests if provided
+        if max_in_flight_requests is not PROTOCOL_DEFAULT:
+            self.max_in_flight_requests = max_in_flight_requests
         else:
             # else, use the recommended defaults for newer protocol versions
             if self.session._protocol_version >= 3:
-                self.max_concurrency = 1000
+                self.max_in_flight_requests = 1000
             else:
-                self.max_concurrency = 100
+                self.max_in_flight_requests = 100
 
         # set the maximum number of unsent write requests before the Pipeline
         # blocks to ensure that all in-flight write requests have been
         # processed and confirmed to not have thrown any exceptions.
         # ignore the maximum size of pending statements if set to None/0/False
-        self.max_pending_write_requests = max_pending_write_requests
+        self.max_unconfirmed_write_requests = max_unconfirmed_write_requests
 
         # set the maximum number of unconsumed futures to hold onto
         # before continuing to process more pending read requests
         self.max_unconsumed_read_responses = max_unconsumed_read_responses
 
-        # hold futures for the ReadPipeline superclass
-        self.futures = Queue()
-
         # use a custom error_handler function upon future.result() errors
         self.error_handler = error_handler
+
+        # hold futures for the ReadPipeline superclass
+        self.futures = Queue()
 
         # store all pending PreparedStatements along with matching args/kwargs
         self.statements = Queue()
@@ -294,11 +301,11 @@ class WritePipeline(object):
 
         # ensure that we are not using settings for the ReadPipeline within
         # the WritePipeline, or vice versa
-        if self.max_pending_write_requests \
+        if self.max_unconfirmed_write_requests \
                 and self.max_unconsumed_read_responses:
             raise ValueError('The pipeline can either be a Read or Write'
                              ' Pipeline, not both. As such,'
-                             ' max_pending_write_requests and'
+                             ' max_unconfirmed_write_requests and'
                              ' max_unconsumed_read_responses'
                              ' cannot both be non-zero.')
 
@@ -310,9 +317,9 @@ class WritePipeline(object):
         # ensure all writes are confirmed when exiting the with-block
         self.confirm()
 
-    def __future_callback(self, previous_result=pipeline_sentinel):
+    def __future_callback(self, previous_result=RESULT_SENTINEL):
         # check to see if we're processing a future.result()
-        if previous_result is not pipeline_sentinel:
+        if previous_result is not RESULT_SENTINEL:
             # handle the case where future.result() is an exception
             if isinstance(previous_result, BaseException):
                 log.error('Error on statement: %r', previous_result)
@@ -339,13 +346,13 @@ class WritePipeline(object):
             # allow the continued processing of pending statements
             self.executing_lock.release()
 
-        # attempt to process the another statement
-        self.__maximize_in_flight_futures()
+        # attempt to process the another request
+        self.__maximize_in_flight_requests()
 
-    def __maximize_in_flight_futures(self):
+    def __maximize_in_flight_requests(self):
         # convert pending statements to in-flight futures if we haven't hit our
         # soft concurrency threshold
-        if self.num_started - self.num_finished > self.max_concurrency:
+        if self.num_started - self.num_finished > self.max_in_flight_requests:
             return
 
         # convert pending statements to in-flight futures if there aren't too
@@ -396,8 +403,8 @@ class WritePipeline(object):
         # if the soft maximum size of pending statements has been exceeded,
         # wait until all pending statements and in-flight futures have returned
         # ignore the maximum size of pending statements if set to None/0/False
-        if self.max_pending_write_requests \
-                and self.statements.qsize() > self.max_pending_write_requests:
+        if self.max_unconfirmed_write_requests \
+                and self.statements.qsize() > self.max_unconfirmed_write_requests:
             self.confirm()
 
         # reset the self.completed_futures Event and block on self.confirm()
@@ -408,7 +415,7 @@ class WritePipeline(object):
         self.statements.put((args, kwargs))
 
         # attempt to process the newest statement
-        self.__maximize_in_flight_futures()
+        self.__maximize_in_flight_requests()
 
     def confirm(self):
         # block until all pending statements and in-flight futures
@@ -418,14 +425,14 @@ class WritePipeline(object):
 
 class ReadPipeline(WritePipeline):
     def __init__(self, *args, **kwargs):
-        if 'max_pending_write_requests' in kwargs:
-            raise ValueError('A custom max_pending_write_requests value is'
+        if 'max_unconfirmed_write_requests' in kwargs:
+            raise ValueError('A custom max_unconfirmed_write_requests value is'
                              ' not supported for the ReadPipeline.')
 
-        # set max_pending_write_requests to None to avoid mid-loop confirms()
+        # set max_unconfirmed_write_requests to None to avoid mid-loop confirms()
         # since we need the user to call on results() in order to catch all
         # pending future.results()
-        kwargs['max_pending_write_requests'] = None
+        kwargs['max_unconfirmed_write_requests'] = None
 
         # set a default value for the max_unconsumed_read_responses to store
         # in memory before the user must consume ReadPipeline.results()
@@ -459,7 +466,7 @@ class ReadPipeline(WritePipeline):
         for future in self.futures:
             # always ensure that at least one future has been queued.
             # useful for cases where `max_unconsumed_read_responses == 0`
-            self.__maximize_in_flight_futures()
+            self.__maximize_in_flight_requests()
 
             # yield the ResultSet which in turn is another iterator over the
             # rows within the query's result
