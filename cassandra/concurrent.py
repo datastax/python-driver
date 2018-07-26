@@ -334,17 +334,12 @@ class WritePipeline(object):
 
             # ensure that the last statement within self.statements is not
             # being processed
-            self.executing_lock.acquire()
-
-            # if there are no more pending statements and all in-flight
-            # futures have returned...
-            if self.statements.empty() \
-                    and next(self.num_finished) >= self.num_started:
-                # ... set self.completed_futures to True
-                self.completed_futures.set()
-
-            # allow the continued processing of pending statements
-            self.executing_lock.release()
+            with self.executing_lock:
+                # if there are no more pending statements and all in-flight
+                # futures have returned set self.completed_futures to True
+                if self.statements.empty() \
+                        and next(self.num_finished) >= self.num_started:
+                    self.completed_futures.set()
 
         # attempt to process the another request
         self.__maximize_in_flight_requests()
@@ -364,11 +359,9 @@ class WritePipeline(object):
                 and self.futures.qsize() > self.max_unconsumed_read_responses:
             return
 
-        try:
-            # ensure self.completed_futures is never set to True when we
-            # are processing the very last pending statement
-            self.executing_lock.acquire()
-
+        # ensure self.completed_futures is never set to True when we
+        # are processing the very last pending statement
+        with self.executing_lock:
             # grab the next statement, if still available
             try:
                 args, kwargs = self.statements.get_nowait()
@@ -378,10 +371,6 @@ class WritePipeline(object):
 
             # keep track of the number of in-flight requests
             next(self.num_started)
-        finally:
-            # allow self.completed_futures to be modified again,
-            # even after an early exit
-            self.executing_lock.release()
 
         # send the statement to Cassandra and await for the future's callback
         future = self.session.execute_async(*args, **kwargs)
