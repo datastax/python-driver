@@ -249,82 +249,19 @@ RESULT_SENTINEL = object()
 PROTOCOL_DEFAULT = object()
 
 
-class WritePipeline(object):
+class Pipeline(object):
     """
-    The ``WritePipeline`` is a helper object meant to add high-performance
-    write request pipelining to any application with minimal code changes.
+    This ``Pipeline`` object is not meant to be used by itself and instead
+    should be used via the :class:`cassandra.concurrent.WritePipeline` or
+    :class:`cassandra.concurrent.ReadPipeline` objects.
 
-    A :class:`cassandra.cluster.Session` object is first created and used
-    to initiate the ``WritePipeline``. The ``WritePipeline`` can then be
-    used to execute multiple queries asynchronously using
-    :meth:`WritePipeline.execute()`.
-
-    As :attr:`WritePipeline.max_in_flight_requests` is reached, statements
-    are queued up for execution as soon as a
-    :class:`cassandra.cluster.ResponseFuture` is returned.
-
-    As :attr:`WritePipeline.max_unsent_write_requests` is reached,
-    :meth:`WritePipeline.confirm()` is called to ensure all unsent write
-    requests are sent and return without error in an effort to alleviate
-    memory pressures from the queued unsent requests.
-
-    Once all requests have been sent into the ``WritePipeline`` and the
-    business logic requires confirmation on the write requests or the
-    program is about to exit, :meth:`WritePipeline.confirm()` should be
-    called to block until all sent requests have returned and confirmed
-    to have been ingested without error.
-
-    :meth:`WritePipeline.execute()` passes all _args_ and _kwargs_ to
-    :meth:`cassandra.cluster.Session.execute_async()` internally to
-    increase familiarity with previous python-driver usage. This means that
-    :meth:`cassandra.query.Statements`,
-    :meth:`cassandra.query.PreparedStatement`, and
-    :meth:`cassandra.query.BoundStatements` will be processed as expected.
-    :meth:`cassandra.query.BatchStatements` are also accepted but should
-    only be used if all statements will modify the same partition to avoid
-    Cassandra anti-patterns.
-
-    Example usage::
-
-    >>> from cassandra.cluster import Cluster
-    >>> from cassandra.concurrent import WritePipeline
-    >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
-    >>> session = cluster.connect()
-    >>> write_pipeline = WritePipeline(session)
-    >>> statement = 'INSERT INTO mykeyspace.users (name, age) VALUES ("Jorge", 28)'
-    >>> write_pipeline.execute(statement)
-    >>> ...
-    >>> prepared_statement = session.prepare("INSERT INTO mykeyspace.users (name, age) VALUES (?, ?)")
-    >>> write_pipeline.execute(prepared_statement, ('Jose', 28))
-    >>> write_pipeline.execute(prepared_statement, ('Sara', 25))
-    >>> ...
-    >>> write_pipeline.confirm()
-    >>> ...
-    >>> cluster.shutdown()
-
-    The ``WritePipeline`` also functions as a context manager allowing for
-    with-block usage. By using the ``with`` keyword there is no longer a
-    need to call on :meth:`WritePipeline.confirm()` since the context
-    manager will handle that logic upon leaving the scope of the
-    with-block.
-
-    Example usage::
-
-    >>> from cassandra.cluster import Cluster
-    >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
-    >>> session = cluster.connect()
-    >>> prepared_statement = session.prepare("INSERT INTO mykeyspace.kv (k, v) VALUES (?, ?)")
-    >>> with WritePipeline(session) as write_pipeline:
-    ...    write_pipeline.execute(prepared_statement, ('Jorge', 28))
-    ...    write_pipeline.execute(prepared_statement, ('Jose', 28))
-    ...    write_pipeline.execute(prepared_statement, ('Sara', 25))
-    >>> ...
-    >>> cluster.shutdown()
+    This ``Pipeline`` object is missing fundamental functionality to ensure
+    write requests are processed or read requests are able to be read.
     """
 
     session = None
     """
-    A :class:`cassandra.cluster.Session` object used by the ``WritePipeline``
+    A :class:`cassandra.cluster.Session` object used by the ``Pipeline``
     to send Cassandra requests.
     """
 
@@ -332,27 +269,26 @@ class WritePipeline(object):
     """
     The maximum number of in-flight requests that have yet to return responses.
 
-    As :attr:`WritePipeline.max_in_flight_requests` is reached, statements
-    are queued up for execution as soon as a
+    As :attr:`cassandra.concurrent.Pipeline.max_in_flight_requests` is reached,
+    statements are queued up for execution as soon as a
     :class:`cassandra.cluster.ResponseFuture` is returned.
     """
 
     max_unsent_write_requests = 50000
     """
-    The maximum number of queued write requests that have yet to be
-    delivered to Cassandra.
+    This value is specifically for a ``WritePipeline`` to set the maximum
+    number of queued write requests that have yet to be delivered to Cassandra.
 
     This can be set to `None`, `0`, or `False` to avoid any limitation on the
     number of queued write requests that have yet to be processed, but the
     user should be aware of the possibility of running out of memory.
 
-    As :attr:`WritePipeline.max_unsent_write_requests` is reached,
-    :meth:`WritePipeline.confirm()` is called to ensure all unsent write
-    requests are sent and return without error in an effort to alleviate
-    memory pressures from the queued unsent requests.
+    As :attr:`cassandra.concurrent.Pipeline.max_unsent_write_requests` is
+    reached, :meth:`cassandra.concurrent.Pipeline.confirm()` is called to
+    ensure all unsent write requests are sent and return without error in an
+    effort to alleviate memory pressures from the queued unsent requests.
     """
 
-    # TODO: Create a Pipeline(object)
     max_unconsumed_read_responses = False
     """
     This value is specifically for a ``ReadPipeline`` to alleviate memory
@@ -382,11 +318,26 @@ class WritePipeline(object):
     retries of the failed request.
     """
 
+    allow_non_performant_queries = False
+    """
+    Only :class:`cassandra.query.PreparedStatement` requests are allowed when
+    using the ``Pipeline``, by default. If other Statement types must be used,
+    set :attr:`cassandra.concurrent.Pipeline.allow_non_performant_queries` to
+    `True` with the understanding that there may some performance hit since
+    :class:`cassandra.query.SimpleStatement` queries will require server-side
+    processing, :class:`cassandra.query.BoundStatement` requests can be
+    generated on the fly by using :class:`cassandra.query.PreparedStatement`
+    requests and bind values, and :class:`cassandra.query.BatchStatement`
+    requests should only contain mutations targeting the same partition to
+    avoid a Cassandra anti-pattern.
+    """
+
     def __init__(self, session,
                  max_in_flight_requests=PROTOCOL_DEFAULT,
                  max_unsent_write_requests=50000,
                  max_unconsumed_read_responses=False,
-                 error_handler=None):
+                 error_handler=None,
+                 allow_non_performant_queries=False):
         # the Cassandra session object
         self.session = session
 
@@ -413,6 +364,10 @@ class WritePipeline(object):
 
         # use a custom error_handler function upon future.result() errors
         self.error_handler = error_handler
+
+        # allow for Statements, BoundStatements, and BatchStatements to be
+        # processed. By default, only PreparedStatements are processed.
+        self.allow_non_performant_queries = allow_non_performant_queries
 
         # hold futures for the ReadPipeline superclass
         self.futures = Queue()
@@ -442,24 +397,6 @@ class WritePipeline(object):
                              ' max_unconsumed_read_responses'
                              ' cannot both be non-zero.')
 
-    def __enter__(self):
-        """
-        Adds with-block support.
-
-        :return: A ``WritePipeline`` object.
-        :rtype: cassandra.concurrent.WritePipeline
-        """
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Ensures all writes are confirmed when exiting with-blocks.
-
-        Failure to confirm all pending requests may cause some requests not to
-        be delivered to Cassandra.
-        """
-        self.confirm()
-
     def __future_callback(self, previous_result=RESULT_SENTINEL):
         """
         This is handled by the
@@ -469,7 +406,7 @@ class WritePipeline(object):
         requests.
 
         If an error has occurred, the exception will immediately be raised
-        or handled by :attr:`WritePipeline.error_handler`.
+        or handled by :attr:`Pipeline.error_handler`.
 
         In all cases, calling this method will try to maximize the number
         of in-flight requests.
@@ -516,7 +453,7 @@ class WritePipeline(object):
         In all other cases, we call
         :meth:`cassandra.cluster.Session.execute_async()` with the queued
         statement's _args_, _kwargs_, and a callback to
-        :meth:`cassandra.concurrent.WritePipeline.__future_callback()`.
+        :meth:`cassandra.concurrent.Pipeline.__future_callback()`.
 
         In cases where we're using a ReadPipeline, we will store the future
         for later consumption of the :class:`cassandra.cluster.ResponseFuture`
@@ -561,34 +498,50 @@ class WritePipeline(object):
 
     def execute(self, *args, **kwargs):
         """
-        This method passes all _args_ and _kwargs_ to
-        :meth:`cassandra.cluster.Session.execute_async()` internally to
-        increase familiarity with previous python-driver usage. This means that
-        :meth:`cassandra.query.Statements`,
-        :meth:`cassandra.query.PreparedStatement`, and
-        :meth:`cassandra.query.BoundStatements` will be processed as expected.
-        :meth:`cassandra.query.BatchStatements` are also accepted but should
-        only be used if all statements will modify the same partition to avoid
-        Cassandra anti-patterns.
+        This method passes all _args_ and
+        _kwargs_ to :meth:`cassandra.cluster.Session.execute_async()`
+        internally to increase familiarity with standard python-driver usage.
+        By default, :class:`cassandra.query.PreparedStatement` queries will be
+        processed as expected.
 
-        When :attr:`WritePipeline.max_unsent_write_requests` is reached,
-        :meth:`WritePipeline.confirm()` is called to ensure all unsent write
+        If :class:`cassandra.query.SimpleStatement`,
+        :class:`cassandra.query.BoundStatement`,
+        and :class:`cassandra.query.BatchStatement` statements need to be
+        processed,
+        :attr:`cassandra.concurrent.Pipeline.allow_non_performant_queries` will
+        need to be set to `True`. :meth:`cassandra.query.BatchStatements`
+        should only be used if all statements will modify the same partition to
+        avoid Cassandra anti-patterns.
+
+        If using the :class:`cassandra.concurrent.WritePipeline`:
+
+        * When :attr:`Pipeline.max_unsent_write_requests` is reached,
+        :meth:`Pipeline.confirm()` is called to ensure all unsent write
         requests are sent and return without error in an effort to alleviate
         memory pressures from the queued unsent requests.
 
-        Once :meth:`WritePipeline.confirm()` is returned, or if
-        :attr:`WritePipeline.max_unsent_write_requests` is not reached,
-        the new _args_ and _kwargs_ are placed into the `self.statements`
+        * Once :meth:`Pipeline.confirm()` is returned, or if
+        :attr:`Pipeline.max_unsent_write_requests` is not reached, continue.
+
+        The _args_ and _kwargs_ are placed into the `self.statements`
         Queue and
-        :meth:`cassandra.concurrent.WritePipeline.__maximize_in_flight_requests()`
+        :meth:`cassandra.concurrent.Pipeline.__maximize_in_flight_requests()`
         is called to process any pending requests in the `self.statements`
         Queue.
 
         This method returns immediately and continues to process pending
         statements asynchronously without any further interaction.
 
-        To ensure all pending statements are processed, call
-        :meth:`WritePipeline.confirm()` manually if using the ``WritePipeline``.
+        If using the :class:`cassandra.concurrent.WritePipeline`:
+
+        * To ensure all pending statements are processed, call
+        :meth:`Pipeline.confirm()` manually if using the
+        :class:`cassandra.concurrent.WritePipeline`.
+
+        If using the :class:`cassandra.concurrent.ReadPipeline`:
+
+        * All requests can be read by consuming the
+        :meth:`cassandra.concurrent.ReadPipeline.results()` iterator.
 
         :param args: Any _args_ for
                      :meth:`cassandra.cluster.Session.execute_async()`.
@@ -597,9 +550,20 @@ class WritePipeline(object):
         """
         # to ensure maximum throughput, only interact with PreparedStatements
         # as is the best practice
-        if not isinstance(args[0], PreparedStatement):
-            raise TypeError('Only PreparedStatements are allowed when when'
-                            ' using the WritePipeline.')
+        if not self.allow_non_performant_queries \
+                and not isinstance(args[0], PreparedStatement):
+            raise TypeError('Only PreparedStatements are allowed when'
+                            ' using the Pipeline. If other Statement types'
+                            ' must be used, set'
+                            ' Pipeline.self.allow_non_performant_queries to'
+                            ' `True` with the understanding that there may'
+                            ' some performance hit since SimpleStatements will'
+                            ' require server-side processing, BoundStatements'
+                            ' can be generated on the fly by using'
+                            ' PreparedStatements and bind values, and'
+                            ' BatchStatements should only contain mutations'
+                            ' targeting the same partition to avoid a'
+                            ' Cassandra anti-pattern.')
 
         # if the soft maximum size of pending statements has been exceeded,
         # wait until all pending statements and in-flight futures have returned
@@ -629,34 +593,313 @@ class WritePipeline(object):
         self.completed_futures.wait()
 
 
-class ReadPipeline(WritePipeline):
-    def __init__(self, *args, **kwargs):
-        if 'max_unsent_write_requests' in kwargs:
-            raise ValueError('A custom max_unsent_write_requests value is'
-                             ' not supported for the ReadPipeline.')
+class WritePipeline(Pipeline):
+    """
+    The ``WritePipeline`` is a helper object meant to add high-performance
+    write request pipelining to any application with minimal code changes.
 
-        # set max_unsent_write_requests to None to avoid mid-loop confirms()
-        # since we need the user to call on results() in order to catch all
-        # pending future.results()
-        kwargs['max_unsent_write_requests'] = None
+    A :class:`cassandra.cluster.Session` object is first created and used
+    to initiate the ``WritePipeline``. The ``WritePipeline`` can then be
+    used to execute multiple queries asynchronously using
+    :meth:`cassandra.concurrent.Pipeline.execute()`.
 
-        # set a default value for the max_unconsumed_read_responses to store
-        # in memory before the user must consume ReadPipeline.results()
-        if 'max_unconsumed_read_responses' not in kwargs:
-            kwargs['max_unconsumed_read_responses'] = 2000
+    As :attr:`cassandra.concurrent.Pipeline.max_in_flight_requests` is reached,
+    statements are queued up for execution as soon as a
+    :class:`cassandra.cluster.ResponseFuture` is returned.
 
-        super(ReadPipeline, self).__init__(*args, **kwargs)
+    As :attr:`cassandra.concurrent.Pipeline.max_unsent_write_requests` is
+    reached, :meth:`cassandra.concurrent.Pipeline.confirm()` is called to
+    ensure all unsent write requests are sent and return without error in an
+    effort to alleviate memory pressures from the queued unsent requests.
+
+    Once all requests have been sent into the ``WritePipeline`` and the
+    business logic requires confirmation on the write requests or the
+    program is about to exit, :meth:`cassandra.concurrent.Pipeline.confirm()`
+    should be called to block until all sent requests have returned and
+    confirmed to have been ingested without error.
+
+    :meth:`cassandra.concurrent.Pipeline.execute()` passes all _args_ and
+    _kwargs_ to :meth:`cassandra.cluster.Session.execute_async()`
+    internally to increase familiarity with standard python-driver usage.
+    By default, :class:`cassandra.query.PreparedStatement` queries will be
+    processed as expected.
+
+    If :class:`cassandra.query.SimpleStatement`,
+    :class:`cassandra.query.BoundStatement`,
+    and :class:`cassandra.query.BatchStatement` statements need to be
+    processed,
+    :attr:`cassandra.concurrent.Pipeline.allow_non_performant_queries` will
+    need to be set to `True`. :meth:`cassandra.query.BatchStatements`
+    should only be used if all statements will modify the same partition to
+    avoid Cassandra anti-patterns.
+
+    Example usage::
+
+    >>> from cassandra.cluster import Cluster
+    >>> from cassandra.concurrent import WritePipeline
+    >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
+    >>> session = cluster.connect()
+    >>> write_pipeline = WritePipeline(session)
+    >>> prepared_statement = session.prepare("INSERT INTO mykeyspace.users (name, age) VALUES (?, ?)")
+    >>> write_pipeline.execute(prepared_statement, ('Jorge', 28))
+    >>> write_pipeline.execute(prepared_statement, ('Jose', 28))
+    >>> write_pipeline.execute(prepared_statement, ('Sara', 25))
+    >>> ...
+    >>> write_pipeline.confirm()
+    >>> ...
+    >>> cluster.shutdown()
+
+    The ``WritePipeline`` also functions as a context manager allowing for
+    with-block usage. By using the ``with`` keyword there is no longer a
+    need to call on :meth:`cassandra.concurrent.Pipeline.confirm()` since the
+    context manager will handle that logic upon leaving the scope of the
+    with-block.
+
+    Example usage::
+
+    >>> from cassandra.cluster import Cluster
+    >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
+    >>> session = cluster.connect()
+    >>> prepared_statement = session.prepare("INSERT INTO mykeyspace.users (name, age) VALUES (?, ?)")
+    >>> with WritePipeline(session) as write_pipeline:
+    ...    write_pipeline.execute(prepared_statement, ('Jorge', 28))
+    ...    write_pipeline.execute(prepared_statement, ('Jose', 28))
+    ...    write_pipeline.execute(prepared_statement, ('Sara', 25))
+    >>> ...
+    >>> cluster.shutdown()
+    """
+
+    session = None
+    """
+    A :class:`cassandra.cluster.Session` object used by the ``Pipeline``
+    to send Cassandra requests.
+    """
+
+    max_in_flight_requests = PROTOCOL_DEFAULT
+    """
+    The maximum number of in-flight requests that have yet to return responses.
+
+    As :attr:`cassandra.concurrent.Pipeline.max_in_flight_requests` is reached,
+    statements are queued up for execution as soon as a
+    :class:`cassandra.cluster.ResponseFuture` is returned.
+    """
+
+    max_unsent_write_requests = 50000
+    """
+    This value is specifically for a ``WritePipeline`` to set the maximum
+    number of queued write requests that have yet to be delivered to Cassandra.
+
+    This can be set to `None`, `0`, or `False` to avoid any limitation on the
+    number of queued write requests that have yet to be processed, but the
+    user should be aware of the possibility of running out of memory.
+
+    As :attr:`cassandra.concurrent.Pipeline.max_unsent_write_requests` is
+    reached, :meth:`cassandra.concurrent.Pipeline.confirm()` is called to
+    ensure all unsent write requests are sent and return without error in an
+    effort to alleviate memory pressures from the queued unsent requests.
+    """
+
+    error_handler = None
+    """
+    Allows for custom error handlers to be implemented instead of simply
+    raising the first encountered Cassandra request exception.
+
+    Other implementations may call for a log of failed requests or immediate
+    retries of the failed request.
+    """
+
+    allow_non_performant_queries = False
+    """
+    Only :class:`cassandra.query.PreparedStatement` requests are allowed when
+    using the ``Pipeline``, by default. If other Statement types must be used,
+    set :attr:`cassandra.concurrent.Pipeline.allow_non_performant_queries` to
+    `True` with the understanding that there may some performance hit since
+    :class:`cassandra.query.SimpleStatement` queries will require server-side
+    processing, :class:`cassandra.query.BoundStatement` requests can be
+    generated on the fly by using :class:`cassandra.query.PreparedStatement`
+    requests and bind values, and :class:`cassandra.query.BatchStatement`
+    requests should only contain mutations targeting the same partition to
+    avoid a Cassandra anti-pattern.
+    """
+
+    def __init__(self, session,
+                 max_in_flight_requests=PROTOCOL_DEFAULT,
+                 max_unsent_write_requests=50000,
+                 error_handler=None,
+                 allow_non_performant_queries=False):
+        super(WritePipeline, self).__init__(session=session,
+                                            max_in_flight_requests=max_in_flight_requests,
+                                            max_unsent_write_requests=max_unsent_write_requests,
+                                            error_handler=error_handler,
+                                            allow_non_performant_queries=allow_non_performant_queries)
 
     def __enter__(self):
-        # do not implement a with-block since reads should always be returned
-        # to the user
-        raise NotImplementedError
+        """
+        Adds with-block support.
 
-    def __exit__(self, *args, **kwargs):
-        # not needed since we do not implement a with-block
-        raise NotImplementedError
+        :return: A ``WritePipeline`` object.
+        :rtype: cassandra.concurrent.WritePipeline
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Ensures all writes are confirmed when exiting with-blocks.
+
+        Failure to confirm all pending requests may cause some requests not to
+        be delivered to Cassandra.
+        """
+        self.confirm()
+
+
+class ReadPipeline(Pipeline):
+    """
+    The ``ReadPipeline`` is a helper object meant to add high-performance
+    read request pipelining to any application with minimal code changes.
+
+    A :class:`cassandra.cluster.Session` object is first created and used
+    to initiate the ``ReadPipeline``. The ``ReadPipeline`` can then be
+    used to execute multiple queries asynchronously using
+    :meth:`cassandra.concurrent.Pipeline.execute()`.
+
+    As :attr:`cassandra.concurrent.Pipeline.max_in_flight_requests` is reached,
+    statements are queued up for execution as soon as a
+    :class:`cassandra.cluster.ResponseFuture` is returned.
+
+    Once all requests have been sent into the ``ReadPipeline`` and the
+    business logic requires consuming those read requests,
+    :meth:`cassandra.concurrent.ReadPipeline.results()` will return an iterator
+    of :class:`cassandra.cluster.ResultSet` objects which are generated when
+    calling :meth:`cassandra.cluster.ResponseFuture.result()` internally within
+    the :class:`cassandra.concurrent.Pipeline`.
+
+    The result from :meth:`cassandra.concurrent.ReadPipeline.results()` is an
+    iterator of :class:`cassandra.cluster.ResultSet` objects which in turn
+    another iterator over the result's rows and the same type of object
+    returned when calling :meth:`cassandra.cluster.Session.execute()`. The
+
+    The results from :meth:`cassandra.concurrent.ReadPipeline.results()` follow
+    the same ordering as statements that went into
+    :meth:`cassandra.concurrent.Pipeline.execute()` without no top-level
+    indication of the keyspace, table, nor query that was called that is not
+    already accessible within the :class:`cassandra.cluster.ResultSet`.
+
+    It's recommended to keep a dedicated read_pipeline for each query unless
+    schemas are identical or business logic will handle the different types of
+    returned Cassandra rows.
+
+    :meth:`cassandra.concurrent.Pipeline.execute()` passes all _args_ and
+    _kwargs_ to :meth:`cassandra.cluster.Session.execute_async()`
+    internally to increase familiarity with standard python-driver usage.
+    By default, :class:`cassandra.query.PreparedStatement` queries will be
+    processed as expected.
+
+    If :class:`cassandra.query.SimpleStatement`,
+    :class:`cassandra.query.BoundStatement`,
+    and :class:`cassandra.query.BatchStatement` statements need to be
+    processed,
+    :attr:`cassandra.concurrent.Pipeline.allow_non_performant_queries` will
+    need to be set to `True`. :meth:`cassandra.query.BatchStatements`
+    should only be used if all statements will modify the same partition to
+    avoid Cassandra anti-patterns.
+
+    Example usage::
+
+    >>> from cassandra.cluster import Cluster
+    >>> from cassandra.concurrent import WritePipeline
+    >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
+    >>> session = cluster.connect()
+    >>> read_pipeline = ReadPipeline(session)
+    >>> prepared_statement = session.prepare('SELECT * FROM mykeyspace.users WHERE name = ?')
+    >>> read_pipeline.execute(prepared_statement, ('Jorge'))
+    >>> read_pipeline.execute(prepared_statement, ('Jose'))
+    >>> read_pipeline.execute(prepared_statement, ('Sara'))
+    >>> prepared_statement = session.prepare('SELECT * FROM old_keyspace.old_users WHERE name = ?')
+    >>> read_pipeline.execute(prepared_statement, ('Jorge'))
+    >>> read_pipeline.execute(prepared_statement, ('Jose'))
+    >>> read_pipeline.execute(prepared_statement, ('Sara'))
+    >>> for result in read_pipeline.results():
+    ...     for row in result:
+    ...         print row.name, row.age
+    >>> ...
+    >>> cluster.shutdown()
+    """
+
+    session = None
+    """
+    A :class:`cassandra.cluster.Session` object used by the ``Pipeline``
+    to send Cassandra requests.
+    """
+
+    max_in_flight_requests = PROTOCOL_DEFAULT
+    """
+    The maximum number of in-flight requests that have yet to return responses.
+
+    As :attr:`Pipeline.max_in_flight_requests` is reached, statements
+    are queued up for execution as soon as a
+    :class:`cassandra.cluster.ResponseFuture` is returned.
+    """
+
+    max_unconsumed_read_responses = False
+    """
+    This value is specifically for a ``ReadPipeline`` to alleviate memory
+    pressure. If this limit is reached and there are already plenty of
+    :class:`cassandra.cluster.ResponseFuture` results that have yet to be read,
+    no further requests will be sent to Cassandra until
+    :meth:`cassandra.concurrent.ReadPipeline.results()` is called.
+
+    Once :meth:`cassandra.concurrent.ReadPipeline.results()` is called and a
+    single future is consumed, another request will be immediately sent to
+    Cassandra. We will continue to process new requests until the number of
+    in-flight requests is saturated or this limit is again reached.
+
+    To avoid out of memory exceptions, be sure to periodically read from the
+    ``ReadPipeline`` by calling
+    :meth:`cassandra.concurrent.ReadPipeline.results()` especially when dealing
+    with large read results since these will be stored in memory until
+    consumption.
+    """
+
+    error_handler = None
+    """
+    Allows for custom error handlers to be implemented instead of simply
+    raising the first encountered Cassandra request exception.
+
+    Other implementations may call for a log of failed requests or immediate
+    retries of the failed request.
+    """
+
+    allow_non_performant_queries = False
+    """
+    Only :class:`cassandra.query.PreparedStatement` requests are allowed when
+    using the ``Pipeline``, by default. If other Statement types must be used,
+    set :attr:`cassandra.concurrent.Pipeline.allow_non_performant_queries` to
+    `True` with the understanding that there may some performance hit since
+    :class:`cassandra.query.SimpleStatement` queries will require server-side
+    processing, :class:`cassandra.query.BoundStatement` requests can be
+    generated on the fly by using :class:`cassandra.query.PreparedStatement`
+    requests and bind values, and :class:`cassandra.query.BatchStatement`
+    requests should only contain mutations targeting the same partition to
+    avoid a Cassandra anti-pattern.
+    """
+
+    def __init__(self, session,
+                 max_in_flight_requests=PROTOCOL_DEFAULT,
+                 max_unconsumed_read_responses=2000,
+                 error_handler=None,
+                 allow_non_performant_queries=False):
+        super(ReadPipeline, self).__init__(session=session,
+                                           max_in_flight_requests=max_in_flight_requests,
+                                           max_unconsumed_read_responses=max_unconsumed_read_responses,
+                                           error_handler=error_handler,
+                                           allow_non_performant_queries=allow_non_performant_queries)
 
     def confirm(self):
+        """
+        This is not implemented the for the ``ReadPipeline`` since we do not
+        simply want to confirm our read requests, but we also want to consume
+        them.
+        """
         # reads should always be returned to the user, not simply checked for
         # communication exceptions
         raise NotImplementedError
