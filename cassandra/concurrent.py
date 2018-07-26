@@ -250,6 +250,138 @@ PROTOCOL_DEFAULT = object()
 
 
 class WritePipeline(object):
+    """
+    The ``WritePipeline`` is a helper object meant to add high-performance
+    write request pipelining to any application with minimal code changes.
+
+    A :class:`cassandra.cluster.Session` object is first created and used
+    to initiate the ``WritePipeline``. The ``WritePipeline`` can then be
+    used to execute multiple queries asynchronously using
+    :meth:`WritePipeline.execute()`.
+
+    As :attr:`WritePipeline.max_in_flight_requests` is reached, statements
+    are queued up for execution as soon as a
+    :class:`cassandra.cluster.ResponseFuture` is returned.
+
+    As :attr:`WritePipeline.max_unsent_write_requests` is reached,
+    :meth:`WritePipeline.confirm()` is called to ensure all unsent write
+    requests are sent and return without error in an effort to alleviate
+    memory pressures from the queued unsent requests.
+
+    Once all requests have been sent into the ``WritePipeline`` and the
+    business logic requires confirmation on the write requests or the
+    program is about to exit, :meth:`WritePipeline.confirm()` should be
+    called to block until all sent requests have returned and confirmed
+    to have been ingested without error.
+
+    :meth:`WritePipeline.execute()` passes all _args_ and _kwargs_ to
+    :meth:`cassandra.cluster.Session.execute_async()` internally to
+    increase familiarity with previous python-driver usage. This means that
+    :meth:`cassandra.query.Statements`,
+    :meth:`cassandra.query.PreparedStatement`, and
+    :meth:`cassandra.query.BoundStatements` will be processed as expected.
+    :meth:`cassandra.query.BatchStatements` are also accepted but should
+    only be used if all statements will modify the same partition to avoid
+    Cassandra anti-patterns.
+
+    Example usage::
+
+    >>> from cassandra.cluster import Cluster
+    >>> from cassandra.concurrent import WritePipeline
+    >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
+    >>> session = cluster.connect()
+    >>> write_pipeline = WritePipeline(session)
+    >>> statement = 'INSERT INTO mykeyspace.users (name, age) VALUES ("Jorge", 28)'
+    >>> write_pipeline.execute(statement)
+    >>> ...
+    >>> prepared_statement = session.prepare("INSERT INTO mykeyspace.users (name, age) VALUES (?, ?)")
+    >>> write_pipeline.execute(prepared_statement, ('Jose', 28))
+    >>> write_pipeline.execute(prepared_statement, ('Sara', 25))
+    >>> ...
+    >>> write_pipeline.confirm()
+    >>> ...
+    >>> cluster.shutdown()
+
+    The ``WritePipeline`` also functions as a context manager allowing for
+    with-block usage. By using the ``with`` keyword there is no longer a
+    need to call on :meth:`WritePipeline.confirm()` since the context
+    manager will handle that logic upon leaving the scope of the
+    with-block.
+
+    Example usage::
+
+    >>> from cassandra.cluster import Cluster
+    >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
+    >>> session = cluster.connect()
+    >>> prepared_statement = session.prepare("INSERT INTO mykeyspace.kv (k, v) VALUES (?, ?)")
+    >>> with WritePipeline(session) as write_pipeline:
+    ...    write_pipeline.execute(prepared_statement, ('Jorge', 28))
+    ...    write_pipeline.execute(prepared_statement, ('Jose', 28))
+    ...    write_pipeline.execute(prepared_statement, ('Sara', 25))
+    >>> ...
+    >>> cluster.shutdown()
+    """
+
+    session = None
+    """
+    A :class:`cassandra.cluster.Session` object used by the ``WritePipeline``
+    to send Cassandra requests.
+    """
+
+    max_in_flight_requests = PROTOCOL_DEFAULT
+    """
+    The maximum number of in-flight requests that have yet to return responses.
+
+    As :attr:`WritePipeline.max_in_flight_requests` is reached, statements
+    are queued up for execution as soon as a
+    :class:`cassandra.cluster.ResponseFuture` is returned.
+    """
+
+    max_unsent_write_requests = 50000
+    """
+    The maximum number of queued write requests that have yet to be
+    delivered to Cassandra.
+
+    This can be set to `None`, `0`, or `False` to avoid any limitation on the
+    number of queued write requests that have yet to be processed, but the
+    user should be aware of the possibility of running out of memory.
+
+    As :attr:`WritePipeline.max_unsent_write_requests` is reached,
+    :meth:`WritePipeline.confirm()` is called to ensure all unsent write
+    requests are sent and return without error in an effort to alleviate
+    memory pressures from the queued unsent requests.
+    """
+
+    # TODO: Create a Pipeline(object)
+    max_unconsumed_read_responses = False
+    """
+    This value is specifically for a ``ReadPipeline`` to alleviate memory
+    pressure. If this limit is reached and there are already plenty of
+    :class:`cassandra.cluster.ResponseFuture` results that have yet to be read,
+    no further requests will be sent to Cassandra until
+    :meth:`cassandra.concurrent.ReadPipeline.results()` is called.
+
+    Once :meth:`cassandra.concurrent.ReadPipeline.results()` is called and a
+    single future is consumed, another request will be immediately sent to
+    Cassandra. We will continue to process new requests until the number of
+    in-flight requests is saturated or this limit is again reached.
+
+    To avoid out of memory exceptions, be sure to periodically read from the
+    ``ReadPipeline`` by calling
+    :meth:`cassandra.concurrent.ReadPipeline.results()` especially when dealing
+    with large read results since these will be stored in memory until
+    consumption.
+    """
+
+    error_handler = None
+    """
+    Allows for custom error handlers to be implemented instead of simply
+    raising the first encountered Cassandra request exception.
+
+    Other implementations may call for a log of failed requests or immediate
+    retries of the failed request.
+    """
+
     def __init__(self, session,
                  max_in_flight_requests=PROTOCOL_DEFAULT,
                  max_unsent_write_requests=50000,
@@ -263,6 +395,7 @@ class WritePipeline(object):
             self.max_in_flight_requests = max_in_flight_requests
         else:
             # else, use the recommended defaults for newer protocol versions
+            # since protocol version 3 allows for more parallel requests
             if self.session._protocol_version >= 3:
                 self.max_in_flight_requests = 1000
             else:
@@ -310,14 +443,37 @@ class WritePipeline(object):
                              ' cannot both be non-zero.')
 
     def __enter__(self):
-        # add with-block support
+        """
+        Adds with-block support.
+
+        :return: A ``WritePipeline`` object.
+        :rtype: cassandra.concurrent.WritePipeline
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # ensure all writes are confirmed when exiting the with-block
+        """
+        Ensures all writes are confirmed when exiting with-blocks.
+
+        Failure to confirm all pending requests may cause some requests not to
+        be delivered to Cassandra.
+        """
         self.confirm()
 
     def __future_callback(self, previous_result=RESULT_SENTINEL):
+        """
+        This is handled by the
+        :meth:`cassandra.cluster.ResponseFuture.add_callbacks()` logic.
+        Once a request has been completed, this method is called to ensure
+        no errors have occurred and to keep tally of the pending in-flight
+        requests.
+
+        If an error has occurred, the exception will immediately be raised
+        or handled by :attr:`WritePipeline.error_handler`.
+
+        In all cases, calling this method will try to maximize the number
+        of in-flight requests.
+        """
         # check to see if we're processing a future.result()
         if previous_result is not RESULT_SENTINEL:
             # handle the case where future.result() is an exception
@@ -345,8 +501,29 @@ class WritePipeline(object):
         self.__maximize_in_flight_requests()
 
     def __maximize_in_flight_requests(self):
+        """
+        This code is called multiple times within the Pipeline infrastructure
+        to ensure we're keeping as many in-flight requests processing as
+        possible.
+
+        We're cautious here and default to a no-op in cases where:
+
+        * There are already too many in-flight requests.
+        * We already have too many :class:`cassandra.cluster.ResponseFuture`
+          objects taking up memory.
+        * There are no more statements that need to be processed.
+
+        In all other cases, we call
+        :meth:`cassandra.cluster.Session.execute_async()` with the queued
+        statement's _args_, _kwargs_, and a callback to
+        :meth:`cassandra.concurrent.WritePipeline.__future_callback()`.
+
+        In cases where we're using a ReadPipeline, we will store the future
+        for later consumption of the :class:`cassandra.cluster.ResponseFuture`
+        objects by way of :meth:`cassandra.concurrent.ReadPipeline.results()`.
+        """
         # convert pending statements to in-flight futures if we haven't hit our
-        # soft concurrency threshold
+        # threshold
         if self.num_started - self.num_finished > self.max_in_flight_requests:
             return
 
@@ -383,6 +560,41 @@ class WritePipeline(object):
             self.futures.put(future)
 
     def execute(self, *args, **kwargs):
+        """
+        This method passes all _args_ and _kwargs_ to
+        :meth:`cassandra.cluster.Session.execute_async()` internally to
+        increase familiarity with previous python-driver usage. This means that
+        :meth:`cassandra.query.Statements`,
+        :meth:`cassandra.query.PreparedStatement`, and
+        :meth:`cassandra.query.BoundStatements` will be processed as expected.
+        :meth:`cassandra.query.BatchStatements` are also accepted but should
+        only be used if all statements will modify the same partition to avoid
+        Cassandra anti-patterns.
+
+        When :attr:`WritePipeline.max_unsent_write_requests` is reached,
+        :meth:`WritePipeline.confirm()` is called to ensure all unsent write
+        requests are sent and return without error in an effort to alleviate
+        memory pressures from the queued unsent requests.
+
+        Once :meth:`WritePipeline.confirm()` is returned, or if
+        :attr:`WritePipeline.max_unsent_write_requests` is not reached,
+        the new _args_ and _kwargs_ are placed into the `self.statements`
+        Queue and
+        :meth:`cassandra.concurrent.WritePipeline.__maximize_in_flight_requests()`
+        is called to process any pending requests in the `self.statements`
+        Queue.
+
+        This method returns immediately and continues to process pending
+        statements asynchronously without any further interaction.
+
+        To ensure all pending statements are processed, call
+        :meth:`WritePipeline.confirm()` manually if using the ``WritePipeline``.
+
+        :param args: Any _args_ for
+                     :meth:`cassandra.cluster.Session.execute_async()`.
+        :param kwargs: Any _kwargs_ for
+                       :meth:`cassandra.cluster.Session.execute_async()`.
+        """
         # to ensure maximum throughput, only interact with PreparedStatements
         # as is the best practice
         if not isinstance(args[0], PreparedStatement):
@@ -407,8 +619,13 @@ class WritePipeline(object):
         self.__maximize_in_flight_requests()
 
     def confirm(self):
-        # block until all pending statements and in-flight futures
-        # have returned
+        """
+        Blocks until all pending statements and in-flight requests have
+        returned.
+        """
+        # this Event() is set in __future_callback() if all sent requests have
+        # returned and cleared each time execute() is called since another
+        # statement is added to the `self.statements` Queue
         self.completed_futures.wait()
 
 
