@@ -979,15 +979,13 @@ class Map(BaseContainerColumn):
 class UDTValueManager(BaseValueManager):
     @property
     def changed(self):
-        if self.explicit:
-            return self.value != self.previous_value
+        if self.explicit or self.previous_value is not None:
+            return self.value != self.previous_value or \
+                   (self.value is not None and self.value.has_changed_fields())
 
         default_value = self.column.get_default()
         if not self.column._val_is_null(default_value):
             return self.value != default_value
-        elif self.previous_value is None:
-            return not self.column._val_is_null(self.value) and self.value.has_changed_fields()
-
         return False
 
     def reset_previous_value(self):
