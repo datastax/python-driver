@@ -15,7 +15,7 @@
 
 from collections import namedtuple
 from heapq import heappush, heappop
-from itertools import count, cycle
+from itertools import cycle
 import six
 from six.moves import xrange, zip
 from six.moves.queue import Queue, Empty
@@ -421,12 +421,15 @@ class Pipeline(object):
 
             # ensure that the last statement within self.statements is not
             # being processed
-            with self.executing_lock:
+            with self.in_flight_counter_lock:
+                # decrement the number of in-flight requests
+                self.in_flight_counter -= self.in_flight_counter
+
                 # if there are no more pending statements and all in-flight
                 # futures have returned set self.completed_futures to True
-                if self.statements.empty() \
-                        and next(self.num_finished) >= self.num_started:
-                    self.completed_futures.set()
+                if self.in_flight_counter == 0:
+                    if self.statements.empty():
+                        self.completed_futures.set()
 
         # attempt to process the another request
         self._maximize_in_flight_requests()
@@ -467,18 +470,17 @@ class Pipeline(object):
                 and self.futures.qsize() > self.max_unconsumed_read_responses:
             return
 
-        # ensure self.completed_futures is never set to True when we
-        # are processing the very last pending statement
-        with self.executing_lock:
-            # grab the next statement, if still available
-            try:
-                args, kwargs = self.statements.get_nowait()
-            except Empty:
-                # exit early if there are no more statements to process
-                return
-
+        # grab the next statement, if still available
+        try:
             # keep track of the number of in-flight requests
-            next(self.num_started)
+            with self.in_flight_counter_lock:
+                args, kwargs = self.statements.get_nowait()
+                self.in_flight_counter += 1
+                self.completed_futures.clear()
+        except Empty:
+            # exit early if there are no more statements to process
+            return
+
 
         # send the statement to Cassandra and await for the future's callback
         future = self.session.execute_async(*args, **kwargs)
