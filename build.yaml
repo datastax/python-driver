@@ -141,13 +141,6 @@ build:
         python setup.py build_ext --inplace --no-cython
       fi
 
-      echo "Installing simulacron"
-      pushd ~
-
-
-      popd
-
-
       echo "JUST_UPGRADE: $JUST_UPGRADE"
       if [[ $JUST_UPGRADE == 'True' ]]; then
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=upgrade_results.xml tests/integration/upgrade || true
