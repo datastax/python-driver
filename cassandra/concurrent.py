@@ -244,10 +244,6 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
 # a real result
 RESULT_SENTINEL = object()
 
-# a sentinel to detect if a kwarg was using the default value or was passed
-# a user-defined parameter
-PROTOCOL_DEFAULT = object()
-
 
 class Pipeline(object):
     """
@@ -265,9 +261,15 @@ class Pipeline(object):
     to send Cassandra requests.
     """
 
-    max_in_flight_requests = PROTOCOL_DEFAULT
+    max_in_flight_requests = 1500
     """
     The maximum number of in-flight requests that have yet to return responses.
+
+    A default of 1500 in-flight requests for the ``WritePipeline`` and 700 for
+    the ``ReadPipeline`` are ideal for a small single node cluster. Performance
+    tuning would be ideal to see the sort of throughput each individual cluster
+    can achieve. Keep in mind that less in-flight requests are ideal for older
+    versions of Cassandra.
 
     As :attr:`cassandra.concurrent.Pipeline.max_in_flight_requests` is reached,
     statements are queued up for execution as soon as a
@@ -341,16 +343,8 @@ class Pipeline(object):
         # the Cassandra session object
         self.session = session
 
-        # set max_in_flight_requests if provided
-        if max_in_flight_requests is not PROTOCOL_DEFAULT:
-            self.max_in_flight_requests = max_in_flight_requests
-        else:
-            # else, use the recommended defaults for newer protocol versions
-            # since protocol version 3 allows for more parallel requests
-            if self.session._protocol_version >= 3:
-                self.max_in_flight_requests = 1500
-            else:
-                self.max_in_flight_requests = 100
+        # set max_in_flight_requests
+        self.max_in_flight_requests = max_in_flight_requests
 
         # set the maximum number of unsent write requests before the Pipeline
         # blocks to ensure that all in-flight write requests have been
@@ -675,9 +669,15 @@ class WritePipeline(Pipeline):
     to send Cassandra requests.
     """
 
-    max_in_flight_requests = PROTOCOL_DEFAULT
+    max_in_flight_requests = 1500
     """
     The maximum number of in-flight requests that have yet to return responses.
+
+    A default of 1500 in-flight requests for the ``WritePipeline`` and 700 for
+    the ``ReadPipeline`` are ideal for a small single node cluster. Performance
+    tuning would be ideal to see the sort of throughput each individual cluster
+    can achieve. Keep in mind that less in-flight requests are ideal for older
+    versions of Cassandra.
 
     As :attr:`cassandra.concurrent.Pipeline.max_in_flight_requests` is reached,
     statements are queued up for execution as soon as a
@@ -832,9 +832,15 @@ class ReadPipeline(Pipeline):
     to send Cassandra requests.
     """
 
-    max_in_flight_requests = PROTOCOL_DEFAULT
+    max_in_flight_requests = 700
     """
     The maximum number of in-flight requests that have yet to return responses.
+
+    A default of 1500 in-flight requests for the ``WritePipeline`` and 700 for
+    the ``ReadPipeline`` are ideal for a small single node cluster. Performance
+    tuning would be ideal to see the sort of throughput each individual cluster
+    can achieve. Keep in mind that less in-flight requests are ideal for older
+    versions of Cassandra.
 
     As :attr:`Pipeline.max_in_flight_requests` is reached, statements
     are queued up for execution as soon as a
