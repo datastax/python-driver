@@ -99,7 +99,7 @@ python:
   - 3.6
 
 os:
-  - ubuntu/trusty64
+  - ubuntu/bionic64/python-driver
 
 cassandra:
   - '2.1'
@@ -122,9 +122,7 @@ build:
       pip install --upgrade pip
       pip install -U setuptools
 
-      pip install git+https://github.com/pcmanus/ccm.git
-      # Install dependencies
-      sudo apt-get install -y libev4 libev-dev libssl-dev
+      pip install git+https://github.com/riptano/ccm.git
 
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring
@@ -146,8 +144,6 @@ build:
       echo "Installing simulacron"
       pushd ~
 
-      SIMULACRON_JAR=`find \`pwd\` -name "simulacron-standalone-*.jar"`
-      echo "SIMULACRON_JAR: $SIMULACRON_JAR"
 
       popd
 
@@ -170,6 +166,7 @@ build:
 
       echo "Running with event loop manager: $EVENT_LOOP_MANAGER"
       echo "==========RUNNING SIMULACRON TESTS=========="
+      SIMULACRON_JAR="$HOME/simulacron.jar"
       SIMULACRON_JAR=$SIMULACRON_JAR EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_DIR=$CCM_INSTALL_DIR DSE_VERSION=$CCM_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=simulacron_results.xml tests/integration/simulacron/ || true
 
       echo "Running with event loop manager: $EVENT_LOOP_MANAGER"
