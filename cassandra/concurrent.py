@@ -333,8 +333,8 @@ class Pipeline(object):
     """
 
     def __init__(self, session,
-                 max_in_flight_requests=PROTOCOL_DEFAULT,
-                 max_unsent_write_requests=50000,
+                 max_in_flight_requests=1500,
+                 max_unsent_write_requests=40000,
                  max_unconsumed_read_responses=False,
                  error_handler=None,
                  allow_non_performant_queries=False):
@@ -348,7 +348,7 @@ class Pipeline(object):
             # else, use the recommended defaults for newer protocol versions
             # since protocol version 3 allows for more parallel requests
             if self.session._protocol_version >= 3:
-                self.max_in_flight_requests = 1000
+                self.max_in_flight_requests = 1500
             else:
                 self.max_in_flight_requests = 100
 
@@ -375,17 +375,17 @@ class Pipeline(object):
         # store all pending PreparedStatements along with matching args/kwargs
         self.statements = Queue()
 
-        # track the number of in-flight futures and completed statements
-        self.num_started = count()
-        self.num_finished = count()
-
         # track when all pending statements and futures have returned
         self.completed_futures = Event()
+
+        # track the number of in-flight futures and completed statements
+        # always to be used with an in_flight_counter_lock
+        self.in_flight_counter = 0
 
         # ensure that self.completed_futures will never be set() between:
         # 1. emptying the self.statements
         # 2. creating the last future
-        self.executing_lock = Lock()
+        self.in_flight_counter_lock = Lock()
 
         # ensure that we are not using settings for the ReadPipeline within
         # the WritePipeline, or vice versa
@@ -435,9 +435,9 @@ class Pipeline(object):
                     self.completed_futures.set()
 
         # attempt to process the another request
-        self.__maximize_in_flight_requests()
+        self._maximize_in_flight_requests()
 
-    def __maximize_in_flight_requests(self):
+    def _maximize_in_flight_requests(self):
         """
         This code is called multiple times within the Pipeline infrastructure
         to ensure we're keeping as many in-flight requests processing as
@@ -461,7 +461,7 @@ class Pipeline(object):
         """
         # convert pending statements to in-flight futures if we haven't hit our
         # threshold
-        if self.num_started - self.num_finished > self.max_in_flight_requests:
+        if self.in_flight_counter > self.max_in_flight_requests:
             return
 
         # convert pending statements to in-flight futures if there aren't too
@@ -525,7 +525,7 @@ class Pipeline(object):
 
         The _args_ and _kwargs_ are placed into the `self.statements`
         Queue and
-        :meth:`cassandra.concurrent.Pipeline.__maximize_in_flight_requests()`
+        :meth:`cassandra.concurrent.Pipeline._maximize_in_flight_requests()`
         is called to process any pending requests in the `self.statements`
         Queue.
 
@@ -580,7 +580,7 @@ class Pipeline(object):
         self.statements.put((args, kwargs))
 
         # attempt to process the newest statement
-        self.__maximize_in_flight_requests()
+        self._maximize_in_flight_requests()
 
     def confirm(self):
         """
@@ -723,13 +723,14 @@ class WritePipeline(Pipeline):
     """
 
     def __init__(self, session,
-                 max_in_flight_requests=PROTOCOL_DEFAULT,
-                 max_unsent_write_requests=50000,
+                 max_in_flight_requests=1500,
+                 max_unsent_write_requests=40000,
                  error_handler=None,
                  allow_non_performant_queries=False):
         super(WritePipeline, self).__init__(session=session,
                                             max_in_flight_requests=max_in_flight_requests,
                                             max_unsent_write_requests=max_unsent_write_requests,
+                                            max_unconsumed_read_responses=False,
                                             error_handler=error_handler,
                                             allow_non_performant_queries=allow_non_performant_queries)
 
@@ -806,7 +807,7 @@ class ReadPipeline(Pipeline):
     Example usage::
 
     >>> from cassandra.cluster import Cluster
-    >>> from cassandra.concurrent import WritePipeline
+    >>> from cassandra.concurrent import ReadPipeline
     >>> cluster = Cluster(['192.168.1.1', '192.168.1.2'])
     >>> session = cluster.connect()
     >>> read_pipeline = ReadPipeline(session)
@@ -884,12 +885,13 @@ class ReadPipeline(Pipeline):
     """
 
     def __init__(self, session,
-                 max_in_flight_requests=PROTOCOL_DEFAULT,
-                 max_unconsumed_read_responses=2000,
+                 max_in_flight_requests=700,
+                 max_unconsumed_read_responses=400,
                  error_handler=None,
                  allow_non_performant_queries=False):
         super(ReadPipeline, self).__init__(session=session,
                                            max_in_flight_requests=max_in_flight_requests,
+                                           max_unsent_write_requests=False,
                                            max_unconsumed_read_responses=max_unconsumed_read_responses,
                                            error_handler=error_handler,
                                            allow_non_performant_queries=allow_non_performant_queries)
@@ -912,11 +914,13 @@ class ReadPipeline(Pipeline):
                  iterators over the rows from a query result.
         :rtype: iter(cassandra.cluster.ResultSet)
         """
-        for future in self.futures:
+        while not self.completed_futures.is_set():
+            future = self.futures.get()
+
             # always ensure that at least one future has been queued.
             # useful for cases where `max_unconsumed_read_responses == 0`
-            self.__maximize_in_flight_requests()
+            self._maximize_in_flight_requests()
 
             # yield the ResultSet which in turn is another iterator over the
             # rows within the query's result
-            yield future.results()
+            yield future.result()
