@@ -476,7 +476,7 @@ class Pipeline(object):
             with self.in_flight_counter_lock:
                 args, kwargs = self.statements.get_nowait()
                 self.in_flight_counter += 1
-                self.completed_futures.clear()
+            self.completed_futures.clear()
         except Empty:
             # exit early if there are no more statements to process
             return
