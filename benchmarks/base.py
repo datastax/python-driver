@@ -30,6 +30,7 @@ sys.path.append(os.path.join(dirname, '..'))
 import cassandra
 from cassandra.cluster import Cluster
 from cassandra.io.asyncorereactor import AsyncoreConnection
+from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy
 
 log = logging.getLogger()
 handler = logging.StreamHandler()
@@ -89,7 +90,8 @@ COLUMN_VALUES = {
 def setup(options):
     log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
-    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
+    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False,
+                      load_balancing_policy=(RoundRobinPolicy()))
     try:
         session = cluster.connect()
 
@@ -125,7 +127,8 @@ def setup(options):
 
 
 def teardown(options):
-    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False)
+    cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False,
+                      load_balancing_policy=(RoundRobinPolicy()))
     session = cluster.connect()
     if not options.keep_data:
         session.execute("DROP KEYSPACE " + options.keyspace)
@@ -139,7 +142,8 @@ def benchmark(thread_class):
         log.info("==== %s ====" % (conn_class.__name__,))
 
         kwargs = {'metrics_enabled': options.enable_metrics,
-                  'connection_class': conn_class}
+                  'connection_class': conn_class,
+                  'load_balancing_policy': TokenAwarePolicy(RoundRobinPolicy())}
         if options.protocol_version:
             kwargs['protocol_version'] = options.protocol_version
         cluster = Cluster(options.hosts, **kwargs)
