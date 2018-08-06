@@ -3,7 +3,7 @@ try:
     import asynctest
     ASYNCIO_AVAILABLE = True
 except (ImportError, SyntaxError):
-    AysncioConnection = None
+    AsyncioConnection = None
     ASYNCIO_AVAILABLE = False
 
 from tests import is_monkey_patched, connection_class
