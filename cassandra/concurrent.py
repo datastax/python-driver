@@ -261,11 +261,11 @@ class Pipeline(object):
     to send Cassandra requests.
     """
 
-    max_in_flight_requests = 1500
+    max_in_flight_requests = 1000
     """
     The maximum number of in-flight requests that have yet to return responses.
 
-    A default of 1500 in-flight requests for the ``WritePipeline`` and 700 for
+    A default of 1000 in-flight requests for the ``WritePipeline`` and 700 for
     the ``ReadPipeline`` are ideal for a small single node cluster. Performance
     tuning would be ideal to see the sort of throughput each individual cluster
     can achieve. Keep in mind that less in-flight requests are ideal for older
@@ -335,7 +335,7 @@ class Pipeline(object):
     """
 
     def __init__(self, session,
-                 max_in_flight_requests=1500,
+                 max_in_flight_requests=1000,
                  max_unsent_write_requests=40000,
                  max_unconsumed_read_responses=False,
                  error_handler=None,
@@ -676,11 +676,11 @@ class WritePipeline(Pipeline):
     to send Cassandra requests.
     """
 
-    max_in_flight_requests = 1500
+    max_in_flight_requests = 1000
     """
     The maximum number of in-flight requests that have yet to return responses.
 
-    A default of 1500 in-flight requests for the ``WritePipeline`` and 700 for
+    A default of 1000 in-flight requests for the ``WritePipeline`` and 700 for
     the ``ReadPipeline`` are ideal for a small single node cluster. Performance
     tuning would be ideal to see the sort of throughput each individual cluster
     can achieve. Keep in mind that less in-flight requests are ideal for older
@@ -730,7 +730,7 @@ class WritePipeline(Pipeline):
     """
 
     def __init__(self, session,
-                 max_in_flight_requests=1500,
+                 max_in_flight_requests=1000,
                  max_unsent_write_requests=40000,
                  error_handler=None,
                  allow_non_performant_queries=False):
@@ -843,7 +843,7 @@ class ReadPipeline(Pipeline):
     """
     The maximum number of in-flight requests that have yet to return responses.
 
-    A default of 1500 in-flight requests for the ``WritePipeline`` and 700 for
+    A default of 1000 in-flight requests for the ``WritePipeline`` and 700 for
     the ``ReadPipeline`` are ideal for a small single node cluster. Performance
     tuning would be ideal to see the sort of throughput each individual cluster
     can achieve. Keep in mind that less in-flight requests are ideal for older
