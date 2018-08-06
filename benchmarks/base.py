@@ -91,7 +91,7 @@ def setup(options):
     log.info("Using 'cassandra' package from %s", cassandra.__path__)
 
     cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False,
-                      load_balancing_policy=(RoundRobinPolicy()))
+                      load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
     try:
         session = cluster.connect()
 
@@ -128,7 +128,7 @@ def setup(options):
 
 def teardown(options):
     cluster = Cluster(options.hosts, schema_metadata_enabled=False, token_metadata_enabled=False,
-                      load_balancing_policy=(RoundRobinPolicy()))
+                      load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
     session = cluster.connect()
     if not options.keep_data:
         session.execute("DROP KEYSPACE " + options.keyspace)
