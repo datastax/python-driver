@@ -60,24 +60,27 @@ class Runner(BenchmarkThread):
                 # query = prepared_statement
                 # self.values = ('key',)
 
-                start_time = time.time()
+                try:
+                    start_time = time.time()
 
-                for _ in range(self.num_queries):
+                    for _ in range(self.num_queries):
+                        if options.read:
+                            read_pipeline.execute(query, self.values)
+                        else:
+                            write_pipeline.execute(query, self.values)
+
                     if options.read:
-                        read_pipeline.execute(query, self.values)
+                        for _ in read_pipeline.results():
+                            pass
                     else:
-                        write_pipeline.execute(query, self.values)
+                        write_pipeline.confirm()
 
-                if options.read:
-                    for _ in read_pipeline.results():
-                        pass
-                else:
-                    write_pipeline.confirm()
-
-                elapsed_time = time.time() - start_time
-                result = (elapsed_time, max_in_flight_requests, buffer_size)
-                results.append(result)
-                print result
+                    elapsed_time = time.time() - start_time
+                    result = (elapsed_time, max_in_flight_requests, buffer_size)
+                    results.append(result)
+                    print result
+                except:
+                    print 'Failed:', max_in_flight_requests, buffer_size
 
         # sort the list by the shortest runtimes and choose the top results
         results.sort()
