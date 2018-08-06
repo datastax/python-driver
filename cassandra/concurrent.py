@@ -427,8 +427,13 @@ class Pipeline(object):
 
                 # if there are no more pending statements and all in-flight
                 # futures have returned set self.completed_futures to True
-                if self.in_flight_counter == 0:
+                if self.in_flight_counter < 1:
                     if self.statements.empty():
+                        if self.in_flight_counter < 0:
+                            raise RuntimeError('The in_flight_counter should'
+                                               ' never have been less than 0.'
+                                               ' The lock mechanism is not'
+                                               ' working as expected!')
                         self.completed_futures.set()
 
         # attempt to process the another request
@@ -912,7 +917,10 @@ class ReadPipeline(Pipeline):
         """
         # reads should always be returned to the user, not simply checked for
         # communication exceptions
-        raise NotImplementedError
+        raise NotImplementedError('The ReadPipeline should never discard'
+                                  ' results. Instead, call .results() to'
+                                  ' consume returned results rather than just'
+                                  ' confirming that futures were returned.')
 
     def results(self):
         """

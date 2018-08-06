@@ -10,10 +10,10 @@
 
 This request method fires off all asynchronous requests at the same time.
 
-When the `ResponseFuture`'s callback is executed the callback code ensures all
-pending requests are completed before exiting the code block by setting a
-Python `Event` in the callback while waiting for the `Event` in the main
-thread.
+When the `ResponseFuture`'s callback is executed, the callback code ensures all
+pending requests are completed before exiting the code block. This is done by
+setting a Python `Event` in the callback while waiting for the `Event` in the
+main thread.
 
 Assuming the Cassandra cluster is not overloaded by the large number of
 parallel requests and `OperationTimedOut` exceptions are not raised, this is
@@ -42,7 +42,7 @@ and `WritePipeline.execute()` is called for each asynchronous request.
 `WritePipeline.confirm()` is used to ensure all requests were processed
 correctly before exiting the code block.
 
-Internally, the `WritePipeline` creates a request `Queue` which are executed
+Internally, the `WritePipeline` creates a request `Queue` which is executed
 and managed via `ResponseFuture` callbacks. If the number of pending futures
 is too large, all futures are first consumed internally by calling
 `WritePipeline.confirm()` before allowing new requests to be created.
@@ -169,10 +169,10 @@ request method.
 
 This request method fires off all asynchronous requests at the same time.
 
-When the `ResponseFuture`'s callback is executed the callback code ensures all
-pending requests are completed before exiting the code block by setting a
-Python `Event` in the callback while waiting for the `Event` in the main
-thread.
+When the `ResponseFuture`'s callback is executed, the callback code ensures all
+pending requests are completed before exiting the code block. This is done by
+setting a Python `Event` in the callback while waiting for the `Event` in the
+main thread.
 
 Assuming the Cassandra cluster is not overloaded by the large number of
 parallel requests and `OperationTimedOut` exceptions are not raised, this is
@@ -200,7 +200,7 @@ To the developer, the `ReadPipeline` is initialized with a Cassandra `session`
 and `ReadPipeline.execute()` is called for each asynchronous request.
 `ReadPipeline.results()` is used to consume all requests in FIFO ordering.
 
-Internally, the `ReadPipeline` creates a request `Queue` which are executed
+Internally, the `ReadPipeline` creates a request `Queue` which is executed
 and managed via `ResponseFuture` callbacks. If the number of unconsumed results
 is too large, no new requests are created.
 `ReadPipeline.results()` iterates over a `Queue` of `ResponseFuture` objects
