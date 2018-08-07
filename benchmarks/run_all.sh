@@ -3,7 +3,7 @@
 # This file can be used to kick off each benchmarking test with a single
 # command.
 
-NUM_OF_OPS=50000
+NUM_OF_OPS=150000
 OPTIONS=
 
 set -x
