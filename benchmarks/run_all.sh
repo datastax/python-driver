@@ -15,7 +15,7 @@ python benchmarks/future_full_pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
 python benchmarks/future_full_throttle.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
 python benchmarks/sync.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
 
-OPTIONS=--read
+OPTIONS="${OPTIONS} --read"
 
 python benchmarks/callback_full_pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
 python benchmarks/pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}

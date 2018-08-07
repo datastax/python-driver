@@ -2,7 +2,8 @@
 > performance and are instead to be used as relative results to compare the
 > different request methods.
 >
-> All tests were done on a local laptop running Cassandra 3.11.2 on OS X.
+> All tests were done on a single node within AWS running Cassandra 3.11.3 on
+> an `m5.4xlarge` instance.
 
 # Write Throughputs
 
@@ -20,16 +21,19 @@ parallel requests and `OperationTimedOut` exceptions are not raised, this is
 the fastest the driver can perform.
 
 ```
-+ python benchmarks/callback_full_pipeline.py --num-ops 50000
-2018-08-03 18:05:09,744 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:05:09,744 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:05:09,978 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:05:21,523 [INFO] root: Total time: 9.06s
-2018-08-03 18:05:21,523 [INFO] root: Average throughput: 5516.36/sec
-2018-08-03 18:05:21,523 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:05:21,652 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:05:33,723 [INFO] root: Total time: 9.60s
-2018-08-03 18:05:33,723 [INFO] root: Average throughput: 5208.19/sec
++ python benchmarks/callback_full_pipeline.py --num-ops 150000 -H 172.30.0.56
+2018-08-07 04:24:10,824 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:24:10,958 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:24:27,816 [INFO] root: Total time: 13.82s
+2018-08-07 04:24:27,816 [INFO] root: Average throughput: 10853.92/sec
+2018-08-07 04:24:27,816 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:24:28,047 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:24:43,761 [INFO] root: Total time: 12.87s
+2018-08-07 04:24:43,761 [INFO] root: Average throughput: 11655.05/sec
+2018-08-07 04:24:43,761 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:24:43,891 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:25:02,320 [INFO] root: Total time: 15.54s
+2018-08-07 04:25:02,320 [INFO] root: Average throughput: 9652.95/sec
 ```
 
 ## WritePipeline Object
@@ -50,18 +54,19 @@ is too large, all futures are first consumed internally by calling
 requests have returned.
 
 ```
-+ python benchmarks/pipeline.py --num-ops 50000
-2018-08-03 18:05:33,947 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:05:33,947 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:05:34,072 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:05:36,137 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:05:50,133 [INFO] root: Total time: 13.52s
-2018-08-03 18:05:50,134 [INFO] root: Average throughput: 3698.07/sec
-2018-08-03 18:05:50,134 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:05:50,258 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:05:52,504 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:06:16,780 [INFO] root: Total time: 23.94s
-2018-08-03 18:06:16,780 [INFO] root: Average throughput: 2088.48/sec
++ python benchmarks/pipeline.py --num-ops 150000 -H 172.30.0.56
+2018-08-07 04:25:04,885 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:25:05,020 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:25:30,845 [INFO] root: Total time: 23.32s
+2018-08-07 04:25:30,845 [INFO] root: Average throughput: 6431.47/sec
+2018-08-07 04:25:30,846 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:25:31,078 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:25:56,541 [INFO] root: Total time: 22.90s
+2018-08-07 04:25:56,541 [INFO] root: Average throughput: 6551.19/sec
+2018-08-07 04:25:56,541 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:25:56,671 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:26:36,229 [INFO] root: Total time: 37.06s
+2018-08-07 04:26:36,230 [INFO] root: Average throughput: 4047.98/sec
 ```
 
 ## Future Batches
@@ -77,16 +82,19 @@ Before exiting, all futures within the future `Queue` are consumed to ensure
 all pending requests have been processed.
 
 ```
-+ python benchmarks/future_batches.py --num-ops 50000
-2018-08-03 18:06:17,364 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:06:17,364 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:06:17,491 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:06:34,970 [INFO] root: Total time: 15.02s
-2018-08-03 18:06:34,971 [INFO] root: Average throughput: 3329.23/sec
-2018-08-03 18:06:34,971 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:06:35,100 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:06:58,580 [INFO] root: Total time: 21.02s
-2018-08-03 18:06:58,580 [INFO] root: Average throughput: 2378.37/sec
++ python benchmarks/future_batches.py --num-ops 150000 -H 172.30.0.56
+2018-08-07 04:26:39,062 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:26:39,194 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:27:05,877 [INFO] root: Total time: 23.78s
+2018-08-07 04:27:05,877 [INFO] root: Average throughput: 6308.53/sec
+2018-08-07 04:27:05,877 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:27:06,108 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:27:31,350 [INFO] root: Total time: 22.29s
+2018-08-07 04:27:31,350 [INFO] root: Average throughput: 6730.50/sec
+2018-08-07 04:27:31,350 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:27:31,526 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:28:09,978 [INFO] root: Total time: 35.64s
+2018-08-07 04:28:09,978 [INFO] root: Average throughput: 4209.29/sec
 ```
 
 ## Future Full Pipeline
@@ -102,16 +110,19 @@ Before exiting, all futures within the future `Queue` are consumed to ensure
 all pending requests have been processed.
 
 ```
-+ python benchmarks/future_full_pipeline.py --num-ops 50000
-2018-08-03 18:06:59,129 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:06:59,129 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:06:59,256 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:07:18,166 [INFO] root: Total time: 16.41s
-2018-08-03 18:07:18,166 [INFO] root: Average throughput: 3046.46/sec
-2018-08-03 18:07:18,166 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:07:18,297 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:07:45,822 [INFO] root: Total time: 25.03s
-2018-08-03 18:07:45,822 [INFO] root: Average throughput: 1997.40/sec
++ python benchmarks/future_full_pipeline.py --num-ops 150000 -H 172.30.0.56
+2018-08-07 04:28:12,587 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:28:12,722 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:28:42,443 [INFO] root: Total time: 26.82s
+2018-08-07 04:28:42,443 [INFO] root: Average throughput: 5592.19/sec
+2018-08-07 04:28:42,443 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:28:42,674 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:29:10,494 [INFO] root: Total time: 24.94s
+2018-08-07 04:29:10,494 [INFO] root: Average throughput: 6014.01/sec
+2018-08-07 04:29:10,494 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:29:10,626 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:29:52,830 [INFO] root: Total time: 39.28s
+2018-08-07 04:29:52,830 [INFO] root: Average throughput: 3819.16/sec
 ```
 
 ## Future Full Throttle
@@ -131,16 +142,19 @@ times FIFO consumption of read requests are required since the resulting
 data may be merged with known data.
 
 ```
-+ python benchmarks/future_full_throttle.py --num-ops 50000
-2018-08-03 18:07:46,160 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:07:46,161 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:07:46,286 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:08:05,541 [INFO] root: Total time: 16.57s
-2018-08-03 18:08:05,541 [INFO] root: Average throughput: 3018.07/sec
-2018-08-03 18:08:05,541 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:08:05,663 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:08:34,282 [INFO] root: Total time: 26.11s
-2018-08-03 18:08:34,282 [INFO] root: Average throughput: 1914.96/sec
++ python benchmarks/future_full_throttle.py --num-ops 150000 -H 172.30.0.56
+2018-08-07 04:29:55,634 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:29:55,766 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:30:28,940 [INFO] root: Total time: 30.34s
+2018-08-07 04:30:28,940 [INFO] root: Average throughput: 4944.40/sec
+2018-08-07 04:30:28,940 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:30:29,174 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:31:03,236 [INFO] root: Total time: 31.15s
+2018-08-07 04:31:03,236 [INFO] root: Average throughput: 4816.09/sec
+2018-08-07 04:31:03,236 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:31:03,367 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:31:40,248 [INFO] root: Total time: 34.04s
+2018-08-07 04:31:40,248 [INFO] root: Average throughput: 4406.98/sec
 ```
 
 ## Synchronous Requests
@@ -151,16 +165,19 @@ Since only *one* request is in-flight at a given time, this will be the slowest
 request method.
 
 ```
-+ python benchmarks/sync.py --num-ops 50000
-2018-08-03 18:08:35,390 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:08:35,390 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:08:35,521 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:09:11,932 [INFO] root: Total time: 34.01s
-2018-08-03 18:09:11,932 [INFO] root: Average throughput: 1470.28/sec
-2018-08-03 18:09:11,932 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:09:12,059 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:09:53,698 [INFO] root: Total time: 39.22s
-2018-08-03 18:09:53,698 [INFO] root: Average throughput: 1274.94/sec
++ python benchmarks/sync.py --num-ops 150000 -H 172.30.0.56
+2018-08-07 04:31:44,558 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:31:44,690 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:32:37,343 [INFO] root: Total time: 50.14s
+2018-08-07 04:32:37,343 [INFO] root: Average throughput: 2991.66/sec
+2018-08-07 04:32:37,343 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:32:37,575 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:33:22,182 [INFO] root: Total time: 42.08s
+2018-08-07 04:33:22,183 [INFO] root: Average throughput: 3565.04/sec
+2018-08-07 04:33:22,183 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:33:22,314 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:34:21,940 [INFO] root: Total time: 57.17s
+2018-08-07 04:34:21,940 [INFO] root: Average throughput: 2623.56/sec
 ```
 
 # Read Throughputs
@@ -179,16 +196,19 @@ parallel requests and `OperationTimedOut` exceptions are not raised, this is
 the fastest the driver can perform.
 
 ```
-+ python benchmarks/callback_full_pipeline.py --num-ops 50000 --read
-2018-08-03 18:09:54,088 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:09:54,089 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:09:54,319 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:11:02,393 [INFO] root: Total time: 65.60s
-2018-08-03 18:11:02,393 [INFO] root: Average throughput: 762.24/sec
-2018-08-03 18:11:02,393 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:11:02,526 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:12:10,430 [INFO] root: Total time: 65.51s
-2018-08-03 18:12:10,431 [INFO] root: Average throughput: 763.20/sec
++ python benchmarks/callback_full_pipeline.py --num-ops 150000 -H 172.30.0.56 --read
+2018-08-07 04:36:37,101 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:36:37,233 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:38:07,919 [INFO] root: Total time: 88.10s
+2018-08-07 04:38:07,919 [INFO] root: Average throughput: 1702.70/sec
+2018-08-07 04:38:07,919 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:38:08,151 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:39:37,585 [INFO] root: Total time: 86.94s
+2018-08-07 04:39:37,586 [INFO] root: Average throughput: 1725.25/sec
+2018-08-07 04:39:37,586 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:39:37,716 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:41:09,767 [INFO] root: Total time: 89.52s
+2018-08-07 04:41:09,767 [INFO] root: Average throughput: 1675.67/sec
 ```
 
 ## ReadPipeline Object
@@ -208,18 +228,19 @@ and allows pending requests to be executed asynchronously each time an
 additional result is consumed.
 
 ```
-+ python benchmarks/pipeline.py --num-ops 50000 --read
-2018-08-03 18:12:11,132 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:12:11,132 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:12:11,259 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:12:13,333 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:13:14,372 [INFO] root: Total time: 60.69s
-2018-08-03 18:13:14,372 [INFO] root: Average throughput: 823.80/sec
-2018-08-03 18:13:14,372 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:13:14,504 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:13:16,636 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:14:49,721 [INFO] root: Total time: 92.69s
-2018-08-03 18:14:49,721 [INFO] root: Average throughput: 539.44/sec
++ python benchmarks/pipeline.py --num-ops 150000 -H 172.30.0.56 --read
+2018-08-07 04:41:12,342 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:41:12,475 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:43:01,004 [INFO] root: Total time: 106.03s
+2018-08-07 04:43:01,005 [INFO] root: Average throughput: 1414.65/sec
+2018-08-07 04:43:01,005 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:43:01,242 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:44:48,072 [INFO] root: Total time: 104.32s
+2018-08-07 04:44:48,072 [INFO] root: Average throughput: 1437.86/sec
+2018-08-07 04:44:48,072 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:44:48,314 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:46:48,665 [INFO] root: Total time: 117.68s
+2018-08-07 04:46:48,666 [INFO] root: Average throughput: 1274.69/sec
 ```
 
 ## Future Batches
@@ -235,16 +256,19 @@ Before exiting, all futures within the future `Queue` are consumed to ensure
 all pending requests have been processed.
 
 ```
-+ python benchmarks/future_batches.py --num-ops 50000 --read
-2018-08-03 18:14:50,149 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:14:50,149 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:14:50,387 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:15:55,079 [INFO] root: Total time: 62.27s
-2018-08-03 18:15:55,080 [INFO] root: Average throughput: 802.95/sec
-2018-08-03 18:15:55,080 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:15:55,209 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:17:51,799 [INFO] root: Total time: 114.16s
-2018-08-03 18:17:51,799 [INFO] root: Average throughput: 437.98/sec
++ python benchmarks/future_batches.py --num-ops 150000 -H 172.30.0.56 --read
+2018-08-07 04:46:51,271 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:46:51,403 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:48:24,745 [INFO] root: Total time: 90.75s
+2018-08-07 04:48:24,745 [INFO] root: Average throughput: 1652.84/sec
+2018-08-07 04:48:24,745 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:48:24,976 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:49:55,937 [INFO] root: Total time: 88.45s
+2018-08-07 04:49:55,937 [INFO] root: Average throughput: 1695.87/sec
+2018-08-07 04:49:55,937 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:49:56,068 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:51:46,465 [INFO] root: Total time: 107.96s
+2018-08-07 04:51:46,465 [INFO] root: Average throughput: 1389.43/sec
 ```
 
 ## Future Full Pipeline
@@ -260,16 +284,19 @@ Before exiting, all futures within the future `Queue` are consumed to ensure
 all pending requests have been processed.
 
 ```
-+ python benchmarks/future_full_pipeline.py --num-ops 50000 --read
-2018-08-03 18:17:52,305 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:17:52,306 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:17:52,442 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:19:05,990 [INFO] root: Total time: 71.09s
-2018-08-03 18:19:05,990 [INFO] root: Average throughput: 703.34/sec
-2018-08-03 18:19:05,990 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:19:06,122 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:21:01,888 [INFO] root: Total time: 113.35s
-2018-08-03 18:21:01,889 [INFO] root: Average throughput: 441.13/sec
++ python benchmarks/future_full_pipeline.py --num-ops 150000 -H 172.30.0.56 --read
+2018-08-07 04:51:48,991 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:51:49,123 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 04:53:27,992 [INFO] root: Total time: 96.27s
+2018-08-07 04:53:27,993 [INFO] root: Average throughput: 1558.16/sec
+2018-08-07 04:53:27,993 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:53:28,222 [INFO] root: ==== LibevConnection ====
+2018-08-07 04:55:04,824 [INFO] root: Total time: 94.00s
+2018-08-07 04:55:04,824 [INFO] root: Average throughput: 1595.78/sec
+2018-08-07 04:55:04,824 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 04:55:04,955 [INFO] root: ==== TwistedConnection ====
+2018-08-07 04:56:58,690 [INFO] root: Total time: 111.22s
+2018-08-07 04:56:58,690 [INFO] root: Average throughput: 1348.73/sec
 ```
 
 ## Future Full Throttle
@@ -288,31 +315,24 @@ While FIFO verification of write requests may not be required, often
 times FIFO consumption of read requests are required since the resulting
 data may be merged with known data.
 
-**Note:** The following execution could not complete successfully on my local
-machine due to the large number of parallel requests. The faulty throughput is
-omitted below.
+**Note:** The following execution could not complete successfully due to the
+large number of parallel requests. The number of operations was divided by 10
+in order to gain a basic idea of throughput.
 
 ```
-+ python benchmarks/future_full_throttle.py --num-ops 50000 --read
-2018-08-03 18:21:02,576 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:21:02,576 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:21:02,814 [INFO] root: ==== AsyncoreConnection ====
-Exception in thread Thread-4:
-Traceback (most recent call last):
-  File "/usr/local/Cellar/python/2.7.13_1/Frameworks/Python.framework/Versions/2.7/lib/python2.7/threading.py", line 801, in __bootstrap_inner
-    self.run()
-  File "benchmarks/future_full_throttle.py", line 34, in run
-    future.result()
-  File "/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra/cluster.py", line 4033, in result
-    raise self._final_exception
-OperationTimedOut: errors={'127.0.0.1': 'Client request timeout. See Session.execute[_async](timeout)'}, last_host=127.0.0.1
-
-2018-08-03 18:21:35,466 [INFO] root: Total time: --.--s
-2018-08-03 18:21:35,467 [INFO] root: Average throughput: --/sec
-2018-08-03 18:21:35,472 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:21:35,764 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:23:06,036 [INFO] root: Total time: 87.72s
-2018-08-03 18:23:06,037 [INFO] root: Average throughput: 569.97/sec
++ python benchmarks/future_full_throttle.py --num-ops 15000 -H 172.30.0.56 --read
+2018-08-07 05:19:45,419 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 05:19:45,651 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 05:19:59,715 [INFO] root: Total time: 11.45s
+2018-08-07 05:19:59,716 [INFO] root: Average throughput: 1309.58/sec
+2018-08-07 05:19:59,716 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 05:19:59,946 [INFO] root: ==== LibevConnection ====
+2018-08-07 05:20:12,663 [INFO] root: Total time: 10.24s
+2018-08-07 05:20:12,663 [INFO] root: Average throughput: 1464.50/sec
+2018-08-07 05:20:12,663 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 05:20:12,893 [INFO] root: ==== TwistedConnection ====
+2018-08-07 05:20:25,810 [INFO] root: Total time: 10.52s
+2018-08-07 05:20:25,810 [INFO] root: Average throughput: 1425.74/sec
 ```
 
 ## Synchronous Requests
@@ -323,15 +343,19 @@ Since only *one* request is in-flight at a given time, this will be the slowest
 request method.
 
 ```
-+ python benchmarks/sync.py --num-ops 50000 --read
-2018-08-03 18:23:07,726 [WARNING] root: Not benchmarking libev reactor because libev is not available
-2018-08-03 18:23:07,726 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:23:07,852 [INFO] root: ==== AsyncoreConnection ====
-2018-08-03 18:24:50,007 [INFO] root: Total time: 99.68s
-2018-08-03 18:24:50,007 [INFO] root: Average throughput: 501.60/sec
-2018-08-03 18:24:50,007 [INFO] root: Using 'cassandra' package from ['/Users/joaquin/repos/tlp/python-driver/benchmarks/../cassandra']
-2018-08-03 18:24:50,244 [INFO] root: ==== TwistedConnection ====
-2018-08-03 18:26:23,052 [INFO] root: Total time: 90.39s
++ python benchmarks/sync.py --num-ops 150000 -H 172.30.0.56 --read
+2018-08-07 05:08:30,524 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 05:08:30,757 [INFO] root: ==== AsyncoreConnection ====
+2018-08-07 05:10:32,994 [INFO] root: Total time: 119.74s
+2018-08-07 05:10:32,994 [INFO] root: Average throughput: 1252.74/sec
+2018-08-07 05:10:32,994 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 05:10:33,125 [INFO] root: ==== LibevConnection ====
+2018-08-07 05:12:27,412 [INFO] root: Total time: 111.74s
+2018-08-07 05:12:27,413 [INFO] root: Average throughput: 1342.39/sec
+2018-08-07 05:12:27,413 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-07 05:12:27,543 [INFO] root: ==== TwistedConnection ====
+2018-08-07 05:14:41,783 [INFO] root: Total time: 131.86s
+2018-08-07 05:14:41,783 [INFO] root: Average throughput: 1137.60/sec
 ```
 
 # Pipeline Tuning
