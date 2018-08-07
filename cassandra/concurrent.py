@@ -423,7 +423,7 @@ class Pipeline(object):
             # being processed
             with self.in_flight_counter_lock:
                 # decrement the number of in-flight requests
-                self.in_flight_counter -= self.in_flight_counter
+                self.in_flight_counter -= 1
 
                 # if there are no more pending statements and all in-flight
                 # futures have returned set self.completed_futures to True
