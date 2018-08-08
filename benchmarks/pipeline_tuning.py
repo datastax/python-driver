@@ -82,6 +82,17 @@ class Runner(BenchmarkThread):
                 except:
                     print 'Failed:', max_in_flight_requests, buffer_size
 
+            print '=' * 60
+            print 'In Progress Stats\n'.upper()
+            self.print_stats(options, results)
+            print '=' * 60
+
+        print '=' * 60
+        print 'Final Stats\n'.upper()
+        self.print_stats(options, results)
+        print '=' * 60
+
+    def print_stats(self, options, results):
         # sort the list by the shortest runtimes and choose the top results
         results.sort()
         top_n = 10
@@ -101,18 +112,18 @@ class Runner(BenchmarkThread):
         best_average_buffer_size = int(round(best_average_buffer_size, -1))
 
         # Pretty print the top N results
-        print 'Top %s results' % top_n
+        print 'Top %s results:' % top_n
         pprint(optimal_runtimes)
 
         # Print the average value of the parameter values used for the fastest
         # runs
-        print '-' * 20
+        print '-' * 60
         print 'Best average max_in_flight_requests value:', best_average_max_in_flight_requests
         if options.read:
             print 'Best average max_unconsumed_read_responses value:', best_average_buffer_size
         else:
             print 'Best average max_unsent_write_requests value:', best_average_buffer_size
-        print '-' * 20
+        print '-' * 60
         print
 
 
