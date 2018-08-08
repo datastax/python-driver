@@ -30,8 +30,12 @@ class Runner(BenchmarkThread):
     def run(self):
         options, args = parse_options()
         write_pipeline = WritePipeline(self.session,
+                                       max_in_flight_requests=100,
+                                       max_unsent_write_requests=40000,
                                        allow_non_performant_queries=True)
         read_pipeline = ReadPipeline(self.session,
+                                     max_in_flight_requests=100,
+                                     max_unconsumed_read_responses=400,
                                      allow_non_performant_queries=True)
         self.start_profile()
 
