@@ -346,6 +346,26 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
                          {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
 
+        # test update udt fields
+        udt_default.age = 2
+        item.update(udt_default=udt_default)
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(), item._as_dict())
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
+                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
+
+        # test update udt fields implicitly
+        udt_default.age = 3
+        item.save()
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(), item._as_dict())
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
+                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
+
+        # test update udt fields to default value implicitly
+        udt_default.age = 1
+        item.save()
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(), item._as_dict())
+        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
+                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
 
     def test_udt_to_python(self):
         """
