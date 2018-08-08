@@ -276,7 +276,7 @@ class Pipeline(object):
     :class:`cassandra.cluster.ResponseFuture` is returned.
     """
 
-    max_unsent_write_requests = 50000
+    max_unsent_write_requests = 40000
     """
     This value is specifically for a ``WritePipeline`` to set the maximum
     number of queued write requests that have yet to be delivered to Cassandra.
@@ -691,7 +691,7 @@ class WritePipeline(Pipeline):
     :class:`cassandra.cluster.ResponseFuture` is returned.
     """
 
-    max_unsent_write_requests = 50000
+    max_unsent_write_requests = 40000
     """
     This value is specifically for a ``WritePipeline`` to set the maximum
     number of queued write requests that have yet to be delivered to Cassandra.
