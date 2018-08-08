@@ -9,17 +9,29 @@ OPTIONS=
 set -x
 
 python benchmarks/callback_full_pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/future_batches.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/future_full_pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/future_full_throttle.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/sync.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 
 OPTIONS="${OPTIONS} --read"
 
 python benchmarks/callback_full_pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/future_batches.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/future_full_pipeline.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/future_full_throttle.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
 python benchmarks/sync.py --num-ops ${NUM_OF_OPS} ${OPTIONS}
+sleep 10
