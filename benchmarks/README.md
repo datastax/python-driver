@@ -22,18 +22,18 @@ the fastest the driver can perform.
 
 ```
 + python benchmarks/callback_full_pipeline.py --num-ops 150000 -H 172.30.0.56
-2018-08-08 19:17:16,303 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:17:16,435 [INFO] root: ==== AsyncoreConnection ====
-2018-08-08 19:17:33,679 [INFO] root: Total time: 14.27s
-2018-08-08 19:17:33,679 [INFO] root: Average throughput: 10511.13/sec
-2018-08-08 19:17:33,679 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:17:33,911 [INFO] root: ==== LibevConnection ====
-2018-08-08 19:17:50,300 [INFO] root: Total time: 13.32s
-2018-08-08 19:17:50,300 [INFO] root: Average throughput: 11261.17/sec
-2018-08-08 19:17:50,300 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:17:50,432 [INFO] root: ==== TwistedConnection ====
-2018-08-08 19:18:10,613 [INFO] root: Total time: 17.17s
-2018-08-08 19:18:10,613 [INFO] root: Average throughput: 8733.76/sec
+2018-08-08 19:51:42,392 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:51:42,625 [INFO] root: ==== AsyncoreConnection ====
+2018-08-08 19:51:59,315 [INFO] root: Total time: 13.77s
+2018-08-08 19:51:59,316 [INFO] root: Average throughput: 10893.45/sec
+2018-08-08 19:51:59,316 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:51:59,547 [INFO] root: ==== LibevConnection ====
+2018-08-08 19:52:15,718 [INFO] root: Total time: 13.17s
+2018-08-08 19:52:15,718 [INFO] root: Average throughput: 11390.19/sec
+2018-08-08 19:52:15,718 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:52:16,049 [INFO] root: ==== TwistedConnection ====
+2018-08-08 19:52:34,524 [INFO] root: Total time: 15.67s
+2018-08-08 19:52:34,524 [INFO] root: Average throughput: 9571.80/sec
 ```
 
 ## WritePipeline Object
@@ -55,18 +55,18 @@ requests have returned.
 
 ```
 + python benchmarks/pipeline.py --num-ops 150000 -H 172.30.0.56
-2018-08-08 19:18:20,317 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:18:20,449 [INFO] root: ==== AsyncoreConnection ====
-2018-08-08 19:18:46,428 [INFO] root: Total time: 23.41s
-2018-08-08 19:18:46,429 [INFO] root: Average throughput: 6407.10/sec
-2018-08-08 19:18:46,429 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:18:46,662 [INFO] root: ==== LibevConnection ====
-2018-08-08 19:19:13,132 [INFO] root: Total time: 23.70s
-2018-08-08 19:19:13,132 [INFO] root: Average throughput: 6328.08/sec
-2018-08-08 19:19:13,132 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:19:13,364 [INFO] root: ==== TwistedConnection ====
-2018-08-08 19:19:51,967 [INFO] root: Total time: 36.05s
-2018-08-08 19:19:51,967 [INFO] root: Average throughput: 4161.26/sec
+2018-08-08 19:52:47,102 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:52:47,337 [INFO] root: ==== AsyncoreConnection ====
+2018-08-08 19:53:12,381 [INFO] root: Total time: 22.55s
+2018-08-08 19:53:12,381 [INFO] root: Average throughput: 6653.16/sec
+2018-08-08 19:53:12,381 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:53:12,612 [INFO] root: ==== LibevConnection ====
+2018-08-08 19:53:37,060 [INFO] root: Total time: 21.79s
+2018-08-08 19:53:37,060 [INFO] root: Average throughput: 6884.64/sec
+2018-08-08 19:53:37,060 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:53:37,292 [INFO] root: ==== TwistedConnection ====
+2018-08-08 19:54:13,721 [INFO] root: Total time: 34.00s
+2018-08-08 19:54:13,721 [INFO] root: Average throughput: 4411.34/sec
 ```
 
 ## Future Batches
@@ -197,18 +197,18 @@ the fastest the driver can perform.
 
 ```
 + python benchmarks/callback_full_pipeline.py --num-ops 150000 -H 172.30.0.56 --read
-2018-08-08 19:20:18,369 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:20:18,503 [INFO] root: ==== AsyncoreConnection ====
-2018-08-08 19:21:52,157 [INFO] root: Total time: 91.14s
-2018-08-08 19:21:52,157 [INFO] root: Average throughput: 1645.89/sec
-2018-08-08 19:21:52,157 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:21:52,389 [INFO] root: ==== LibevConnection ====
-2018-08-08 19:23:23,840 [INFO] root: Total time: 88.85s
-2018-08-08 19:23:23,840 [INFO] root: Average throughput: 1688.30/sec
-2018-08-08 19:23:23,840 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:23:23,975 [INFO] root: ==== TwistedConnection ====
-2018-08-08 19:24:58,355 [INFO] root: Total time: 91.94s
-2018-08-08 19:24:58,355 [INFO] root: Average throughput: 1631.56/sec
+2018-08-08 19:54:26,365 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:54:26,598 [INFO] root: ==== AsyncoreConnection ====
+2018-08-08 19:55:57,287 [INFO] root: Total time: 88.30s
+2018-08-08 19:55:57,287 [INFO] root: Average throughput: 1698.66/sec
+2018-08-08 19:55:57,287 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:55:57,418 [INFO] root: ==== LibevConnection ====
+2018-08-08 19:57:26,697 [INFO] root: Total time: 86.66s
+2018-08-08 19:57:26,697 [INFO] root: Average throughput: 1730.82/sec
+2018-08-08 19:57:26,697 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:57:26,928 [INFO] root: ==== TwistedConnection ====
+2018-08-08 19:58:58,523 [INFO] root: Total time: 89.22s
+2018-08-08 19:58:58,523 [INFO] root: Average throughput: 1681.22/sec
 ```
 
 ## ReadPipeline Object
@@ -229,18 +229,18 @@ additional result is consumed.
 
 ```
 + python benchmarks/pipeline.py --num-ops 150000 -H 172.30.0.56 --read
-2018-08-08 19:25:59,768 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:25:59,900 [INFO] root: ==== AsyncoreConnection ====
-2018-08-08 19:27:46,331 [INFO] root: Total time: 103.91s
-2018-08-08 19:27:46,331 [INFO] root: Average throughput: 1443.52/sec
-2018-08-08 19:27:46,331 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:27:46,563 [INFO] root: ==== LibevConnection ====
-2018-08-08 19:29:31,621 [INFO] root: Total time: 102.48s
-2018-08-08 19:29:31,622 [INFO] root: Average throughput: 1463.72/sec
-2018-08-08 19:29:31,622 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
-2018-08-08 19:29:31,751 [INFO] root: ==== TwistedConnection ====
-2018-08-08 19:31:27,978 [INFO] root: Total time: 113.79s
-2018-08-08 19:31:27,978 [INFO] root: Average throughput: 1318.23/sec
+2018-08-08 19:59:11,102 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 19:59:11,334 [INFO] root: ==== AsyncoreConnection ====
+2018-08-08 20:00:55,541 [INFO] root: Total time: 101.79s
+2018-08-08 20:00:55,542 [INFO] root: Average throughput: 1473.65/sec
+2018-08-08 20:00:55,542 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 20:00:55,772 [INFO] root: ==== LibevConnection ====
+2018-08-08 20:02:38,310 [INFO] root: Total time: 99.76s
+2018-08-08 20:02:38,310 [INFO] root: Average throughput: 1503.68/sec
+2018-08-08 20:02:38,310 [INFO] root: Using 'cassandra' package from ['/usr/local/lib/python2.7/dist-packages/cassandra_driver-3.14.0-py2.7-linux-x86_64.egg/cassandra']
+2018-08-08 20:02:38,540 [INFO] root: ==== TwistedConnection ====
+2018-08-08 20:04:31,720 [INFO] root: Total time: 110.77s
+2018-08-08 20:04:31,720 [INFO] root: Average throughput: 1354.11/sec
 ```
 
 ## Future Batches
