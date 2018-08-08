@@ -564,7 +564,7 @@ class RequestValidationException(DriverException):
 
 class ConfigurationException(RequestValidationException):
     """
-    Server indicated request errro due to current configuration
+    Server indicated request error due to current configuration
     """
     pass
 

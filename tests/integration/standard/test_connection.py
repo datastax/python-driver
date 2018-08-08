@@ -206,7 +206,7 @@ class ConnectionTests(object):
             try:
                 contact_point = CASSANDRA_IP
                 conn = self.klass.factory(
-                    driver_context,
+                    context=driver_context,
                     host=contact_point, timeout=timeout,
                     protocol_version=PROTOCOL_VERSION)
                 break

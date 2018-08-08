@@ -12,11 +12,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 from collections import defaultdict
 
 from cassandra import ProtocolVersion
 from cassandra.protocol import *
+from cassandra.cqltypes import (
+    CustomType, AsciiType, BytesType, BooleanType, CounterColumnType,
+    DateType, DecimalType, DoubleType, FloatType, Int32Type, InetAddressType,
+    IntegerType, ListType, LongType, MapType, SetType, TimeUUIDType,
+    UTF8Type, VarcharType, UUIDType, UserType, TupleType, SimpleDateType,
+    TimeType, ByteType, ShortType, DurationType, CompositeType,
+    DynamicCompositeType, ColumnToCollectionType, ReversedType, FrozenType,
+    lookup_casstype, apache_cassandra_type_prefix)
+
+
+class CqlTypeRegistry(object):
+    """Default implementation of the CqlTypeRegistry"""
+
+    lookup_casstype = staticmethod(lookup_casstype)
+
+    type_codes = None
+
+    _casstypes = None
+    _cqltypes = None
+
+    def __init__(self, types):
+        self._casstypes = {}
+        self._cqltypes = {}
+        self.type_codes = {}
+        for t in types:
+            if hasattr(t, 'type_code') and t.type_code not in self.type_codes:
+                self.type_codes[t.type_code] = t
+            self.add_type(t)
+
+    def add_type(self, type_class):
+        self._casstypes[type_class.__name__] = type_class
+        try:
+            # some types don't have a typename
+            if not type_class.typename.startswith(apache_cassandra_type_prefix):
+                self._cqltypes[type_class.typename] = type_class
+        except AttributeError:
+            pass
+
+    def lookup(self, casstype):
+        return self.lookup_casstype(casstype, registry=self)
+
+    def lookup_by_typename(self, typename):
+        return self._cqltypes[typename]
+
+    def __getitem__(self, item):
+        return self._casstypes[item]
+
+    @classmethod
+    def factory(cls, types=None):
+        """"Factory to construct the default cql type registry
+
+        :param types: All data types to register.
+        """
+        if types is None:
+            types = [
+                CustomType, AsciiType, BytesType, BooleanType,
+                CounterColumnType, DateType, DecimalType,
+                DoubleType, FloatType, Int32Type,
+                InetAddressType, IntegerType, ListType,
+                LongType, MapType, SetType, TimeUUIDType,
+                UTF8Type, VarcharType, UUIDType, UserType,
+                TupleType, SimpleDateType, TimeType, ByteType,
+                ShortType, DurationType, CompositeType, DynamicCompositeType,
+                FrozenType, ColumnToCollectionType, ReversedType
+            ]
+        return cls(types)
 
 
 class ProtocolVersionRegistry(object):
@@ -80,7 +145,7 @@ class MessageCodecRegistry(object):
     encoders = None
     decoders = None
 
-    def __init__(self, protocol_version_registry):
+    def __init__(self):
         self.encoders = defaultdict(dict)
         self.decoders = defaultdict(dict)
 
@@ -110,24 +175,28 @@ class MessageCodecRegistry(object):
         return self._get(self.decoders, protocol_version, opcode)
 
     @classmethod
-    def factory(cls, protocol_version_registry):
+    def factory(cls, context):
         """Factory to construct the default message codec registry"""
 
-        registry = cls(protocol_version_registry)
-        for v in protocol_version_registry.supported_versions:
+        registry = cls()
+        for v in context.protocol_version_registry.supported_versions:
             for message in [
                 StartupMessage,
                 RegisterMessage,
-                BatchMessage,
-                QueryMessage,
-                ExecuteMessage,
-                PrepareMessage,
                 OptionsMessage,
                 AuthResponseMessage,
             ]:
-                registry.add_encoder(v, message.opcode, message.encode)
+                registry.add_encoder(v, message.opcode, message.Codec())
 
-            error_decoders = [(e.error_code, e.decode) for e in [
+            for message in [
+                BatchMessage,
+                QueryMessage,
+                ExecuteMessage,
+                PrepareMessage
+            ]:
+                registry.add_encoder(v, message.opcode, message.Codec(context))
+
+            error_decoders = [(e.error_code, e.Codec()) for e in [
                 UnavailableErrorMessage,
                 ReadTimeoutErrorMessage,
                 WriteTimeoutErrorMessage,
@@ -138,9 +207,7 @@ class MessageCodecRegistry(object):
                 ProtocolException,
                 BadCredentials,
                 TruncateError,
-                ReadFailureMessage,
                 FunctionFailureMessage,
-                WriteFailureMessage,
                 CDCWriteException,
                 SyntaxException,
                 InvalidRequestException,
@@ -149,17 +216,22 @@ class MessageCodecRegistry(object):
                 AlreadyExistsException
             ]]
 
-            for codec in [
+            error_decoders += [(e.error_code, e.Codec(context)) for e in [
+                ReadFailureMessage,
+                WriteFailureMessage
+            ]]
+
+            for message in [
                 ReadyMessage,
-                EventMessage.Codec,
-                ResultMessage.Codec,
+                EventMessage,
                 AuthenticateMessage,
                 AuthSuccessMessage,
                 AuthChallengeMessage,
-                SupportedMessage,
-                ErrorMessage.Codec(error_decoders)
-
+                SupportedMessage
             ]:
-                registry.add_decoder(v, codec.opcode, codec.decode)
+                registry.add_decoder(v, message.opcode, message.Codec())
+
+            registry.add_decoder(v, ResultMessage.opcode, ResultMessage.Codec(context))
+            registry.add_decoder(v, ErrorMessage.opcode, ErrorMessage.Codec(error_decoders))
 
         return registry

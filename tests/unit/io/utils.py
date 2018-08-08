@@ -146,8 +146,8 @@ class TimerTestMixin(object):
 
     def setUp(self):
         self.connection = self.connection_class(
-            driver_context,
-            connect_timeout=5
+            connect_timeout=5,
+            context=driver_context
         )
 
     def tearDown(self):
@@ -205,9 +205,8 @@ class ReactorTestMixin(object):
 
     def make_connection(self):
         c = self.connection_class(
-            driver_context,
-            '1.2.3.4',
-            cql_version='3.0.1', connect_timeout=5)
+            '1.2.3.4', cql_version='3.0.1', connect_timeout=5,
+            context=driver_context)
         mocket = Mock()
         mocket.send.side_effect = lambda x: len(x)
         self.set_socket(c, mocket)

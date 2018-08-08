@@ -21,13 +21,14 @@ import datetime
 import tempfile
 import six
 import time
+import copy
 
 import cassandra
 from cassandra.cqltypes import (BooleanType, lookup_casstype_simple, lookup_casstype,
                                 LongType, DecimalType, SetType, cql_typename,
                                 CassandraType, UTF8Type, parse_casstype_args,
                                 SimpleDateType, TimeType, ByteType, ShortType,
-                                EmptyValue, _CassandraType, DateType, int64_pack)
+                                EmptyValue, DateType, int64_pack)
 from cassandra.encoder import cql_quote
 from cassandra.protocol import (write_string, read_longstring, write_stringmap,
                                 read_stringmap, read_inet, write_inet,
@@ -37,6 +38,8 @@ from cassandra.hosts import Host
 from cassandra.policies import SimpleConvictionPolicy, ConvictionPolicy
 from cassandra.util import Date, Time
 from cassandra.metadata import Token
+
+from tests.unit import driver_context
 
 
 class TypeTests(unittest.TestCase):
@@ -161,12 +164,16 @@ class TypeTests(unittest.TestCase):
         class BarType(FooType):
             typename = 'org.apache.cassandra.db.marshal.BarType'
 
+        type_registry = copy.deepcopy(driver_context.type_registry)
+        type_registry.add_type(FooType)
+        type_registry.add_type(BarType)
+
         ctype = parse_casstype_args(''.join((
             'org.apache.cassandra.db.marshal.FooType(',
                 '63697479:org.apache.cassandra.db.marshal.UTF8Type,',
                 'BarType(61646472657373:org.apache.cassandra.db.marshal.UTF8Type),',
                 '7a6970:org.apache.cassandra.db.marshal.UTF8Type',
-            ')')))
+            ')')), registry=type_registry)
 
         self.assertEqual(FooType, ctype.__class__)
 

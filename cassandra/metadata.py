@@ -35,13 +35,14 @@ except ImportError as e:
     pass
 
 from cassandra import SignatureDescriptor, ConsistencyLevel, InvalidRequest, Unauthorized
-import cassandra.cqltypes as types
+from cassandra import cqltypes as types
 from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
 from cassandra.protocol import QueryMessage
 from cassandra.query import dict_factory, bind_params, Statement
 from cassandra.util import OrderedDict
 from cassandra.hosts import HostDistance
+from cassandra.context import DefaultDriverContext
 
 
 log = logging.getLogger(__name__)
@@ -109,7 +110,10 @@ class Metadata(object):
     token_map = None
     """ A :class:`~.TokenMap` instance describing the ring topology. """
 
-    def __init__(self):
+    _context = None
+
+    def __init__(self, context=None):
+        self._context = context or DefaultDriverContext()
         self.keyspaces = {}
         self._hosts = {}
         self._hosts_lock = RLock()
@@ -124,7 +128,7 @@ class Metadata(object):
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
         server_version = self.get_host(connection.host).release_version
-        parser = get_schema_parser(connection, server_version, timeout)
+        parser = get_schema_parser(connection, server_version, timeout, context=self._context)
 
         if not target_type:
             self._rebuild_all(parser)
@@ -637,7 +641,10 @@ class KeyspaceMetadata(object):
     _exc_info = None
     """ set if metadata parsing failed """
 
-    def __init__(self, name, durable_writes, strategy_class, strategy_options):
+    _context = None
+
+    def __init__(self, name, durable_writes, strategy_class, strategy_options, context=None):
+        self._context = context or DefaultDriverContext()
         self.name = name
         self.durable_writes = durable_writes
         self.replication_strategy = ReplicationStrategy.create(strategy_class, strategy_options)
@@ -1623,7 +1630,10 @@ class TriggerMetadata(object):
 
 class _SchemaParser(object):
 
-    def __init__(self, connection, timeout):
+    _context = None
+
+    def __init__(self, connection, timeout, context=None):
+        self._context = context or DefaultDriverContext()
         self.connection = connection
         self.timeout = timeout
 
@@ -1688,8 +1698,8 @@ class SchemaParserV22(_SchemaParser):
         "compression",
         "default_time_to_live")
 
-    def __init__(self, connection, timeout):
-        super(SchemaParserV22, self).__init__(connection, timeout)
+    def __init__(self, connection, timeout, context=None):
+        super(SchemaParserV22, self).__init__(connection, timeout, context=context)
         self.keyspaces_result = []
         self.tables_result = []
         self.columns_result = []
@@ -1777,47 +1787,42 @@ class SchemaParserV22(_SchemaParser):
         where_clause = bind_params(" WHERE keyspace_name = %s", (keyspace,), _encoder)
         return self._query_build_row(self._SELECT_KEYSPACES + where_clause, self._build_keyspace_metadata)
 
-    @classmethod
-    def _build_keyspace_metadata(cls, row):
+    def _build_keyspace_metadata(self, row):
         try:
-            ksm = cls._build_keyspace_metadata_internal(row)
+            ksm = self._build_keyspace_metadata_internal(row)
         except Exception:
             name = row["keyspace_name"]
-            ksm = KeyspaceMetadata(name, False, 'UNKNOWN', {})
+            ksm = KeyspaceMetadata(name, False, 'UNKNOWN', {}, context=self._context)
             ksm._exc_info = sys.exc_info()  # capture exc_info before log because nose (test) logging clears it in certain circumstances
             log.exception("Error while parsing metadata for keyspace %s row(%s)", name, row)
         return ksm
 
-    @staticmethod
-    def _build_keyspace_metadata_internal(row):
+    def _build_keyspace_metadata_internal(self, row):
         name = row["keyspace_name"]
         durable_writes = row["durable_writes"]
         strategy_class = row["strategy_class"]
         strategy_options = json.loads(row["strategy_options"])
-        return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
+        return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options, context=self._context)
 
-    @classmethod
-    def _build_user_type(cls, usertype_row):
-        field_types = list(map(cls._schema_type_to_cql, usertype_row['field_types']))
+    def _build_user_type(self, usertype_row):
+        field_types = list(map(self._schema_type_to_cql, usertype_row['field_types']))
         return UserType(usertype_row['keyspace_name'], usertype_row['type_name'],
                         usertype_row['field_names'], field_types)
 
-    @classmethod
-    def _build_function(cls, function_row):
-        return_type = cls._schema_type_to_cql(function_row['return_type'])
+    def _build_function(self, function_row):
+        return_type = self._schema_type_to_cql(function_row['return_type'])
         return Function(function_row['keyspace_name'], function_row['function_name'],
-                        function_row[cls._function_agg_arument_type_col], function_row['argument_names'],
+                        function_row[self._function_agg_arument_type_col], function_row['argument_names'],
                         return_type, function_row['language'], function_row['body'],
                         function_row['called_on_null_input'])
 
-    @classmethod
-    def _build_aggregate(cls, aggregate_row):
-        cass_state_type = types.lookup_casstype(aggregate_row['state_type'])
+    def _build_aggregate(self, aggregate_row):
+        cass_state_type = self._context.type_registry.lookup(aggregate_row['state_type'])
         initial_condition = aggregate_row['initcond']
         if initial_condition is not None:
             initial_condition = _encoder.cql_encode_all_types(cass_state_type.deserialize(initial_condition, 3))
         state_type = _cql_from_cass_type(cass_state_type)
-        return_type = cls._schema_type_to_cql(aggregate_row['return_type'])
+        return_type = self._schema_type_to_cql(aggregate_row['return_type'])
         return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
                          aggregate_row['signature'], aggregate_row['state_func'], state_type,
                          aggregate_row['final_func'], initial_condition, return_type)
@@ -1836,7 +1841,7 @@ class SchemaParserV22(_SchemaParser):
         table_meta = TableMetadata(keyspace_name, cfname)
 
         try:
-            comparator = types.lookup_casstype(row["comparator"])
+            comparator = self._context.type_registry.lookup(row["comparator"])
             table_meta.comparator = comparator
 
             is_dct_comparator = issubclass(comparator, types.DynamicCompositeType)
@@ -1905,10 +1910,10 @@ class SchemaParserV22(_SchemaParser):
 
             key_validator = row.get("key_validator")
             if key_validator is not None:
-                key_type = types.lookup_casstype(key_validator)
+                key_type = self._context.type_registry.lookup(key_validator)
                 key_types = key_type.subtypes if issubclass(key_type, types.CompositeType) else [key_type]
             else:
-                key_types = [types.lookup_casstype(r.get('validator')) for r in partition_rows]
+                key_types = [self._context.type_registry.lookup(r.get('validator')) for r in partition_rows]
 
             for i, col_type in enumerate(key_types):
                 if len(key_aliases) > i:
@@ -1951,10 +1956,10 @@ class SchemaParserV22(_SchemaParser):
 
                 default_validator = row.get("default_validator")
                 if default_validator:
-                    validator = types.lookup_casstype(default_validator)
+                    validator = self._context.type_registry.lookup(default_validator)
                 else:
                     if value_alias_rows:  # CASSANDRA-8487
-                        validator = types.lookup_casstype(value_alias_rows[0].get('validator'))
+                        validator = self._context.type_registry.lookup(value_alias_rows[0].get('validator'))
 
                 cql_type = _cql_from_cass_type(validator)
                 col = ColumnMetadata(table_meta, value_alias, cql_type)
@@ -1997,11 +2002,10 @@ class SchemaParserV22(_SchemaParser):
 
         return options
 
-    @classmethod
-    def _build_column_metadata(cls, table_metadata, row):
+    def _build_column_metadata(self, table_metadata, row):
         name = row["column_name"]
         type_string = row["validator"]
-        data_type = types.lookup_casstype(type_string)
+        data_type = self._context.type_registry.lookup(type_string)
         cql_type = _cql_from_cass_type(data_type)
         is_static = row.get("type", None) == "static"
         is_reversed = types.is_reversed_casstype(data_type)
@@ -2140,9 +2144,8 @@ class SchemaParserV22(_SchemaParser):
             cfname = row[self._table_name_col]
             m[ksname][cfname].append(row)
 
-    @staticmethod
-    def _schema_type_to_cql(type_string):
-        cass_type = types.lookup_casstype(type_string)
+    def _schema_type_to_cql(self, type_string):
+        cass_type = self._context.type_registry.lookup(type_string)
         return _cql_from_cass_type(cass_type)
 
 
@@ -2178,8 +2181,8 @@ class SchemaParserV3(SchemaParserV22):
         'read_repair_chance',
         'speculative_retry')
 
-    def __init__(self, connection, timeout):
-        super(SchemaParserV3, self).__init__(connection, timeout)
+    def __init__(self, connection, timeout, context=None):
+        super(SchemaParserV3, self).__init__(connection, timeout, context=context)
         self.indexes_result = []
         self.keyspace_table_index_rows = defaultdict(lambda: defaultdict(list))
         self.keyspace_view_rows = defaultdict(list)
@@ -2218,13 +2221,12 @@ class SchemaParserV3(SchemaParserV22):
         if view_result:
             return self._build_view_metadata(view_result[0], col_result)
 
-    @staticmethod
-    def _build_keyspace_metadata_internal(row):
+    def _build_keyspace_metadata_internal(self, row):
         name = row["keyspace_name"]
         durable_writes = row["durable_writes"]
         strategy_options = dict(row["replication"])
         strategy_class = strategy_options.pop("class")
-        return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options)
+        return KeyspaceMetadata(name, durable_writes, strategy_class, strategy_options, context=self._context)
 
     @staticmethod
     def _build_aggregate(aggregate_row):
@@ -2544,14 +2546,14 @@ class MaterializedViewMetadata(object):
         return self.as_cql_query(formatted=True) + ";"
 
 
-def get_schema_parser(connection, server_version, timeout):
+def get_schema_parser(connection, server_version, timeout, context=None):
     server_major_version = int(server_version.split('.')[0])
     if server_major_version >= 3:
-        return SchemaParserV3(connection, timeout)
+        return SchemaParserV3(connection, timeout, context=context)
     else:
         # we could further specialize by version. Right now just refactoring the
         # multi-version parser we have as of C* 2.2.0rc1.
-        return SchemaParserV22(connection, timeout)
+        return SchemaParserV22(connection, timeout, context=context)
 
 
 def _cql_from_cass_type(cass_type):
@@ -2559,7 +2561,7 @@ def _cql_from_cass_type(cass_type):
     A string representation of the type for this column, such as "varchar"
     or "map<string, int>".
     """
-    if issubclass(cass_type, types.ReversedType):
+    if types.is_reversed_casstype(cass_type):
         return cass_type.subtypes[0].cql_parameterized_type()
     else:
         return cass_type.cql_parameterized_type()
@@ -2583,10 +2585,10 @@ def group_keys_by_replica(session, keyspace, table, keys):
                  )
     """
     cluster = session.cluster
-
     partition_keys = cluster.metadata.keyspaces[keyspace].tables[table].partition_key
 
-    serializers = list(types._cqltypes[partition_key.cql_type] for partition_key in partition_keys)
+    serializers = list(session._context.type_registry.lookup_by_typename(
+        partition_key.cql_type)for partition_key in partition_keys)
     keys_per_host = defaultdict(list)
     distance = cluster._default_load_balancing_policy.distance
 

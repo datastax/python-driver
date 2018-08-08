@@ -52,10 +52,12 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack, vints_pack, vints_unpack)
 from cassandra import util
+from cassandra.context import DefaultDriverContext
+
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
-
 cassandra_empty_type = 'org.apache.cassandra.db.marshal.EmptyType'
+
 cql_empty_type = 'empty'
 
 log = logging.getLogger(__name__)
@@ -78,10 +80,6 @@ def trim_if_startswith(s, prefix):
     return s
 
 
-_casstypes = {}
-_cqltypes = {}
-
-
 cql_type_scanner = re.Scanner((
     ('frozen', None),
     (r'[a-zA-Z0-9_]+', lambda s, t: t),
@@ -98,19 +96,11 @@ class CassandraTypeType(type):
     The CassandraType objects in this module will normally be used directly,
     rather than through instances of those types. They can be instantiated,
     of course, but the type information is what this driver mainly needs.
-
-    This metaclass registers CassandraType classes in the global
-    by-cassandra-typename and by-cql-typename registries, unless their class
-    name starts with an underscore.
     """
 
     def __new__(metacls, name, bases, dct):
         dct.setdefault('cassname', name)
         cls = type.__new__(metacls, name, bases, dct)
-        if not name.startswith('_'):
-            _casstypes[name] = cls
-            if not cls.typename.startswith(apache_cassandra_type_prefix):
-                _cqltypes[cls.typename] = cls
         return cls
 
 
@@ -121,7 +111,7 @@ casstype_scanner = re.Scanner((
 ))
 
 
-def lookup_casstype_simple(casstype):
+def lookup_casstype_simple(casstype, registry=None):
     """
     Given a Cassandra type name (either fully distinguished or not), hand
     back the CassandraType class responsible for it. If a name is not
@@ -131,15 +121,17 @@ def lookup_casstype_simple(casstype):
     nothing with parentheses). Use lookup_casstype() instead if you might need
     that.
     """
+    registry = registry or DefaultDriverContext().type_registry
     shortname = trim_if_startswith(casstype, apache_cassandra_type_prefix)
     try:
-        typeclass = _casstypes[shortname]
+        typeclass = registry[shortname]
     except KeyError:
         typeclass = mkUnrecognizedType(casstype)
     return typeclass
 
 
-def parse_casstype_args(typestring):
+def parse_casstype_args(typestring, registry=None):
+    registry = registry or DefaultDriverContext().type_registry
     tokens, remainder = casstype_scanner.scan(typestring)
     if remainder:
         raise ValueError("weird characters %r at end" % remainder)
@@ -162,14 +154,14 @@ def parse_casstype_args(typestring):
             else:
                 names.append(None)
 
-            ctype = lookup_casstype_simple(tok)
+            ctype = lookup_casstype_simple(tok, registry=registry)
             types.append(ctype)
 
     # return the first (outer) type, which will have all parameters applied
     return args[0][0][0]
 
 
-def lookup_casstype(casstype):
+def lookup_casstype(casstype, registry=None):
     """
     Given a Cassandra type as a string (possibly including parameters), hand
     back the CassandraType class responsible for it. If a name is not
@@ -181,10 +173,11 @@ def lookup_casstype(casstype):
         <class 'cassandra.cqltypes.MapType(UTF8Type, Int32Type)'>
 
     """
-    if isinstance(casstype, (CassandraType, CassandraTypeType)):
+    registry = registry or DefaultDriverContext().type_registry
+    if isinstance(casstype, (CassandraType,)):
         return casstype
     try:
-        return parse_casstype_args(casstype)
+        return parse_casstype_args(casstype, registry=registry)
     except (ValueError, AssertionError, IndexError) as e:
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
@@ -200,11 +193,12 @@ class EmptyValue(object):
         return "EMPTY"
     __repr__ = __str__
 
+
 EMPTY = EmptyValue()
 
 
 @six.add_metaclass(CassandraTypeType)
-class _CassandraType(object):
+class CassandraType(object):
     subtypes = ()
     num_subtypes = 0
     empty_binary_ok = False
@@ -330,12 +324,7 @@ class _CassandraType(object):
         return cls.cass_parameterized_type_with(cls.subtypes, full=full)
 
 
-# it's initially named with a _ to avoid registering it as a real type, but
-# client programs may want to use the name still for isinstance(), etc
-CassandraType = _CassandraType
-
-
-class _UnrecognizedType(_CassandraType):
+class _UnrecognizedType(CassandraType):
     num_subtypes = 'UNKNOWN'
 
 
@@ -351,8 +340,13 @@ else:
                                  {'typename': "'%s'" % casstypename})
 
 
-class BytesType(_CassandraType):
+class CustomType(CassandraType):
+    type_code = 0x0000
+
+
+class BytesType(CassandraType):
     typename = 'blob'
+    type_code = 0x0003
     empty_binary_ok = True
 
     @staticmethod
@@ -360,8 +354,9 @@ class BytesType(_CassandraType):
         return six.binary_type(val)
 
 
-class DecimalType(_CassandraType):
+class DecimalType(CassandraType):
     typename = 'decimal'
+    type_code = 0x0006
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -386,8 +381,9 @@ class DecimalType(_CassandraType):
         return scale + unscaled
 
 
-class UUIDType(_CassandraType):
+class UUIDType(CassandraType):
     typename = 'uuid'
+    type_code = 0x000F
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -401,8 +397,9 @@ class UUIDType(_CassandraType):
             raise TypeError("Got a non-UUID object for a UUID value")
 
 
-class BooleanType(_CassandraType):
+class BooleanType(CassandraType):
     typename = 'boolean'
+    type_code = 0x0004
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -412,8 +409,9 @@ class BooleanType(_CassandraType):
     def serialize(truth, protocol_version):
         return int8_pack(truth)
 
-class ByteType(_CassandraType):
+class ByteType(CassandraType):
     typename = 'tinyint'
+    type_code = 0x0014
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -425,12 +423,14 @@ class ByteType(_CassandraType):
 
 
 if six.PY2:
-    class AsciiType(_CassandraType):
+    class AsciiType(CassandraType):
         typename = 'ascii'
+        type_code = 0x0001
         empty_binary_ok = True
 else:
-    class AsciiType(_CassandraType):
+    class AsciiType(CassandraType):
         typename = 'ascii'
+        type_code = 0x0001
         empty_binary_ok = True
 
         @staticmethod
@@ -445,8 +445,9 @@ else:
                 return var
 
 
-class FloatType(_CassandraType):
+class FloatType(CassandraType):
     typename = 'float'
+    type_code = 0x0008
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -457,8 +458,9 @@ class FloatType(_CassandraType):
         return float_pack(byts)
 
 
-class DoubleType(_CassandraType):
+class DoubleType(CassandraType):
     typename = 'double'
+    type_code = 0x0007
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -469,8 +471,9 @@ class DoubleType(_CassandraType):
         return double_pack(byts)
 
 
-class LongType(_CassandraType):
+class LongType(CassandraType):
     typename = 'bigint'
+    type_code = 0x0002
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -481,8 +484,9 @@ class LongType(_CassandraType):
         return int64_pack(byts)
 
 
-class Int32Type(_CassandraType):
+class Int32Type(CassandraType):
     typename = 'int'
+    type_code = 0x0009
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -493,8 +497,9 @@ class Int32Type(_CassandraType):
         return int32_pack(byts)
 
 
-class IntegerType(_CassandraType):
+class IntegerType(CassandraType):
     typename = 'varint'
+    type_code = 0x000E
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -505,8 +510,9 @@ class IntegerType(_CassandraType):
         return varint_pack(byts)
 
 
-class InetAddressType(_CassandraType):
+class InetAddressType(CassandraType):
     typename = 'inet'
+    type_code = 0x0010
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -534,6 +540,7 @@ class InetAddressType(_CassandraType):
 
 class CounterColumnType(LongType):
     typename = 'counter'
+    type_code = 0x0005
 
 cql_timestamp_formats = (
     '%Y-%m-%d %H:%M',
@@ -546,8 +553,9 @@ cql_timestamp_formats = (
 _have_warned_about_timestamps = False
 
 
-class DateType(_CassandraType):
+class DateType(CassandraType):
     typename = 'timestamp'
+    type_code = 0x000B
 
     @staticmethod
     def interpret_datestring(val):
@@ -595,6 +603,7 @@ class TimestampType(DateType):
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
+    type_code = 0x000C
 
     def my_timestamp(self):
         return util.unix_time_from_uuid1(self.val)
@@ -611,8 +620,9 @@ class TimeUUIDType(DateType):
             raise TypeError("Got a non-UUID object for a UUID value")
 
 
-class SimpleDateType(_CassandraType):
+class SimpleDateType(CassandraType):
     typename = 'date'
+    type_code = 0x0011
     date_format = "%Y-%m-%d"
 
     # Values of the 'date'` type are encoded as 32-bit unsigned integers
@@ -639,8 +649,9 @@ class SimpleDateType(_CassandraType):
         return uint32_pack(days + SimpleDateType.EPOCH_OFFSET_DAYS)
 
 
-class ShortType(_CassandraType):
+class ShortType(CassandraType):
     typename = 'smallint'
+    type_code = 0x0013
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -651,8 +662,9 @@ class ShortType(_CassandraType):
         return int16_pack(byts)
 
 
-class TimeType(_CassandraType):
+class TimeType(CassandraType):
     typename = 'time'
+    type_code = 0x0012
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -667,8 +679,9 @@ class TimeType(_CassandraType):
         return int64_pack(nano)
 
 
-class DurationType(_CassandraType):
+class DurationType(CassandraType):
     typename = 'duration'
+    type_code = 0x0015
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -684,8 +697,9 @@ class DurationType(_CassandraType):
         return vints_pack([m, d, n])
 
 
-class UTF8Type(_CassandraType):
+class UTF8Type(CassandraType):
     typename = 'text'
+    type_code = 0x000A
     empty_binary_ok = True
 
     @staticmethod
@@ -703,9 +717,10 @@ class UTF8Type(_CassandraType):
 
 class VarcharType(UTF8Type):
     typename = 'varchar'
+    type_code = 0x000D
 
 
-class _ParameterizedType(_CassandraType):
+class _ParameterizedType(CassandraType):
     num_subtypes = 'UNKNOWN'
 
     @classmethod
@@ -758,18 +773,21 @@ class _SimpleParameterizedType(_ParameterizedType):
 
 class ListType(_SimpleParameterizedType):
     typename = 'list'
+    type_code = 0x0020
     num_subtypes = 1
     adapter = list
 
 
 class SetType(_SimpleParameterizedType):
     typename = 'set'
+    type_code = 0x0022
     num_subtypes = 1
     adapter = util.sortedset
 
 
 class MapType(_ParameterizedType):
     typename = 'map'
+    type_code = 0x0021
     num_subtypes = 2
 
     @classmethod
@@ -816,6 +834,7 @@ class MapType(_ParameterizedType):
 
 class TupleType(_ParameterizedType):
     typename = 'tuple'
+    type_code = 0x0031
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
@@ -867,6 +886,7 @@ class TupleType(_ParameterizedType):
 
 class UserType(TupleType):
     typename = "org.apache.cassandra.db.marshal.UserType"
+    type_code = 0x0030
 
     _cache = {}
     _module = sys.modules[__name__]
@@ -1047,13 +1067,14 @@ class FrozenType(_ParameterizedType):
         return subtype.to_binary(val, protocol_version)
 
 
-def is_counter_type(t):
+def is_counter_type(t, registry=None):
+    registry = registry or DefaultDriverContext().type_registry
     if isinstance(t, six.string_types):
-        t = lookup_casstype(t)
+        t = lookup_casstype(t, registry=registry)
     return issubclass(t, CounterColumnType)
 
 
-def cql_typename(casstypename):
+def cql_typename(casstypename, registry=None):
     """
     Translate a Cassandra-style type specifier (optionally-fully-distinguished
     Java class names for data types, along with optional parameters) into a
@@ -1064,4 +1085,5 @@ def cql_typename(casstypename):
         >>> cql_typename('org.apache.cassandra.db.marshal.ListType(IntegerType)')
         'list<varint>'
     """
-    return lookup_casstype(casstypename).cql_parameterized_type()
+    registry = registry or DefaultDriverContext().type_registry
+    return lookup_casstype(casstypename, registry=registry).cql_parameterized_type()

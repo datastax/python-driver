@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.registry import ProtocolVersionRegistry, MessageCodecRegistry
-from cassandra.protocol import ProtocolHandler
-
-__all__ = ['DriverContext']
+__all__ = ['DriverContext', 'DefaultDriverContext']
 
 
 class SingletonProvider(object):
@@ -47,16 +44,26 @@ class SingletonProvider(object):
 class DriverContext(object):
 
     _protocol_version_registry = None
+    _type_registry = None
     _message_codec_registry = None
     # the default protocol handler
     _protocol_handler = None
 
     def __init__(self):
-        self._protocol_version_registry = SingletonProvider(ProtocolVersionRegistry.factory)
+        # This file requires delayed imports because the DefaultDriverContext
+        # class is also imported from various components in the code.
+        from cassandra.protocol import ProtocolHandler
+        from cassandra import registry
+        self._protocol_version_registry = SingletonProvider(
+            registry.ProtocolVersionRegistry.factory)
+        self._type_registry = SingletonProvider(registry.CqlTypeRegistry.factory)
         self._message_codec_registry = SingletonProvider(
-            MessageCodecRegistry.factory,
-            self.protocol_version_registry)
+            registry.MessageCodecRegistry.factory, self)
         self._protocol_handler = SingletonProvider(ProtocolHandler, self)
+
+    @property
+    def type_registry(self):
+        return self._type_registry()
 
     @property
     def message_codec_registry(self):
@@ -69,3 +76,11 @@ class DriverContext(object):
     @property
     def protocol_version_registry(self):
         return self._protocol_version_registry()
+
+    @staticmethod
+    def factory():
+        return DriverContext()
+
+
+DefaultDriverContext = SingletonProvider(DriverContext.factory)
+"""Default DriverContext provider"""
