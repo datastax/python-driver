@@ -3948,11 +3948,15 @@ class ResponseFuture(object):
                 for (fn, args, kwargs) in self._callbacks
             )
 
-        self._event.set()
-
         # apply each callback
         for callback_partial in to_call:
             callback_partial()
+
+        # this should come after the callbacks are fired so that when mixing
+        # callbacks and .result() we know the callbacks are all done by the
+        # time .result() returns.
+        self._event.set()
+
 
     def _set_final_exception(self, response):
         self._cancel_timer()
@@ -3969,11 +3973,15 @@ class ResponseFuture(object):
                 partial(fn, response, *args, **kwargs)
                 for (fn, args, kwargs) in self._errbacks
             )
-        self._event.set()
 
         # apply each callback
         for callback_partial in to_call:
             callback_partial()
+
+        # this should come after the callbacks are fired so that when mixing
+        # callbacks and .result() we know the callbacks are all done by the
+        # time .result() returns.
+        self._event.set()
 
     def _retry(self, reuse_connection, consistency_level, host):
         if self._final_exception:
