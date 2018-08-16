@@ -19,15 +19,13 @@ except ImportError:
 
 from mock import Mock, MagicMock, ANY
 
-from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType
+from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType, ProtocolConstants
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable, ProtocolVersion
 from cassandra.connection import Connection, ConnectionException
 from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
                                 UnavailableErrorMessage, ResultMessage, QueryMessage,
                                 OverloadedErrorMessage, IsBootstrappingErrorMessage,
-                                PreparedQueryNotFound, PrepareMessage,
-                                RESULT_KIND_ROWS, RESULT_KIND_SET_KEYSPACE,
-                                RESULT_KIND_SCHEMA_CHANGE, RESULT_KIND_PREPARED)
+                                PreparedQueryNotFound, PrepareMessage)
 from cassandra.policies import RetryPolicy
 from cassandra.hosts import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
@@ -61,7 +59,7 @@ class ResponseFutureTests(unittest.TestCase):
         return ResponseFuture(session, message, query, 1)
 
     def make_mock_response(self, results):
-        return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=results, paging_state=None, col_types=None)
+        return Mock(spec=ResultMessage, kind=ProtocolConstants.ResultKind.ROWS, results=results, paging_state=None, col_types=None)
 
     def test_result_message(self):
         session = self.make_basic_session()
@@ -104,7 +102,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         result = Mock(spec=ResultMessage,
-                      kind=RESULT_KIND_SET_KEYSPACE,
+                      kind=ProtocolConstants.ResultKind.SET_KEYSPACE,
                       results="keyspace1")
         rf._set_result(None, None, None, result)
         rf._set_keyspace_completed({})
@@ -118,7 +116,7 @@ class ResponseFutureTests(unittest.TestCase):
         event_results={'target_type': SchemaTargetType.TABLE, 'change_type': SchemaChangeType.CREATED,
                        'keyspace': "keyspace1", "table": "table1"}
         result = Mock(spec=ResultMessage,
-                      kind=RESULT_KIND_SCHEMA_CHANGE,
+                      kind=ProtocolConstants.ResultKind.SCHEMA_CHANGE,
                       results=event_results)
         connection = Mock()
         rf._set_result(None, connection, None, result)
@@ -547,7 +545,7 @@ class ResponseFutureTests(unittest.TestCase):
         session = self.make_session()
         rf = self.make_response_future(session)
 
-        response = Mock(spec=ResultMessage, kind=RESULT_KIND_PREPARED)
+        response = Mock(spec=ResultMessage, kind=ProtocolConstants.ResultKind.PREPARED)
         response.results = (None, None, None, None, None)
 
         rf._query = Mock(return_value=True)

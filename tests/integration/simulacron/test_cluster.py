@@ -45,7 +45,7 @@ class ClusterTests(SimulacronCluster):
         with self.assertRaises(WriteTimeout) as assert_raised_context:
             self.session.execute(query_to_prime_simple)
         wt = assert_raised_context.exception
-        self.assertEqual(wt.write_type, WriteType.name_to_value[write_type])
+        self.assertEqual(wt.write_type, WriteType.UNLOGGED_BATCH)
         self.assertEqual(wt.consistency, ConsistencyLevel.name_to_value[consistency])
         self.assertEqual(wt.received_responses, received_responses)
         self.assertEqual(wt.required_responses, required_responses)

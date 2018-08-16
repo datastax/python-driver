@@ -99,7 +99,7 @@ python:
   - 3.6
 
 os:
-  - ubuntu/trusty64
+  - ubuntu/bionic64/python-driver
 
 cassandra:
   - '2.1'
@@ -123,8 +123,6 @@ build:
       pip install -U setuptools
 
       pip install git+https://github.com/pcmanus/ccm.git
-      # Install dependencies
-      sudo apt-get install -y libev4 libev-dev
 
       pip install -r test-requirements.txt
       pip install nose-ignore-docstring

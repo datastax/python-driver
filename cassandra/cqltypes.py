@@ -51,7 +51,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack, vints_pack, vints_unpack)
-from cassandra import util
+from cassandra import ProtocolConstants, util
 from cassandra.context import DefaultDriverContext
 
 
@@ -341,12 +341,12 @@ else:
 
 
 class CustomType(CassandraType):
-    type_code = 0x0000
+    type_code = ProtocolConstants.DataType.CUSTOM
 
 
 class BytesType(CassandraType):
     typename = 'blob'
-    type_code = 0x0003
+    type_code = ProtocolConstants.DataType.BLOB
     empty_binary_ok = True
 
     @staticmethod
@@ -356,7 +356,7 @@ class BytesType(CassandraType):
 
 class DecimalType(CassandraType):
     typename = 'decimal'
-    type_code = 0x0006
+    type_code = ProtocolConstants.DataType.DECIMAL
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -383,7 +383,7 @@ class DecimalType(CassandraType):
 
 class UUIDType(CassandraType):
     typename = 'uuid'
-    type_code = 0x000F
+    type_code = ProtocolConstants.DataType.UUID
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -399,7 +399,7 @@ class UUIDType(CassandraType):
 
 class BooleanType(CassandraType):
     typename = 'boolean'
-    type_code = 0x0004
+    type_code = ProtocolConstants.DataType.BOOLEAN
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -411,7 +411,7 @@ class BooleanType(CassandraType):
 
 class ByteType(CassandraType):
     typename = 'tinyint'
-    type_code = 0x0014
+    type_code = ProtocolConstants.DataType.TINYINT
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -425,12 +425,12 @@ class ByteType(CassandraType):
 if six.PY2:
     class AsciiType(CassandraType):
         typename = 'ascii'
-        type_code = 0x0001
+        type_code = ProtocolConstants.DataType.ASCII
         empty_binary_ok = True
 else:
     class AsciiType(CassandraType):
         typename = 'ascii'
-        type_code = 0x0001
+        type_code = ProtocolConstants.DataType.ASCII
         empty_binary_ok = True
 
         @staticmethod
@@ -447,7 +447,7 @@ else:
 
 class FloatType(CassandraType):
     typename = 'float'
-    type_code = 0x0008
+    type_code = ProtocolConstants.DataType.FLOAT
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -460,7 +460,7 @@ class FloatType(CassandraType):
 
 class DoubleType(CassandraType):
     typename = 'double'
-    type_code = 0x0007
+    type_code = ProtocolConstants.DataType.DOUBLE
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -473,7 +473,7 @@ class DoubleType(CassandraType):
 
 class LongType(CassandraType):
     typename = 'bigint'
-    type_code = 0x0002
+    type_code = ProtocolConstants.DataType.BIGINT
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -486,7 +486,7 @@ class LongType(CassandraType):
 
 class Int32Type(CassandraType):
     typename = 'int'
-    type_code = 0x0009
+    type_code = ProtocolConstants.DataType.INT
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -499,7 +499,7 @@ class Int32Type(CassandraType):
 
 class IntegerType(CassandraType):
     typename = 'varint'
-    type_code = 0x000E
+    type_code = ProtocolConstants.DataType.VARINT
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -512,7 +512,7 @@ class IntegerType(CassandraType):
 
 class InetAddressType(CassandraType):
     typename = 'inet'
-    type_code = 0x0010
+    type_code = ProtocolConstants.DataType.INET
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -540,7 +540,7 @@ class InetAddressType(CassandraType):
 
 class CounterColumnType(LongType):
     typename = 'counter'
-    type_code = 0x0005
+    type_code = ProtocolConstants.DataType.COUNTER
 
 cql_timestamp_formats = (
     '%Y-%m-%d %H:%M',
@@ -555,7 +555,7 @@ _have_warned_about_timestamps = False
 
 class DateType(CassandraType):
     typename = 'timestamp'
-    type_code = 0x000B
+    type_code = ProtocolConstants.DataType.TIMESTAMP
 
     @staticmethod
     def interpret_datestring(val):
@@ -603,7 +603,7 @@ class TimestampType(DateType):
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
-    type_code = 0x000C
+    type_code = ProtocolConstants.DataType.TIMEUUID
 
     def my_timestamp(self):
         return util.unix_time_from_uuid1(self.val)
@@ -622,7 +622,7 @@ class TimeUUIDType(DateType):
 
 class SimpleDateType(CassandraType):
     typename = 'date'
-    type_code = 0x0011
+    type_code = ProtocolConstants.DataType.DATE
     date_format = "%Y-%m-%d"
 
     # Values of the 'date'` type are encoded as 32-bit unsigned integers
@@ -651,7 +651,7 @@ class SimpleDateType(CassandraType):
 
 class ShortType(CassandraType):
     typename = 'smallint'
-    type_code = 0x0013
+    type_code = ProtocolConstants.DataType.SMALLINT
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -664,7 +664,7 @@ class ShortType(CassandraType):
 
 class TimeType(CassandraType):
     typename = 'time'
-    type_code = 0x0012
+    type_code = ProtocolConstants.DataType.TIME
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -681,7 +681,7 @@ class TimeType(CassandraType):
 
 class DurationType(CassandraType):
     typename = 'duration'
-    type_code = 0x0015
+    type_code = ProtocolConstants.DataType.DURATION
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -699,7 +699,7 @@ class DurationType(CassandraType):
 
 class UTF8Type(CassandraType):
     typename = 'text'
-    type_code = 0x000A
+    type_code = ProtocolConstants.DataType.TEXT
     empty_binary_ok = True
 
     @staticmethod
@@ -717,7 +717,7 @@ class UTF8Type(CassandraType):
 
 class VarcharType(UTF8Type):
     typename = 'varchar'
-    type_code = 0x000D
+    type_code = ProtocolConstants.DataType.VARCHAR
 
 
 class _ParameterizedType(CassandraType):
@@ -773,21 +773,21 @@ class _SimpleParameterizedType(_ParameterizedType):
 
 class ListType(_SimpleParameterizedType):
     typename = 'list'
-    type_code = 0x0020
+    type_code = ProtocolConstants.DataType.LIST
     num_subtypes = 1
     adapter = list
 
 
 class SetType(_SimpleParameterizedType):
     typename = 'set'
-    type_code = 0x0022
+    type_code = ProtocolConstants.DataType.SET
     num_subtypes = 1
     adapter = util.sortedset
 
 
 class MapType(_ParameterizedType):
     typename = 'map'
-    type_code = 0x0021
+    type_code = ProtocolConstants.DataType.MAP
     num_subtypes = 2
 
     @classmethod
@@ -834,7 +834,7 @@ class MapType(_ParameterizedType):
 
 class TupleType(_ParameterizedType):
     typename = 'tuple'
-    type_code = 0x0031
+    type_code = ProtocolConstants.DataType.TUPLE
 
     @classmethod
     def deserialize_safe(cls, byts, protocol_version):
@@ -886,7 +886,7 @@ class TupleType(_ParameterizedType):
 
 class UserType(TupleType):
     typename = "org.apache.cassandra.db.marshal.UserType"
-    type_code = 0x0030
+    type_code = ProtocolConstants.DataType.UDT
 
     _cache = {}
     _module = sys.modules[__name__]
