@@ -370,13 +370,13 @@ class Pipeline(object):
         self.statements = Queue()
 
         # track when all pending statements and futures have returned
-        self.completed_futures = Event()
+        self.completed_requests = Event()
 
         # track the number of in-flight futures and completed statements
         # always to be used with an in_flight_counter_lock
         self.in_flight_counter = 0
 
-        # ensure that self.completed_futures will never be set() between:
+        # ensure that self.completed_requests will never be set() between:
         # 1. emptying the self.statements
         # 2. creating the last future
         self.in_flight_counter_lock = Lock()
@@ -426,7 +426,7 @@ class Pipeline(object):
                 self.in_flight_counter -= 1
 
                 # if there are no more pending statements and all in-flight
-                # futures have returned set self.completed_futures to True
+                # futures have returned set self.completed_requests to True
                 if self.in_flight_counter < 1:
                     if self.statements.empty():
                         if self.in_flight_counter < 0:
@@ -434,7 +434,7 @@ class Pipeline(object):
                                                ' never have been less than 0.'
                                                ' The lock mechanism is not'
                                                ' working as expected!')
-                        self.completed_futures.set()
+                        self.completed_requests.set()
 
         # attempt to process the another request
         self._maximize_in_flight_requests()
@@ -481,7 +481,7 @@ class Pipeline(object):
             with self.in_flight_counter_lock:
                 args, kwargs = self.statements.get_nowait()
                 self.in_flight_counter += 1
-            self.completed_futures.clear()
+            self.completed_requests.clear()
         except Empty:
             # exit early if there are no more statements to process
             return
@@ -573,9 +573,9 @@ class Pipeline(object):
                 and self.statements.qsize() > self.max_unsent_write_requests:
             self.confirm()
 
-        # reset the self.completed_futures Event and block on self.confirm()
+        # reset the self.completed_requests Event and block on self.confirm()
         # until the new statement has been processed
-        self.completed_futures.clear()
+        self.completed_requests.clear()
 
         # add the new statement to the pending statements Queue
         self.statements.put((args, kwargs))
@@ -591,7 +591,7 @@ class Pipeline(object):
         # this Event() is set in __future_callback() if all sent requests have
         # returned and cleared each time execute() is called since another
         # statement is added to the `self.statements` Queue
-        self.completed_futures.wait()
+        self.completed_requests.wait()
 
 
 class WritePipeline(Pipeline):
@@ -930,7 +930,7 @@ class ReadPipeline(Pipeline):
                  iterators over the rows from a query result.
         :rtype: iter(cassandra.cluster.ResultSet)
         """
-        while not self.completed_futures.is_set():
+        while not self.completed_requests.is_set():
             future = self.futures.get()
 
             # always ensure that at least one future has been queued.
