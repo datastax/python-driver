@@ -750,13 +750,22 @@ class WritePipeline(Pipeline):
         """
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exception_type, exception_value, traceback):
         """
         Ensures all writes are confirmed when exiting with-blocks.
 
         Failure to confirm all pending requests may cause some requests not to
         be delivered to Cassandra.
         """
+        if exception_type:
+            log.error(
+                'Exception type seen within codeblock: %s' % exception_type)
+            log.error(
+                'Exception value seen within codeblock: %s' % exception_value)
+            log.error(
+                'Exception traceback seen within codeblock: %s' % traceback)
+            log.info('Attempting to confirm() all other pending writes.')
+
         self.confirm()
 
 
