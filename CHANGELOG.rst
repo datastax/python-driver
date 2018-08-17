@@ -1,5 +1,10 @@
 3.15.0
 ======
+
+Features
+--------
+* Parse Virtual Keyspace Metadata (PYTHON-992)
+
 Bug Fixes
 ---------
 * Tokenmap.get_replicas returns the wrong value if token coincides with the end of the range (PYTHON-978)
