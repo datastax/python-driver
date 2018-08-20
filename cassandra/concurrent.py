@@ -583,16 +583,6 @@ class Pipeline(object):
         # attempt to process the newest statement
         self._maximize_in_flight_requests()
 
-    def confirm(self):
-        """
-        Blocks until all pending statements and in-flight requests have
-        returned.
-        """
-        # this Event() is set in __future_callback() if all sent requests have
-        # returned and cleared each time execute() is called since another
-        # statement is added to the `self.statements` Queue
-        self.completed_requests.wait()
-
 
 class WritePipeline(Pipeline):
     """
@@ -768,6 +758,16 @@ class WritePipeline(Pipeline):
 
         self.confirm()
 
+    def confirm(self):
+        """
+        Blocks until all pending statements and in-flight requests have
+        returned.
+        """
+        # this Event() is set in __future_callback() if all sent requests have
+        # returned and cleared each time execute() is called since another
+        # statement is added to the `self.statements` Queue
+        self.completed_requests.wait()
+
 
 class ReadPipeline(Pipeline):
     """
@@ -917,19 +917,6 @@ class ReadPipeline(Pipeline):
                                            max_unconsumed_read_responses=max_unconsumed_read_responses,
                                            error_handler=error_handler,
                                            allow_non_performant_queries=allow_non_performant_queries)
-
-    def confirm(self):
-        """
-        This is not implemented the for the ``ReadPipeline`` since we do not
-        simply want to confirm our read requests, but we also want to consume
-        them.
-        """
-        # reads should always be returned to the user, not simply checked for
-        # communication exceptions
-        raise NotImplementedError('The ReadPipeline should never discard'
-                                  ' results. Instead, call .results() to'
-                                  ' consume returned results rather than just'
-                                  ' confirming that futures were returned.')
 
     def results(self):
         """
