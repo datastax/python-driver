@@ -793,7 +793,7 @@ class ReadPipeline(Pipeline):
     The result from :meth:`cassandra.concurrent.ReadPipeline.results()` is an
     iterator of :class:`cassandra.cluster.ResultSet` objects which in turn
     another iterator over the result's rows and the same type of object
-    returned when calling :meth:`cassandra.cluster.Session.execute()`. The
+    returned when calling :meth:`cassandra.cluster.Session.execute()`.
 
     The results from :meth:`cassandra.concurrent.ReadPipeline.results()` follow
     the same ordering as statements that went into
