@@ -797,7 +797,7 @@ class ReadPipeline(Pipeline):
 
     The results from :meth:`cassandra.concurrent.ReadPipeline.results()` follow
     the same ordering as statements that went into
-    :meth:`cassandra.concurrent.Pipeline.execute()` without no top-level
+    :meth:`cassandra.concurrent.Pipeline.execute()` without a top-level
     indication of the keyspace, table, nor query that was called that is not
     already accessible within the :class:`cassandra.cluster.ResultSet`.
 
