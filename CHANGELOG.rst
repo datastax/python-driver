@@ -1,5 +1,6 @@
 3.15.0
 ======
+August 29, 2018
 
 Features
 --------
@@ -10,6 +11,7 @@ Bug Fixes
 * Tokenmap.get_replicas returns the wrong value if token coincides with the end of the range (PYTHON-978)
 * Python Driver fails with "more than 255 arguments" python exception when > 255 columns specified in query response (PYTHON-893)
 * Hang in integration.standard.test_cluster.ClusterTests.test_set_keyspace_twice (PYTHON-998)
+* Asyncore reactors should use a global variable instead of a class variable for the event loop (PYTHON-697)
 
 Other
 -----
@@ -28,7 +30,6 @@ Features
 * Allow filter queries with fields that have an index managed outside of cqlengine (PYTHON-966)
 * Twisted SSL Support (PYTHON-343)
 * Support IS NOT NULL operator in cqlengine (PYTHON-968)
-* Asyncore reactors should use a global variable instead of a class variable for the event loop (PYTHON-697)
 
 Other
 -----
