@@ -106,6 +106,17 @@ class BatchQueryTests(BaseCassEngTestCase):
         for i in range(5):
             TestMultiKeyModel.get(partition=self.pkey, cluster=i)
 
+    def test_async_batch(self):
+        b = BatchQuery(execute_async=True)
+        TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=2, count=3, text='4')
+
+        with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+            TestMultiKeyModel.get(partition=self.pkey, cluster=2)
+
+        b.execute()
+
+        TestMultiKeyModel.get(partition=self.pkey, cluster=2)
+
     def test_bulk_delete_success_case(self):
 
         for i in range(1):

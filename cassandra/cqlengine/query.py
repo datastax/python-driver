@@ -111,7 +111,6 @@ class AbstractQueryableColumn(UnicodeMixin):
         """
         return WhereClause(six.text_type(self), ContainsOperator(), item)
 
-
     def __eq__(self, other):
         return WhereClause(six.text_type(self), EqualsOperator(), self._to_database(other))
 
@@ -148,9 +147,8 @@ class BatchQuery(object):
     _connection = None
     _connection_explicit = False
 
-
     def __init__(self, batch_type=None, timestamp=None, consistency=None, execute_on_exception=False,
-                 timeout=conn.NOT_SET, connection=None):
+                 timeout=conn.NOT_SET, connection=None, execute_async=False):
         """
         :param batch_type: (optional) One of batch type values available through BatchType enum
         :type batch_type: BatchType, str or None
@@ -168,6 +166,7 @@ class BatchQuery(object):
             to default session timeout
         :type timeout: float or None
         :param str connection: Connection name to use for the batch execution
+        :param execute_async: (Defaults to False) Indicates weather the execution command should be asynchronous
         """
         self.queries = []
         self.batch_type = batch_type
@@ -181,6 +180,7 @@ class BatchQuery(object):
         self._executed = False
         self._context_entered = False
         self._connection = connection
+        self._execute_async = execute_async
         if connection:
             self._connection_explicit = True
 
@@ -255,11 +255,17 @@ class BatchQuery(object):
 
         query_list.append('APPLY BATCH;')
 
-        tmp = conn.execute('\n'.join(query_list), parameters, self._consistency, self._timeout, connection=self._connection)
-        check_applied(tmp)
+        if self._execute_async:
+            future = conn.session.execute_async('\n'.join(query_list), parameters)
+            future.add_callbacks(self.get_on_success(self._execute_callbacks),
+                                 self.get_on_error(self._execute_callbacks))
+        else:
+            tmp = conn.execute('\n'.join(query_list), parameters, self._consistency, self._timeout,
+                               connection=self._connection)
+            check_applied(tmp)
+            self._execute_callbacks()
 
         self.queries = []
-        self._execute_callbacks()
 
     def __enter__(self):
         self._context_entered = True
@@ -270,6 +276,22 @@ class BatchQuery(object):
         if exc_type is not None and not self._execute_on_exception:
             return
         self.execute()
+
+    @staticmethod
+    def get_on_success(func):
+        def handle(*args, **kwargs):
+            check_applied(*args, **kwargs)
+            func()
+
+        return handle
+
+    @staticmethod
+    def get_on_error(func):
+        def handle(exception):
+            warn(exception)
+            func()
+
+        return handle
 
 
 class ContextQuery(object):
