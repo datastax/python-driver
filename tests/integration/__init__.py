@@ -351,11 +351,14 @@ def is_current_cluster(cluster_name, node_counts):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
-                configuration_options={}, dse_cluster=False, dse_options={}):
+                configuration_options={}, dse_cluster=False, dse_options={},
+                dse_version=None):
+    if (dse_version and not dse_cluster):
+        raise ValueError('specified dse_version {} but not dse_cluster'.format(dse_version))
     set_default_cass_ip()
 
     if ccm_options is None and dse_cluster:
-        ccm_options = {"version": DSE_VERSION}
+        ccm_options = {"version": dse_version or DSE_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
 

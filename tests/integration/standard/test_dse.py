@@ -12,25 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
+from packaging.version import Version
+
+from cassandra.cluster import Cluster
+from tests import notwindows
+from tests.integration import (execute_until_pass,
+                               execute_with_long_wait_retry, use_cluster)
+
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
 
-from cassandra.cluster import Cluster
-from tests import is_windows, notwindows
-from tests.integration import (CLUSTER_NAME, PROTOCOL_VERSION,
-                               execute_until_pass,
-                               execute_with_long_wait_retry, use_cluster)
-
-
-def setup_module():
-    if is_windows():
-        return
-    use_cluster(CLUSTER_NAME, [3], dse_cluster=True, dse_options={})
-
-
+@unittest.skipIf(os.environ.get('CCM_ARGS', None), 'environment has custom CCM_ARGS; skipping')
 @notwindows
 class DseCCMClusterTest(unittest.TestCase):
     """
@@ -39,12 +36,23 @@ class DseCCMClusterTest(unittest.TestCase):
     If CASSANDRA_VERSION is set instead, it will be converted to the corresponding DSE_VERSION
     """
 
-    def test_basic(self):
+    def test_dse_5x(self):
+        self._test_basic(Version('5.1.10'))
+
+    def test_dse_60(self):
+        self._test_basic(Version('6.0.2'))
+
+    def _test_basic(self, dse_version):
         """
         Test basic connection and usage
         """
+        cluster_name = '{}-{}'.format(
+            self.__class__.__name__, dse_version.base_version.replace('.', '_')
+        )
+        use_cluster(cluster_name=cluster_name, nodes=[3],
+                    dse_cluster=True, dse_options={}, dse_version=dse_version)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster()
         session = cluster.connect()
         result = execute_until_pass(
             session,
