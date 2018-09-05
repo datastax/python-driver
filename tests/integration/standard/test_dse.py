@@ -19,9 +19,10 @@ except ImportError:
 
 
 from cassandra.cluster import Cluster
-from tests import notwindows, is_windows
-from tests.integration import use_cluster, CLUSTER_NAME, PROTOCOL_VERSION, execute_until_pass, \
-    execute_with_long_wait_retry
+from tests import is_windows, notwindows
+from tests.integration import (CLUSTER_NAME, PROTOCOL_VERSION,
+                               execute_until_pass,
+                               execute_with_long_wait_retry, use_cluster)
 
 
 def setup_module():
@@ -45,14 +46,16 @@ class DseCCMClusterTest(unittest.TestCase):
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION)
         session = cluster.connect()
-        result = execute_until_pass(session,
+        result = execute_until_pass(
+            session,
             """
             CREATE KEYSPACE clustertests
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
         self.assertFalse(result)
 
-        result = execute_with_long_wait_retry(session,
+        result = execute_with_long_wait_retry(
+            session,
             """
             CREATE TABLE clustertests.cf0 (
                 a text,
