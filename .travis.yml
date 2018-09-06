@@ -7,10 +7,10 @@ python:
   - "pypy-5.4.1"
 
 sudo: false
-env:
-  - CASS_DRIVER_NO_CYTHON=1
 
 addons:
+  artifacts:
+    working_dir: dist
   apt:
     packages:
     - build-essential
@@ -32,6 +32,10 @@ script:
       echo "This PR includes code changes, but no CHANGELOG changes. Please include a CHANGELOG entry."
       exit 1
     fi
-  - tox
-  - tox -e gevent_loop
-  - tox -e eventlet_loop
+  - CASS_DRIVER_NO_CYTHON=1 tox
+  - CASS_DRIVER_NO_CYTHON=1 tox -e gevent_loop
+  - CASS_DRIVER_NO_CYTHON=1 tox -e eventlet_loop
+  - |
+    if [ "${TRAVIS_BRANCH}" = "master" ]; then
+      python setup.py bdist_wheel
+    fi
