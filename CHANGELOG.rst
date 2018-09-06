@@ -1,3 +1,11 @@
+3.15.1
+======
+September 6, 2018
+
+Bug Fixes
+---------
+* C* 4.0 schema-parsing logic breaks running against DSE 6.0.X (PYTHON-1018)
+
 3.15.0
 ======
 August 30, 2018

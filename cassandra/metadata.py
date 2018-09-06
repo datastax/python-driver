@@ -2720,7 +2720,9 @@ class MaterializedViewMetadata(object):
 
 def get_schema_parser(connection, server_version, timeout):
     server_major_version = int(server_version.split('.')[0])
-    if server_major_version >= 4:
+    # check for DSE version
+    has_build_version = len(server_version.split('.')) > 3
+    if server_major_version >= 4 and not has_build_version:
         return SchemaParserV4(connection, timeout)
     if server_major_version >= 3:
         return SchemaParserV3(connection, timeout)
