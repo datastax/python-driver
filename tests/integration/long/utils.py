@@ -124,6 +124,7 @@ def bootstrap(node, data_center=None, token=None):
             start(node)
         except:
             log.error('Added node failed to start twice.')
+            raise e1
 
 
 def ring(node):
