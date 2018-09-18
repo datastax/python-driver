@@ -549,7 +549,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._check_query_order_changes(session=session, keyspace=keyspace)
 
-        #check TokenAwarePolicy still return the remaining replicas when one goes down
+        # check TokenAwarePolicy still return the remaining replicas when one goes down
         self.coordinator_stats.reset_counts()
         stop(2)
         self._wait_for_nodes_down([2], cluster)
