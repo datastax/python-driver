@@ -17,8 +17,9 @@ import logging
 import time
 
 from collections import defaultdict
-from ccmlib.node import Node
+from ccmlib.node import Node, ToolError
 
+from nose.tools import assert_in
 from cassandra.query import named_tuple_factory
 from cassandra.cluster import ConsistencyLevel
 
@@ -101,7 +102,17 @@ def force_stop(node):
 
 
 def decommission(node):
-    get_node(node).decommission()
+    try:
+        get_node(node).decommission()
+    except ToolError as e:
+        expected_errs = (('Not enough live nodes to maintain replication '
+                          'factor in keyspace system_distributed'),
+                         'Perform a forceful decommission to ignore.')
+        for err in expected_errs:
+            assert_in(err, e.stdout)
+        # in this case, we're running against a C* version with CASSANDRA-12510
+        # applied and need to decommission with `--force`
+        get_node(node).decommission(force=True)
     get_node(node).stop()
 
 
