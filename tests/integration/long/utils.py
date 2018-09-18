@@ -35,6 +35,7 @@ class CoordinatorStats():
         self.coordinator_counts = defaultdict(int)
 
     def add_coordinator(self, future):
+        log.debug('adding coordinator from {}'.format(future))
         future.result()
         coordinator = future._current_host.address
         self.coordinator_counts[coordinator] += 1
@@ -105,6 +106,9 @@ def decommission(node):
 
 
 def bootstrap(node, data_center=None, token=None):
+    log.debug('called bootstrap('
+              'node={node}, data_center={data_center}, '
+              'token={token})')
     node_instance = Node('node%s' % node,
                          get_cluster(),
                          auto_bootstrap=False,
@@ -118,11 +122,13 @@ def bootstrap(node, data_center=None, token=None):
 
     try:
         start(node)
-    except:
+    except Exception as e0:
+        log.debug('failed 1st bootstrap attempt with: \n{}'.format(e0))
         # Try only twice
         try:
             start(node)
-        except:
+        except Exception as e1:
+            log.debug('failed 2nd bootstrap attempt with: \n{}'.format(e1))
             log.error('Added node failed to start twice.')
             raise e1
 
@@ -141,7 +147,7 @@ def wait_for_up(cluster, node):
             log.debug("Done waiting for node %s to be up", node)
             return
         else:
-            log.debug("Host is still marked down, waiting")
+            log.debug("Host {} is still marked down, waiting".format(addr))
             tries += 1
             time.sleep(1)
 

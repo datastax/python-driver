@@ -65,13 +65,20 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.probe_session = self.probe_cluster.connect()
 
     def _wait_for_nodes_up(self, nodes, cluster=None):
+        log.debug('entered: _wait_for_nodes_up(nodes={ns}, '
+                  'cluster={cs})'.format(ns=nodes,
+                                         cs=cluster))
         if not cluster:
+            log.debug('connecting to cluster')
             self._connect_probe_cluster()
             cluster = self.probe_cluster
         for n in nodes:
             wait_for_up(cluster, n)
 
     def _wait_for_nodes_down(self, nodes, cluster=None):
+        log.debug('entered: _wait_for_nodes_down(nodes={ns}, '
+                  'cluster={cs})'.format(ns=nodes,
+                                         cs=cluster))
         if not cluster:
             self._connect_probe_cluster()
             cluster = self.probe_cluster
@@ -87,6 +94,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
     def _insert(self, session, keyspace, count=12,
                 consistency_level=ConsistencyLevel.ONE):
+        log.debug('entered _insert('
+                  'session={session}, keyspace={keyspace}, '
+                  'count={count}, consistency_level={consistency_level}'
+                  ')'.format(session=session, keyspace=keyspace, count=count,
+                             consistency_level=consistency_level))
         session.execute('USE %s' % keyspace)
         ss = SimpleStatement('INSERT INTO cf(k, i) VALUES (0, 0)', consistency_level=consistency_level)
 
@@ -94,6 +106,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         while tries < 100:
             try:
                 execute_concurrent_with_args(session, ss, [None] * count)
+                log.debug('Completed _insert on try #{}'.format(tries + 1))
                 return
             except (OperationTimedOut, WriteTimeout, WriteFailure):
                 ex_type, ex, tb = sys.exc_info()
@@ -105,6 +118,13 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
     def _query(self, session, keyspace, count=12,
                consistency_level=ConsistencyLevel.ONE, use_prepared=False):
+        log.debug('entered _query('
+                  'session={session}, keyspace={keyspace}, '
+                  'count={count}, consistency_level={consistency_level}, '
+                  'use_prepared={use_prepared}'
+                  ')'.format(session=session, keyspace=keyspace, count=count,
+                             consistency_level=consistency_level,
+                             use_prepared=use_prepared))
         if use_prepared:
             query_string = 'SELECT * FROM %s.cf WHERE k = ?' % keyspace
             if not self.prepared or self.prepared.query_string != query_string:
