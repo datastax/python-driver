@@ -42,6 +42,9 @@ class DseCCMClusterTest(unittest.TestCase):
     def test_dse_60(self):
         self._test_basic(Version('6.0.2'))
 
+    def test_dse_67(self):
+        self._test_basic(Version('6.7.0'))
+
     def _test_basic(self, dse_version):
         """
         Test basic connection and usage

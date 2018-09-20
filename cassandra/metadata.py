@@ -2531,12 +2531,27 @@ class SchemaParserV4(SchemaParserV3):
         self.indexes_result = self._handle_results(indexes_success, indexes_result)
         self.views_result = self._handle_results(views_success, views_result)
         # V4-only results
-        self.virtual_keyspaces_result = self._handle_results(virtual_ks_success,
-                                                             virtual_ks_result)
-        self.virtual_tables_result = self._handle_results(virtual_table_success,
-                                                          virtual_table_result)
-        self.virtual_columns_result = self._handle_results(virtual_column_success,
-                                                           virtual_column_result)
+        # These tables don't exist in some DSE versions reporting 4.X so we can
+        # ignore them if we got an error
+        if isinstance(virtual_ks_result, InvalidRequest):
+            self.virtual_keyspaces_result = []
+        else:
+            self.virtual_keyspaces_result = self._handle_results(
+                virtual_ks_success, virtual_ks_result
+            )
+        if isinstance(virtual_table_result, InvalidRequest):
+            self.virtual_tables_result = []
+        else:
+            self.virtual_tables_result = self._handle_results(
+                virtual_table_success, virtual_table_result
+            )
+        if isinstance(virtual_column_result, InvalidRequest):
+            self.virtual_columns_result = []
+        else:
+            self.virtual_columns_result = self._handle_results(
+                virtual_column_success, virtual_column_result
+            )
+
         self._aggregate_results()
 
     def _aggregate_results(self):
@@ -2722,9 +2737,7 @@ class MaterializedViewMetadata(object):
 
 def get_schema_parser(connection, server_version, timeout):
     server_major_version = int(server_version.split('.')[0])
-    # check for DSE version
-    has_build_version = len(server_version.split('.')) > 3
-    if server_major_version >= 4 and not has_build_version:
+    if server_major_version >= 4:
         return SchemaParserV4(connection, timeout)
     if server_major_version >= 3:
         return SchemaParserV3(connection, timeout)
