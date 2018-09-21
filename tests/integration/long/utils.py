@@ -17,8 +17,9 @@ import logging
 import time
 
 from collections import defaultdict
-from ccmlib.node import Node
+from ccmlib.node import Node, ToolError
 
+from nose.tools import assert_in
 from cassandra.query import named_tuple_factory
 from cassandra.cluster import ConsistencyLevel
 
@@ -35,6 +36,7 @@ class CoordinatorStats():
         self.coordinator_counts = defaultdict(int)
 
     def add_coordinator(self, future):
+        log.debug('adding coordinator from {}'.format(future))
         future.result()
         coordinator = future._current_host.address
         self.coordinator_counts[coordinator] += 1
@@ -100,11 +102,24 @@ def force_stop(node):
 
 
 def decommission(node):
-    get_node(node).decommission()
+    try:
+        get_node(node).decommission()
+    except ToolError as e:
+        expected_errs = (('Not enough live nodes to maintain replication '
+                          'factor in keyspace system_distributed'),
+                         'Perform a forceful decommission to ignore.')
+        for err in expected_errs:
+            assert_in(err, e.stdout)
+        # in this case, we're running against a C* version with CASSANDRA-12510
+        # applied and need to decommission with `--force`
+        get_node(node).decommission(force=True)
     get_node(node).stop()
 
 
 def bootstrap(node, data_center=None, token=None):
+    log.debug('called bootstrap('
+              'node={node}, data_center={data_center}, '
+              'token={token})')
     node_instance = Node('node%s' % node,
                          get_cluster(),
                          auto_bootstrap=False,
@@ -118,12 +133,15 @@ def bootstrap(node, data_center=None, token=None):
 
     try:
         start(node)
-    except:
+    except Exception as e0:
+        log.debug('failed 1st bootstrap attempt with: \n{}'.format(e0))
         # Try only twice
         try:
             start(node)
-        except:
+        except Exception as e1:
+            log.debug('failed 2nd bootstrap attempt with: \n{}'.format(e1))
             log.error('Added node failed to start twice.')
+            raise e1
 
 
 def ring(node):
@@ -140,7 +158,7 @@ def wait_for_up(cluster, node):
             log.debug("Done waiting for node %s to be up", node)
             return
         else:
-            log.debug("Host is still marked down, waiting")
+            log.debug("Host {} is still marked down, waiting".format(addr))
             tries += 1
             time.sleep(1)
 

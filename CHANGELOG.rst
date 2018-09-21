@@ -1,3 +1,10 @@
+3.15.2
+======
+
+Other
+-----
+* Fix tests when RF is not maintained if we decomission a node (PYTHON-1017)
+
 3.15.1
 ======
 September 6, 2018
