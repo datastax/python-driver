@@ -158,4 +158,12 @@ class SchemaTests(unittest.TestCase):
     def check_and_wait_for_agreement(self, session, rs, exepected):
         self.assertEqual(rs.response_future.is_schema_agreed, exepected)
         if not rs.response_future.is_schema_agreed:
-            session.cluster.control_connection.wait_for_schema_agreement(wait_time=1000)
+            cc = session.cluster.control_connection
+            agreed = cc.wait_for_schema_agreement(wait_time=1000)
+            self.assertTrue(
+                agreed,
+                ('schema {agreed_or_not} as expected at checking time, but '
+                 'then schemas did not agree; cannot continue test'.format(
+                     agreed_or_not=('agreed' if exepected else 'did not agree')
+                 ))
+            )
