@@ -224,12 +224,15 @@ class Encoder(object):
         """
         return '{%s}' % ', '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
 
-    def cql_encode_all_types(self, val):
+    def cql_encode_all_types(self, val, as_text_type=False):
         """
         Converts any type into a CQL string, defaulting to ``cql_encode_object``
         if :attr:`~Encoder.mapping` does not contain an entry for the type.
         """
-        return self.mapping.get(type(val), self.cql_encode_object)(val)
+        encoded = self.mapping.get(type(val), self.cql_encode_object)(val)
+        if as_text_type and not isinstance(encoded, six.text_type):
+            return encoded.decode('utf-8')
+        return encoded
 
     if six.PY3:
         def cql_encode_ipaddress(self, val):
