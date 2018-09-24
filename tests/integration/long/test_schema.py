@@ -142,7 +142,7 @@ class SchemaTests(unittest.TestCase):
         rs = session.execute("DROP KEYSPACE test_schema_disagreement")
         self.check_and_wait_for_agreement(session, rs, False)
         cluster.shutdown()
-        
+
         # These should have schema agreement
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=100)
         session = cluster.connect()
