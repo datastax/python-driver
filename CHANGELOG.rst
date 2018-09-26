@@ -1,3 +1,12 @@
+3.18.1
+======
+NOT RELEASED
+
+Other
+-----
+
+* Avoid deprecation warnings when using Python 3.7 (PYTHON-1023)
+
 3.18.0
 ======
 May 27, 2019
@@ -46,16 +55,7 @@ Bug Fixes
 Other
 -----
 * Fail faster on incorrect lz4 import (PYTHON-1042)
-* Bump Cython dependency version to 0.29 (PYTHON-1036)
-* Expand Driver SSL Documentation (PYTHON-740)
 
-Deprecations
-------------
-
-* Using Cluster.ssl_options to enable SSL is deprecated and will be removed in
-  the next major release, use ssl_context.
-* DowngradingConsistencyRetryPolicy is deprecated and will be
-  removed in the next major release. (PYTHON-937)
 
 3.16.0
 ======

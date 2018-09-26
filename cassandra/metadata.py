@@ -14,7 +14,7 @@
 
 from binascii import unhexlify
 from bisect import bisect_left
-from collections import defaultdict, Mapping
+from collections import defaultdict
 from functools import total_ordering
 from hashlib import md5
 from itertools import islice, cycle
@@ -27,6 +27,11 @@ import sys
 from threading import RLock
 import struct
 import random
+
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping
 
 murmur3 = None
 try:

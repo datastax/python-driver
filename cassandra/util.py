@@ -713,7 +713,10 @@ class SortedSet(object):
 sortedset = SortedSet  # backwards-compatibility
 
 
-from collections import Mapping
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping
 from six.moves import cPickle
 
 

@@ -19,7 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
-from collections import defaultdict, Mapping
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
 from functools import partial, wraps
@@ -33,6 +33,11 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
+
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping
 
 import weakref
 from weakref import WeakValueDictionary
