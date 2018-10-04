@@ -18,6 +18,7 @@ from packaging.version import Version
 
 from cassandra.cluster import Cluster
 from tests import notwindows
+from tests.unit.cython.utils import notcython
 from tests.integration import (execute_until_pass,
                                execute_with_long_wait_retry, use_cluster)
 
@@ -27,8 +28,12 @@ except ImportError:
     import unittest  # noqa
 
 
+CCM_IS_DSE = (os.environ.get('CCM_IS_DSE', None) == 'true')
+
+
 @unittest.skipIf(os.environ.get('CCM_ARGS', None), 'environment has custom CCM_ARGS; skipping')
 @notwindows
+@notcython  # no need to double up on this test; also __default__ setting doesn't work
 class DseCCMClusterTest(unittest.TestCase):
     """
     This class can be executed setting the DSE_VERSION variable, for example:
@@ -42,6 +47,7 @@ class DseCCMClusterTest(unittest.TestCase):
     def test_dse_60(self):
         self._test_basic(Version('6.0.2'))
 
+    @unittest.skipUnless(CCM_IS_DSE, 'DSE version unavailable')
     def test_dse_67(self):
         self._test_basic(Version('6.7.0'))
 
@@ -55,7 +61,8 @@ class DseCCMClusterTest(unittest.TestCase):
         use_cluster(cluster_name=cluster_name, nodes=[3],
                     dse_cluster=True, dse_options={}, dse_version=dse_version)
 
-        cluster = Cluster()
+        cluster = Cluster(
+            allow_beta_protocol_version=(dse_version >= Version('6.7.0')))
         session = cluster.connect()
         result = execute_until_pass(
             session,
