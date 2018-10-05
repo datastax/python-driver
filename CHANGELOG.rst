@@ -1,6 +1,10 @@
 3.15.2
 ======
 
+Bug Fixes
+---------
+* Improve and fix socket error-catching code in nonblocking-socket reactors (PYTHON-1024)
+
 Other
 -----
 * Fix tests when RF is not maintained if we decomission a node (PYTHON-1017)

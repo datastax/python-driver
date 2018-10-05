@@ -424,10 +424,14 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                     break
         except socket.error as err:
             if ssl and isinstance(err, ssl.SSLError):
-                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                if err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                    return
+                else:
                     self.defunct(err)
                     return
-            elif err.args[0] not in NONBLOCKING:
+            elif err.args[0] in NONBLOCKING:
+                return
+            else:
                 self.defunct(err)
                 return
 

@@ -284,7 +284,6 @@ class ReactorTestMixin(object):
 
         self.get_socket(c).recv.side_effect = side_effect
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._current_frame.end_pos, 20000 + len(header))
         # the EAGAIN prevents it from reading the last 100 bytes
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
