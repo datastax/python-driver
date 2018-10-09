@@ -25,9 +25,11 @@ from six import binary_type, BytesIO
 from mock import Mock
 
 import errno
+import logging
 import math
 import os
 from socket import error as socket_error
+import ssl
 
 try:
     import unittest2 as unittest
@@ -35,6 +37,9 @@ except ImportError:
     import unittest # noqa
 
 import time
+
+
+log = logging.getLogger(__name__)
 
 
 class TimerCallback(object):
@@ -247,18 +252,31 @@ class ReactorTestMixin(object):
         return c
 
     def test_eagain_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(errno.EAGAIN)
+
+    def test_ewouldblock_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(errno.EWOULDBLOCK)
+
+    def test_sslwantread_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(ssl.SSL_ERROR_WANT_READ)
+
+    def test_sslwantwrite_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(ssl.SSL_ERROR_WANT_WRITE)
+
+    def _check_error_recovery_on_buffer_size(self, error_code):
         c = self.test_successful_connection()
 
         header = six.b('\x00\x00\x00\x00') + int32_pack(20000)
         responses = [
             header + (six.b('a') * (4096 - len(header))),
             six.b('a') * 4096,
-            socket_error(errno.EAGAIN),
+            socket_error(error_code),
             six.b('a') * 100,
-            socket_error(errno.EAGAIN)]
+            socket_error(error_code)]
 
         def side_effect(*args):
             response = responses.pop(0)
+            log.debug('about to mock return {}'.format(response))
             if isinstance(response, socket_error):
                 raise response
             else:
@@ -266,7 +284,6 @@ class ReactorTestMixin(object):
 
         self.get_socket(c).recv.side_effect = side_effect
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._current_frame.end_pos, 20000 + len(header))
         # the EAGAIN prevents it from reading the last 100 bytes
         c._iobuf.seek(0, os.SEEK_END)
         pos = c._iobuf.tell()
