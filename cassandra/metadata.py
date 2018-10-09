@@ -1435,7 +1435,11 @@ class IndexMetadata(object):
                 index_target,
                 class_name)
             if options:
-                ret += " WITH OPTIONS = %s" % Encoder().cql_encode_all_types(options)
+                opts_cql_encoded = Encoder().cql_encode_all_types(options)
+                # PYTHON-1008
+                if isinstance(opts_cql_encoded, six.binary_type):
+                    opts_cql_encoded = opts_cql_encoded.decode('utf-8')
+                ret += " WITH OPTIONS = %s" % opts_cql_encoded
             return ret
 
     def export_as_string(self):
