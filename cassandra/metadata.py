@@ -1435,7 +1435,9 @@ class IndexMetadata(object):
                 index_target,
                 class_name)
             if options:
-                ret += " WITH OPTIONS = %s" % Encoder().cql_encode_all_types(options)
+                # PYTHON-1008: `ret` will always be a unicode
+                opts_cql_encoded = _encoder.cql_encode_all_types(options, as_text_type=True)
+                ret += " WITH OPTIONS = %s" % opts_cql_encoded
             return ret
 
     def export_as_string(self):

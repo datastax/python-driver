@@ -4,6 +4,7 @@
 Bug Fixes
 ---------
 * Improve and fix socket error-catching code in nonblocking-socket reactors (PYTHON-1024)
+* Non-ASCII characters in schema break CQL string generation (PYTHON-1008)
 
 Other
 -----
