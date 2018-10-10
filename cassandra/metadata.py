@@ -1667,8 +1667,30 @@ class _SchemaParser(object):
         self.connection = connection
         self.timeout = timeout
 
-    def _handle_results(self, success, result):
-        if success:
+    def _handle_results(self, success, result, expected_failures=tuple()):
+        """
+        Given a bool and a ResultSet (the form returned per result from
+        Connection.wait_for_responses), return a dictionary containing the
+        results. Used to process results from asynchronous queries to system
+        tables.
+
+        ``expected_failures`` will usually be used to allow callers to ignore
+        ``InvalidRequest`` errors caused by a missing system keyspace. For
+        example, some DSE versions report a 4.X server version, but do not have
+        virtual tables. Thus, running against 4.X servers, SchemaParserV4 uses
+        expected_failures to make a best-effort attempt to read those
+        keyspaces, but treat them as empty if they're not found.
+
+        :param success: A boolean representing whether or not the query
+        succeeded
+        :param result: The resultset in question.
+        :expected_failures: An Exception class or an iterable thereof. If the
+        query failed, but raised an instance of an expected failure class, this
+        will ignore the failure and return an empty list.
+        """
+        if not success and isinstance(result, expected_failures):
+            return []
+        elif success:
             return dict_factory(*result.results) if result else []
         else:
             raise result
@@ -1784,11 +1806,9 @@ class SchemaParserV22(_SchemaParser):
         table_result = self._handle_results(cf_success, cf_result)
         col_result = self._handle_results(col_success, col_result)
 
-        # handle the triggers table not existing in Cassandra 1.2
-        if not triggers_success and isinstance(triggers_result, InvalidRequest):
-            triggers_result = []
-        else:
-            triggers_result = self._handle_results(triggers_success, triggers_result)
+        # the triggers table doesn't exist in C* 1.2
+        triggers_result = self._handle_results(triggers_success, triggers_result,
+                                               expected_failures=InvalidRequest)
 
         if table_result:
             return self._build_table_metadata(table_result[0], col_result, triggers_result)
@@ -2531,12 +2551,21 @@ class SchemaParserV4(SchemaParserV3):
         self.indexes_result = self._handle_results(indexes_success, indexes_result)
         self.views_result = self._handle_results(views_success, views_result)
         # V4-only results
-        self.virtual_keyspaces_result = self._handle_results(virtual_ks_success,
-                                                             virtual_ks_result)
-        self.virtual_tables_result = self._handle_results(virtual_table_success,
-                                                          virtual_table_result)
-        self.virtual_columns_result = self._handle_results(virtual_column_success,
-                                                           virtual_column_result)
+        # These tables don't exist in some DSE versions reporting 4.X so we can
+        # ignore them if we got an error
+        self.virtual_keyspaces_result = self._handle_results(
+            virtual_ks_success, virtual_ks_result,
+            expected_failures=InvalidRequest
+        )
+        self.virtual_tables_result = self._handle_results(
+            virtual_table_success, virtual_table_result,
+            expected_failures=InvalidRequest
+        )
+        self.virtual_columns_result = self._handle_results(
+            virtual_column_success, virtual_column_result,
+            expected_failures=InvalidRequest
+        )
+
         self._aggregate_results()
 
     def _aggregate_results(self):
@@ -2722,9 +2751,7 @@ class MaterializedViewMetadata(object):
 
 def get_schema_parser(connection, server_version, timeout):
     server_major_version = int(server_version.split('.')[0])
-    # check for DSE version
-    has_build_version = len(server_version.split('.')) > 3
-    if server_major_version >= 4 and not has_build_version:
+    if server_major_version >= 4:
         return SchemaParserV4(connection, timeout)
     if server_major_version >= 3:
         return SchemaParserV3(connection, timeout)

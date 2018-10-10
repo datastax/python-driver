@@ -118,6 +118,7 @@ cassandra:
   - '3.0'
   - '3.11'
   - 'test-dse'
+  - 'dse-6.7'
 
 env:
   CYTHON:
@@ -159,6 +160,13 @@ build:
         exit 0
       fi
 
+      if [[ $CCM_IS_DSE == 'true' ]]; then
+        # We only use a DSE version for unreleased DSE versions, so we only need to run the smoke tests here
+        echo "CCM_IS_DSE: $CCM_IS_DSE"
+        echo "==========RUNNING SMOKE TESTS==========="
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION DSE_VERSION='6.7.0' MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/test_dse.py || true
+        exit 0
+      fi
 
       # Run the unit tests, this is not done in travis because
       # it takes too much time for the whole matrix to build with cython
