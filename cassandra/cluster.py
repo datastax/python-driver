@@ -4244,7 +4244,14 @@ class ResultSet(object):
         you know a query returns a single row. Consider using an iterator if the
         ResultSet contains more than one row.
         """
-        return self._current_rows[0] if self._current_rows else None
+        row = None
+        if self._current_rows:
+            try:
+                row = self._current_rows[0]
+            except TypeError:  # generator object is not subscriptable, PYTHON-1026
+                row = next(iter(self._current_rows))
+
+        return row
 
     def __iter__(self):
         if self._list_mode:
