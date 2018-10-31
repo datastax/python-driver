@@ -11,6 +11,6 @@ pure-sasl
 twisted[tls]
 gevent>=1.0
 eventlet
-cython>=0.20,<0.29
+cython>=0.20,<0.30
 packaging
 asynctest; python_version > '3.4'
