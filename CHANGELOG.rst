@@ -1,3 +1,8 @@
+
+Others
+------
+* Bump Cython dependency version to 0.29
+
 3.15.2
 ======
 
