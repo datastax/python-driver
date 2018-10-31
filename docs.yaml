@@ -1,6 +1,7 @@
 title: DataStax Python Driver for Apache Cassandra
 summary: DataStax Python Driver for Apache Cassandra Documentation
 output: docs/_build/
+swiftype_drivers: pythondrivers
 checks:
   external_links:
     exclude:
