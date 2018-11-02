@@ -1058,7 +1058,7 @@ class Cluster(object):
         if self._config_mode == _ConfigMode.LEGACY:
             raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly.")
         if name in self.profile_manager.profiles:
-            raise ValueError("Profile %s already exists")
+            raise ValueError("Profile {} already exists".format(name))
         contact_points_but_no_lbp = (
             self._contact_points_explicit and not
             profile._load_balancing_policy_explicit)
