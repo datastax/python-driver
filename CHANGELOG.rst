@@ -6,6 +6,7 @@ Bug Fixes
 * Improve and fix socket error-catching code in nonblocking-socket reactors (PYTHON-1024)
 * Non-ASCII characters in schema break CQL string generation (PYTHON-1008)
 * Fix OSS driver's virtual table support against DSE 6.0.X and future server releases (PYTHON-1020)
+* ResultSet.one() fails if the row_factory is using a generator (PYTHON-1026)
 
 Other
 -----

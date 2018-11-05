@@ -181,6 +181,32 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         self.assertEqual(result[1]['k'], result[1]['v'])
         self.assertEqual(result[1]['k'], 2)
 
+    def test_generator_row_factory(self):
+        """
+        Test that ResultSet.one() works with a row_factory that contains a generator.
+
+        @since 3.16
+        @jira_ticket PYTHON-1026
+        @expected_result one() returns the first row
+
+        @test_category queries
+        """
+        def generator_row_factory(column_names, rows):
+            return _gen_row_factory(rows)
+
+        def _gen_row_factory(rows):
+            for r in rows:
+                yield r
+
+        session = self.session
+        session.row_factory = generator_row_factory
+
+        session.execute(self.insert1)
+        result = session.execute(self.select)
+        self.assertIsInstance(result, ResultSet)
+        first_row = result.one()
+        self.assertEqual(first_row[0], first_row[1])
+
 
 class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
