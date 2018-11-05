@@ -9,6 +9,7 @@ Bug Fixes
 * Fix OSS driver's virtual table support against DSE 6.0.X and future server releases (PYTHON-1020)
 * ResultSet.one() fails if the row_factory is using a generator (PYTHON-1026)
 * Log profile name on attempt to create existing profile (PYTHON-944)
+* Cluster instantiation fails if any contact points' hostname resolution fails (PYTHON-895)
 
 Other
 -----
