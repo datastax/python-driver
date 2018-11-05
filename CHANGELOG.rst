@@ -1,5 +1,6 @@
-3.15.2
+3.16.0
 ======
+NOT RELEASED
 
 Bug Fixes
 ---------
@@ -11,6 +12,7 @@ Bug Fixes
 Other
 -----
 * Fix tests when RF is not maintained if we decomission a node (PYTHON-1017)
+* Fix wrong use of ResultSet indexing (PYTHON-1015)
 
 3.15.1
 ======
