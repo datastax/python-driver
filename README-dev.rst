@@ -79,35 +79,35 @@ Running the Tests
 =================
 In order for the extensions to be built and used in the test, run::
 
-    python setup.py nosetests
+    nosetests
 
 You can run a specific test module or package like so::
 
-    python setup.py nosetests -w tests/unit/
+    nosetests -w tests/unit/
 
 You can run a specific test method like so::
 
-    python setup.py nosetests -w tests/unit/test_connection.py:ConnectionTest.test_bad_protocol_version
+    nosetests -w tests/unit/test_connection.py:ConnectionTest.test_bad_protocol_version
 
 Seeing Test Logs in Real Time
 -----------------------------
 Sometimes it's useful to output logs for the tests as they run::
 
-    python setup.py nosetests -w tests/unit/ --nocapture --nologcapture
+    nosetests -w tests/unit/ --nocapture --nologcapture
 
 Use tee to capture logs and see them on your terminal::
 
-    python setup.py nosetests -w tests/unit/ --nocapture --nologcapture 2>&1 | tee test.log
+    nosetests -w tests/unit/ --nocapture --nologcapture 2>&1 | tee test.log
 
 Specifying a Cassandra Version for Integration Tests
 ----------------------------------------------------
 You can specify a cassandra version with the ``CASSANDRA_VERSION`` environment variable::
 
-    CASSANDRA_VERSION=2.0.9 python setup.py nosetests -w tests/integration/standard
+    CASSANDRA_VERSION=2.0.9 nosetests -w tests/integration/standard
 
 You can also specify a cassandra directory (to test unreleased versions)::
 
-    CASSANDRA_DIR=/home/thobbs/cassandra python setup.py nosetests -w tests/integration/standard
+    CASSANDRA_DIR=/home/thobbs/cassandra nosetests -w tests/integration/standard
 
 Specifying the usage of an already running Cassandra cluster
 ----------------------------------------------------
@@ -120,7 +120,7 @@ Specify a Protocol Version for Tests
 The protocol version defaults to 1 for cassandra 1.2 and 2 otherwise.  You can explicitly set
 it with the ``PROTOCOL_VERSION`` environment variable::
 
-    PROTOCOL_VERSION=3 python setup.py nosetests -w tests/integration/standard
+    PROTOCOL_VERSION=3 nosetests -w tests/integration/standard
 
 Testing Multiple Python Versions
 --------------------------------
