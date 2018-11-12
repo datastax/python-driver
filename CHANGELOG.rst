@@ -1,6 +1,6 @@
 3.16.0
 ======
-NOT RELEASED
+November 12, 2018
 
 Bug Fixes
 ---------
