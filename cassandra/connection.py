@@ -68,6 +68,17 @@ else:
     except ImportError:
         lz4_block = lz4
 
+    try:
+        lz4_block.compress
+        lz4_block.decompress
+    except AttributeError:
+        raise ImportError(
+            'lz4 not imported correctly. Imported object should have '
+            '.compress and and .decompress attributes but does not. '
+            'Please file a bug report on JIRA. (Imported object was '
+            '{lz4_block})'.format(lz4_block=repr(lz4_block))
+        )
+
     # Cassandra writes the uncompressed message length in big endian order,
     # but the lz4 lib requires little endian order, so we wrap these
     # functions to handle that
