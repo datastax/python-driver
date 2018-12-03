@@ -26,7 +26,7 @@ To protect the community, all contributors are required to `sign the DataStax Co
 
 Design and Implementation Guidelines
 ------------------------------------
-- We support Python 2.6+, so any changes must work in any of these runtimes (we use ``six``, ``futures``, and some internal backports for compatability)
+- We support Python 2.7+, so any changes must work in any of these runtimes (we use ``six``, ``futures``, and some internal backports for compatability)
 - We have integrations (notably Cassandra cqlsh) that require pure Python and minimal external dependencies. We try to avoid new external dependencies. Where compiled extensions are concerned, there should always be a pure Python fallback implementation.
 - This project follows `semantic versioning <http://semver.org/>`_, so breaking API changes will only be introduced in major versions.
 - Legacy ``cqlengine`` has varying degrees of overreaching client-side validation. Going forward, we will avoid client validation where server feedback is adequate and not overly expensive.
