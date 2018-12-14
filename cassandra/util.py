@@ -105,11 +105,11 @@ def uuid_from_time(time_arg, node=None, clock_seq=None):
     if not hasattr(time_arg, 'utctimetuple'):
         time_arg = datetime.datetime.fromtimestamp(time_arg)
     seconds = int(calendar.timegm(time_arg.utctimetuple()))
-    microseconds = (seconds * 1e6) + time_arg.time().microsecond
+    microseconds = (seconds * 1000000) + time_arg.time().microsecond
 
     # 0x01b21dd213814000 is the number of 100-ns intervals between the
     # UUID epoch 1582-10-15 00:00:00 and the Unix epoch 1970-01-01 00:00:00.
-    intervals = int(microseconds * 10) + 0x01b21dd213814000
+    intervals = microseconds * 10 + 0x01b21dd213814000
 
     time_low = intervals & 0xffffffff
     time_mid = (intervals >> 32) & 0xffff
