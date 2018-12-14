@@ -100,11 +100,12 @@ def uuid_from_time(time_arg, node=None, clock_seq=None):
     :rtype: :class:`uuid.UUID`
 
     """
-    if hasattr(time_arg, 'utctimetuple'):
-        seconds = int(calendar.timegm(time_arg.utctimetuple()))
-        microseconds = (seconds * 1e6) + time_arg.time().microsecond
-    else:
-        microseconds = int(time_arg * 1e6)
+    # PYTHON-914: use builtin utils to convert float into datetime without
+    # multiplication errors
+    if not hasattr(time_arg, 'utctimetuple'):
+        time_arg = datetime.datetime.fromtimestamp(time_arg)
+    seconds = int(calendar.timegm(time_arg.utctimetuple()))
+    microseconds = (seconds * 1e6) + time_arg.time().microsecond
 
     # 0x01b21dd213814000 is the number of 100-ns intervals between the
     # UUID epoch 1582-10-15 00:00:00 and the Unix epoch 1970-01-01 00:00:00.

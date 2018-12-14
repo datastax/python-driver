@@ -2,6 +2,10 @@
 ======
 NOT RELEASED
 
+Bug Fixes
+---------
+* Convert Python timestamps to UUID without float multiplication (PYTHON-914)
+
 Other
 -----
 * Fail faster on incorrect lz4 import (PYTHON-1042)
