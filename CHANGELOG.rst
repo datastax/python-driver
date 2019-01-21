@@ -8,6 +8,10 @@ Features
 * Add Cluster ssl_context option to enable SSL (PYTHON-995)
 * Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
 
+Bug Fixes
+---------
+* NoHostAvailable when all hosts are up and connectable (PYTHON-891)
+
 Other
 -----
 * Fail faster on incorrect lz4 import (PYTHON-1042)
