@@ -49,10 +49,11 @@ else:
     verify_certs = {'cert_reqs': ssl.CERT_REQUIRED,
                     'check_hostname': True}
 
+
 def setup_cluster_ssl(client_auth=False):
     """
     We need some custom setup for this module. This will start the ccm cluster with basic
-    ssl connectivity, and client authenticiation if needed.
+    ssl connectivity, and client authentication if needed.
     """
 
     use_single_node(start=False)
@@ -244,33 +245,6 @@ class SSLConnectionAuthTests(unittest.TestCase):
                        'certfile': abs_driver_certfile}
         validate_ssl_options(ssl_options)
 
-    def test_can_connect_with_ssl_client_auth_password_private_key(self):
-        """
-        Identical test to test_can_connect_with_ssl_client_auth, the only difference
-        is that the DRIVER_KEYFILE is encrypted with a password.
-
-        @jira_ticket PYTHON-995.
-
-        @since 2.8.0
-        @expected_result The client can connect via SSL and preform some basic operations
-        @test_category connection:ssl
-        """
-
-        # Need to get absolute paths for certs/key
-        abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE_ENCRYPTED)
-        abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE)
-        # ssl_options = {'ca_certs': abs_path_ca_cert_path,
-        #                'ssl_version': ssl_version,
-        #                'keyfile': abs_driver_keyfile,
-        #                'password': 'cassandra',
-        #                'certfile': abs_driver_certfile}
-        from ssl import SSLContext
-        ssl_context = SSLContext(ssl_version)
-        ssl_context.load_cert_chain(certfile=abs_driver_certfile,
-                                    keyfile=abs_driver_keyfile,
-                                    password='cassandra')
-        validate_ssl_options(ssl_context=ssl_context)
-
     def test_can_connect_with_ssl_client_auth_host_name(self):
         """
         Test to validate that we can connect to a C* cluster that has client_auth enabled, and hostmatching
@@ -347,3 +321,50 @@ class SSLConnectionAuthTests(unittest.TestCase):
         with self.assertRaises(NoHostAvailable) as context:
             cluster.connect()
         cluster.shutdown()
+
+
+class SSLConnectionWithSSLContextTests(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        setup_cluster_ssl()
+
+    @classmethod
+    def tearDownClass(cls):
+        ccm_cluster = get_cluster()
+        ccm_cluster.stop()
+        remove_cluster()
+
+    def test_can_connect_with_sslcontext_certificate(self):
+        """
+        Test to validate that we are able to connect to a cluster using a SSLContext.
+
+        @since 3.17.0
+        @jira_ticket PYTHON-995
+        @expected_result The client can connect via SSL and preform some basic operations
+
+        @test_category connection:ssl
+        """
+        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
+        ssl_context = ssl.SSLContext(ssl_version)
+        ssl_context.load_verify_locations(abs_path_ca_cert_path)
+        validate_ssl_options(ssl_context=ssl_context)
+
+    def test_can_connect_with_ssl_client_auth_password_private_key(self):
+        """
+        Identical test to SSLConnectionAuthTests.test_can_connect_with_ssl_client_auth,
+        the only difference is that the DRIVER_KEYFILE is encrypted with a password.
+
+        @jira_ticket PYTHON-995.
+
+        @since 3.17.0
+        @expected_result The client can connect via SSL and preform some basic operations
+        @test_category connection:ssl
+        """
+        abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE_ENCRYPTED)
+        abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE)
+        ssl_context = ssl.SSLContext(ssl_version)
+        ssl_context.load_cert_chain(certfile=abs_driver_certfile,
+                                    keyfile=abs_driver_keyfile,
+                                    password='cassandra')
+        validate_ssl_options(ssl_context=ssl_context)
