@@ -27,9 +27,6 @@ For example, suppose Cassandra is setup with its default
     cluster = Cluster(auth_provider=auth_provider, protocol_version=2)
 
 
-When working with version 2 or higher of the driver, the protocol
-version is set to 2 by default, but we've included it in the example
-to be explicit.
 
 Custom Authenticators
 ^^^^^^^^^^^^^^^^^^^^^
@@ -59,10 +56,40 @@ a dict of credentials with a ``username`` and ``password`` key:
 
 SSL
 ---
+SSL should be used when client encryption is enabled in Cassandra.
+
+Versions 3.17.0 and higher
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To enable SSL you will need to set :attr:`.Cluster.ssl_context` to a
+``ssl.SSLContext`` instance. Optionally, you can also set :attr:`.Cluster.ssl_options`
+to a dict of options. These will be passed as kwargs to ``ssl.SSLContext.wrap_socket()``
+when new sockets are created.
+
+For example:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster
+    from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+
+    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context.verify_mode = CERT_REQUIRED
+    ssl_context.load_verify_locations('/path/to/my/ca.certs')
+    cluster = Cluster(ssl_context=ssl_context)
+
+
+This is only an example to show how to pass the ssl parameters. Consider reading
+the `python ssl documentation <https://docs.python.org/3/library/ssl.html#ssl.SSLContext>`_ for
+your configuration.
+
+Versions 3.16.0 and lower
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
 To enable SSL you will need to set :attr:`.Cluster.ssl_options` to a
 dict of options.  These will be passed as kwargs to ``ssl.wrap_socket()``
-when new sockets are created.  This should be used when client encryption
-is enabled in Cassandra.
+when new sockets are created. Note that this use of ssl_options will be
+deprecated in the next major release.
 
 By default, a ``ca_certs`` value should be supplied (the value should be
 a string pointing to the location of the CA certs file), and you probably
@@ -88,5 +115,8 @@ the `python ssl documentation <https://docs.python.org/2/library/ssl.html#ssl.wr
 your configuration. For further reading, Andrew Mussey has published a thorough guide on
 `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.
 
-*Note*: In case the twisted event loop is used pyOpenSSL must be installed or an exception will be risen. Also
+SSL with Twisted
+++++++++++++++++
+
+In case the twisted event loop is used pyOpenSSL must be installed or an exception will be risen. Also
 to set the ``ssl_version`` and ``cert_reqs`` in ``ssl_opts`` the appropriate constants from pyOpenSSL are expected.

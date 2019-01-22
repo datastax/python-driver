@@ -576,9 +576,14 @@ class Cluster(object):
 
     ssl_options = None
     """
-    An optional dict which will be used as kwargs for ``ssl.wrap_socket()``
-    when new sockets are created.  This should be used when client encryption
-    is enabled in Cassandra.
+    Using ssl_options without ssl_context is deprecated and will be removed in the
+    next major release.
+
+    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` (or
+    ``ssl.wrap_socket()`` if used without ssl_context) when new sockets are created.
+    This should be used when client encryption is enabled in Cassandra.
+
+    The following documentation only applies when ssl_options is used without ssl_context.
 
     By default, a ``ca_certs`` value should be supplied (the value should be
     a string pointing to the location of the CA certs file), and you probably
@@ -595,6 +600,15 @@ class Cluster(object):
     """
 
     ssl_context = None
+    """
+    An optional ``ssl.SSLContext`` instance which will be used when new sockets are created.
+    This should be used when client encryption is enabled in Cassandra.
+
+    ``wrap_socket`` options can be set using :attr:`~Cluster.ssl_options`. ssl_options will
+    be used as kwargs for ``ssl.SSLContext.wrap_socket``.
+
+    .. versionadded:: 3.17.0
+    """
 
     sockopts = None
     """
