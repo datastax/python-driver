@@ -968,6 +968,14 @@ class Cluster(object):
                         ''.format(cp=contact_points, lbp=load_balancing_policy))
 
         self.metrics_enabled = metrics_enabled
+
+        if ssl_options and not ssl_context:
+            warn('Using ssl_options without ssl_context is '
+                 'deprecated and will result in an error in '
+                 'the next major release. Please use ssl_context '
+                 'to prepare for that release.',
+                 DeprecationWarning)
+
         self.ssl_options = ssl_options
         self.ssl_context = ssl_context
         self.sockopts = sockopts

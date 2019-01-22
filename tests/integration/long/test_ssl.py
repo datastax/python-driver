@@ -80,7 +80,7 @@ def setup_cluster_ssl(client_auth=False):
     ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
 
-def validate_ssl_options(*args, **kwargs):
+def validate_ssl_options(**kwargs):
         ssl_options = kwargs.get('ssl_options', None)
         ssl_context = kwargs.get('ssl_context', None)
 
@@ -243,7 +243,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
                        'ssl_version': ssl_version,
                        'keyfile': abs_driver_keyfile,
                        'certfile': abs_driver_certfile}
-        validate_ssl_options(ssl_options)
+        validate_ssl_options(ssl_options=ssl_options)
 
     def test_can_connect_with_ssl_client_auth_host_name(self):
         """
@@ -271,7 +271,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
                        'certfile': abs_driver_certfile}
         ssl_options.update(verify_certs)
 
-        validate_ssl_options(ssl_options)
+        validate_ssl_options(ssl_options=ssl_options)
 
     def test_cannot_connect_without_client_auth(self):
         """

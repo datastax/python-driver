@@ -26,7 +26,6 @@ import struct
 import sys
 from threading import Thread, Event, RLock
 import time
-import warnings
 
 try:
     import ssl
@@ -295,13 +294,7 @@ class Connection(object):
         self._requests = {}
         self._iobuf = io.BytesIO()
 
-        if ssl_options and not ssl_context:
-            warnings.warn('Using ssl_options without ssl_context is '
-                          'deprecated and will result in an error in '
-                          'the next major release. Please use ssl_context '
-                          'to prepare for that release.',
-                          DeprecationWarning)
-
+        if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
             if self._check_hostname:
                 if not getattr(ssl, 'match_hostname', None):
