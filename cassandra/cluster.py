@@ -576,7 +576,7 @@ class Cluster(object):
 
     ssl_options = None
     """
-    A optional dict which will be used as kwargs for ``ssl.wrap_socket()``
+    An optional dict which will be used as kwargs for ``ssl.wrap_socket()``
     when new sockets are created.  This should be used when client encryption
     is enabled in Cassandra.
 
@@ -593,6 +593,8 @@ class Cluster(object):
     Python standard library until (2.7.9, 3.2). To enable this mechanism in earlier versions, patch ``ssl.match_hostname``
     with a custom or `back-ported function <https://pypi.org/project/backports.ssl_match_hostname/>`_.
     """
+
+    ssl_context = None
 
     sockopts = None
     """
@@ -831,7 +833,8 @@ class Cluster(object):
                  allow_beta_protocol_version=False,
                  timestamp_generator=None,
                  idle_heartbeat_timeout=30,
-                 no_compact=False):
+                 no_compact=False,
+                 ssl_context=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -952,6 +955,7 @@ class Cluster(object):
 
         self.metrics_enabled = metrics_enabled
         self.ssl_options = ssl_options
+        self.ssl_context = ssl_context
         self.sockopts = sockopts
         self.cql_version = cql_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
@@ -1247,6 +1251,7 @@ class Cluster(object):
         kwargs_dict.setdefault('compression', self.compression)
         kwargs_dict.setdefault('sockopts', self.sockopts)
         kwargs_dict.setdefault('ssl_options', self.ssl_options)
+        kwargs_dict.setdefault('ssl_context', self.ssl_context)
         kwargs_dict.setdefault('cql_version', self.cql_version)
         kwargs_dict.setdefault('protocol_version', self.protocol_version)
         kwargs_dict.setdefault('user_type_map', self._user_types)

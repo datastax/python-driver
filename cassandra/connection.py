@@ -26,6 +26,7 @@ import struct
 import sys
 from threading import Thread, Event, RLock
 import time
+import warnings
 
 try:
     import ssl
@@ -225,6 +226,7 @@ class Connection(object):
     decompressor = None
 
     ssl_options = None
+    ssl_context = None
     last_error = None
 
     # The current number of operations that are in flight. More precisely,
@@ -273,11 +275,13 @@ class Connection(object):
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
-                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False):
+                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False,
+                 ssl_context=None):
         self.host = host
         self.port = port
         self.authenticator = authenticator
         self.ssl_options = ssl_options.copy() if ssl_options else None
+        self.ssl_context = ssl_context
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
@@ -291,7 +295,13 @@ class Connection(object):
         self._requests = {}
         self._iobuf = io.BytesIO()
 
-        if ssl_options:
+        if ssl_options and not ssl_context:
+            warnings.warn('Using ssl_options without ssl_context is '
+                          'deprecated and will result in an error in '
+                          'the next major release. Please use ssl_context '
+                          'to prepare for that release.',
+                          DeprecationWarning)
+
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
             if self._check_hostname:
                 if not getattr(ssl, 'match_hostname', None):
@@ -363,7 +373,10 @@ class Connection(object):
         for (af, socktype, proto, canonname, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
-                if self.ssl_options:
+                if self.ssl_context:
+                    self._socket = self.ssl_context.wrap_socket(self._socket,
+                                                                **(self.ssl_options or {}))
+                elif self.ssl_options:
                     if not self._ssl_impl:
                         raise RuntimeError("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
