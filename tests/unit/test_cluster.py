@@ -147,8 +147,13 @@ class SessionTest(unittest.TestCase):
         # default is None
         self.assertIsNone(s.default_serial_consistency_level)
 
-        sentinel = 1001
-        for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL, sentinel):
+        # Should fail
+        with self.assertRaises(ValueError):
+            s.default_serial_consistency_level = ConsistencyLevel.ANY
+        with self.assertRaises(ValueError):
+            s.default_serial_consistency_level = 1001
+
+        for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
             s.default_serial_consistency_level = cl
 
             # default is passed through
@@ -204,7 +209,7 @@ class ExecutionProfileTest(unittest.TestCase):
 
     @mock_session_pools
     def test_default_profile(self):
-        non_default_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(3)])
+        non_default_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(2)])
         cluster = Cluster(execution_profiles={'non-default': non_default_profile})
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
 
@@ -216,6 +221,17 @@ class ExecutionProfileTest(unittest.TestCase):
 
         rf = session.execute_async("query", execution_profile='non-default')
         self._verify_response_future_profile(rf, non_default_profile)
+
+    def test_serial_consistency_level_validation(self):
+        # should pass
+        ep = ExecutionProfile(RoundRobinPolicy(), serial_consistency_level=ConsistencyLevel.SERIAL)
+        ep = ExecutionProfile(RoundRobinPolicy(), serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
+
+        # should not pass
+        with self.assertRaises(ValueError):
+            ep = ExecutionProfile(RoundRobinPolicy(), serial_consistency_level=ConsistencyLevel.ANY)
+        with self.assertRaises(ValueError):
+            ep = ExecutionProfile(RoundRobinPolicy(), serial_consistency_level=42)
 
     @mock_session_pools
     def test_statement_params_override_legacy(self):
@@ -240,7 +256,7 @@ class ExecutionProfileTest(unittest.TestCase):
 
     @mock_session_pools
     def test_statement_params_override_profile(self):
-        non_default_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(3)])
+        non_default_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(2)])
         cluster = Cluster(execution_profiles={'non-default': non_default_profile})
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
 
@@ -309,7 +325,7 @@ class ExecutionProfileTest(unittest.TestCase):
     @mock_session_pools
     def test_profile_name_value(self):
 
-        internalized_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(3)])
+        internalized_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(2)])
         cluster = Cluster(execution_profiles={'by-name': internalized_profile})
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
         self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
@@ -317,7 +333,7 @@ class ExecutionProfileTest(unittest.TestCase):
         rf = session.execute_async("query", execution_profile='by-name')
         self._verify_response_future_profile(rf, internalized_profile)
 
-        by_value = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(3)])
+        by_value = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(2)])
         rf = session.execute_async("query", execution_profile=by_value)
         self._verify_response_future_profile(rf, by_value)
 

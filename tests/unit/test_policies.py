@@ -1021,13 +1021,13 @@ class RetryPolicyTest(unittest.TestCase):
             query=None, consistency=ONE,
             required_replicas=1, alive_replicas=2, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY_NEXT_HOST)
-        self.assertEqual(consistency, ONE)
+        self.assertEqual(consistency, None)
 
         retry, consistency = policy.on_unavailable(
             query=None, consistency=ONE,
             required_replicas=10000, alive_replicas=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY_NEXT_HOST)
-        self.assertEqual(consistency, ONE)
+        self.assertEqual(consistency, None)
 
 
 class FallthroughRetryPolicyTest(unittest.TestCase):

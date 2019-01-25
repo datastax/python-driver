@@ -7,10 +7,12 @@ Features
 * Send driver name and version in startup message (PYTHON-1068)
 * Add Cluster ssl_context option to enable SSL (PYTHON-995)
 * Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
+* Introduce new method ConsistencyLevel.is_serial (PYTHON-1067)
 
 Bug Fixes
 ---------
 * NoHostAvailable when all hosts are up and connectable (PYTHON-891)
+* Serial consistency level is not used (PYTHON-1007)
 
 Other
 -----
