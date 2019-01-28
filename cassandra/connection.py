@@ -106,6 +106,8 @@ else:
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
 
+DRIVER_NAME, DRIVER_VERSION = 'DataStax Python Driver', sys.modules['cassandra'].__version__
+
 PROTOCOL_VERSION_MASK = 0x7f
 
 HEADER_DIRECTION_FROM_CLIENT = 0x00
@@ -721,7 +723,8 @@ class Connection(object):
     @defunct_on_error
     def _send_startup_message(self, compression=None, no_compact=False):
         log.debug("Sending StartupMessage on %s", self)
-        opts = {}
+        opts = {'DRIVER_NAME': DRIVER_NAME,
+                'DRIVER_VERSION': DRIVER_VERSION}
         if compression:
             opts['COMPRESSION'] = compression
         if no_compact:
