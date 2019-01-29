@@ -2,6 +2,10 @@
 ======
 NOT RELEASED
 
+Features
+--------
+* Send driver name and version in startup message (PYTHON-1068)
+
 Other
 -----
 * Fail faster on incorrect lz4 import (PYTHON-1042)
