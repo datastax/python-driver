@@ -17,7 +17,7 @@ try:
 except ImportError:
     import unittest
 
-import os, sys, traceback, logging, ssl, time
+import os, sys, traceback, logging, ssl, time, math, uuid
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -323,6 +323,49 @@ class SSLConnectionAuthTests(unittest.TestCase):
         cluster.shutdown()
 
 
+class SSLSocketErrorTests(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        setup_cluster_ssl()
+
+    @classmethod
+    def tearDownClass(cls):
+        ccm_cluster = get_cluster()
+        ccm_cluster.stop()
+        remove_cluster()
+
+    def test_ssl_want_write_errors_are_retried(self):
+        """
+        Test that when a socket receives a WANT_WRITE error, the message chunk sending is retried.
+
+        @since 3.17.0
+        @jira_ticket PYTHON-891
+        @expected_result The query is executed successfully
+
+        @test_category connection:ssl
+        """
+        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
+        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+                       'ssl_version': ssl_version}
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
+        session = cluster.connect(wait_for_all_pools=True)
+        try:
+            session.execute('drop keyspace ssl_error_test')
+        except:
+            pass
+        session.execute(
+            "CREATE KEYSPACE ssl_error_test WITH replication = {'class':'SimpleStrategy','replication_factor':1};")
+        session.execute("CREATE TABLE ssl_error_test.big_text (id uuid PRIMARY KEY, data text);")
+
+        params = {
+            '0': uuid.uuid4(),
+            '1': "0" * int(math.pow(10, 7))
+        }
+
+        session.execute('INSERT INTO ssl_error_test.big_text ("id", "data") VALUES (%(0)s, %(1)s)', params)
+
+
 class SSLConnectionWithSSLContextTests(unittest.TestCase):
 
     @classmethod
@@ -355,10 +398,10 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
         Identical test to SSLConnectionAuthTests.test_can_connect_with_ssl_client_auth,
         the only difference is that the DRIVER_KEYFILE is encrypted with a password.
 
-        @jira_ticket PYTHON-995.
-
         @since 3.17.0
+        @jira_ticket PYTHON-995
         @expected_result The client can connect via SSL and preform some basic operations
+
         @test_category connection:ssl
         """
         abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE_ENCRYPTED)
