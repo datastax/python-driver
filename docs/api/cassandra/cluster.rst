@@ -32,6 +32,8 @@
 
    .. autoattribute:: metrics
 
+   .. autoattribute:: ssl_context
+
    .. autoattribute:: ssl_options
 
    .. autoattribute:: sockopts

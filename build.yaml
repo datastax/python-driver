@@ -118,7 +118,6 @@ cassandra:
   - '3.0'
   - '3.11'
   - 'test-dse'
-  - 'dse-6.7'
 
 env:
   CYTHON:

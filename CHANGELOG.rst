@@ -5,11 +5,18 @@ NOT RELEASED
 Features
 --------
 * Send driver name and version in startup message (PYTHON-1068)
+* Add Cluster ssl_context option to enable SSL (PYTHON-995)
+* Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
 
 Other
 -----
 * Fail faster on incorrect lz4 import (PYTHON-1042)
 
+Deprecations
+------------
+
+* Using Cluster.ssl_options to enable SSL is deprecated and will be removed in
+  the next major release, use ssl_context.
 
 3.16.0
 ======
