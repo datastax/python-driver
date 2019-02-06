@@ -23,6 +23,8 @@ Deprecations
 
 * Using Cluster.ssl_options to enable SSL is deprecated and will be removed in
   the next major release, use ssl_context.
+* DowngradingConsistencyRetryPolicy is deprecated and will be
+  removed in the next major release. (PYTHON-937)
 
 3.16.0
 ======

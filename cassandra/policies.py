@@ -17,6 +17,7 @@ import logging
 from random import randint, shuffle
 from threading import Lock
 import socket
+import warnings
 from cassandra import WriteType as WT
 
 
@@ -855,6 +856,8 @@ class FallthroughRetryPolicy(RetryPolicy):
 
 class DowngradingConsistencyRetryPolicy(RetryPolicy):
     """
+    *Deprecated:* This retry policy will be removed in the next major release.
+
     A retry policy that sometimes retries with a lower consistency level than
     the one initially requested.
 
@@ -900,6 +903,12 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     to make sure the data is persisted, and that reading something is better
     than reading nothing, even if there is a risk of reading stale data.
     """
+    def __init__(self, *args, **kwargs):
+        super(DowngradingConsistencyRetryPolicy, self).__init__(*args, **kwargs)
+        warnings.warn('DowngradingConsistencyRetryPolicy is deprecated '
+                      'and will be removed in the next major release.',
+                      DeprecationWarning)
+
     def _pick_consistency(self, num_responses):
         if num_responses >= 3:
             return self.RETRY, ConsistencyLevel.THREE
