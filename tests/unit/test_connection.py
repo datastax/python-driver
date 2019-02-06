@@ -411,14 +411,6 @@ class ConnectionHeartbeatTest(unittest.TestCase):
             [call(connection)] * get_holders.call_count)
 
 
-class LZ4Tests(unittest.TestCase):
-    def test_lz4_is_correctly_imported(self):
-        try:
-            import lz4
-        except ImportError:
-            return
-        from lz4 import block as lz4_block
-
 class TimerTest(unittest.TestCase):
 
     def test_timer_collision(self):

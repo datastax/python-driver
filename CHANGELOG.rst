@@ -1,20 +1,49 @@
-
-Others
-------
-* Bump Cython dependency version to 0.29
-
-3.15.2
+3.17.0
 ======
+NOT RELEASED
+
+Features
+--------
+* Send driver name and version in startup message (PYTHON-1068)
+* Add Cluster ssl_context option to enable SSL (PYTHON-995)
+* Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
+* Introduce new method ConsistencyLevel.is_serial (PYTHON-1067)
+
+Bug Fixes
+---------
+* NoHostAvailable when all hosts are up and connectable (PYTHON-891)
+* Serial consistency level is not used (PYTHON-1007)
+
+Other
+-----
+* Fail faster on incorrect lz4 import (PYTHON-1042)
+* Bump Cython dependency version to 0.29 (PYTHON-1036)
+
+Deprecations
+------------
+
+* Using Cluster.ssl_options to enable SSL is deprecated and will be removed in
+  the next major release, use ssl_context.
+* DowngradingConsistencyRetryPolicy is deprecated and will be
+  removed in the next major release. (PYTHON-937)
+
+3.16.0
+======
+November 12, 2018
 
 Bug Fixes
 ---------
 * Improve and fix socket error-catching code in nonblocking-socket reactors (PYTHON-1024)
 * Non-ASCII characters in schema break CQL string generation (PYTHON-1008)
 * Fix OSS driver's virtual table support against DSE 6.0.X and future server releases (PYTHON-1020)
+* ResultSet.one() fails if the row_factory is using a generator (PYTHON-1026)
+* Log profile name on attempt to create existing profile (PYTHON-944)
+* Cluster instantiation fails if any contact points' hostname resolution fails (PYTHON-895)
 
 Other
 -----
 * Fix tests when RF is not maintained if we decomission a node (PYTHON-1017)
+* Fix wrong use of ResultSet indexing (PYTHON-1015)
 
 3.15.1
 ======

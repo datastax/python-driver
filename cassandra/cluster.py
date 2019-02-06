@@ -43,7 +43,8 @@ except ImportError:
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
-                       SchemaTargetType, DriverException, ProtocolVersion)
+                       SchemaTargetType, DriverException, ProtocolVersion,
+                       UnresolvableContactPoints)
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported)
 from cassandra.cqltypes import UserType
@@ -85,6 +86,7 @@ def _is_gevent_monkey_patched():
         return False
     import gevent.socket
     return socket.socket is gevent.socket.socket
+
 
 # default to gevent when we are monkey patched with gevent, eventlet when
 # monkey patched with eventlet, otherwise if libev is available, use that as
@@ -181,6 +183,7 @@ def _shutdown_clusters():
     for cluster in clusters:
         cluster.shutdown()
 
+
 atexit.register(_shutdown_clusters)
 
 
@@ -188,6 +191,35 @@ def default_lbp_factory():
     if murmur3 is not None:
         return TokenAwarePolicy(DCAwareRoundRobinPolicy())
     return DCAwareRoundRobinPolicy()
+
+
+def _addrinfo_or_none(contact_point, port):
+    """
+    A helper function that wraps socket.getaddrinfo and returns None
+    when it fails to, e.g. resolve one of the hostnames. Used to address
+    PYTHON-895.
+    """
+    try:
+        return socket.getaddrinfo(contact_point, port,
+                                  socket.AF_UNSPEC, socket.SOCK_STREAM)
+    except socket.gaierror:
+        log.debug('Could not resolve hostname "{}" '
+                  'with port {}'.format(contact_point, port))
+        return None
+
+
+def _resolve_contact_points(contact_points, port):
+    resolved = tuple(_addrinfo_or_none(p, port)
+                     for p in contact_points)
+
+    if resolved and all((x is None for x in resolved)):
+        raise UnresolvableContactPoints(contact_points, port)
+
+    resolved = tuple(r for r in resolved if r is not None)
+
+    return [endpoint[4][0]
+            for addrinfo in resolved
+            for endpoint in addrinfo]
 
 
 class ExecutionProfile(object):
@@ -258,7 +290,14 @@ class ExecutionProfile(object):
             self.load_balancing_policy = load_balancing_policy
         self.retry_policy = retry_policy or RetryPolicy()
         self.consistency_level = consistency_level
+
+        if (serial_consistency_level is not None and
+                not ConsistencyLevel.is_serial(serial_consistency_level)):
+            raise ValueError("serial_consistency_level must be either "
+                             "ConsistencyLevel.SERIAL "
+                             "or ConsistencyLevel.LOCAL_SERIAL.")
         self.serial_consistency_level = serial_consistency_level
+
         self.request_timeout = request_timeout
         self.row_factory = row_factory
         self.speculative_execution_policy = speculative_execution_policy or NoSpeculativeExecutionPolicy()
@@ -544,9 +583,14 @@ class Cluster(object):
 
     ssl_options = None
     """
-    A optional dict which will be used as kwargs for ``ssl.wrap_socket()``
-    when new sockets are created.  This should be used when client encryption
-    is enabled in Cassandra.
+    Using ssl_options without ssl_context is deprecated and will be removed in the
+    next major release.
+
+    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` (or
+    ``ssl.wrap_socket()`` if used without ssl_context) when new sockets are created.
+    This should be used when client encryption is enabled in Cassandra.
+
+    The following documentation only applies when ssl_options is used without ssl_context.
 
     By default, a ``ca_certs`` value should be supplied (the value should be
     a string pointing to the location of the CA certs file), and you probably
@@ -560,6 +604,17 @@ class Cluster(object):
     should almost always require the option ``'cert_reqs': ssl.CERT_REQUIRED``. Note also that this functionality was not built into
     Python standard library until (2.7.9, 3.2). To enable this mechanism in earlier versions, patch ``ssl.match_hostname``
     with a custom or `back-ported function <https://pypi.org/project/backports.ssl_match_hostname/>`_.
+    """
+
+    ssl_context = None
+    """
+    An optional ``ssl.SSLContext`` instance which will be used when new sockets are created.
+    This should be used when client encryption is enabled in Cassandra.
+
+    ``wrap_socket`` options can be set using :attr:`~Cluster.ssl_options`. ssl_options will
+    be used as kwargs for ``ssl.SSLContext.wrap_socket``.
+
+    .. versionadded:: 3.17.0
     """
 
     sockopts = None
@@ -799,7 +854,8 @@ class Cluster(object):
                  allow_beta_protocol_version=False,
                  timestamp_generator=None,
                  idle_heartbeat_timeout=30,
-                 no_compact=False):
+                 no_compact=False,
+                 ssl_context=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -822,8 +878,8 @@ class Cluster(object):
 
         self.port = port
 
-        self.contact_points_resolved = [endpoint[4][0] for a in self.contact_points
-                                        for endpoint in socket.getaddrinfo(a, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+        self.contact_points_resolved = _resolve_contact_points(self.contact_points,
+                                                               self.port)
 
         self.compression = compression
 
@@ -919,7 +975,16 @@ class Cluster(object):
                         ''.format(cp=contact_points, lbp=load_balancing_policy))
 
         self.metrics_enabled = metrics_enabled
+
+        if ssl_options and not ssl_context:
+            warn('Using ssl_options without ssl_context is '
+                 'deprecated and will result in an error in '
+                 'the next major release. Please use ssl_context '
+                 'to prepare for that release.',
+                 DeprecationWarning)
+
         self.ssl_options = ssl_options
+        self.ssl_context = ssl_context
         self.sockopts = sockopts
         self.cql_version = cql_version
         self.max_schema_agreement_wait = max_schema_agreement_wait
@@ -1058,7 +1123,7 @@ class Cluster(object):
         if self._config_mode == _ConfigMode.LEGACY:
             raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly.")
         if name in self.profile_manager.profiles:
-            raise ValueError("Profile %s already exists")
+            raise ValueError("Profile {} already exists".format(name))
         contact_points_but_no_lbp = (
             self._contact_points_explicit and not
             profile._load_balancing_policy_explicit)
@@ -1085,7 +1150,6 @@ class Cluster(object):
         _, not_done = wait_futures(futures, pool_wait_timeout)
         if not_done:
             raise OperationTimedOut("Failed to create all new connection pools in the %ss timeout.")
-
 
     def get_min_requests_per_connection(self, host_distance):
         return self._min_requests_per_connection[host_distance]
@@ -1216,6 +1280,7 @@ class Cluster(object):
         kwargs_dict.setdefault('compression', self.compression)
         kwargs_dict.setdefault('sockopts', self.sockopts)
         kwargs_dict.setdefault('ssl_options', self.ssl_options)
+        kwargs_dict.setdefault('ssl_context', self.ssl_context)
         kwargs_dict.setdefault('cql_version', self.cql_version)
         kwargs_dict.setdefault('protocol_version', self.protocol_version)
         kwargs_dict.setdefault('user_type_map', self._user_types)
@@ -1974,6 +2039,12 @@ class Session(object):
 
     @default_serial_consistency_level.setter
     def default_serial_consistency_level(self, cl):
+        if (cl is not None and
+                not ConsistencyLevel.is_serial(cl)):
+            raise ValueError("default_serial_consistency_level must be either "
+                             "ConsistencyLevel.SERIAL "
+                             "or ConsistencyLevel.LOCAL_SERIAL.")
+
         self._validate_set_legacy_config('default_serial_consistency_level', cl)
 
     max_trace_wait = 2.0
@@ -2028,7 +2099,6 @@ class Session(object):
 
     .. versionadded:: 3.8.0
     """
-
 
     encoder = None
     """
@@ -2218,7 +2288,6 @@ class Session(object):
             row_factory = execution_profile.row_factory
             load_balancing_policy = execution_profile.load_balancing_policy
             spec_exec_policy = execution_profile.speculative_execution_policy
-
 
         fetch_size = query.fetch_size
         if fetch_size is FETCH_SIZE_UNSET and self._protocol_version >= 2:
@@ -4244,7 +4313,14 @@ class ResultSet(object):
         you know a query returns a single row. Consider using an iterator if the
         ResultSet contains more than one row.
         """
-        return self._current_rows[0] if self._current_rows else None
+        row = None
+        if self._current_rows:
+            try:
+                row = self._current_rows[0]
+            except TypeError:  # generator object is not subscriptable, PYTHON-1026
+                row = next(iter(self._current_rows))
+
+        return row
 
     def __iter__(self):
         if self._list_mode:

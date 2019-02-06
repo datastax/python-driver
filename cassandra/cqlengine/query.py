@@ -76,7 +76,7 @@ def check_applied(result):
     except Exception:
         applied = True  # result was not LWT form
     if not applied:
-        raise LWTException(result[0])
+        raise LWTException(result.one())
 
 
 class AbstractQueryableColumn(UnicodeMixin):
@@ -841,7 +841,7 @@ class AbstractQuerySet(object):
             query = self._select_query()
             query.count = True
             result = self._execute(query)
-            count_row = result[0].popitem()
+            count_row = result.one().popitem()
             self._count = count_row[1]
         return self._count
 

@@ -402,7 +402,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 sent = self.send(next_msg)
                 self._readable = True
             except socket.error as err:
-                if (err.args[0] in NONBLOCKING):
+                if (err.args[0] in NONBLOCKING or
+                        err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE)):
                     with self.deque_lock:
                         self.deque.appendleft(next_msg)
                 else:

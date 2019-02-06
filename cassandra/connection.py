@@ -68,6 +68,17 @@ else:
     except ImportError:
         lz4_block = lz4
 
+    try:
+        lz4_block.compress
+        lz4_block.decompress
+    except AttributeError:
+        raise ImportError(
+            'lz4 not imported correctly. Imported object should have '
+            '.compress and and .decompress attributes but does not. '
+            'Please file a bug report on JIRA. (Imported object was '
+            '{lz4_block})'.format(lz4_block=repr(lz4_block))
+        )
+
     # Cassandra writes the uncompressed message length in big endian order,
     # but the lz4 lib requires little endian order, so we wrap these
     # functions to handle that
@@ -94,6 +105,8 @@ else:
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
+
+DRIVER_NAME, DRIVER_VERSION = 'DataStax Python Driver', sys.modules['cassandra'].__version__
 
 PROTOCOL_VERSION_MASK = 0x7f
 
@@ -212,6 +225,7 @@ class Connection(object):
     decompressor = None
 
     ssl_options = None
+    ssl_context = None
     last_error = None
 
     # The current number of operations that are in flight. More precisely,
@@ -260,11 +274,13 @@ class Connection(object):
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
-                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False):
+                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False,
+                 ssl_context=None):
         self.host = host
         self.port = port
         self.authenticator = authenticator
         self.ssl_options = ssl_options.copy() if ssl_options else None
+        self.ssl_context = ssl_context
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
@@ -350,7 +366,10 @@ class Connection(object):
         for (af, socktype, proto, canonname, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
-                if self.ssl_options:
+                if self.ssl_context:
+                    self._socket = self.ssl_context.wrap_socket(self._socket,
+                                                                **(self.ssl_options or {}))
+                elif self.ssl_options:
                     if not self._ssl_impl:
                         raise RuntimeError("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
@@ -710,7 +729,8 @@ class Connection(object):
     @defunct_on_error
     def _send_startup_message(self, compression=None, no_compact=False):
         log.debug("Sending StartupMessage on %s", self)
-        opts = {}
+        opts = {'DRIVER_NAME': DRIVER_NAME,
+                'DRIVER_VERSION': DRIVER_VERSION}
         if compression:
             opts['COMPRESSION'] = compression
         if no_compact:

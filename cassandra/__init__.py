@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 15, 1, 'post0')
+__version_info__ = (3, 16, 0)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -91,6 +91,11 @@ class ConsistencyLevel(object):
     Sends a request only to replicas in the local datacenter and waits for
     one response.
     """
+
+    @staticmethod
+    def is_serial(cl):
+        return cl == ConsistencyLevel.SERIAL or cl == ConsistencyLevel.LOCAL_SERIAL
+
 
 ConsistencyLevel.value_to_name = {
     ConsistencyLevel.ANY: 'ANY',
@@ -684,5 +689,15 @@ class UnsupportedOperation(DriverException):
     An attempt was made to use a feature that is not supported by the
     selected protocol version.  See :attr:`Cluster.protocol_version`
     for more details.
+    """
+    pass
+
+
+class UnresolvableContactPoints(DriverException):
+    """
+    The driver was unable to resolve any provided hostnames.
+
+    Note that this is *not* raised when a :class:`.Cluster` is created with no
+    contact points, only when lookup fails for all hosts
     """
     pass

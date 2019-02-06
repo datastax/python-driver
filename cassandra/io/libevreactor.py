@@ -316,7 +316,8 @@ class LibevConnection(Connection):
             try:
                 sent = self._socket.send(next_msg)
             except socket.error as err:
-                if (err.args[0] in NONBLOCKING):
+                if (err.args[0] in NONBLOCKING or
+                        err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE)):
                     with self._deque_lock:
                         self.deque.appendleft(next_msg)
                 else:

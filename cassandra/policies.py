@@ -17,6 +17,7 @@ import logging
 from random import randint, shuffle
 from threading import Lock
 import socket
+import warnings
 from cassandra import WriteType as WT
 
 
@@ -814,7 +815,7 @@ class RetryPolicy(object):
         This is called when the coordinator node determines that a read or
         write operation cannot be successful because the number of live
         replicas are too low to meet the requested :class:`.ConsistencyLevel`.
-        This means that the read or write operation was never forwared to
+        This means that the read or write operation was never forwarded to
         any replicas.
 
         `query` is the :class:`.Statement` that failed.
@@ -830,9 +831,11 @@ class RetryPolicy(object):
         `retry_num` counts how many times the operation has been retried, so
         the first time this method is called, `retry_num` will be 0.
 
-        By default, no retries will be attempted and the error will be re-raised.
+        By default, if this is the first retry, it triggers a retry on the next
+        host in the query plan with the same consistency level. If this is not the
+        first retry, no retries will be attempted and the error will be re-raised.
         """
-        return (self.RETRY_NEXT_HOST, consistency) if retry_num == 0 else (self.RETHROW, None)
+        return (self.RETRY_NEXT_HOST, None) if retry_num == 0 else (self.RETHROW, None)
 
 
 class FallthroughRetryPolicy(RetryPolicy):
@@ -853,6 +856,8 @@ class FallthroughRetryPolicy(RetryPolicy):
 
 class DowngradingConsistencyRetryPolicy(RetryPolicy):
     """
+    *Deprecated:* This retry policy will be removed in the next major release.
+
     A retry policy that sometimes retries with a lower consistency level than
     the one initially requested.
 
@@ -898,6 +903,12 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     to make sure the data is persisted, and that reading something is better
     than reading nothing, even if there is a risk of reading stale data.
     """
+    def __init__(self, *args, **kwargs):
+        super(DowngradingConsistencyRetryPolicy, self).__init__(*args, **kwargs)
+        warnings.warn('DowngradingConsistencyRetryPolicy is deprecated '
+                      'and will be removed in the next major release.',
+                      DeprecationWarning)
+
     def _pick_consistency(self, num_responses):
         if num_responses >= 3:
             return self.RETRY, ConsistencyLevel.THREE
@@ -911,6 +922,9 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
         if retry_num != 0:
+            return self.RETHROW, None
+        elif ConsistencyLevel.is_serial(consistency):
+            # Downgrading does not make sense for a CAS read query
             return self.RETHROW, None
         elif received_responses < required_responses:
             return self._pick_consistency(received_responses)
@@ -940,6 +954,9 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         if retry_num != 0:
             return self.RETHROW, None
+        elif ConsistencyLevel.is_serial(consistency):
+            # failed at the paxos phase of a LWT, retry on the next host
+            return self.RETRY_NEXT_HOST, None
         else:
             return self._pick_consistency(alive_replicas)
 

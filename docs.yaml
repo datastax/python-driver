@@ -1,6 +1,7 @@
 title: DataStax Python Driver for Apache Cassandra
 summary: DataStax Python Driver for Apache Cassandra Documentation
 output: docs/_build/
+swiftype_drivers: pythondrivers
 checks:
   external_links:
     exclude:
@@ -21,6 +22,8 @@ sections:
       # build extensions like libev
       CASS_DRIVER_NO_CYTHON=1 python setup.py build_ext --inplace --force
 versions:
+  - name: '3.16'
+    ref: '3.16.0'
   - name: '3.15'
     ref: '2ce0bd97'
   - name: '3.14'

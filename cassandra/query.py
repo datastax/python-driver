@@ -328,8 +328,8 @@ class Statement(object):
         return self._serial_consistency_level
 
     def _set_serial_consistency_level(self, serial_consistency_level):
-        acceptable = (None, ConsistencyLevel.SERIAL, ConsistencyLevel.LOCAL_SERIAL)
-        if serial_consistency_level not in acceptable:
+        if (serial_consistency_level is not None and
+                not ConsistencyLevel.is_serial(serial_consistency_level)):
             raise ValueError(
                 "serial_consistency_level must be either ConsistencyLevel.SERIAL "
                 "or ConsistencyLevel.LOCAL_SERIAL")
@@ -445,7 +445,7 @@ class PreparedStatement(object):
     result_metadata_id = None
     routing_key_indexes = None
     _routing_key_index_set = None
-    serial_consistency_level = None
+    serial_consistency_level = None  # TODO never used?
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
                  keyspace, protocol_version, result_metadata, result_metadata_id):
