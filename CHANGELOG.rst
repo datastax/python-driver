@@ -8,6 +8,7 @@ Features
 * Add Cluster ssl_context option to enable SSL (PYTHON-995)
 * Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
 * Introduce new method ConsistencyLevel.is_serial (PYTHON-1067)
+* Add Session.get_execution_profile (PYTHON-932)
 
 Bug Fixes
 ---------
