@@ -92,6 +92,11 @@ class ConsistencyLevel(object):
     one response.
     """
 
+    @staticmethod
+    def is_serial(cl):
+        return cl == ConsistencyLevel.SERIAL or cl == ConsistencyLevel.LOCAL_SERIAL
+
+
 ConsistencyLevel.value_to_name = {
     ConsistencyLevel.ANY: 'ANY',
     ConsistencyLevel.ONE: 'ONE',

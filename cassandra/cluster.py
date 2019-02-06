@@ -290,7 +290,14 @@ class ExecutionProfile(object):
             self.load_balancing_policy = load_balancing_policy
         self.retry_policy = retry_policy or RetryPolicy()
         self.consistency_level = consistency_level
+
+        if (serial_consistency_level is not None and
+                not ConsistencyLevel.is_serial(serial_consistency_level)):
+            raise ValueError("serial_consistency_level must be either "
+                             "ConsistencyLevel.SERIAL "
+                             "or ConsistencyLevel.LOCAL_SERIAL.")
         self.serial_consistency_level = serial_consistency_level
+
         self.request_timeout = request_timeout
         self.row_factory = row_factory
         self.speculative_execution_policy = speculative_execution_policy or NoSpeculativeExecutionPolicy()
@@ -2032,6 +2039,12 @@ class Session(object):
 
     @default_serial_consistency_level.setter
     def default_serial_consistency_level(self, cl):
+        if (cl is not None and
+                not ConsistencyLevel.is_serial(cl)):
+            raise ValueError("default_serial_consistency_level must be either "
+                             "ConsistencyLevel.SERIAL "
+                             "or ConsistencyLevel.LOCAL_SERIAL.")
+
         self._validate_set_legacy_config('default_serial_consistency_level', cl)
 
     max_trace_wait = 2.0
