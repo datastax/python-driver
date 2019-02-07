@@ -9,6 +9,7 @@ Features
 * Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
 * Introduce new method ConsistencyLevel.is_serial (PYTHON-1067)
 * Add Session.get_execution_profile (PYTHON-932)
+* Add host kwarg to Session.execute/execute_async APIs to send a query to a specific node (PYTHON-933)
 
 Bug Fixes
 ---------

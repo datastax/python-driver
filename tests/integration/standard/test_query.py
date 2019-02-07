@@ -35,6 +35,7 @@ from tests.integration import greaterthanorequalcass30, get_node
 import time
 import re
 
+
 def setup_module():
     if not USE_CASS_EXTERNAL:
         use_singledc(start=False)
@@ -326,6 +327,23 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(results.column_names, ["[json]"])
         self.assertEqual(results[0][0], '{"k": 1, "v": 1}')
 
+    @local
+    def test_host_targeting_query(self):
+        """
+        Test to validate the the single host targeting works.
+
+        @since 3.17.0
+        @jira_ticket PYTHON-933
+        @expected_result the coordinator host is always the one set
+        """
+
+        query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)")
+        host = self.cluster.metadata.get_host('127.0.0.3')
+        for i in range(10):
+            future = self.session.execute_async(query, host=host)
+            future.result()
+            self.assertEqual(host, future.coordinator_host)  # always 127.0.0.3
+
 
 class PreparedStatementTests(unittest.TestCase):
 
@@ -568,7 +586,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         select_results = session.execute("SELECT * FROM %s" % table)
         expected_results = [(1, None, 2, None, 3), (2, None, 3, None, 4),
              (3, None, 4, None, 5), (4, None, 5, None, 6)]
-        
+
         self.assertEqual(set(expected_results), set(select_results._current_rows))
 
 
@@ -1421,7 +1439,7 @@ class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
         # <Host: 127.0.0.1 datacenter1>: ConnectionException('Host has been marked down or removed',)})
         with self.assertRaises(NoHostAvailable):
             session.execute(simple_stmt)
-            
+
     def _check_set_keyspace_in_statement(self, session):
         simple_stmt = SimpleStatement("SELECT * from {}".format(self.table_name), keyspace=self.ks_name)
         results = session.execute(simple_stmt)
