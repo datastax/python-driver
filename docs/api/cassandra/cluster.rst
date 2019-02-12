@@ -160,6 +160,8 @@
 
    .. automethod:: set_keyspace(keyspace)
 
+   .. automethod:: get_execution_profile
+
    .. automethod:: execution_profile_clone_update
 
    .. automethod:: add_request_init_listener

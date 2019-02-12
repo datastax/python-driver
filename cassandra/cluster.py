@@ -2276,7 +2276,7 @@ class Session(object):
             load_balancing_policy = self.cluster.load_balancing_policy
             spec_exec_policy = None
         else:
-            execution_profile = self._get_execution_profile(execution_profile)
+            execution_profile = self._maybe_get_execution_profile(execution_profile)
 
             if timeout is _NOT_SET:
                 timeout = execution_profile.request_timeout
@@ -2341,12 +2341,20 @@ class Session(object):
             prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory,
             load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan)
 
-    def _get_execution_profile(self, ep):
+    def get_execution_profile(self, name):
+        """
+        Returns the execution profile associated with the provided ``name``.
+
+        :param name: The name (or key) of the execution profile.
+        """
         profiles = self.cluster.profile_manager.profiles
         try:
-            return ep if isinstance(ep, ExecutionProfile) else profiles[ep]
+            return profiles[name]
         except KeyError:
-            raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (ep, profiles.keys()))
+            raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (name, profiles.keys()))
+
+    def _maybe_get_execution_profile(self, ep):
+        return ep if isinstance(ep, ExecutionProfile) else self.get_execution_profile(ep)
 
     def execution_profile_clone_update(self, ep, **kwargs):
         """
@@ -2358,7 +2366,7 @@ class Session(object):
         by the active profile. In cases where this is not desirable, be sure to replace the instance instead of manipulating
         the shared object.
         """
-        clone = copy(self._get_execution_profile(ep))
+        clone = copy(self._maybe_get_execution_profile(ep))
         for attr, value in kwargs.items():
             setattr(clone, attr, value)
         return clone
