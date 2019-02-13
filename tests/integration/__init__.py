@@ -250,6 +250,7 @@ def local_decorator_creator():
 
     def _id_and_mark(f):
         f.local = True
+        return f
 
     return _id_and_mark
 

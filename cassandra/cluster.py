@@ -2174,7 +2174,9 @@ class Session(object):
                 msg += " using keyspace '%s'" % self.keyspace
             raise NoHostAvailable(msg, [h.address for h in hosts])
 
-    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False, custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
+    def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False,
+                custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT,
+                paging_state=None, host=None):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -2207,10 +2209,16 @@ class Session(object):
         for example
 
         `paging_state` is an optional paging state, reused from a previous :class:`ResultSet`.
-        """
-        return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state).result()
 
-    def execute_async(self, query, parameters=None, trace=False, custom_payload=None, timeout=_NOT_SET, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
+        `host` is the :class:`pool.Host` that should handle the query. Using this is discouraged except in a few
+        cases, e.g., querying node-local tables and applying schema changes.
+        """
+        return self.execute_async(query, parameters, trace, custom_payload,
+                                  timeout, execution_profile, paging_state, host).result()
+
+    def execute_async(self, query, parameters=None, trace=False, custom_payload=None,
+                      timeout=_NOT_SET, execution_profile=EXEC_PROFILE_DEFAULT,
+                      paging_state=None, host=None):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -2245,13 +2253,17 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
-        future = self._create_response_future(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state)
+        future = self._create_response_future(
+            query, parameters, trace, custom_payload, timeout,
+            execution_profile, paging_state, host)
         future._protocol_handler = self.client_protocol_handler
         self._on_request(future)
         future.send_request()
         return future
 
-    def _create_response_future(self, query, parameters, trace, custom_payload, timeout, execution_profile=EXEC_PROFILE_DEFAULT, paging_state=None):
+    def _create_response_future(self, query, parameters, trace, custom_payload,
+                                timeout, execution_profile=EXEC_PROFILE_DEFAULT,
+                                paging_state=None, host=None):
         """ Returns the ResponseFuture before calling send_request() on it """
 
         prepared_statement = None
@@ -2339,7 +2351,8 @@ class Session(object):
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
             prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory,
-            load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan)
+            load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan,
+            host=host)
 
     def get_execution_profile(self, name):
         """
@@ -3539,11 +3552,13 @@ class ResponseFuture(object):
     _timer = None
     _protocol_handler = ProtocolHandler
     _spec_execution_plan = NoSpeculativeExecutionPlan()
+    _host = None
 
     _warned_timeout = False
 
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None,
-                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None, speculative_execution_plan=None):
+                 retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None,
+                 speculative_execution_plan=None, host=None):
         self.session = session
         # TODO: normalize handling of retry policy and row factory
         self.row_factory = row_factory or session.row_factory
@@ -3556,6 +3571,7 @@ class ResponseFuture(object):
         self.prepared_statement = prepared_statement
         self._callback_lock = Lock()
         self._start_time = start_time or time.time()
+        self._host = host
         self._spec_execution_plan = speculative_execution_plan or self._spec_execution_plan
         self._make_query_plan()
         self._event = Event()
@@ -3651,12 +3667,17 @@ class ResponseFuture(object):
             self.send_request(error_no_hosts=False)
             self._start_timer()
 
-
     def _make_query_plan(self):
-        # convert the list/generator/etc to an iterator so that subsequent
-        # calls to send_request (which retries may do) will resume where
-        # they last left off
-        self.query_plan = iter(self._load_balancer.make_query_plan(self.session.keyspace, self.query))
+        # set the query_plan according to the load balancing policy,
+        # or to the explicit host target if set
+        if self._host:
+            # returning a single value effectively disables retries
+            self.query_plan = [self._host]
+        else:
+            # convert the list/generator/etc to an iterator so that subsequent
+            # calls to send_request (which retries may do) will resume where
+            # they last left off
+            self.query_plan = iter(self._load_balancer.make_query_plan(self.session.keyspace, self.query))
 
     def send_request(self, error_no_hosts=True):
         """ Internal """
