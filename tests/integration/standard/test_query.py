@@ -33,6 +33,7 @@ from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
 import time
+import random
 import re
 
 
@@ -327,7 +328,6 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(results.column_names, ["[json]"])
         self.assertEqual(results[0][0], '{"k": 1, "v": 1}')
 
-    @local
     def test_host_targeting_query(self):
         """
         Test to validate the the single host targeting works.
@@ -338,11 +338,11 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         """
 
         query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)")
-        host = self.cluster.metadata.get_host('127.0.0.3')
         for i in range(10):
+            host = random.choice(self.cluster.metadata.all_hosts())
             future = self.session.execute_async(query, host=host)
             future.result()
-            self.assertEqual(host, future.coordinator_host)  # always 127.0.0.3
+            self.assertEqual(host, future.coordinator_host)
 
 
 class PreparedStatementTests(unittest.TestCase):
