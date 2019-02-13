@@ -33,7 +33,13 @@ from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
 import time
+import random
 import re
+
+import mock
+
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -327,7 +333,6 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(results.column_names, ["[json]"])
         self.assertEqual(results[0][0], '{"k": 1, "v": 1}')
 
-    @local
     def test_host_targeting_query(self):
         """
         Test to validate the the single host targeting works.
@@ -337,12 +342,23 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         @expected_result the coordinator host is always the one set
         """
 
+        default_ep = self.cluster.profile_manager.default
+        # copy of default EP with checkable LBP
+        checkable_ep = self.session.execution_profile_clone_update(
+            ep=default_ep,
+            load_balancing_policy=mock.Mock(wraps=default_ep.load_balancing_policy)
+        )
         query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)")
-        host = self.cluster.metadata.get_host('127.0.0.3')
+
         for i in range(10):
-            future = self.session.execute_async(query, host=host)
+            host = random.choice(self.cluster.metadata.all_hosts())
+            log.debug('targeting {}'.format(host))
+            future = self.session.execute_async(query, host=host, execution_profile=checkable_ep)
             future.result()
-            self.assertEqual(host, future.coordinator_host)  # always 127.0.0.3
+            # check we're using the selected host
+            self.assertEqual(host, future.coordinator_host)
+            # check that this bypasses the LBP
+            self.assertFalse(checkable_ep.load_balancing_policy.make_query_plan.called)
 
 
 class PreparedStatementTests(unittest.TestCase):
