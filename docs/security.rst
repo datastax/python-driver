@@ -58,12 +58,18 @@ SSL
 ---
 SSL should be used when client encryption is enabled in Cassandra.
 
-With version 3.17.0 and higher, you will need to set :attr:`.Cluster.ssl_context` to a
+To give you as much control as possible over your SSL configuration, our SSL
+API takes a user-created `SSLContext` instance from the Python standard library.
+These docs will include some examples for how to achieve common configurations,
+but the `ssl.SSLContext` documentation gives a more complete description of
+what is possible.
+
+To enable SSL with version 3.17.0 and higher, you will need to set :attr:`.Cluster.ssl_context` to a
 ``ssl.SSLContext`` instance to enable SSL. Optionally, you can also set :attr:`.Cluster.ssl_options`
 to a dict of options. These will be passed as kwargs to ``ssl.SSLContext.wrap_socket()``
 when new sockets are created.
 
-The following examples assume you have generated your cassandra certificate and
+The following examples assume you have generated your Cassandra certificate and
 keystore files with these intructions:
 
 * `Setup SSL Cert <https://docs.datastax.com/en/dse/6.7/dse-admin/datastax_enterprise/security/secSetUpSSLCert.html>`_
@@ -74,13 +80,13 @@ It might be also useful to learn about the different levels of identity verifica
 
 SSL Configuration Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
+Here, we'll describe the server and driver configuration necessary to set up SSL to meet various goals, such as the client verifying the server and the server verifying the client. We'll also include Python code demonstrating how to use servers and drivers configured in these ways.
 No identity verification
 ++++++++++++++++++++++++
 
 No identity verification at all. Note that this is not recommended for for production deployments.
 
-The cassandra configuration::
+The Cassandra configuration::
 
     client_encryption_options:
       enabled: true
@@ -105,7 +111,7 @@ Client verifies server
 
 Ensure the python driver verifies the identity of the server.
 
-The cassandra configuration::
+The Cassandra configuration::
 
     client_encryption_options:
       enabled: true
@@ -128,7 +134,7 @@ to `CERT_REQUIRED`. Otherwise, the loaded verify certificate will have no effect
     cluster = Cluster(['127.0.0.1'], ssl_context=ssl_context)
     session = cluster.connect()
 
-Additionally, you can also verify the `hostname` of the server:
+Additionally, you can also force the driver to verify the `hostname` of the server by passing additional options to `ssl_context.wrap_socket` via the `ssl_options` kwarg:
 
 .. code-block:: python
 
@@ -147,8 +153,8 @@ Additionally, you can also verify the `hostname` of the server:
 Server verifies client
 ++++++++++++++++++++++
 
-If cassandra is configured to verify clients (require_client_auth), you need to generate
-SSL key and certificate files for them.
+If Cassandra is configured to verify clients (``require_client_auth``), you need to generate
+SSL key and certificate files.
 
 The cassandra configuration::
 
@@ -160,7 +166,7 @@ The cassandra configuration::
       truststore: /path/to/dse-truststore.jks
       truststore_password: myStorePass
 
-For Python, you need to generate certificate in PEM format. First, create a certificate
+The Python ``ssl`` APIs require the certificate in PEM format. First, create a certificate
 conf file:
 
 .. code-block:: bash
@@ -193,7 +199,7 @@ And generate the client signed certificate:
     openssl x509 -req -CA ${ROOT_CA_BASE_NAME}.crt -CAkey ${ROOT_CA_BASE_NAME}.key -passin pass:${ROOT_CERT_PASS} \
         -in client.csr -out client.crt_signed -days ${CERT_VALIDITY} -CAcreateserial
 
-The driver configuration:
+Finally, you can use that configuration with the following driver code:
 
 .. code-block:: python
 
@@ -212,10 +218,10 @@ The driver configuration:
 Server verifies client and client verifies server
 +++++++++++++++++++++++++++++++++++++++++++++++++
 
-See the previous section for the cassandra configuration and preparing
+See the previous section for examples of Cassandra configuration and preparing
 the client certificates.
 
-The driver configuration:
+The following driver code specifies that the connection should use two-way verification:
 
 .. code-block:: python
 
@@ -233,8 +239,8 @@ The driver configuration:
     session = cluster.connect()
 
 
-Consider reading the `python ssl documentation <https://docs.python.org/3/library/ssl.html#ssl.SSLContext>`_
-for more details about the SSLContext configuration.
+The driver uses ``SSLContext`` directly to give you many other options in configuring SSL. Consider reading the `Python SSL documentation <https://docs.python.org/library/ssl.html#ssl.SSLContext>`_
+for more details about ``SSLContext`` configuration.
 
 Versions 3.16.0 and lower
 ^^^^^^^^^^^^^^^^^^^^^^^^^
