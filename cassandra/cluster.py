@@ -2210,8 +2210,8 @@ class Session(object):
 
         `paging_state` is an optional paging state, reused from a previous :class:`ResultSet`.
 
-        `host` the :class:`pool.Host` that should handle the query. Using this is usually
-        discouraged unless for a few cases. e.g querying node-local tables, applying schema changes.
+        `host` is the :class:`pool.Host` that should handle the query. Using this is discouraged except in a few
+        cases, e.g., querying node-local tables and applying schema changes.
         """
         return self.execute_async(query, parameters, trace, custom_payload,
                                   timeout, execution_profile, paging_state, host).result()
@@ -3671,6 +3671,7 @@ class ResponseFuture(object):
         # set the query_plan according to the load balancing policy,
         # or to the explicit host target if set
         if self._host:
+            # returning a single value effectively disables retries
             self.query_plan = [self._host]
         else:
             # convert the list/generator/etc to an iterator so that subsequent
