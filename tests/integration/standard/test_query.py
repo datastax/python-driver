@@ -36,6 +36,11 @@ import time
 import random
 import re
 
+import mock
+
+
+log = logging.getLogger(__name__)
+
 
 def setup_module():
     if not USE_CASS_EXTERNAL:
@@ -337,12 +342,23 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         @expected_result the coordinator host is always the one set
         """
 
+        default_ep = self.cluster.profile_manager.default
+        # copy of default EP with checkable LBP
+        checkable_ep = self.session.execution_profile_clone_update(
+            ep=default_ep,
+            load_balancing_policy=mock.Mock(wraps=default_ep.load_balancing_policy)
+        )
         query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)")
+
         for i in range(10):
             host = random.choice(self.cluster.metadata.all_hosts())
-            future = self.session.execute_async(query, host=host)
+            log.debug('targeting {}'.format(host))
+            future = self.session.execute_async(query, host=host, execution_profile=checkable_ep)
             future.result()
+            # check we're using the selected host
             self.assertEqual(host, future.coordinator_host)
+            # check that this bypasses the LBP
+            self.assertFalse(checkable_ep.load_balancing_policy.make_query_plan.called)
 
 
 class PreparedStatementTests(unittest.TestCase):
