@@ -81,6 +81,7 @@ It might be also useful to learn about the different levels of identity verifica
 SSL Configuration Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Here, we'll describe the server and driver configuration necessary to set up SSL to meet various goals, such as the client verifying the server and the server verifying the client. We'll also include Python code demonstrating how to use servers and drivers configured in these ways.
+
 No identity verification
 ++++++++++++++++++++++++
 
