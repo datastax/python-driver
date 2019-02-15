@@ -1,6 +1,6 @@
 3.17.0
 ======
-NOT RELEASED
+February 19, 2019
 
 Features
 --------
