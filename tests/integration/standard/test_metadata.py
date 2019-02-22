@@ -54,7 +54,7 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
     @local
     def test_broadcast_listen_address(self):
         """
-        Check to ensure that the broadcast and listen adresss is populated correctly
+        Check to ensure that the broadcast, rpc_address, listen adresss and host are is populated correctly
 
         @since 3.3
         @jira_ticket PYTHON-332
@@ -62,14 +62,21 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        # All nodes should have the broadcast_address set
+        # All nodes should have the broadcast_address, rpc_address and host_id set
         for host in self.cluster.metadata.all_hosts():
             self.assertIsNotNone(host.broadcast_address)
+            self.assertIsNotNone(host.broadcast_rpc_address)
+            self.assertIsNotNone(host.host_id)
         con = self.cluster.control_connection.get_connections()[0]
         local_host = con.host
+
         # The control connection node should have the listen address set.
         listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
         self.assertTrue(local_host in listen_addrs)
+
+        # The control connection node should have the broadcast_rpc_address set.
+        rpc_addrs = [host.broadcast_rpc_address for host in self.cluster.metadata.all_hosts()]
+        self.assertTrue(local_host in rpc_addrs)
 
     def test_host_release_version(self):
         """

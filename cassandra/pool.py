@@ -28,7 +28,7 @@ except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
 from cassandra import AuthenticationFailed
-from cassandra.connection import ConnectionException
+from cassandra.connection import ConnectionException, EndPoint, DefaultEndPoint
 from cassandra.policies import HostDistance
 
 log = logging.getLogger(__name__)
@@ -48,9 +48,9 @@ class Host(object):
     Represents a single Cassandra node.
     """
 
-    address = None
+    endpoint = None
     """
-    The IP address of the node. This is the RPC address the driver uses when connecting to the node
+    The :class:`~.connection.EndPoint` to connect to the node.
     """
 
     broadcast_address = None
@@ -58,6 +58,11 @@ class Host(object):
     broadcast address configured for the node, *if available* ('peer' in system.peers table).
     This is not present in the ``system.local`` table for older versions of Cassandra. It is also not queried if
     :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    """
+
+    broadcast_rpc_address = None
+    """
+    The broadcast rpc address of the node (`native_address` or `rpc_address`).
     """
 
     listen_address = None
@@ -85,6 +90,11 @@ class Host(object):
     release_version as queried from the control connection system tables
     """
 
+    host_id = None
+    """
+    The unique identifier of the cassandra node
+    """
+
     dse_version = None
     """
     dse_version as queried from the control connection system tables. Only populated when connecting to
@@ -104,16 +114,22 @@ class Host(object):
 
     _currently_handling_node_up = False
 
-    def __init__(self, inet_address, conviction_policy_factory, datacenter=None, rack=None):
-        if inet_address is None:
-            raise ValueError("inet_address may not be None")
+    def __init__(self, endpoint, conviction_policy_factory, datacenter=None, rack=None, host_id=None):
+        if endpoint is None:
+            raise ValueError("endpoint may not be None")
         if conviction_policy_factory is None:
             raise ValueError("conviction_policy_factory may not be None")
 
-        self.address = inet_address
+        self.endpoint = endpoint if isinstance(endpoint, EndPoint) else DefaultEndPoint(endpoint)
         self.conviction_policy = conviction_policy_factory(self)
+        self.host_id = host_id
         self.set_location_info(datacenter, rack)
         self.lock = RLock()
+
+    @property
+    def address(self):
+        # backward compatibility
+        return self.endpoint.address
 
     @property
     def datacenter(self):
@@ -136,7 +152,7 @@ class Host(object):
 
     def set_up(self):
         if not self.is_up:
-            log.debug("Host %s is now marked up", self.address)
+            log.debug("Host %s is now marked up", self.endpoint)
         self.conviction_policy.reset()
         self.is_up = True
 
@@ -160,20 +176,20 @@ class Host(object):
             return old
 
     def __eq__(self, other):
-        return self.address == other.address
+        return self.endpoint == other.endpoint
 
     def __hash__(self):
-        return hash(self.address)
+        return hash(self.endpoint)
 
     def __lt__(self, other):
-        return self.address < other.address
+        return self.endpoint < other.endpoint
 
     def __str__(self):
-        return str(self.address)
+        return str(self.endpoint)
 
     def __repr__(self):
         dc = (" %s" % (self._datacenter,)) if self._datacenter else ""
-        return "<%s: %s%s>" % (self.__class__.__name__, self.address, dc)
+        return "<%s: %s%s>" % (self.__class__.__name__, self.endpoint, dc)
 
 
 class _ReconnectionHandler(object):
@@ -329,7 +345,7 @@ class HostConnection(object):
             return
 
         log.debug("Initializing connection for host %s", self.host)
-        self._connection = session.cluster.connection_factory(host.address)
+        self._connection = session.cluster.connection_factory(host.endpoint)
         self._keyspace = session.keyspace
         if self._keyspace:
             self._connection.set_keyspace_blocking(self._keyspace)
@@ -399,12 +415,12 @@ class HostConnection(object):
 
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.address)
+            conn = self._session.cluster.connection_factory(self.host)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._keyspace)
             self._connection = conn
         except Exception:
-            log.warning("Failed reconnecting %s. Retrying." % (self.host.address,))
+            log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
             self._session.submit(self._replace, connection)
         else:
             with self._lock:
@@ -478,7 +494,7 @@ class HostConnectionPool(object):
 
         log.debug("Initializing new connection pool for host %s", self.host)
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
-        self._connections = [session.cluster.connection_factory(host.address)
+        self._connections = [session.cluster.connection_factory(host.endpoint)
                              for i in range(core_conns)]
 
         self._keyspace = session.keyspace
@@ -582,7 +598,7 @@ class HostConnectionPool(object):
 
         log.debug("Going to open new connection to host %s", self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.address)
+            conn = self._session.cluster.connection_factory(self.host.endpoint)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._session.keyspace)
             self._next_trash_allowed_at = time.time() + _MIN_TRASH_INTERVAL

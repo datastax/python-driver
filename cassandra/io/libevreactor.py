@@ -20,7 +20,6 @@ import socket
 import ssl
 from threading import Lock, Thread
 import time
-import weakref
 
 from six.moves import range
 
@@ -285,16 +284,16 @@ class LibevConnection(Connection):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection (%s) to %s", id(self), self.host)
+        log.debug("Closing connection (%s) to %s", id(self), self.endpoint)
 
         _global_loop.connection_destroyed(self)
         self._socket.close()
-        log.debug("Closed socket to %s", self.host)
+        log.debug("Closed socket to %s", self.endpoint)
 
         # don't leave in-progress operations hanging
         if not self.is_defunct:
             self.error_all_requests(
-                ConnectionShutdown("Connection to %s was closed" % self.host))
+                ConnectionShutdown("Connection to %s was closed" % self.endpoint))
 
     def handle_write(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:

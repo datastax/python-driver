@@ -1,3 +1,12 @@
+3.18.0
+======
+NOT RELEASED
+
+Features
+--------
+
+* Abstract Host Connection information (PYTHON-1079)
+
 3.17.0
 ======
 February 19, 2019

@@ -17,6 +17,8 @@ from cassandra.connection import (ConnectionException, ProtocolError,
 from cassandra.marshal import int32_pack, uint8_pack, uint32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ReadyMessage, ServerError)
+from cassandra.connection import DefaultEndPoint
+
 from tests import is_monkey_patched
 
 from functools import wraps
@@ -150,6 +152,7 @@ class TimerTestMixin(object):
 
     def setUp(self):
         self.connection = self.connection_class(
+            DefaultEndPoint("127.0.0.1"),
             connect_timeout=5
         )
 
@@ -206,7 +209,7 @@ class ReactorTestMixin(object):
         ]))
 
     def make_connection(self):
-        c = self.connection_class('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
+        c = self.connection_class(DefaultEndPoint('1.2.3.4'), cql_version='3.0.1', connect_timeout=5)
         mocket = Mock()
         mocket.send.side_effect = lambda x: len(x)
         self.set_socket(c, mocket)

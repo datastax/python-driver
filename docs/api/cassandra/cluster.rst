@@ -70,6 +70,8 @@
 
    .. autoattribute:: timestamp_generator
 
+   .. autoattribute:: endpoint_factory
+
    .. automethod:: connect
 
    .. automethod:: shutdown

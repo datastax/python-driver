@@ -37,6 +37,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 from cassandra.auth import PlainTextAuthProvider, SaslAuthProvider
 from cassandra import connection
+from cassandra.connection import DefaultEndPoint
 
 from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
@@ -58,7 +59,7 @@ class IgnoredHostPolicy(RoundRobinPolicy):
         RoundRobinPolicy.__init__(self)
 
     def distance(self, host):
-        if(str(host) in self.ignored_hosts):
+        if(host.address in self.ignored_hosts):
             return HostDistance.IGNORED
         else:
             return HostDistance.LOCAL
@@ -80,7 +81,7 @@ class ClusterTests(unittest.TestCase):
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=ingored_host_policy)
         session = cluster.connect()
         for host in cluster.metadata.all_hosts():
-            if str(host) == "127.0.0.1":
+            if str(host) == "127.0.0.1:9042":
                 self.assertTrue(host.is_up)
             else:
                 self.assertIsNone(host.is_up)
@@ -98,7 +99,7 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
         cluster = Cluster(contact_points=["localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
-        self.assertTrue('127.0.0.1' in cluster.contact_points_resolved)
+        self.assertTrue(DefaultEndPoint('127.0.0.1') in cluster.endpoints_resolved)
 
     @local
     def test_host_duplication(self):
@@ -1264,7 +1265,7 @@ class TestAddressTranslation(unittest.TestCase):
         c = Cluster(address_translator=lh_ad)
         c.connect()
         for host in c.metadata.all_hosts():
-            self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
+            self.assertEqual(adder_map.get(host.address), host.broadcast_address)
         c.shutdown()
 
 @local
@@ -1424,7 +1425,7 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         # the length of mock_calls will vary, but all should use the unignored
         # address
         for c in cluster.connection_factory.mock_calls:
-            self.assertEqual(call(unignored_address), c)
+            self.assertEqual(call(DefaultEndPoint(unignored_address)), c)
         cluster.shutdown()
 
 
