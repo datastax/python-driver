@@ -614,8 +614,8 @@ class Connection(object):
         self.push(msg)
         return len(msg)
 
-    def wait_for_response(self, msg, timeout=None):
-        return self.wait_for_responses(msg, timeout=timeout)[0]
+    def wait_for_response(self, msg, timeout=None, **kwargs):
+        return self.wait_for_responses(msg, timeout=timeout, **kwargs)[0]
 
     def wait_for_responses(self, *msgs, **kwargs):
         """

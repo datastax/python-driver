@@ -128,6 +128,9 @@ class Host(object):
 
     @property
     def address(self):
+        """
+        The IP address of the endpoint. This is the RPC address the driver uses when connecting to the node.
+        """
         # backward compatibility
         return self.endpoint.address
 
@@ -176,7 +179,10 @@ class Host(object):
             return old
 
     def __eq__(self, other):
-        return self.endpoint == other.endpoint
+        if isinstance(other, Host):
+            return self.endpoint == other.endpoint
+        else:  # TODO Backward compatibility, remove next major
+            return self.endpoint.address == other
 
     def __hash__(self):
         return hash(self.endpoint)

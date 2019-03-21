@@ -2831,7 +2831,9 @@ class ControlConnection(object):
     _SELECT_PEERS = "SELECT * FROM system.peers"
     _SELECT_PEERS_NO_TOKENS = "SELECT host_id, peer, data_center, rack, rpc_address, release_version, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT * FROM system.local WHERE key='local'"
-    _SELECT_LOCAL_NO_TOKENS = "SELECT host_id, rpc_address, cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+    _SELECT_LOCAL_NO_TOKENS = "SELECT host_id, cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+    # Used only when token_metadata_enabled is set to False
+    _SELECT_LOCAL_NO_TOKENS_RPC_ADDRESS = "SELECT rpc_address FROM system.local WHERE key='local'"
 
     _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
@@ -2915,11 +2917,11 @@ class ControlConnection(object):
             try:
                 return self._try_connect(host)
             except ConnectionException as exc:
-                errors[host.endpoint] = exc
+                errors[str(host.endpoint)] = exc
                 log.warning("[control connection] Error connecting to %s:", host, exc_info=True)
                 self._cluster.signal_connection_failure(host, exc, is_host_addition=False)
             except Exception as exc:
-                errors[host.endpoint] = exc
+                errors[str(host.endpoint)] = exc
                 log.warning("[control connection] Error connecting to %s:", host, exc_info=True)
             if self._is_shutdown:
                 raise DriverException("[control connection] Reconnection in progress during shutdown")
@@ -3131,7 +3133,26 @@ class ControlConnection(object):
                 host.host_id = local_row.get("host_id")
                 host.listen_address = local_row.get("listen_address")
                 host.broadcast_address = local_row.get("broadcast_address")
+
                 host.broadcast_rpc_address = self._address_from_row(local_row)
+                if host.broadcast_rpc_address is None:
+                    if self._token_meta_enabled:
+                        # local rpc_address is not available, use the connection endpoint
+                        host.broadcast_rpc_address = connection.endpoint.address
+                    else:
+                        # local rpc_address has not been queried yet, try to fetch it
+                        # separately, which might fail because C* < 2.1.6 doesn't have rpc_address
+                        # in system.local. See CASSANDRA-9436.
+                        local_rpc_address_query = QueryMessage(query=self._SELECT_LOCAL_NO_TOKENS_RPC_ADDRESS,
+                                                               consistency_level=ConsistencyLevel.ONE)
+                        success, local_rpc_address_result = connection.wait_for_response(
+                            local_rpc_address_query, timeout=self._timeout, fail_on_error=False)
+                        if success:
+                            row = dict_factory(*local_rpc_address_result.results)
+                            host.broadcast_rpc_address = row[0]['rpc_address']
+                        else:
+                            host.broadcast_rpc_address = connection.endpoint.address
+
                 host.release_version = local_row.get("release_version")
                 host.dse_version = local_row.get("dse_version")
                 host.dse_workload = local_row.get("workload")
@@ -3663,11 +3684,11 @@ class ResponseFuture(object):
         errors = self._errors
         if not errors:
             if self.is_schema_agreed:
-                key = self._current_host.endpoint if self._current_host else 'no host queried before timeout'
+                key = str(self._current_host.endpoint) if self._current_host else 'no host queried before timeout'
                 errors = {key: "Client request timeout. See Session.execute[_async](timeout)"}
             else:
                 connection = self.session.cluster.control_connection._connection
-                host = connection.endpoint if connection else 'unknown'
+                host = str(connection.endpoint) if connection else 'unknown'
                 errors = {host: "Request timed out while waiting for schema agreement. See Session.execute[_async](timeout) and Cluster.max_schema_agreement_wait."}
 
         self._set_final_exception(OperationTimedOut(errors, self._current_host))
