@@ -37,6 +37,7 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
                                 IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy)
 from cassandra.pool import Host
+from cassandra.connection import DefaultEndPoint
 from cassandra.query import Statement
 
 from six.moves import xrange
@@ -49,7 +50,7 @@ class LoadBalancingPolicyTest(unittest.TestCase):
         """
 
         policy = LoadBalancingPolicy()
-        host = Host("ip1", SimpleConvictionPolicy)
+        host = Host(DefaultEndPoint("ip1"), SimpleConvictionPolicy)
         host.set_location_info("dc1", "rack1")
 
         self.assertRaises(NotImplementedError, policy.distance, host)
@@ -186,7 +187,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
     def test_no_remote(self):
         hosts = []
         for i in range(4):
-            h = Host(i, SimpleConvictionPolicy)
+            h = Host(DefaultEndPoint(i), SimpleConvictionPolicy)
             h.set_location_info("dc1", "rack1")
             hosts.append(h)
 
@@ -196,7 +197,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         self.assertEqual(sorted(qplan), sorted(hosts))
 
     def test_with_remotes(self):
-        hosts = [Host(i, SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(i), SimpleConvictionPolicy) for i in range(4)]
         for h in hosts[:2]:
             h.set_location_info("dc1", "rack1")
         for h in hosts[2:]:
@@ -231,14 +232,14 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
     def test_get_distance(self):
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0)
-        host = Host("ip1", SimpleConvictionPolicy)
+        host = Host(DefaultEndPoint("ip1"), SimpleConvictionPolicy)
         host.set_location_info("dc1", "rack1")
         policy.populate(Mock(), [host])
 
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
 
         # used_hosts_per_remote_dc is set to 0, so ignore it
-        remote_host = Host("ip2", SimpleConvictionPolicy)
+        remote_host = Host(DefaultEndPoint("ip2"), SimpleConvictionPolicy)
         remote_host.set_location_info("dc2", "rack1")
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
@@ -252,14 +253,14 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
         # since used_hosts_per_remote_dc is set to 1, only the first
         # remote host in dc2 will be REMOTE, the rest are IGNORED
-        second_remote_host = Host("ip3", SimpleConvictionPolicy)
+        second_remote_host = Host(DefaultEndPoint("ip3"), SimpleConvictionPolicy)
         second_remote_host.set_location_info("dc2", "rack1")
         policy.populate(Mock(), [host, remote_host, second_remote_host])
         distances = set([policy.distance(remote_host), policy.distance(second_remote_host)])
         self.assertEqual(distances, set([HostDistance.REMOTE, HostDistance.IGNORED]))
 
     def test_status_updates(self):
-        hosts = [Host(i, SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(i), SimpleConvictionPolicy) for i in range(4)]
         for h in hosts[:2]:
             h.set_location_info("dc1", "rack1")
         for h in hosts[2:]:
@@ -270,11 +271,11 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy.on_down(hosts[0])
         policy.on_remove(hosts[2])
 
-        new_local_host = Host(4, SimpleConvictionPolicy)
+        new_local_host = Host(DefaultEndPoint(4), SimpleConvictionPolicy)
         new_local_host.set_location_info("dc1", "rack1")
         policy.on_up(new_local_host)
 
-        new_remote_host = Host(5, SimpleConvictionPolicy)
+        new_remote_host = Host(DefaultEndPoint(5), SimpleConvictionPolicy)
         new_remote_host.set_location_info("dc9000", "rack1")
         policy.on_add(new_remote_host)
 
@@ -297,7 +298,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         self.assertEqual(qplan, [])
 
     def test_modification_during_generation(self):
-        hosts = [Host(i, SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(i), SimpleConvictionPolicy) for i in range(4)]
         for h in hosts[:2]:
             h.set_location_info("dc1", "rack1")
         for h in hosts[2:]:
@@ -311,7 +312,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         # approach that changes specific things during known phases of the
         # generator.
 
-        new_host = Host(4, SimpleConvictionPolicy)
+        new_host = Host(DefaultEndPoint(4), SimpleConvictionPolicy)
         new_host.set_location_info("dc1", "rack1")
 
         # new local before iteration
@@ -422,7 +423,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy.on_up(hosts[2])
         policy.on_up(hosts[3])
 
-        another_host = Host(5, SimpleConvictionPolicy)
+        another_host = Host(DefaultEndPoint(5), SimpleConvictionPolicy)
         another_host.set_location_info("dc3", "rack1")
         new_host.set_location_info("dc3", "rack1")
 
@@ -456,7 +457,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
 
         hosts = []
         for i in range(4):
-            h = Host(i, SimpleConvictionPolicy)
+            h = Host(DefaultEndPoint(i), SimpleConvictionPolicy)
             h.set_location_info("dc1", "rack1")
             hosts.append(h)
 
@@ -481,12 +482,12 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         self.assertEqual(qplan, [])
 
     def test_default_dc(self):
-        host_local = Host(1, SimpleConvictionPolicy, 'local')
-        host_remote = Host(2, SimpleConvictionPolicy, 'remote')
-        host_none = Host(1, SimpleConvictionPolicy)
+        host_local = Host(DefaultEndPoint(1), SimpleConvictionPolicy, 'local')
+        host_remote = Host(DefaultEndPoint(2), SimpleConvictionPolicy, 'remote')
+        host_none = Host(DefaultEndPoint(1), SimpleConvictionPolicy)
 
         # contact point is '1'
-        cluster = Mock(contact_points_resolved=[1])
+        cluster = Mock(endpoints_resolved=[DefaultEndPoint(1)])
 
         # contact DC first
         policy = DCAwareRoundRobinPolicy()
@@ -526,7 +527,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     def test_wrap_round_robin(self):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
-        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
 
@@ -557,7 +558,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     def test_wrap_dc_aware(self):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
-        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
         for h in hosts[:2]:
@@ -608,7 +609,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         """
 
         policy = TokenAwarePolicy(DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=0))
-        host = Host("ip1", SimpleConvictionPolicy)
+        host = Host(DefaultEndPoint("ip1"), SimpleConvictionPolicy)
         host.set_location_info("dc1", "rack1")
 
         policy.populate(self.FakeCluster(), [host])
@@ -616,7 +617,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
 
         # used_hosts_per_remote_dc is set to 0, so ignore it
-        remote_host = Host("ip2", SimpleConvictionPolicy)
+        remote_host = Host(DefaultEndPoint("ip2"), SimpleConvictionPolicy)
         remote_host.set_location_info("dc2", "rack1")
         self.assertEqual(policy.distance(remote_host), HostDistance.IGNORED)
 
@@ -630,7 +631,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         # since used_hosts_per_remote_dc is set to 1, only the first
         # remote host in dc2 will be REMOTE, the rest are IGNORED
-        second_remote_host = Host("ip3", SimpleConvictionPolicy)
+        second_remote_host = Host(DefaultEndPoint("ip3"), SimpleConvictionPolicy)
         second_remote_host.set_location_info("dc2", "rack1")
         policy.populate(self.FakeCluster(), [host, remote_host, second_remote_host])
         distances = set([policy.distance(remote_host), policy.distance(second_remote_host)])
@@ -641,7 +642,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         Same test as DCAwareRoundRobinPolicyTest.test_status_updates()
         """
 
-        hosts = [Host(i, SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(i), SimpleConvictionPolicy) for i in range(4)]
         for h in hosts[:2]:
             h.set_location_info("dc1", "rack1")
         for h in hosts[2:]:
@@ -652,11 +653,11 @@ class TokenAwarePolicyTest(unittest.TestCase):
         policy.on_down(hosts[0])
         policy.on_remove(hosts[2])
 
-        new_local_host = Host(4, SimpleConvictionPolicy)
+        new_local_host = Host(DefaultEndPoint(4), SimpleConvictionPolicy)
         new_local_host.set_location_info("dc1", "rack1")
         policy.on_up(new_local_host)
 
-        new_remote_host = Host(5, SimpleConvictionPolicy)
+        new_remote_host = Host(DefaultEndPoint(5), SimpleConvictionPolicy)
         new_remote_host.set_location_info("dc9000", "rack1")
         policy.on_add(new_remote_host)
 
@@ -679,7 +680,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
         self.assertEqual(qplan, [])
 
     def test_statement_keyspace(self):
-        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
 
@@ -769,7 +770,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
     @patch('cassandra.policies.shuffle')
     def _assert_shuffle(self, patched_shuffle, keyspace, routing_key):
-        hosts = [Host(str(i), SimpleConvictionPolicy) for i in range(4)]
+        hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
 
@@ -1224,7 +1225,7 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
     def test_hosts_with_hostname(self):
         hosts = ['localhost']
         policy = WhiteListRoundRobinPolicy(hosts)
-        host = Host("127.0.0.1", SimpleConvictionPolicy)
+        host = Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy)
         policy.populate(None, [host])
 
         qplan = list(policy.make_query_plan())
@@ -1347,8 +1348,8 @@ class HostFilterPolicyDistanceTest(unittest.TestCase):
             child_policy=Mock(name='child_policy', distance=Mock(name='distance')),
             predicate=lambda host: host.address == 'acceptme'
         )
-        self.ignored_host = Host(inet_address='ignoreme', conviction_policy_factory=Mock())
-        self.accepted_host = Host(inet_address='acceptme', conviction_policy_factory=Mock())
+        self.ignored_host = Host(DefaultEndPoint('ignoreme'), conviction_policy_factory=Mock())
+        self.accepted_host = Host(DefaultEndPoint('acceptme'), conviction_policy_factory=Mock())
 
     def test_ignored_with_filter(self):
         self.assertEqual(self.hfp.distance(self.ignored_host),
@@ -1422,7 +1423,7 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
 
     def test_wrap_token_aware(self):
         cluster = Mock(spec=Cluster)
-        hosts = [Host("127.0.0.{}".format(i), SimpleConvictionPolicy) for i in range(1, 6)]
+        hosts = [Host(DefaultEndPoint("127.0.0.{}".format(i)), SimpleConvictionPolicy) for i in range(1, 6)]
         for host in hosts:
             host.set_up()
 
@@ -1447,13 +1448,13 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
         query_plan = hfp.make_query_plan("keyspace", mocked_query)
         # First the not filtered replica, and then the rest of the allowed hosts ordered
         query_plan = list(query_plan)
-        self.assertEqual(query_plan[0], Host("127.0.0.2", SimpleConvictionPolicy))
-        self.assertEqual(set(query_plan[1:]),{Host("127.0.0.3", SimpleConvictionPolicy),
-                                              Host("127.0.0.5", SimpleConvictionPolicy)})
+        self.assertEqual(query_plan[0], Host(DefaultEndPoint("127.0.0.2"), SimpleConvictionPolicy))
+        self.assertEqual(set(query_plan[1:]),{Host(DefaultEndPoint("127.0.0.3"), SimpleConvictionPolicy),
+                                              Host(DefaultEndPoint("127.0.0.5"), SimpleConvictionPolicy)})
 
     def test_create_whitelist(self):
         cluster = Mock(spec=Cluster)
-        hosts = [Host("127.0.0.{}".format(i), SimpleConvictionPolicy) for i in range(1, 6)]
+        hosts = [Host(DefaultEndPoint("127.0.0.{}".format(i)), SimpleConvictionPolicy) for i in range(1, 6)]
         for host in hosts:
             host.set_up()
 
@@ -1471,6 +1472,6 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
         mocked_query = Mock()
         query_plan = hfp.make_query_plan("keyspace", mocked_query)
         # Only the filtered replicas should be allowed
-        self.assertEqual(set(query_plan), {Host("127.0.0.1", SimpleConvictionPolicy),
-                                           Host("127.0.0.4", SimpleConvictionPolicy)})
+        self.assertEqual(set(query_plan), {Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy),
+                                           Host(DefaultEndPoint("127.0.0.4"), SimpleConvictionPolicy)})
 

@@ -7,3 +7,9 @@
 .. autoexception:: ConnectionShutdown ()
 .. autoexception:: ConnectionBusy ()
 .. autoexception:: ProtocolError ()
+
+.. autoclass:: EndPoint
+   :members:
+
+.. autoclass:: EndPointFactory
+   :members:

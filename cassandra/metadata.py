@@ -42,7 +42,7 @@ from cassandra.protocol import QueryMessage
 from cassandra.query import dict_factory, bind_params
 from cassandra.util import OrderedDict
 from cassandra.pool import HostDistance
-
+from cassandra.connection import EndPoint
 
 log = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class Metadata(object):
 
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
-        server_version = self.get_host(connection.host).release_version
+        server_version = self.get_host(connection.endpoint).release_version
         parser = get_schema_parser(connection, server_version, timeout)
 
         if not target_type:
@@ -317,17 +317,30 @@ class Metadata(object):
         """
         with self._hosts_lock:
             try:
-                return self._hosts[host.address], False
+                return self._hosts[host.endpoint], False
             except KeyError:
-                self._hosts[host.address] = host
+                self._hosts[host.endpoint] = host
                 return host, True
 
     def remove_host(self, host):
         with self._hosts_lock:
-            return bool(self._hosts.pop(host.address, False))
+            return bool(self._hosts.pop(host.endpoint, False))
 
-    def get_host(self, address):
-        return self._hosts.get(address)
+    def get_host(self, endpoint_or_address):
+        """
+        Find a host in the metadata for a specific endpoint. If a string inet address is passed,
+        iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` attribute.
+        """
+        if not isinstance(endpoint_or_address, EndPoint):
+            return self._get_host_by_address(endpoint_or_address)
+
+        return self._hosts.get(endpoint_or_address)
+
+    def _get_host_by_address(self, address):
+        for host in six.itervalues(self._hosts):
+            if host.broadcast_rpc_address == address:
+                return host
+        return None
 
     def all_hosts(self):
         """

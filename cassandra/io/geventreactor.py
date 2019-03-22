@@ -86,18 +86,18 @@ class GeventConnection(Connection):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection (%s) to %s" % (id(self), self.host))
+        log.debug("Closing connection (%s) to %s" % (id(self), self.endpoint))
         if self._read_watcher:
             self._read_watcher.kill(block=False)
         if self._write_watcher:
             self._write_watcher.kill(block=False)
         if self._socket:
             self._socket.close()
-        log.debug("Closed socket to %s" % (self.host,))
+        log.debug("Closed socket to %s" % (self.endpoint,))
 
         if not self.is_defunct:
             self.error_all_requests(
-                ConnectionShutdown("Connection to %s was closed" % self.host))
+                ConnectionShutdown("Connection to %s was closed" % self.endpoint))
             # don't leave in-progress operations hanging
             self.connected_event.set()
 

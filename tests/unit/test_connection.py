@@ -26,7 +26,7 @@ from cassandra import OperationTimedOut
 from cassandra.cluster import Cluster
 from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT, ProtocolError,
                                   locally_supported_compressions, ConnectionHeartbeat, _Frame, Timer, TimerManager,
-                                  ConnectionException)
+                                  ConnectionException, DefaultEndPoint)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ProtocolHandler)
@@ -35,7 +35,7 @@ from cassandra.protocol import (write_stringmultimap, write_int, write_string,
 class ConnectionTest(unittest.TestCase):
 
     def make_connection(self):
-        c = Connection('1.2.3.4')
+        c = Connection(DefaultEndPoint('1.2.3.4'))
         c._socket = Mock()
         c._socket.send.side_effect = lambda x: len(x)
         return c
@@ -73,6 +73,21 @@ class ConnectionTest(unittest.TestCase):
 
     def make_msg(self, header, body=""):
         return header + uint32_pack(len(body)) + body
+
+    def test_connection_endpoint(self):
+        endpoint = DefaultEndPoint('1.2.3.4')
+        c = Connection(endpoint)
+        self.assertEqual(c.endpoint, endpoint)
+        self.assertEqual(c.endpoint.address, endpoint.address)
+
+        c = Connection(host=endpoint)  # kwarg
+        self.assertEqual(c.endpoint, endpoint)
+        self.assertEqual(c.endpoint.address, endpoint.address)
+
+        c = Connection('10.0.0.1')
+        endpoint = DefaultEndPoint('10.0.0.1')
+        self.assertEqual(c.endpoint, endpoint)
+        self.assertEqual(c.endpoint.address, endpoint.address)
 
     def test_bad_protocol_version(self, *args):
         c = self.make_connection()
@@ -388,7 +403,8 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         def send_msg(msg, req_id, msg_callback):
             pass
 
-        connection = Mock(spec=Connection, host='localhost',
+        # we used endpoint=X here because it's a mock and we need connection.endpoint to be set
+        connection = Mock(spec=Connection, endpoint=DefaultEndPoint('localhost'),
                           max_request_id=127,
                           lock=Lock(),
                           in_flight=0, is_idle=True,
@@ -406,7 +422,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         exc = connection.defunct.call_args_list[0][0][0]
         self.assertIsInstance(exc, OperationTimedOut)
         self.assertEqual(exc.errors, 'Connection heartbeat timeout after 0.05 seconds')
-        self.assertEqual(exc.last_host, 'localhost')
+        self.assertEqual(exc.last_host, DefaultEndPoint('localhost'))
         holder.return_connection.assert_has_calls(
             [call(connection)] * get_holders.call_count)
 
@@ -425,3 +441,49 @@ class TimerTest(unittest.TestCase):
         tm.add_timer(t2)
         # Prior to #466: "TypeError: unorderable types: Timer() < Timer()"
         tm.service_timeouts()
+
+
+class DefaultEndPointTest(unittest.TestCase):
+
+    def test_default_endpoint_properties(self):
+        endpoint = DefaultEndPoint('10.0.0.1')
+        self.assertEqual(endpoint.address, '10.0.0.1')
+        self.assertEqual(endpoint.port, 9042)
+        self.assertEqual(str(endpoint), '10.0.0.1:9042')
+
+        endpoint = DefaultEndPoint('10.0.0.1', 8888)
+        self.assertEqual(endpoint.address, '10.0.0.1')
+        self.assertEqual(endpoint.port, 8888)
+        self.assertEqual(str(endpoint), '10.0.0.1:8888')
+
+    def test_endpoint_equality(self):
+        self.assertEqual(
+            DefaultEndPoint('10.0.0.1'),
+            DefaultEndPoint('10.0.0.1')
+        )
+
+        self.assertEqual(
+            DefaultEndPoint('10.0.0.1'),
+            DefaultEndPoint('10.0.0.1', 9042)
+        )
+
+        self.assertNotEqual(
+            DefaultEndPoint('10.0.0.1'),
+            DefaultEndPoint('10.0.0.2')
+        )
+
+        self.assertNotEqual(
+            DefaultEndPoint('10.0.0.1'),
+            DefaultEndPoint('10.0.0.1', 0000)
+        )
+
+    def test_endpoint_resolve(self):
+        self.assertEqual(
+            DefaultEndPoint('10.0.0.1').resolve(),
+            ('10.0.0.1', 9042)
+        )
+
+        self.assertEqual(
+            DefaultEndPoint('10.0.0.1', 3232).resolve(),
+            ('10.0.0.1', 3232)
+        )
