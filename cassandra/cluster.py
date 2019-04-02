@@ -1916,7 +1916,7 @@ class Cluster(object):
         connection = None
         try:
             connection = self.connection_factory(host.endpoint)
-            statements = self._prepared_statements.values()
+            statements = list(self._prepared_statements.values())
             if ProtocolVersion.uses_keyspace_flag(self.protocol_version):
                 # V5 protocol and higher, no need to set the keyspace
                 chunks = []
