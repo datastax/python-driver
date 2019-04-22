@@ -411,7 +411,7 @@ class Connection(object):
                 if not getattr(ssl, 'match_hostname', None):
                     raise RuntimeError("ssl_options specify 'check_hostname', but ssl.match_hostname is not provided. "
                                        "Patch or upgrade Python to use this option.")
-            self.ssl.options.update(self.endpoint.ssl_options or {})
+            self.ssl_options.update(self.endpoint.ssl_options or {})
         elif self.endpoint.ssl_options:
             self.ssl_options = self.endpoint.ssl_options
 
