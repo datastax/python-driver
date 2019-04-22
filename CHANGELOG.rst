@@ -7,6 +7,11 @@ Features
 
 * Abstract Host Connection information (PYTHON-1079)
 
+Bug Fixes
+---------
+
+* Fix error when preparing queries with beta protocol v5 (PYTHON-1081)
+
 3.17.0
 ======
 February 19, 2019
