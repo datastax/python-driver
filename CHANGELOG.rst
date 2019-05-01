@@ -1,3 +1,11 @@
+3.17.1
+======
+May 2, 2019
+
+Bug Fixes
+---------
+* Socket errors EAGAIN/EWOULDBLOCK are not handled properly and cause timeouts (PYTHON-1089)
+
 3.17.0
 ======
 February 19, 2019
