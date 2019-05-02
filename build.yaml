@@ -43,6 +43,17 @@ schedules:
         - python: [3.4, 3.6]
         - cassandra: ['2.0', '2.1', '3.0']
 
+  commit_branches:
+    schedule: per_commit
+    branches:
+      include: [/.+release/]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+      EXCLUDE_LONG=1
+    matrix:
+      exclude:
+        - python: [3.4, 3.6]
+
   weekly_libev:
     schedule: 0 10 * * 6
     branches:
