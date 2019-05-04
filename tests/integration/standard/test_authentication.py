@@ -77,9 +77,20 @@ class AuthenticationTests(unittest.TestCase):
             return PlainTextAuthProvider(username=username, password=password)
 
     def cluster_as(self, usr, pwd):
-        return Cluster(protocol_version=PROTOCOL_VERSION,
-                       idle_heartbeat_interval=0,
-                       auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+        # test we can connect at least once with creds
+        # to ensure the role manager is setup
+        for _ in range(5):
+            try:
+                cluster = Cluster(
+                    protocol_version=PROTOCOL_VERSION,
+                    idle_heartbeat_interval=0,
+                    auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+                cluster.connect(wait_for_all_pools=True)
+                return cluster
+            except Exception as e:
+                time.sleep(5)
+
+        raise Exception('Unable to connect with creds: {}/{}'.format(usr, pwd))
 
     def test_auth_connect(self):
         user = 'u'
