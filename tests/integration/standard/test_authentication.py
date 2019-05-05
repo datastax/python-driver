@@ -84,9 +84,13 @@ class AuthenticationTests(unittest.TestCase):
                 cluster = Cluster(
                     protocol_version=PROTOCOL_VERSION,
                     idle_heartbeat_interval=0,
-                    auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+                    auth_provider=self.get_authentication_provider(username='cassandra', password='cassandra'))
                 cluster.connect(wait_for_all_pools=True)
-                return cluster
+
+                return Cluster(
+                    protocol_version=PROTOCOL_VERSION,
+                    idle_heartbeat_interval=0,
+                    auth_provider=self.get_authentication_provider(username=usr, password=pwd))
             except Exception as e:
                 time.sleep(5)
 
