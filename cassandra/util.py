@@ -1232,3 +1232,82 @@ class Duration(object):
             abs(self.days),
             abs(self.nanoseconds)
         )
+
+
+@total_ordering
+class Version(object):
+    """
+    Internal minimalist class to compare versions.
+    A valid version is: <int>.<int>.<int>.<int or str>.
+
+    TODO: when python2 support is removed, use packaging.version.
+    """
+
+    _version = None
+    major = None
+    minor = 0
+    patch = 0
+    build = 0
+
+    def __init__(self, version):
+        self._version = version
+        parts = list(reversed(version.split('.')))
+        if len(parts) > 4:
+            raise ValueError("Invalid version: {}. Only 4 "
+                             "components are supported".format(version))
+
+        self.major = int(parts.pop())
+        self.minor = int(parts.pop()) if parts else 0
+        self.patch = int(parts.pop()) if parts else 0
+
+        if parts:  # we have a build version
+            build = parts.pop()
+            try:
+                self.build = int(build)
+            except ValueError:
+                self.build = build
+
+    def __hash__(self):
+        return self._version
+
+    def __repr__(self):
+        if self.build:
+            return "Version({0}, {1}, {2}, {3})".format(self.major, self.minor, self.patch, self.build)
+
+        return "Version({0}, {1}, {2})".format(self.major, self.minor, self.patch)
+
+    def __str__(self):
+        return self._version
+
+    @staticmethod
+    def _compare_build(build, other_build, cmp):
+        if not (isinstance(build, six.integer_types) and
+                isinstance(other_build, six.integer_types)):
+            build = str(build)
+            other_build = str(other_build)
+
+        return cmp(build, other_build)
+
+    def __eq__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+
+        return (self.major == other.major and
+                self.minor == other.minor and
+                self.patch == other.patch and
+                self._compare_build(self.build, other.build, lambda s, o: s == o))
+
+    def __gt__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+
+        is_major_ge = self.major >= other.major
+        is_minor_ge = self.minor >= other.minor
+        is_patch_ge = self.patch >= other.patch
+        is_build_gt = self._compare_build(
+            self.build, other.build, lambda s, o: s > o)
+
+        return (self.major > other.major or
+            (is_major_ge and self.minor > other.minor) or
+            (is_major_ge and is_minor_ge and self.patch > other.patch) or
+            (is_major_ge and is_minor_ge and is_patch_ge and is_build_gt))

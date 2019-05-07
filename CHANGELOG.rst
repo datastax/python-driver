@@ -6,6 +6,7 @@ Features
 --------
 
 * Abstract Host Connection information (PYTHON-1079)
+* Improve version parsing to support a non-integer 4th component (PYTHON-1091)
 
 Bug Fixes
 ---------

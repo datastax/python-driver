@@ -40,7 +40,7 @@ from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
 from cassandra.protocol import QueryMessage
 from cassandra.query import dict_factory, bind_params
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, Version
 from cassandra.pool import HostDistance
 from cassandra.connection import EndPoint
 
@@ -2763,10 +2763,10 @@ class MaterializedViewMetadata(object):
 
 
 def get_schema_parser(connection, server_version, timeout):
-    server_major_version = int(server_version.split('.')[0])
-    if server_major_version >= 4:
+    version = Version(server_version)
+    if version >= Version('4.0.0'):
         return SchemaParserV4(connection, timeout)
-    if server_major_version >= 3:
+    if version >= Version('3.0.0'):
         return SchemaParserV3(connection, timeout)
     else:
         # we could further specialize by version. Right now just refactoring the

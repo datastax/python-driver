@@ -18,7 +18,7 @@ except ImportError:
 
 import datetime
 
-from cassandra.util import Date, Time, Duration
+from cassandra.util import Date, Time, Duration, Version
 
 
 class DateTests(unittest.TestCase):
@@ -206,4 +206,76 @@ class DurationTests(unittest.TestCase):
         self.assertEqual(str(Duration(52, 23, 564564)), "52mo23d564564ns")
 
 
+class VersionTests(unittest.TestCase):
 
+    def test_version_parsing(self):
+
+        versions = [
+            (2, 0, 0),
+            (3, 1, 0),
+            (2, 4, 54),
+            (3, 1, 1, 12),
+            (3, 55, 1, 'build12'),
+            (3, 55, 1, '20190429-TEST')
+        ]
+
+        for version in versions:
+            str_version = '.'.join([str(p) for p in version])
+            v = Version(str_version)
+            self.assertEqual(str_version, str(v))
+            self.assertEqual(v.major, version[0])
+            self.assertEqual(v.minor, version[1])
+            self.assertEqual(v.patch, version[2])
+            if len(version) > 3:
+                self.assertEqual(v.build, version[3])
+
+        # not supported version formats
+        with self.assertRaises(ValueError):
+            Version('2.1.hello')
+
+        with self.assertRaises(ValueError):
+            Version('2.test.1')
+
+        with self.assertRaises(ValueError):
+            Version('test.1.0')
+
+        with self.assertRaises(ValueError):
+            Version('1.0.0.0.1')
+
+    def test_version_compare(self):
+        # just tests a bunch of versions
+
+        # major wins
+        self.assertTrue(Version('3.3.0') > Version('2.5.0'))
+        self.assertTrue(Version('3.3.0') > Version('2.5.0.66'))
+        self.assertTrue(Version('3.3.0') > Version('2.5.21'))
+
+        # minor wins
+        self.assertTrue(Version('2.3.0') > Version('2.2.0'))
+        self.assertTrue(Version('2.3.0') > Version('2.2.7'))
+        self.assertTrue(Version('2.3.0') > Version('2.2.7.9'))
+
+        # patch wins
+        self.assertTrue(Version('2.3.1') > Version('2.3.0'))
+        self.assertTrue(Version('2.3.1') > Version('2.3.0.4post0'))
+        self.assertTrue(Version('2.3.1') > Version('2.3.0.44'))
+
+        # various
+        self.assertTrue(Version('2.3.0.1') > Version('2.3.0.0'))
+        self.assertTrue(Version('2.3.0.680') > Version('2.3.0.670'))
+        self.assertTrue(Version('2.3.0.681') > Version('2.3.0.680'))
+        self.assertTrue(Version('2.3.0.1build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
+        self.assertTrue(Version('2.3.0.build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
+        self.assertTrue(Version('2.3.0') < Version('2.3.0.build'))
+
+        self.assertTrue(Version('4.0.0') >= Version('4.0.0'))
+        self.assertTrue(Version('4.0.0.421') >= Version('4.0.0'))
+        self.assertTrue(Version('4.0.1') >= Version('4.0.0'))
+        self.assertTrue(Version('2.3.0') == Version('2.3.0'))
+        self.assertTrue(Version('2.3.32') == Version('2.3.32'))
+        self.assertTrue(Version('2.3.32') == Version('2.3.32.0'))
+        self.assertTrue(Version('2.3.0.build') == Version('2.3.0.build'))
+
+        self.assertTrue(Version('4') == Version('4.0.0'))
+        self.assertTrue(Version('4.0') == Version('4.0.0.0'))
+        self.assertTrue(Version('4.0') > Version('3.9.3'))
