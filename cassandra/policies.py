@@ -839,6 +839,31 @@ class RetryPolicy(object):
         """
         return (self.RETRY_NEXT_HOST, None) if retry_num == 0 else (self.RETHROW, None)
 
+    def on_request_error(self, query, consistency, error, retry_num):
+        """
+        This is called when an unexpected error happens. This can be in the
+        following situations:
+
+        * On a connection error
+        * On server errors: overloaded, isBootstrapping, serverError, etc.
+
+        `query` is the :class:`.Statement` that timed out.
+
+        `consistency` is the :class:`.ConsistencyLevel` that the operation was
+        attempted at.
+
+        `error` the instance of the exception.
+
+        `retry_num` counts how many times the operation has been retried, so
+        the first time this method is called, `retry_num` will be 0.
+
+        The default, it triggers a retry on the next host in the query plan
+        with the same consistency level.
+        """
+        # TODO revisit this for the next major
+        # To preserve the same behavior than before, we don't take retry_num into account
+        return self.RETRY_NEXT_HOST, None
+
 
 class FallthroughRetryPolicy(RetryPolicy):
     """
@@ -853,6 +878,9 @@ class FallthroughRetryPolicy(RetryPolicy):
         return self.RETHROW, None
 
     def on_unavailable(self, *args, **kwargs):
+        return self.RETHROW, None
+
+    def on_request_error(self, *args, **kwargs):
         return self.RETHROW, None
 
 

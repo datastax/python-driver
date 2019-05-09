@@ -241,8 +241,8 @@ class ResponseFutureTests(unittest.TestCase):
         rf._set_result(host, None, None, result)
 
         session.submit.assert_called_once_with(rf._retry_task, False, host)
-        # query_retries does not get incremented for Overloaded/Bootstrapping errors
-        self.assertEqual(0, rf._query_retries)
+        # query_retries does get incremented for Overloaded/Bootstrapping errors (since 3.18)
+        self.assertEqual(1, rf._query_retries)
 
         connection = Mock(spec=Connection)
         pool.borrow_connection.return_value = (connection, 2)
