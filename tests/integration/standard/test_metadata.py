@@ -23,6 +23,7 @@ import logging
 import six
 import sys
 import time
+import os
 from packaging.version import Version
 from mock import Mock, patch
 
@@ -78,6 +79,9 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         rpc_addrs = [host.broadcast_rpc_address for host in self.cluster.metadata.all_hosts()]
         self.assertTrue(local_host in rpc_addrs)
 
+    @unittest.skipUnless(
+        os.getenv('MAPPED_CASSANDRA_VERSION', None) is None,
+        "Don't check the host version for test-dse")
     def test_host_release_version(self):
         """
         Checks the hosts release version and validates that it is equal to the
