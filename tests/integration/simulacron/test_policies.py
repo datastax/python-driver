@@ -224,6 +224,7 @@ class CounterRetryPolicy(RetryPolicy):
         self.write_timeout = count()
         self.read_timeout = count()
         self.unavailable = count()
+        self.request_error = count()
 
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
@@ -239,10 +240,15 @@ class CounterRetryPolicy(RetryPolicy):
         next(self.unavailable)
         return self.IGNORE, None
 
+    def on_request_error(self, query, consistency, error, retry_num):
+        next(self.request_error)
+        return self.IGNORE, None
+
     def reset_counters(self):
         self.write_timeout = count()
         self.read_timeout = count()
         self.unavailable = count()
+        self.request_error = count()
 
 
 @requiressimulacron
@@ -261,6 +267,12 @@ class RetryPolicyTests(unittest.TestCase):
 
     def tearDown(self):
         clear_queries()
+
+    def set_cluster(self, retry_policy):
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
+                          default_retry_policy=retry_policy)
+        self.session = self.cluster.connect(wait_for_all_pools=True)
+        self.addCleanup(self.cluster.shutdown)
 
     def test_retry_policy_ignores_and_rethrows(self):
         """
@@ -378,8 +390,62 @@ class RetryPolicyTests(unittest.TestCase):
         self.session.execute(bound_stmt)
         self.assertEqual(next(counter_policy.write_timeout), 1)
 
-    def set_cluster(self, retry_policy):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
-                          default_retry_policy=retry_policy)
-        self.session = self.cluster.connect(wait_for_all_pools=True)
-        self.addCleanup(self.cluster.shutdown)
+    def test_retry_policy_on_request_error(self):
+        """
+        Test to verify that on_request_error is called properly.
+
+        @since 3.18
+        @jira_ticket PYTHON-1064
+        @expected_result the appropriate retry policy is called
+
+        @test_category connection
+        """
+        overloaded_error = {
+            "result": "overloaded",
+            "message": "overloaded"
+        }
+
+        bootstrapping_error = {
+            "result": "is_bootstrapping",
+            "message": "isbootstrapping"
+        }
+
+        truncate_error = {
+            "result": "truncate_error",
+            "message": "truncate_error"
+        }
+
+        server_error = {
+            "result": "server_error",
+            "message": "server_error"
+        }
+
+        # Test the on_request_error call
+        retry_policy = CounterRetryPolicy()
+        self.set_cluster(retry_policy)
+
+        for e in [overloaded_error, bootstrapping_error, truncate_error, server_error]:
+            query_to_prime = "SELECT * from simulacron_keyspace.simulacron_table;"
+            prime_query(query_to_prime, then=e, rows=None, column_types=None)
+            rf = self.session.execute_async(query_to_prime)
+            try:
+                rf.result()
+            except:
+                pass
+            self.assertEqual(len(rf.attempted_hosts), 1)  # no retry
+
+        self.assertEqual(next(retry_policy.request_error), 4)
+
+        # Test that by default, retry on next host
+        retry_policy = RetryPolicy()
+        self.set_cluster(retry_policy)
+
+        for e in [overloaded_error, bootstrapping_error, truncate_error, server_error]:
+            query_to_prime = "SELECT * from simulacron_keyspace.simulacron_table;"
+            prime_query(query_to_prime, then=e, rows=None, column_types=None)
+            rf = self.session.execute_async(query_to_prime)
+            try:
+                rf.result()
+            except:
+                pass
+            self.assertEqual(len(rf.attempted_hosts), 3)  # all 3 nodes failed

@@ -58,6 +58,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 PrepareMessage, ExecuteMessage,
                                 PreparedQueryNotFound,
                                 IsBootstrappingErrorMessage,
+                                TruncateError, ServerError,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler)
@@ -3925,20 +3926,15 @@ class ResponseFuture(object):
                         self._metrics.on_unavailable()
                     retry = retry_policy.on_unavailable(
                         self.query, retry_num=self._query_retries, **response.info)
-                elif isinstance(response, OverloadedErrorMessage):
+                elif isinstance(response, (OverloadedErrorMessage,
+                                           IsBootstrappingErrorMessage,
+                                           TruncateError, ServerError)):
+                    log.warning("Host %s error: %s.", host, response.summary)
                     if self._metrics is not None:
                         self._metrics.on_other_error()
-                    # need to retry against a different host here
-                    log.warning("Host %s is overloaded, retrying against a different "
-                                "host", host)
-                    self._retry(reuse_connection=False, consistency_level=None, host=host)
-                    return
-                elif isinstance(response, IsBootstrappingErrorMessage):
-                    if self._metrics is not None:
-                        self._metrics.on_other_error()
-                    # need to retry against a different host here
-                    self._retry(reuse_connection=False, consistency_level=None, host=host)
-                    return
+                    retry = retry_policy.on_request_error(
+                        self.query, self.message.consistency_level, error=response,
+                        retry_num=self._query_retries)
                 elif isinstance(response, PreparedQueryNotFound):
                     if self.prepared_statement:
                         query_id = self.prepared_statement.query_id
@@ -3988,24 +3984,16 @@ class ResponseFuture(object):
                         self._set_final_exception(response)
                     return
 
-                retry_type, consistency = retry
-                if retry_type in (RetryPolicy.RETRY, RetryPolicy.RETRY_NEXT_HOST):
-                    self._query_retries += 1
-                    reuse = retry_type == RetryPolicy.RETRY
-                    self._retry(reuse, consistency, host)
-                elif retry_type is RetryPolicy.RETHROW:
-                    self._set_final_exception(response.to_exception())
-                else:  # IGNORE
-                    if self._metrics is not None:
-                        self._metrics.on_ignore()
-                    self._set_final_result(None)
-                self._errors[host] = response.to_exception()
+                self._handle_retry_decision(retry, response, host)
             elif isinstance(response, ConnectionException):
                 if self._metrics is not None:
                     self._metrics.on_connection_error()
                 if not isinstance(response, ConnectionShutdown):
                     self._connection.defunct(response)
-                self._retry(reuse_connection=False, consistency_level=None, host=host)
+                retry = self._retry_policy.on_request_error(
+                    self.query, self.message.consistency_level, error=response,
+                    retry_num=self._query_retries)
+                self._handle_retry_decision(retry, response, host)
             elif isinstance(response, Exception):
                 if hasattr(response, 'to_exception'):
                     self._set_final_exception(response.to_exception())
@@ -4120,6 +4108,28 @@ class ResponseFuture(object):
         # apply each callback
         for callback_partial in to_call:
             callback_partial()
+
+    def _handle_retry_decision(self, retry_decision, response, host):
+
+        def exception_from_response(response):
+            if hasattr(response, 'to_exception'):
+                return response.to_exception()
+            else:
+                return response
+
+        retry_type, consistency = retry_decision
+        if retry_type in (RetryPolicy.RETRY, RetryPolicy.RETRY_NEXT_HOST):
+            self._query_retries += 1
+            reuse = retry_type == RetryPolicy.RETRY
+            self._retry(reuse, consistency, host)
+        elif retry_type is RetryPolicy.RETHROW:
+            self._set_final_exception(exception_from_response(response))
+        else:  # IGNORE
+            if self._metrics is not None:
+                self._metrics.on_ignore()
+            self._set_final_result(None)
+
+        self._errors[host] = exception_from_response(response)
 
     def _retry(self, reuse_connection, consistency_level, host):
         if self._final_exception:
