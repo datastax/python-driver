@@ -13,6 +13,7 @@ Bug Fixes
 ---------
 
 * Fix error when preparing queries with beta protocol v5 (PYTHON-1081)
+* Accept legacy empty strings as column names (PYTHON-1082)
 
 3.17.1
 ======
