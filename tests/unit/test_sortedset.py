@@ -20,6 +20,8 @@ except ImportError:
 from cassandra.util import sortedset
 from cassandra.cqltypes import EMPTY
 
+from datetime import datetime
+from itertools import permutations
 
 class SortedSetTest(unittest.TestCase):
     def test_init(self):
@@ -364,3 +366,30 @@ class SortedSetTest(unittest.TestCase):
         s = pickle.dumps(ss)
         self.assertEqual(pickle.loads(s), ss)
 
+    def test_uncomparable_types(self):
+        # PYTHON-1087 - make set handle uncomparable types
+        dt = datetime(2019, 5, 16)
+        items = (('samekey', 3, 1),
+                 ('samekey', None, 0),
+                 ('samekey', dt),
+                 ("samekey", None, 2),
+                 ("samekey", None, 1),
+                 ('samekey', dt),
+                 ('samekey', None, 0),
+                 ("samekey", datetime.now()))
+
+        for perm in permutations(items):
+            ss = sortedset(perm)
+            s = set(perm)
+            self.assertEqual(s, ss)
+            self.assertEqual(ss, ss.union(s))
+            for x in range(len(ss)):
+                subset = set(s)
+                for _ in range(x):
+                    subset.pop()
+                self.assertEqual(ss.difference(subset), s.difference(subset))
+                self.assertEqual(ss.intersection(subset), s.intersection(subset))
+            for x in ss:
+                self.assertIn(x, ss)
+                ss.remove(x)
+                self.assertNotIn(x, ss)

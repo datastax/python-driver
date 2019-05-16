@@ -487,9 +487,6 @@ class WeakSet(object):
         return len(self.intersection(other)) == 0
 
 
-from bisect import bisect_left
-
-
 class SortedSet(object):
     '''
     A sorted set based on sorted list
@@ -593,7 +590,7 @@ class SortedSet(object):
         return self
 
     def __contains__(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         return i < len(self._items) and self._items[i] == item
 
     def __delitem__(self, i):
@@ -603,7 +600,7 @@ class SortedSet(object):
         del self._items[i:j]
 
     def add(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         if i < len(self._items):
             if self._items[i] != item:
                 self._items.insert(i, item)
@@ -637,7 +634,7 @@ class SortedSet(object):
         return self._items.pop()
 
     def remove(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         if i < len(self._items):
             if self._items[i] == item:
                 self._items.pop(i)
@@ -648,18 +645,8 @@ class SortedSet(object):
         union = sortedset()
         union._items = list(self._items)
         for other in others:
-            if isinstance(other, self.__class__):
-                i = 0
-                for item in other._items:
-                    i = bisect_left(union._items, item, i)
-                    if i < len(union._items):
-                        if item != union._items[i]:
-                            union._items.insert(i, item)
-                    else:
-                        union._items.append(item)
-            else:
-                for item in other:
-                    union.add(item)
+            for item in other:
+                union.add(item)
         return union
 
     def intersection(self, *others):
@@ -685,37 +672,43 @@ class SortedSet(object):
 
     def _diff(self, other):
         diff = sortedset()
-        if isinstance(other, self.__class__):
-            i = 0
-            for item in self._items:
-                i = bisect_left(other._items, item, i)
-                if i < len(other._items):
-                    if item != other._items[i]:
-                        diff._items.append(item)
-                else:
-                    diff._items.append(item)
-        else:
-            for item in self._items:
-                if item not in other:
-                    diff.add(item)
+        for item in self._items:
+            if item not in other:
+                diff.add(item)
         return diff
 
     def _intersect(self, other):
         isect = sortedset()
-        if isinstance(other, self.__class__):
-            i = 0
-            for item in self._items:
-                i = bisect_left(other._items, item, i)
-                if i < len(other._items):
-                    if item == other._items[i]:
-                        isect._items.append(item)
-                else:
-                    break
-        else:
-            for item in self._items:
-                if item in other:
-                    isect.add(item)
+        for item in self._items:
+            if item in other:
+                isect.add(item)
         return isect
+
+    def _find_insertion(self, x):
+        # this uses bisect_left algorithm unless it has elements it can't compare,
+        # in which case it defaults to grouping non-comparable items at the beginning or end,
+        # and scanning sequentially to find an insertion point
+        a = self._items
+        lo = 0
+        hi = len(a)
+        try:
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if a[mid] < x: lo = mid + 1
+                else: hi = mid
+        except TypeError:
+            # could not compare a[mid] with x
+            # start scanning to find insertion point while swallowing type errors
+            lo = 0
+            compared_one = False  # flag is used to determine whether uncomparables are grouped at the front or back
+            while lo < hi:
+                try:
+                    if a[lo] >= x: break
+                    compared_one = True
+                except TypeError:
+                    if compared_one: break
+                lo += 1
+        return lo
 
 sortedset = SortedSet  # backwards-compatibility
 
