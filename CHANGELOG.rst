@@ -8,6 +8,7 @@ Features
 * Abstract Host Connection information (PYTHON-1079)
 * Improve version parsing to support a non-integer 4th component (PYTHON-1091)
 * Expose on_request_error method in the RetryPolicy (PYTHON-1064)
+* Add test for error when combining TTL and TIMESTAMP on INSERT (PYTHON-1093)
 
 Bug Fixes
 ---------
