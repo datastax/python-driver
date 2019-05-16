@@ -755,7 +755,8 @@ class InsertStatement(AssignmentStatement):
             qs += ["USING TTL {0}".format(self.ttl)]
 
         if self.timestamp:
-            qs += ["USING TIMESTAMP {0}".format(self.timestamp_normalized)]
+            statement = "AND TIMESTAMP {0}" if self.ttl else "USING TIMESTAMP {0}"
+            qs += [statement.format(self.timestamp_normalized)]
 
         return ' '.join(qs)
 
