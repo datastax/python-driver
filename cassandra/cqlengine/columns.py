@@ -288,7 +288,7 @@ class Column(object):
     @property
     def db_field_name(self):
         """ Returns the name of the cql name of this column """
-        return self.db_field or self.column_name
+        return self.db_field if self.db_field is not None else self.column_name
 
     @property
     def db_index_name(self):

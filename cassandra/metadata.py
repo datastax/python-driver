@@ -2037,7 +2037,7 @@ class SchemaParserV22(_SchemaParser):
             # other normal columns
             for col_row in col_rows:
                 column_meta = self._build_column_metadata(table_meta, col_row)
-                if column_meta.name:
+                if column_meta.name is not None:
                     table_meta.columns[column_meta.name] = column_meta
                     index_meta = self._build_index_metadata(column_meta, col_row)
                     if index_meta:
