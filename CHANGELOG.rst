@@ -11,6 +11,7 @@ Features
 Bug Fixes
 ---------
 * as_cql_query UDF/UDA parameters incorrectly includes "frozen" if arguments are collections (PYTHON-1031)
+* cqlengine does not currently support combining TTL and TIMESTAMP on INSERT (PYTHON-1093)
 * Fix incorrect metadata for compact counter tables (PYTHON-1100)
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
