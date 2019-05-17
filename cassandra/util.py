@@ -703,7 +703,7 @@ class SortedSet(object):
             compared_one = False  # flag is used to determine whether uncomparables are grouped at the front or back
             while lo < hi:
                 try:
-                    if a[lo] >= x: break
+                    if a[lo] == x or a[lo] >= x: break
                     compared_one = True
                 except TypeError:
                     if compared_one: break

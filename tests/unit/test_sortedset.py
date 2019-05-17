@@ -366,18 +366,7 @@ class SortedSetTest(unittest.TestCase):
         s = pickle.dumps(ss)
         self.assertEqual(pickle.loads(s), ss)
 
-    def test_uncomparable_types(self):
-        # PYTHON-1087 - make set handle uncomparable types
-        dt = datetime(2019, 5, 16)
-        items = (('samekey', 3, 1),
-                 ('samekey', None, 0),
-                 ('samekey', dt),
-                 ("samekey", None, 2),
-                 ("samekey", None, 1),
-                 ('samekey', dt),
-                 ('samekey', None, 0),
-                 ("samekey", datetime.now()))
-
+    def _test_uncomparable_types(self, items):
         for perm in permutations(items):
             ss = sortedset(perm)
             s = set(perm)
@@ -393,3 +382,22 @@ class SortedSetTest(unittest.TestCase):
                 self.assertIn(x, ss)
                 ss.remove(x)
                 self.assertNotIn(x, ss)
+
+    def test_uncomparable_types_with_tuples(self):
+        # PYTHON-1087 - make set handle uncomparable types
+        dt = datetime(2019, 5, 16)
+        items = (('samekey', 3, 1),
+                 ('samekey', None, 0),
+                 ('samekey', dt),
+                 ("samekey", None, 2),
+                 ("samekey", None, 1),
+                 ('samekey', dt),
+                 ('samekey', None, 0),
+                 ("samekey", datetime.now()))
+
+        self._test_uncomparable_types(items)
+
+    def test_uncomparable_types_with_integers(self):
+        # PYTHON-1087 - make set handle uncomparable types
+        items = (None, 1, 2, 6, None, None, 92)
+        self._test_uncomparable_types(items)
