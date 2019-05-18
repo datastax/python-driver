@@ -659,6 +659,10 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
     A :class:`.ReconnectionPolicy` subclass which exponentially increases
     the length of the delay inbetween each reconnection attempt up to
     a set maximum delay.
+
+    A random amount of jitter (+/- 15%) will be added to the pure exponential
+    delay value to avoid the situations where many reconnection handlers are
+    trying to reconnect at exactly the same time.
     """
 
     # TODO: max_attempts is 64 to preserve legacy default behavior
@@ -693,12 +697,18 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
                 yield self.max_delay
             else:
                 try:
-                    yield min(self.base_delay * (2 ** i), self.max_delay)
+                    yield self._add_jitter(min(self.base_delay * (2 ** i), self.max_delay))
                 except OverflowError:
                     overflowed = True
                     yield self.max_delay
 
             i += 1
+
+    # Adds -+ 15% to the delay provided
+    def _add_jitter(self, value):
+        jitter = randint(85, 115)
+        delay = (jitter * value) / 100
+        return min(max(self.base_delay, delay), self.max_delay)
 
 
 class RetryPolicy(object):
