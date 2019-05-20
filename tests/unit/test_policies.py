@@ -881,6 +881,9 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
 
 class ExponentialReconnectionPolicyTest(unittest.TestCase):
 
+    def _assert_between(self, value, min, max):
+        self.assertTrue(min <= value <= max)
+
     def test_bad_vals(self):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, -1, 0)
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, 0, -1)
@@ -893,8 +896,8 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         test_iter = 10000
         policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=None)
         sched_slice = list(islice(policy.new_schedule(), 0, test_iter))
-        self.assertEqual(sched_slice[0], base_delay)
-        self.assertEqual(sched_slice[-1], max_delay)
+        self._assert_between(sched_slice[0], base_delay*0.85, base_delay*1.15)
+        self._assert_between(sched_slice[-1], max_delay*0.85, max_delay*1.15)
         self.assertEqual(len(sched_slice), test_iter)
 
     def test_schedule_with_max(self):
@@ -906,11 +909,12 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         self.assertEqual(len(schedule), max_attempts)
         for i, delay in enumerate(schedule):
             if i == 0:
-                self.assertEqual(delay, base_delay)
+                self._assert_between(delay, base_delay*0.85, base_delay*1.15)
             elif i < 6:
-                self.assertEqual(delay, schedule[i - 1] * 2)
+                value =  base_delay * (2 ** i)
+                self._assert_between(delay, value*85/100, value*1.15)
             else:
-                self.assertEqual(delay, max_delay)
+                self._assert_between(delay, max_delay*85/100, max_delay*1.15)
 
     def test_schedule_exactly_one_attempt(self):
         base_delay = 2.0
@@ -944,6 +948,25 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         schedule = list(policy.new_schedule())
         for number in schedule:
             self.assertLessEqual(number, sys.float_info.max)
+
+    def test_schedule_with_jitter(self):
+        """
+        Test to verify jitter is added properly and is always between -/+ 15%.
+
+        @since 3.18
+        @jira_ticket PYTHON-1065
+        """
+        for i in range(100):
+            base_delay = float(randint(2, 5))
+            max_delay = (base_delay - 1)  * 100.0
+            ep = ExponentialReconnectionPolicy(base_delay, max_delay, max_attempts=64)
+            schedule = ep.new_schedule()
+            for i in range(64):
+                exp_delay = min(base_delay * (2 ** i), max_delay)
+                min_jitter_delay = max(base_delay, exp_delay*85/100)
+                max_jitter_delay = min(max_delay, exp_delay*115/100)
+                delay = next(schedule)
+                self._assert_between(delay, min_jitter_delay, max_jitter_delay)
 
 
 ONE = ConsistencyLevel.ONE
