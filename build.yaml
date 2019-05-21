@@ -55,7 +55,7 @@ schedules:
         - python: [2.7, 3.4, 3.6]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
 
-  release:
+  release_test:
     schedule: per_commit
     branches:
       include: [/release-.+/]
