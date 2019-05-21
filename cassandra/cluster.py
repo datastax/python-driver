@@ -2375,6 +2375,11 @@ class Session(object):
             load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan,
             host=host)
 
+    def _execution_profile_to_string(self, name):
+        if name is EXEC_PROFILE_DEFAULT:
+            return 'EXEC_PROFILE_DEFAULT'
+        return '"%s"' % (name,)
+
     def get_execution_profile(self, name):
         """
         Returns the execution profile associated with the provided ``name``.
@@ -2385,7 +2390,9 @@ class Session(object):
         try:
             return profiles[name]
         except KeyError:
-            raise ValueError("Invalid execution_profile: '%s'; valid profiles are %s" % (name, profiles.keys()))
+            eps = [self._execution_profile_to_string(ep) for ep in profiles.keys()]
+            raise ValueError("Invalid execution_profile: %s; valid profiles are: %s." % (
+                self._execution_profile_to_string(name), ', '.join(eps)))
 
     def _maybe_get_execution_profile(self, ep):
         return ep if isinstance(ep, ExecutionProfile) else self.get_execution_profile(ep)
