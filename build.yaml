@@ -55,6 +55,13 @@ schedules:
         - python: [2.7, 3.4, 3.6]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
 
+  release:
+    schedule: per_commit
+    branches:
+      include: [/release-.+/]
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+
   weekly_libev:
     schedule: 0 10 * * 6
     branches:
