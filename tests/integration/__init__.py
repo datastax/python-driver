@@ -32,6 +32,7 @@ from threading import Event
 from subprocess import call
 from itertools import groupby
 import six
+import shutil
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
     InvalidRequest
@@ -400,6 +401,11 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
             ccm_options.update(cmd_line_args_to_dict('CCM_ARGS'))
 
             log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
+
+            # Make sure we cleanup old cluster dir if it exists
+            cluster_path = os.path.join(path, cluster_name)
+            if os.path.exists(cluster_path):
+                shutil.rmtree(cluster_path)
 
             if dse_cluster:
                 CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
