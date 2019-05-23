@@ -393,7 +393,9 @@ class Cluster(object):
 
     contact_points = ['127.0.0.1']
     """
-    The list of contact points to try connecting for cluster discovery.
+    The list of contact points to try connecting for cluster discovery. A
+    contact point can be a string (ip, hostname) or a
+    :class:`.connection.EndPoint` instance.
 
     Defaults to loopback interface.
 
