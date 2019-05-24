@@ -1,6 +1,6 @@
 3.18.0
 ======
-NOT RELEASED
+May 27, 2019
 
 Features
 --------
