@@ -155,8 +155,6 @@ class RoundRobinPolicy(LoadBalancingPolicy):
     A subclass of :class:`.LoadBalancingPolicy` which evenly
     distributes queries across all nodes in the cluster,
     regardless of what datacenter the nodes may be in.
-
-    This load balancing policy is used by default.
     """
     _live_hosts = frozenset(())
     _position = 0
