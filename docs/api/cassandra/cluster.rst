@@ -152,9 +152,9 @@
 
    .. autoattribute:: client_protocol_handler
 
-   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload])
+   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload][, paging_state][, host])
 
-   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload])
+   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload][, paging_state][, host])
 
    .. automethod:: prepare(statement)
 
