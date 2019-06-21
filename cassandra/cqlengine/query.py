@@ -15,6 +15,7 @@
 import copy
 from datetime import datetime, timedelta
 from functools import partial
+import re
 import time
 import six
 from warnings import warn
@@ -391,6 +392,7 @@ class AbstractQuerySet(object):
         self._if_exists = False
         self._fetch_size = None
         self._connection = None
+        self._as_prepared = False
 
     @property
     def column_family_name(self):
@@ -401,7 +403,9 @@ class AbstractQuerySet(object):
             return self._batch.add_query(statement)
         else:
             connection = self._connection or self.model._get_connection()
-            result = _execute_statement(self.model, statement, self._consistency, self._timeout, connection=connection)
+            result = _execute_statement(
+                self.model, statement, self._consistency, self._timeout,
+                connection=connection, as_prepared=self._as_prepared)
             if self._if_not_exists or self._if_exists or self._conditional:
                 check_applied(result)
             return result
@@ -618,6 +622,26 @@ class AbstractQuerySet(object):
                 print(user)
         """
         return copy.deepcopy(self)
+
+    def as_prepared(self):
+        """
+        Marks the queryset as a prepared statement.
+        The underlying query string will be cached upon the first execution
+        and used by all subsequent queries with the same parameters
+        (but not necessarily their values!)
+
+        .. code-block:: python
+
+            # the query is being prepared, so an additional db roundtrip occurs
+            for user in User.objects.filter(id=3).as_prepared():
+                print(user)
+            # ...but now an underlying cached object is used! no overhead here
+            for user in User.objects.filter(id=42).as_prepared():
+                print(user)
+        """
+        clone = copy.deepcopy(self)
+        clone._as_prepared = True
+        return clone
 
     def consistency(self, consistency):
         """
@@ -1518,7 +1542,7 @@ class DMLQuery(object):
         self._execute(ds)
 
 
-def _execute_statement(model, statement, consistency_level, timeout, connection=None):
+def _execute_statement(model, statement, consistency_level, timeout, connection=None, as_prepared=False):
     params = statement.get_context()
     s = SimpleStatement(str(statement), consistency_level=consistency_level, fetch_size=statement.fetch_size)
     if model._partition_key_index:
@@ -1528,4 +1552,22 @@ def _execute_statement(model, statement, consistency_level, timeout, connection=
             s.routing_key = parts
             s.keyspace = model._get_keyspace()
     connection = connection or model._get_connection()
+    if as_prepared:
+        session = conn.get_session(connection=connection)
+        stmt = str(statement)
+        if not hasattr(session, 'cqlengine_prep_stmts_cache'):
+            session.cqlengine_prep_stmts_cache = {}
+        if stmt not in session.cqlengine_prep_stmts_cache:
+            statement_with_question_marks = re.sub('%\(\d+\)s', '?', stmt)
+            prepared = session.prepare(statement_with_question_marks)
+            prepared.consistency_level = consistency_level
+            prepared.fetch_size = statement.fetch_size
+            # cache keys are made of strings with numbered
+            # python-format placeholders, so they don't
+            # have to be processed with the regex above
+            # every time
+            session.cqlengine_prep_stmts_cache[stmt] = prepared
+        return session.execute(
+            session.cqlengine_prep_stmts_cache[stmt],
+            [val for val in params.values()])
     return conn.execute(s, params, timeout=timeout, connection=connection)
