@@ -1,3 +1,14 @@
+3.19.0
+======
+Not released
+
+Features
+--------
+* Future-proof Mapping imports (PYTHON-1023)
+
+Bug Fixes
+---------
+
 3.18.0
 ======
 May 27, 2019

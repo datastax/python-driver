@@ -19,7 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
-from collections import defaultdict, Mapping
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
 from functools import partial, wraps
@@ -74,6 +74,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
+from cassandra.compat import Mapping
 
 
 def _is_eventlet_monkey_patched():

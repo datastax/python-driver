@@ -14,7 +14,7 @@
 
 from binascii import unhexlify
 from bisect import bisect_left
-from collections import defaultdict, Mapping
+from collections import defaultdict
 from functools import total_ordering
 from hashlib import md5
 from itertools import islice, cycle
@@ -43,6 +43,7 @@ from cassandra.query import dict_factory, bind_params
 from cassandra.util import OrderedDict, Version
 from cassandra.pool import HostDistance
 from cassandra.connection import EndPoint
+from cassandra.compat import Mapping
 
 log = logging.getLogger(__name__)
 
