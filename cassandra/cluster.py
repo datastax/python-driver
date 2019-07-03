@@ -2420,10 +2420,10 @@ class Session(object):
         Adds a callback with arguments to be called when any request is created.
 
         It will be invoked as `fn(response_future, *args, **kwargs)` after each client request is created,
-        and before the request is sent\*. This can be used to create extensions by adding result callbacks to the
+        and before the request is sent. This can be used to create extensions by adding result callbacks to the
         response future.
 
-        \* where `response_future` is the :class:`.ResponseFuture` for the request.
+        `response_future` is the :class:`.ResponseFuture` for the request.
 
         Note that the init callback is done on the client thread creating the request, so you may need to consider
         synchronization if you have multiple threads. Any callbacks added to the response future will be executed
