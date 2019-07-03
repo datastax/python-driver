@@ -713,7 +713,7 @@ class SortedSet(object):
 sortedset = SortedSet  # backwards-compatibility
 
 
-from collections import Mapping
+from cassandra.compat import Mapping
 from six.moves import cPickle
 
 
