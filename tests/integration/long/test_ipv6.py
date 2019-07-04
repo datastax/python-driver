@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os, socket
+import os, socket, errno
 from ccmlib import common
 
 from cassandra.cluster import Cluster, NoHostAvailable
@@ -87,7 +87,7 @@ class IPV6ConnectionTest(object):
         cluster = Cluster(connection_class=self.connection_class, contact_points=['::1'], port=9043,
                           connect_timeout=10, protocol_version=PROTOCOL_VERSION)
         self.assertRaisesRegexp(NoHostAvailable, '\(\'Unable to connect.*%s.*::1\', 9043.*Connection refused.*'
-                                % os.errno.ECONNREFUSED, cluster.connect)
+                                % errno.ECONNREFUSED, cluster.connect)
 
     def test_error_multiple(self):
         if len(socket.getaddrinfo('localhost', 9043, socket.AF_UNSPEC, socket.SOCK_STREAM)) < 2:
