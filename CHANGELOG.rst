@@ -4,6 +4,7 @@ Not released
 
 Features
 --------
+* Add Python 3.7 support (PYTHON-1016)
 * Future-proof Mapping imports (PYTHON-1023)
 
 Bug Fixes

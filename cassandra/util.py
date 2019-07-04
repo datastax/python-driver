@@ -732,7 +732,7 @@ class OrderedMap(Mapping):
         ['value', 'value2']
 
     These constructs are needed to support nested collections in Cassandra 2.1.3+,
-    where frozen collections can be specified as parameters to others\*::
+    where frozen collections can be specified as parameters to others::
 
         CREATE TABLE example (
             ...
@@ -743,7 +743,7 @@ class OrderedMap(Mapping):
     This class derives from the (immutable) Mapping API. Objects in these maps
     are not intended be modified.
 
-    \* Note: Because of the way Cassandra encodes nested types, when using the
+    Note: Because of the way Cassandra encodes nested types, when using the
     driver with nested collections, :attr:`~.Cluster.protocol_version` must be 3
     or higher.
 
