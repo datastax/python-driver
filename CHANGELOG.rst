@@ -9,7 +9,7 @@ Features
 
 Bug Fixes
 ---------
-
+* Call ConnectionException with correct kwargs (PYTHON-1117)
 3.18.0
 ======
 May 27, 2019
