@@ -2326,9 +2326,9 @@ class SchemaParserV3(SchemaParserV22):
             table_meta.options = self._build_table_options(row)
             flags = row.get('flags', set())
             if flags:
-                compact_static = False
-                table_meta.is_compact_storage = 'dense' in flags or 'super' in flags or 'compound' not in flags
                 is_dense = 'dense' in flags
+                compact_static = not is_dense and 'super' not in flags and 'compound' not in flags
+                table_meta.is_compact_storage = is_dense or 'super' in flags or 'compound' not in flags
             elif virtual:
                 compact_static = False
                 table_meta.is_compact_storage = False

@@ -9,6 +9,7 @@ Features
 
 Bug Fixes
 ---------
+* Fix incorrect metadata for compact counter tables (PYTHON-1100)
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 3.18.0
 ======

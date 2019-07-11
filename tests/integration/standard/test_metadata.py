@@ -405,6 +405,53 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         tablemeta = self.get_table_metadata()
         self.check_create_statement(tablemeta, create_statement)
 
+    def test_compact_storage(self):
+        create_statement = self.make_create_statement(["a"], [], ["b"])
+        create_statement += " WITH COMPACT STORAGE"
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_dense_compact_storage(self):
+        create_statement = self.make_create_statement(["a"], ["b"], ["c"])
+        create_statement += " WITH COMPACT STORAGE"
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_counter(self):
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text PRIMARY KEY, a1 counter)"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_counter_with_compact_storage(self):
+        """ PYTHON-1100 """
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text PRIMARY KEY, a1 counter) WITH COMPACT STORAGE"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_counter_with_dense_compact_storage(self):
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text, c1 text, a1 counter, PRIMARY KEY (key, c1)) WITH COMPACT STORAGE"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
     def test_indexes(self):
         create_statement = self.make_create_statement(["a"], ["b", "c"], ["d", "e", "f"])
         create_statement += " WITH CLUSTERING ORDER BY (b ASC, c ASC)"
