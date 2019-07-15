@@ -908,9 +908,9 @@ class Aggregate(object):
         sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        type_list = ', '.join(self.argument_types)
+        type_list = ', '.join([strip_frozen(arg_type) for arg_type in self.argument_types])
         state_func = protect_name(self.state_func)
-        state_type = self.state_type
+        state_type = strip_frozen(self.state_type)
 
         ret = "CREATE AGGREGATE %(keyspace)s.%(name)s(%(type_list)s)%(sep)s" \
               "SFUNC %(state_func)s%(sep)s" \
@@ -1001,7 +1001,7 @@ class Function(object):
         sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        arg_list = ', '.join(["%s %s" % (protect_name(n), t)
+        arg_list = ', '.join(["%s %s" % (protect_name(n), strip_frozen(t))
                              for n, t in zip(self.argument_names, self.argument_types)])
         typ = self.return_type
         lang = self.language
@@ -2833,3 +2833,44 @@ def group_keys_by_replica(session, keyspace, table, keys):
             keys_per_host[NO_VALID_REPLICA].append(key)
 
     return dict(keys_per_host)
+
+
+def strip_frozen(cass_type):
+    """
+    Takes a string representation of a cassandra type and removes frozen
+    E.g., 'frozen<tuple<int>>' becomes 'tuple<int>'
+    """
+    scanner = re.Scanner((
+        (r'[a-zA-Z0-9_]+', lambda s, t: t),
+        (r'[<>, ]', lambda s, t: t),
+        (r'".*?"', lambda s, t: t),
+    ))
+
+    scanned_tokens = scanner.scan(cass_type)[0]
+
+    def _strip(tokens):
+        """ Recursively remove each 'frozen' instance (and its brackets) from the list of tokens """
+        if 'frozen' not in tokens:
+            return tokens
+        updated_tokens = []
+        depth = 0
+        in_frozen = False
+        for token in tokens:
+            skip_current_token = False
+            if token == 'frozen' and not in_frozen:
+                in_frozen = True
+                skip_current_token = True
+            elif token == '<' and in_frozen:
+                depth += 1
+                if depth == 1:
+                    skip_current_token = True
+            elif token == '>' and in_frozen:
+                depth -= 1
+                if depth == 0:
+                    in_frozen = False
+                    skip_current_token = True
+            if not skip_current_token:
+                updated_tokens.append(token)
+        return _strip(updated_tokens)
+
+    return ''.join(_strip(scanned_tokens))
