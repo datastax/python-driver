@@ -24,7 +24,7 @@ from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
@@ -37,6 +37,7 @@ import random
 import re
 
 import mock
+import six
 
 
 log = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def setup_module():
     if not USE_CASS_EXTERNAL:
         use_singledc(start=False)
         ccm_cluster = get_cluster()
-        ccm_cluster.clear()
+        ccm_cluster.stop()
         # This is necessary because test_too_many_statements may
         # timeout otherwise
         config_options = {'write_request_timeout_in_ms': '20000'}
@@ -445,17 +446,23 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertEqual(bound.keyspace, 'test3rf')
 
 
-class ForcedHostSwitchPolicy(RoundRobinPolicy):
+class ForcedHostIndexPolicy(RoundRobinPolicy):
+    def __init__(self, host_index_to_use=0):
+        super(ForcedHostIndexPolicy, self).__init__()
+        self.host_index_to_use = host_index_to_use
+
+    def set_host(self, host_index):
+        """ 0-based index of which host to use """
+        self.host_index_to_use = host_index
 
     def make_query_plan(self, working_keyspace=None, query=None):
-        if hasattr(self, 'counter'):
-            self.counter += 1
-        else:
-            self.counter = 0
-        index = self.counter % 3
-        a = list(self._live_hosts)
-        value = [a[index]]
-        return value
+        live_hosts = sorted(list(self._live_hosts))
+        host = []
+        try:
+            host = [live_hosts[self.host_index_to_use]]
+        except IndexError as e:
+            six.raise_from(IndexError('You specified an index larger than the number of hosts'), e)
+        return host
 
 
 class PreparedStatementMetdataTest(unittest.TestCase):
@@ -495,33 +502,30 @@ class PreparedStatementMetdataTest(unittest.TestCase):
 
 class PreparedStatementArgTest(unittest.TestCase):
 
+    def setUp(self):
+        self.mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cluster.__name__)
+        logger.addHandler(self.mock_handler)
+
     def test_prepare_on_all_hosts(self):
         """
         Test to validate prepare_on_all_hosts flag is honored.
 
-        Use a special ForcedHostSwitchPolicy to ensure prepared queries are cycled over nodes that should not
+        Force the host of each query to ensure prepared queries are cycled over nodes that should not
         have them prepared. Check the logs to insure they are being re-prepared on those nodes
 
         @since 3.4.0
         @jira_ticket PYTHON-556
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         """
-        white_list = ForcedHostSwitchPolicy()
-        clus = Cluster(
-            load_balancing_policy=white_list,
-            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
+        clus = Cluster(protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         session = clus.connect(wait_for_all_pools=True)
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cluster.__name__)
-        logger.addHandler(mock_handler)
-        select_statement = session.prepare("SELECT * FROM system.local")
-        session.execute(select_statement)
-        session.execute(select_statement)
-        session.execute(select_statement)
-        self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
-
+        select_statement = session.prepare("SELECT k FROM test3rf.test WHERE k = ?")
+        for host in clus.metadata.all_hosts():
+            session.execute(select_statement, (1, ), host=host)
+        self.assertEqual(2, self.mock_handler.get_message_count('debug', "Re-preparing"))
 
     def test_prepare_batch_statement(self):
         """
@@ -533,11 +537,15 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        white_list = ForcedHostSwitchPolicy()
+        policy = ForcedHostIndexPolicy()
         clus = Cluster(
-            load_balancing_policy=white_list,
-            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
-            reprepare_on_up=False)
+            execution_profiles={
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
+            },
+            protocol_version=PROTOCOL_VERSION,
+            prepare_on_all_hosts=False,
+            reprepare_on_up=False,
+        )
         self.addCleanup(clus.shutdown)
 
         table = "test3rf.%s" % self._testMethodName.lower()
@@ -551,9 +559,15 @@ class PreparedStatementArgTest(unittest.TestCase):
 
         # This is going to query a host where the query
         # is not prepared
+        policy.set_host(1)
         batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
         batch_statement.add(insert_statement, (1, 2))
         session.execute(batch_statement)
+
+        # To verify our test assumption that queries are getting re-prepared properly
+        self.assertEqual(1, self.mock_handler.get_message_count('debug', "Re-preparing"))
+
+        policy.set_host(2)
         select_results = session.execute(SimpleStatement("SELECT * FROM %s WHERE k = 1" % table,
                                                          consistency_level=ConsistencyLevel.ALL))
         first_row = select_results[0][:2]
@@ -570,11 +584,15 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        white_list = ForcedHostSwitchPolicy()
+        policy = ForcedHostIndexPolicy()
         clus = Cluster(
-            load_balancing_policy=white_list,
-            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
-            reprepare_on_up=False)
+            execution_profiles={
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
+            },
+            protocol_version=PROTOCOL_VERSION,
+            prepare_on_all_hosts=False,
+            reprepare_on_up=False
+        )
         self.addCleanup(clus.shutdown)
 
         table = "test3rf.%s" % self._testMethodName.lower()
@@ -590,20 +608,28 @@ class PreparedStatementArgTest(unittest.TestCase):
 
         values_to_insert = [(1, 2, 3), (2, 3, 4), (3, 4, 5), (4, 5, 6)]
 
-        # We query the three hosts in order (due to the ForcedHostSwitchPolicy)
+        # We query the three hosts in order (due to the ForcedHostIndexPolicy)
         # the first three queries will have to be repreapred and the rest should
         # work as normal batch prepared statements
         for i in range(10):
+            policy.set_host(i % 3)
             value_to_insert = values_to_insert[i % len(values_to_insert)]
             batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
             batch_statement.add(insert_statement, value_to_insert)
             session.execute(batch_statement)
 
         select_results = session.execute("SELECT * FROM %s" % table)
-        expected_results = [(1, None, 2, None, 3), (2, None, 3, None, 4),
-             (3, None, 4, None, 5), (4, None, 5, None, 6)]
+        expected_results = [
+            (1, None, 2, None, 3),
+            (2, None, 3, None, 4),
+            (3, None, 4, None, 5),
+            (4, None, 5, None, 6)
+        ]
 
         self.assertEqual(set(expected_results), set(select_results._current_rows))
+
+        # To verify our test assumption that queries are getting re-prepared properly
+        self.assertEqual(3, self.mock_handler.get_message_count('debug', "Re-preparing"))
 
 
 class PrintStatementTests(unittest.TestCase):
