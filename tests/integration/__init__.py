@@ -246,7 +246,7 @@ PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
 
 def local_decorator_creator():
-    if not CASSANDRA_IP.startswith("127.0.0."):
+    if USE_CASS_EXTERNAL or not CASSANDRA_IP.startswith("127.0.0."):
         return unittest.skip('Tests only runs against local C*')
 
     def _id_and_mark(f):
@@ -352,9 +352,11 @@ def is_current_cluster(cluster_name, node_counts):
     return False
 
 
-def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
+def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, set_keyspace=True, ccm_options=None,
                 configuration_options={}, dse_cluster=False, dse_options={},
                 dse_version=None):
+    if not workloads:
+        workloads = []
     if (dse_version and not dse_cluster):
         raise ValueError('specified dse_version {} but not dse_cluster'.format(dse_version))
     set_default_cass_ip()
@@ -440,7 +442,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
         if 'graph' not in workloads:
             if PROTOCOL_VERSION >= 4:
                 jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
-        if(len(workloads) > 0):
+        if len(workloads) > 0:
             for node in CCM_CLUSTER.nodes.values():
                 node.set_workloads(workloads)
         if start:

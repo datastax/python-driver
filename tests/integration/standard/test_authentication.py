@@ -19,7 +19,7 @@ from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
-    set_default_cass_ip
+    set_default_cass_ip, USE_CASS_EXTERNAL
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 
 def setup_module():
-    if CASSANDRA_IP.startswith("127.0.0."):
+    if CASSANDRA_IP.startswith("127.0.0.") and not USE_CASS_EXTERNAL:
         use_singledc(start=False)
         ccm_cluster = get_cluster()
         ccm_cluster.stop()
@@ -59,7 +59,6 @@ class AuthenticationTests(unittest.TestCase):
     """
     Tests to cover basic authentication functionality
     """
-
     def get_authentication_provider(self, username, password):
         """
         Return correct authentication provider based on protocol version.
@@ -165,7 +164,6 @@ class SaslAuthenticatorTests(AuthenticationTests):
     """
     Test SaslAuthProvider as PlainText
     """
-
     def setUp(self):
         if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest('Sasl authentication not available for protocol v1')

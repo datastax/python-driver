@@ -2599,7 +2599,7 @@ class Session(object):
                     # TODO remove host pool again ???
                     new_pool = HostConnectionPool(host, distance, self)
             except AuthenticationFailed as auth_exc:
-                conn_exc = ConnectionException(str(auth_exc), host=host)
+                conn_exc = ConnectionException(str(auth_exc), endpoint=host)
                 self.cluster.signal_connection_failure(host, conn_exc, is_host_addition)
                 return False
             except Exception as conn_exc:
