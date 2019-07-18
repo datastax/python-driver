@@ -1241,13 +1241,18 @@ class Version(object):
     minor = 0
     patch = 0
     build = 0
+    prerelease = 0
 
     def __init__(self, version):
         self._version = version
-        parts = list(reversed(version.split('.')))
+        if '-' in version:
+            version_without_prerelease, self.prerelease = version.split('-')
+        else:
+            version_without_prerelease = version
+        parts = list(reversed(version_without_prerelease.split('.')))
         if len(parts) > 4:
             raise ValueError("Invalid version: {}. Only 4 "
-                             "components are supported".format(version))
+                             "components plus prerelease are supported".format(version))
 
         self.major = int(parts.pop())
         self.minor = int(parts.pop()) if parts else 0
@@ -1264,22 +1269,26 @@ class Version(object):
         return self._version
 
     def __repr__(self):
+        version_string = "Version({0}, {1}, {2}".format(self.major, self.minor, self.patch)
         if self.build:
-            return "Version({0}, {1}, {2}, {3})".format(self.major, self.minor, self.patch, self.build)
+            version_string += ", {}".format(self.build)
+        if self.prerelease:
+            version_string += ", {}".format(self.prerelease)
+        version_string += ")"
 
-        return "Version({0}, {1}, {2})".format(self.major, self.minor, self.patch)
+        return version_string
 
     def __str__(self):
         return self._version
 
     @staticmethod
-    def _compare_build(build, other_build, cmp):
-        if not (isinstance(build, six.integer_types) and
-                isinstance(other_build, six.integer_types)):
-            build = str(build)
-            other_build = str(other_build)
+    def _compare_version_part(version, other_version, cmp):
+        if not (isinstance(version, six.integer_types) and
+                isinstance(other_version, six.integer_types)):
+            version = str(version)
+            other_version = str(other_version)
 
-        return cmp(build, other_build)
+        return cmp(version, other_version)
 
     def __eq__(self, other):
         if not isinstance(other, Version):
@@ -1288,7 +1297,9 @@ class Version(object):
         return (self.major == other.major and
                 self.minor == other.minor and
                 self.patch == other.patch and
-                self._compare_build(self.build, other.build, lambda s, o: s == o))
+                self._compare_version_part(self.build, other.build, lambda s, o: s == o) and
+                self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s == o)
+                )
 
     def __gt__(self, other):
         if not isinstance(other, Version):
@@ -1297,10 +1308,13 @@ class Version(object):
         is_major_ge = self.major >= other.major
         is_minor_ge = self.minor >= other.minor
         is_patch_ge = self.patch >= other.patch
-        is_build_gt = self._compare_build(
-            self.build, other.build, lambda s, o: s > o)
+        is_build_gt = self._compare_version_part(self.build, other.build, lambda s, o: s > o)
+        is_build_ge = self._compare_version_part(self.build, other.build, lambda s, o: s >= o)
+        is_prerelease_gt = self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s > o)
 
         return (self.major > other.major or
-            (is_major_ge and self.minor > other.minor) or
-            (is_major_ge and is_minor_ge and self.patch > other.patch) or
-            (is_major_ge and is_minor_ge and is_patch_ge and is_build_gt))
+                (is_major_ge and self.minor > other.minor) or
+                (is_major_ge and is_minor_ge and self.patch > other.patch) or
+                (is_major_ge and is_minor_ge and is_patch_ge and is_build_gt) or
+                (is_major_ge and is_minor_ge and is_patch_ge and is_build_ge and is_prerelease_gt)
+                )

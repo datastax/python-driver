@@ -6,6 +6,7 @@ Features
 --------
 * Add Python 3.7 support (PYTHON-1016)
 * Future-proof Mapping imports (PYTHON-1023)
+* Allow connecting to pre-release server versions (PYTHON-1118)
 
 Bug Fixes
 ---------
