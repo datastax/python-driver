@@ -10,6 +10,7 @@ Features
 Bug Fixes
 ---------
 * Call ConnectionException with correct kwargs (PYTHON-1117)
+* Fix integration test failures: test_prepare_on_all_hosts (PYTHON-1110)
 3.18.0
 ======
 May 27, 2019

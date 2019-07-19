@@ -461,7 +461,10 @@ class ForcedHostIndexPolicy(RoundRobinPolicy):
         try:
             host = [live_hosts[self.host_index_to_use]]
         except IndexError as e:
-            six.raise_from(IndexError('You specified an index larger than the number of hosts'), e)
+            six.raise_from(IndexError(
+                'You specified an index larger than the number of hosts. Total hosts: {}. Index specified: {}'.format(
+                    len(live_hosts), self.host_index_to_use
+                )), e)
         return host
 
 
@@ -567,7 +570,6 @@ class PreparedStatementArgTest(unittest.TestCase):
         # To verify our test assumption that queries are getting re-prepared properly
         self.assertEqual(1, self.mock_handler.get_message_count('debug', "Re-preparing"))
 
-        policy.set_host(2)
         select_results = session.execute(SimpleStatement("SELECT * FROM %s WHERE k = 1" % table,
                                                          consistency_level=ConsistencyLevel.ALL))
         first_row = select_results[0][:2]
@@ -584,15 +586,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        policy = ForcedHostIndexPolicy()
-        clus = Cluster(
-            execution_profiles={
-                EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
-            },
-            protocol_version=PROTOCOL_VERSION,
-            prepare_on_all_hosts=False,
-            reprepare_on_up=False
-        )
+        clus = Cluster(protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         table = "test3rf.%s" % self._testMethodName.lower()
@@ -611,12 +605,12 @@ class PreparedStatementArgTest(unittest.TestCase):
         # We query the three hosts in order (due to the ForcedHostIndexPolicy)
         # the first three queries will have to be repreapred and the rest should
         # work as normal batch prepared statements
+        hosts = clus.metadata.all_hosts()
         for i in range(10):
-            policy.set_host(i % 3)
             value_to_insert = values_to_insert[i % len(values_to_insert)]
             batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
             batch_statement.add(insert_statement, value_to_insert)
-            session.execute(batch_statement)
+            session.execute(batch_statement, host=hosts[i % len(hosts)])
 
         select_results = session.execute("SELECT * FROM %s" % table)
         expected_results = [
