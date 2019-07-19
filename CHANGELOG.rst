@@ -6,12 +6,12 @@ Features
 --------
 * Add Python 3.7 support (PYTHON-1016)
 * Future-proof Mapping imports (PYTHON-1023)
-* Allow connecting to pre-release server versions (PYTHON-1118)
 
 Bug Fixes
 ---------
 * Fix incorrect metadata for compact counter tables (PYTHON-1100)
 * Call ConnectionException with correct kwargs (PYTHON-1117)
+* Fix "Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT'" (PYTHON-1118)
 3.18.0
 ======
 May 27, 2019

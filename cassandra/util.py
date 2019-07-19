@@ -1310,7 +1310,15 @@ class Version(object):
         is_patch_ge = self.patch >= other.patch
         is_build_gt = self._compare_version_part(self.build, other.build, lambda s, o: s > o)
         is_build_ge = self._compare_version_part(self.build, other.build, lambda s, o: s >= o)
-        is_prerelease_gt = self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s > o)
+
+        # By definition, a prerelease comes BEFORE the actual release, so if a version
+        # doesn't have a prerelease, it's automatically greater than anything that does
+        if self.prerelease and not other.prerelease:
+            is_prerelease_gt = False
+        elif other.prerelease and not self.prerelease:
+            is_prerelease_gt = True
+        else:
+            is_prerelease_gt = self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s > o) \
 
         return (self.major > other.major or
                 (is_major_ge and self.minor > other.minor) or

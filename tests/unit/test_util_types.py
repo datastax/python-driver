@@ -279,6 +279,7 @@ class VersionTests(unittest.TestCase):
         self.assertTrue(Version('4.0') == Version('4.0.0.0'))
         self.assertTrue(Version('4.0') > Version('3.9.3'))
 
+        self.assertTrue(Version('4.0') > Version('4.0-SNAPSHOT'))
         self.assertTrue(Version('4.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
         self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
         self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0.0-SNAPSHOT'))
