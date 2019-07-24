@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from cassandra import ConsistencyLevel
+from cassandra.cqlengine.connection import CQLENGINE_PROFILE
+from cassandra.policies import RoundRobinPolicy
 
 try:
     import unittest2 as unittest
@@ -21,10 +24,10 @@ except ImportError:
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns, connection
 from cassandra.cqlengine.management import sync_table
-from cassandra.cluster import Cluster, _clusters_for_shutdown
+from cassandra.cluster import Cluster, _clusters_for_shutdown, EXEC_PROFILE_DEFAULT, ExecutionProfile, _ConfigMode
 from cassandra.query import dict_factory
 
-from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry, local
+from tests.integration import PROTOCOL_VERSION, execute_with_long_wait_retry, local, CASSANDRA_IP
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE, setup_connection
 from cassandra.cqlengine import models
@@ -127,3 +130,74 @@ class SeveralConnectionsTest(BaseCassEngTestCase):
         connection.set_session(self.session2)
         self.assertEqual(1, TestConnectModel.objects.count())
         self.assertEqual(TestConnectModel.objects.first(), TCM2)
+
+
+class LegacyConnectionsModel(Model):
+    key = columns.Integer(primary_key=True)
+    some_data = columns.Text()
+
+
+class LegacyConnectionsTest(unittest.TestCase):
+    def test_default_connection_uses_execution_profile(self):
+        connection.default()
+        conn = connection.get_connection()
+        self.assertEqual(conn.cluster._config_mode, _ConfigMode.PROFILES)
+
+    def test_connection_with_exeuction_profile(self):
+        connection.setup(
+            hosts=[CASSANDRA_IP],
+            default_keyspace=DEFAULT_KEYSPACE,
+            execution_profile=ExecutionProfile()
+        )
+        conn = connection.get_connection()
+        self.assertEqual(conn.cluster._config_mode, _ConfigMode.PROFILES)
+
+    def test_connection_with_legacy_settings(self):
+        connection.setup(
+            hosts=[CASSANDRA_IP],
+            default_keyspace=DEFAULT_KEYSPACE,
+            consistency=ConsistencyLevel.LOCAL_ONE
+        )
+        conn = connection.get_connection()
+        self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
+
+    def test_connection_from_session_with_execution_profile(self):
+        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile()})
+        session = cluster.connect()
+        connection.default()
+        connection.set_session(session)
+        conn = connection.get_connection()
+        self.assertEqual(conn.cluster._config_mode, _ConfigMode.PROFILES)
+
+    def test_connection_from_session_with_legacy_settings(self):
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy())
+        session = cluster.connect()
+        session.row_factory = dict_factory
+        connection.set_session(session)
+        conn = connection.get_connection()
+        self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
+
+    def test_uncommitted_session_uses_execution_profile(self):
+        cluster = Cluster()
+        session = cluster.connect()
+        connection.set_session(session)
+        conn = connection.get_connection()
+        self.assertEqual(conn.cluster._config_mode, _ConfigMode.PROFILES)
+
+    def test_row_factory_unaltered(self):
+        cluster = Cluster()
+        session = cluster.connect()
+        connection.set_session(session)
+        self.assertIn('dict_factory', str(session.get_execution_profile(CQLENGINE_PROFILE).row_factory))
+        self.assertIn('named_tuple_factory', str(session.get_execution_profile(EXEC_PROFILE_DEFAULT).row_factory))
+
+    def test_legacy_insert_query(self):
+        connection.setup(
+            hosts=[CASSANDRA_IP],
+            default_keyspace=DEFAULT_KEYSPACE,
+            consistency=ConsistencyLevel.LOCAL_ONE
+        )
+        sync_table(LegacyConnectionsModel)
+        LegacyConnectionsModel.objects.create(key=0, some_data='text0')
+        LegacyConnectionsModel.objects.create(key=1, some_data='text1')
+        self.assertEqual(LegacyConnectionsModel.objects(key=0)[0].some_data, 'text0')

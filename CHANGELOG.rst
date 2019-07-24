@@ -6,6 +6,7 @@ Features
 --------
 * Add Python 3.7 support (PYTHON-1016)
 * Future-proof Mapping imports (PYTHON-1023)
+* Add ExecutionProfiles to cqlengine because "Connection setup methods prevent using ExecutionProfile" (PYTHON-1009)
 
 Bug Fixes
 ---------

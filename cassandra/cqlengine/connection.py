@@ -17,12 +17,13 @@ import logging
 import six
 import threading
 
-from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist, ConsistencyLevel
+
+from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist, ConsistencyLevel, _ConfigMode, \
+    ExecutionProfile
 from cassandra.query import SimpleStatement, dict_factory
 
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine.statements import BaseCQLStatement
-
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +40,8 @@ _connections = {}
 # and because sessions may be replaced, we must register UDTs here, in order
 # to have them registered when a new session is established.
 udt_by_keyspace = defaultdict(dict)
+
+CQLENGINE_PROFILE = '_cqlengine'
 
 
 def format_log_context(msg, connection=None, keyspace=None):
@@ -70,9 +73,12 @@ class Connection(object):
 
     cluster = None
     session = None
+    source_execution_profile = None
+    uses_legacy_config = False
 
     def __init__(self, name, hosts, consistency=None,
-                 lazy_connect=False, retry_connect=False, cluster_options=None):
+                 lazy_connect=False, retry_connect=False, cluster_options=None,
+                 execution_profile=None):
         self.hosts = hosts
         self.name = name
         self.consistency = consistency
@@ -80,13 +86,27 @@ class Connection(object):
         self.retry_connect = retry_connect
         self.cluster_options = cluster_options if cluster_options else {}
         self.lazy_connect_lock = threading.RLock()
+        self.source_execution_profile = execution_profile
 
     @classmethod
-    def from_session(cls, name, session):
+    def from_session(cls, name, session, execution_profile=None):
         instance = cls(name=name, hosts=session.hosts)
-        instance.cluster, instance.session = session.cluster, session
+        instance.cluster = session.cluster
+        instance.session = session
+        instance.source_execution_profile = execution_profile
         instance.setup_session()
         return instance
+
+    def set_uses_legacy_config(self):
+        profile_set = self.cluster and self.cluster._config_mode == _ConfigMode.PROFILES
+        legacy_set = self.cluster and self.cluster._config_mode == _ConfigMode.LEGACY
+
+        if self.consistency and (profile_set or self.source_execution_profile):
+            raise ValueError(
+                "Connections constructed with execution_profiles should not specify legacy parameter "
+                "consistency. Configure this in a profile instead."
+            )
+        self.uses_legacy_config = legacy_set or self.consistency
 
     def setup(self):
         """Setup the connection"""
@@ -101,15 +121,15 @@ class Connection(object):
         self.cluster = Cluster(self.hosts, **self.cluster_options)
         try:
             self.session = self.cluster.connect()
+            self.set_uses_legacy_config()
+            if self.uses_legacy_config:
+                self.session.row_factory = dict_factory
             log.debug(format_log_context("connection initialized with internally created session", connection=self.name))
         except NoHostAvailable:
             if self.retry_connect:
                 log.warning(format_log_context("connect failed, setting up for re-attempt on first use", connection=self.name))
                 self.lazy_connect = True
             raise
-
-        if self.consistency is not None:
-            self.session.default_consistency_level = self.consistency
 
         if DEFAULT_CONNECTION in _connections and _connections[DEFAULT_CONNECTION] == self:
             cluster = _connections[DEFAULT_CONNECTION].cluster
@@ -118,7 +138,32 @@ class Connection(object):
         self.setup_session()
 
     def setup_session(self):
-        self.session.row_factory = dict_factory
+        self.set_uses_legacy_config()
+        if self.uses_legacy_config:
+            if self.session.row_factory is not dict_factory:
+                raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
+            if self.source_execution_profile:
+                raise ValueError("Cannot add execution profiles when legacy parameters are set explicitly.")
+            self.session.default_consistency_level = self.consistency if self.consistency else ConsistencyLevel.LOCAL_ONE
+            self.session.row_factory = dict_factory
+        elif CQLENGINE_PROFILE not in self.cluster.profile_manager.profiles:
+            if self.source_execution_profile:
+                if isinstance(self.source_execution_profile, ExecutionProfile):
+                    profile = self.source_execution_profile
+                elif isinstance(self.source_execution_profile, str):
+                    profile = self.session.execution_profile_clone_update(
+                        self.source_execution_profile,
+                        row_factory=dict_factory
+                    )
+                else:
+                    raise ValueError(
+                        "Execution profile must be an instance of ExecutionProfile "
+                        "or a name of a pre-existing ExecutionProfile used by this connection."
+                    )
+            else:
+                profile = ExecutionProfile(row_factory=dict_factory, consistency_level=ConsistencyLevel.LOCAL_ONE)
+            self.cluster.add_execution_profile(CQLENGINE_PROFILE, profile)
+
         enc = self.session.encoder
         enc.mapping[tuple] = enc.cql_encode_tuple
         _register_known_types(self.session.cluster)
@@ -141,7 +186,7 @@ class Connection(object):
 
 def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
                         retry_connect=False, cluster_options=None, default=False,
-                        session=None):
+                        session=None, execution_profile=None):
     """
     Add a connection to the connection registry. ``hosts`` and ``session`` are
     mutually exclusive, and ``consistency``, ``lazy_connect``,
@@ -150,7 +195,8 @@ def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
     :class:`cassandra.cluster.Session`.
 
     :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`).
-    :param int consistency: The default :class:`~.ConsistencyLevel` for the
+    :param int consistency: *Deprecated*. Use execution profile instead.
+        The default :class:`~.ConsistencyLevel` for the
         registered connection's new session. Default is the same as
         :attr:`.Session.default_consistency_level`. For use with ``hosts`` only;
         will fail when used with ``session``.
@@ -166,6 +212,9 @@ def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
         default
     :param Session session: A :class:`cassandra.cluster.Session` to be used in
         the created connection.
+    :param ExecutionProfile execution_profile: An :class:`cassandra.cluster.ExecutionProfile`
+        to be used in the created connection.
+    :
     """
 
     if name in _connections:
@@ -181,15 +230,13 @@ def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
             raise CQLEngineException(
                 "Session configuration arguments and 'session' argument are mutually exclusive"
             )
-        conn = Connection.from_session(name, session=session)
-        conn.setup_session()
+        conn = Connection.from_session(name, session=session, execution_profile=execution_profile)
     else:  # use hosts argument
-        if consistency is None:
-            consistency = ConsistencyLevel.LOCAL_ONE
         conn = Connection(
             name, hosts=hosts,
             consistency=consistency, lazy_connect=lazy_connect,
-            retry_connect=retry_connect, cluster_options=cluster_options
+            retry_connect=retry_connect, cluster_options=cluster_options,
+            execution_profile=execution_profile
         )
         conn.setup()
 
@@ -267,9 +314,10 @@ def set_session(s):
     """
     Configures the default connection with a preexisting :class:`cassandra.cluster.Session`
 
-    Note: the mapper presently requires a Session :attr:`~.row_factory` set to ``dict_factory``.
-    This may be relaxed in the future
+    Note: the mapper requires a Session :attr:`~.row_factory` set to ``dict_factory``
+     if the session is configured with legacy configuration instead of Execution Profiles
     """
+    # TODO: Can we link to the Execution Profiles page in that docstring?
 
     try:
         conn = get_connection()
@@ -281,8 +329,6 @@ def set_session(s):
     if conn.session:
         log.warning("configuring new default connection for cqlengine when one was already set")
 
-    if s.row_factory is not dict_factory:
-        raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
     conn.session = s
     conn.cluster = s.cluster
 
@@ -302,15 +348,17 @@ def setup(
         consistency=None,
         lazy_connect=False,
         retry_connect=False,
+        execution_profile=None,
         **kwargs):
     """
     Setup a the driver connection used by the mapper
 
     :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`)
     :param str default_keyspace: The default keyspace to use
-    :param int consistency: The global default :class:`~.ConsistencyLevel` - default is the same as :attr:`.Session.default_consistency_level`
+    :param int consistency: *Deprecated*. Use execution profile instead. The global default :class:`~.ConsistencyLevel` - default is the same as :attr:`.Session.default_consistency_level`
     :param bool lazy_connect: True if should not connect until first use
     :param bool retry_connect: True if we should retry to connect even if there was a connection failure initially
+    :param ExecutionProfile execution_profile: An :class:`cassandra.cluster.ExecutionProfile` to be used in the created connection
     :param \*\*kwargs: Pass-through keyword arguments for :class:`cassandra.cluster.Cluster`
     """
 
@@ -318,7 +366,8 @@ def setup(
     models.DEFAULT_KEYSPACE = default_keyspace
 
     register_connection('default', hosts=hosts, consistency=consistency, lazy_connect=lazy_connect,
-                        retry_connect=retry_connect, cluster_options=kwargs, default=True)
+                        retry_connect=retry_connect, cluster_options=kwargs, default=True,
+                        execution_profile=execution_profile)
 
 
 def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connection=None):
@@ -337,7 +386,10 @@ def execute(query, params=None, consistency_level=None, timeout=NOT_SET, connect
         query = SimpleStatement(query, consistency_level=consistency_level)
     log.debug(format_log_context(query.query_string, connection=connection))
 
-    result = conn.session.execute(query, params, timeout=timeout)
+    if conn.uses_legacy_config:
+        result = conn.session.execute(query, params, timeout=timeout)
+    else:
+        result = conn.session.execute(query, params, timeout=timeout, execution_profile=CQLENGINE_PROFILE)
 
     return result
 

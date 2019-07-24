@@ -22,6 +22,8 @@ from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
+from tests.integration import CASSANDRA_IP, PROTOCOL_VERSION
+from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
@@ -117,5 +119,12 @@ class TestConsistency(BaseConsistencyTest):
 
         # verify that this session default is set according to connection.setup
         # assumes tests/cqlengine/__init__ setup uses CL.ONE
+        connection.setup(
+            [CASSANDRA_IP],
+            consistency=ConsistencyLevel.ONE,
+            protocol_version=PROTOCOL_VERSION,
+            default_keyspace=DEFAULT_KEYSPACE,
+        )
+
         session = connection.get_session()
         self.assertEqual(session.default_consistency_level, ConsistencyLevel.ONE)

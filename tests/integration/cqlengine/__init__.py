@@ -53,7 +53,6 @@ def is_prepend_reversed():
 
 def setup_connection(keyspace_name):
     connection.setup([CASSANDRA_IP],
-                     consistency=ConsistencyLevel.ONE,
                      protocol_version=PROTOCOL_VERSION,
                      default_keyspace=keyspace_name)
 
