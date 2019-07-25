@@ -1273,10 +1273,15 @@ class ContextManagementTest(unittest.TestCase):
     load_balancing_policy = HostFilterPolicy(
         RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
     )
-    cluster_kwargs = {'execution_profiles': {EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=
-                                                                                    load_balancing_policy)},
-                      'schema_metadata_enabled': False,
-                      'token_metadata_enabled': False}
+
+    def setUp(self):
+        self.cluster_kwargs = {
+            'execution_profiles': {
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=self.load_balancing_policy)
+            },
+            'schema_metadata_enabled': False,
+            'token_metadata_enabled': False
+        }
 
     def test_no_connect(self):
         """
