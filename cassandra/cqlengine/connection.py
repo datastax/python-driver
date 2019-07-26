@@ -278,9 +278,6 @@ def set_session(s):
         register_connection('default', session=s, default=True)
         conn = get_connection()
 
-    if conn.session:
-        log.warning("configuring new default connection for cqlengine when one was already set")
-
     if s.row_factory is not dict_factory:
         raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
     conn.session = s
