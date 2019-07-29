@@ -209,25 +209,24 @@ class DurationTests(unittest.TestCase):
 class VersionTests(unittest.TestCase):
 
     def test_version_parsing(self):
-
         versions = [
-            (2, 0, 0),
-            (3, 1, 0),
-            (2, 4, 54),
-            (3, 1, 1, 12),
-            (3, 55, 1, 'build12'),
-            (3, 55, 1, '20190429-TEST')
+            ('2.0.0', (2, 0, 0, 0, 0)),
+            ('3.1.0', (3, 1, 0, 0, 0)),
+            ('2.4.54', (2, 4, 54, 0, 0)),
+            ('3.1.1.12', (3, 1, 1, 12, 0)),
+            ('3.55.1.build12', (3, 55, 1, 'build12', 0)),
+            ('3.55.1.20190429-TEST', (3, 55, 1, 20190429, 'TEST')),
+            ('4.0-SNAPSHOT', (4, 0, 0, 0, 'SNAPSHOT')),
         ]
 
-        for version in versions:
-            str_version = '.'.join([str(p) for p in version])
+        for str_version, expected_result in versions:
             v = Version(str_version)
             self.assertEqual(str_version, str(v))
-            self.assertEqual(v.major, version[0])
-            self.assertEqual(v.minor, version[1])
-            self.assertEqual(v.patch, version[2])
-            if len(version) > 3:
-                self.assertEqual(v.build, version[3])
+            self.assertEqual(v.major, expected_result[0])
+            self.assertEqual(v.minor, expected_result[1])
+            self.assertEqual(v.patch, expected_result[2])
+            self.assertEqual(v.build, expected_result[3])
+            self.assertEqual(v.prerelease, expected_result[4])
 
         # not supported version formats
         with self.assertRaises(ValueError):
@@ -279,3 +278,14 @@ class VersionTests(unittest.TestCase):
         self.assertTrue(Version('4') == Version('4.0.0'))
         self.assertTrue(Version('4.0') == Version('4.0.0.0'))
         self.assertTrue(Version('4.0') > Version('3.9.3'))
+
+        self.assertTrue(Version('4.0') > Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0.build5-SNAPSHOT') == Version('4.0.0.build5-SNAPSHOT'))
+        self.assertTrue(Version('4.1-SNAPSHOT') > Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0.build6-SNAPSHOT') > Version('4.0.0.build5-SNAPSHOT'))
+        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0-SNAPSHOT1'))
+        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0.0-SNAPSHOT1'))

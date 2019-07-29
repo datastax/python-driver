@@ -11,6 +11,7 @@ Bug Fixes
 ---------
 * Fix incorrect metadata for compact counter tables (PYTHON-1100)
 * Call ConnectionException with correct kwargs (PYTHON-1117)
+* Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
 3.18.0
 ======
 May 27, 2019
