@@ -258,7 +258,7 @@ class ExecutionProfile(object):
     Request timeout used when not overridden in :meth:`.Session.execute`
     """
 
-    row_factory = staticmethod(tuple_factory)
+    row_factory = staticmethod(named_tuple_factory)
     """
     A callable to format results, accepting ``(colnames, rows)`` where ``colnames`` is a list of column names, and
     ``rows`` is a list of tuples, with each tuple representing a row of parsed values.
