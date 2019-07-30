@@ -6,7 +6,7 @@ Features
 --------
 * Add Python 3.7 support (PYTHON-1016)
 * Future-proof Mapping imports (PYTHON-1023)
-
+* Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
 Bug Fixes
 ---------
 * Fix incorrect metadata for compact counter tables (PYTHON-1100)
