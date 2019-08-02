@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -25,6 +24,7 @@ import six
 import timeit
 
 import cassandra
+from cassandra.cqltypes import strip_frozen
 from cassandra.marshal import uint16_unpack, uint16_pack
 from cassandra.metadata import (Murmur3Token, MD5Token,
                                 BytesToken, ReplicationStrategy,
@@ -34,7 +34,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 UserType, KeyspaceMetadata, get_schema_parser,
                                 _UnknownStrategy, ColumnMetadata, TableMetadata,
                                 IndexMetadata, Function, Aggregate,
-                                Metadata, TokenMap, strip_frozen)
+                                Metadata, TokenMap)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 
