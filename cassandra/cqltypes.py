@@ -139,10 +139,7 @@ def cqltype_to_python(cql_string):
 
     scanned_tokens = scanner.scan(cql_string)[0]
     hierarchy = ast.literal_eval(''.join(scanned_tokens))
-    if isinstance(hierarchy, str):
-        return [hierarchy]
-    else:
-        return list(hierarchy)
+    return [hierarchy] if isinstance(hierarchy, str) else list(hierarchy)
 
 
 def python_to_cqltype(types):

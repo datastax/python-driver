@@ -9,7 +9,7 @@ Features
 * Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
 Bug Fixes
 ---------
-* Fix 'as_cql_query UDF/UDA parameters incorrectly includes "frozen" if arguments are collections' (PYTHON-1031)
+* as_cql_query UDF/UDA parameters incorrectly includes "frozen" if arguments are collections (PYTHON-1031)
 * Fix incorrect metadata for compact counter tables (PYTHON-1100)
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
