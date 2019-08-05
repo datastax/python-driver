@@ -908,9 +908,9 @@ class Aggregate(object):
         sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        type_list = ', '.join(self.argument_types)
+        type_list = ', '.join([types.strip_frozen(arg_type) for arg_type in self.argument_types])
         state_func = protect_name(self.state_func)
-        state_type = self.state_type
+        state_type = types.strip_frozen(self.state_type)
 
         ret = "CREATE AGGREGATE %(keyspace)s.%(name)s(%(type_list)s)%(sep)s" \
               "SFUNC %(state_func)s%(sep)s" \
@@ -1001,7 +1001,7 @@ class Function(object):
         sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        arg_list = ', '.join(["%s %s" % (protect_name(n), t)
+        arg_list = ', '.join(["%s %s" % (protect_name(n), types.strip_frozen(t))
                              for n, t in zip(self.argument_names, self.argument_types)])
         typ = self.return_type
         lang = self.language
@@ -2833,3 +2833,4 @@ def group_keys_by_replica(session, keyspace, table, keys):
             keys_per_host[NO_VALID_REPLICA].append(key)
 
     return dict(keys_per_host)
+

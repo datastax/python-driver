@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 try:
     import unittest2 as unittest
 except ImportError:
@@ -25,6 +24,7 @@ import six
 import timeit
 
 import cassandra
+from cassandra.cqltypes import strip_frozen
 from cassandra.marshal import uint16_unpack, uint16_pack
 from cassandra.metadata import (Murmur3Token, MD5Token,
                                 BytesToken, ReplicationStrategy,
@@ -470,6 +470,32 @@ class UserTypesTest(unittest.TestCase):
         self.assertEqual('CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii)', udt.as_cql_query(formatted=False))
 
 
+class UserDefinedFunctionTest(unittest.TestCase):
+    def test_as_cql_query_removes_frozen(self):
+        func = Function("ks1", "myfunction", ["frozen<tuple<int, text>>"], ["a"], "int", "java", "return 0;", True)
+        expected_result = (
+            "CREATE FUNCTION ks1.myfunction(a tuple<int, text>) "
+            "CALLED ON NULL INPUT "
+            "RETURNS int "
+            "LANGUAGE java "
+            "AS $$return 0;$$"
+        )
+        self.assertEqual(expected_result, func.as_cql_query(formatted=False))
+
+
+class UserDefinedAggregateTest(unittest.TestCase):
+    def test_as_cql_query_removes_frozen(self):
+        aggregate = Aggregate("ks1", "myaggregate", ["frozen<tuple<int>>"], "statefunc", "frozen<tuple<int>>", "finalfunc", "(0)", "tuple<int>")
+        expected_result = (
+            "CREATE AGGREGATE ks1.myaggregate(tuple<int>) "
+            "SFUNC statefunc "
+            "STYPE tuple<int> "
+            "FINALFUNC finalfunc "
+            "INITCOND (0)"
+        )
+        self.assertEqual(expected_result, aggregate.as_cql_query(formatted=False))
+
+
 class IndexTest(unittest.TestCase):
 
     def test_build_index_as_cql(self):
@@ -575,3 +601,22 @@ class HostsTests(unittest.TestCase):
             metadata.remove_host(host)
 
         self.assertEqual(len(metadata.all_hosts()), 0)
+
+
+class MetadataHelpersTest(unittest.TestCase):
+    """ For any helper functions that need unit tests """
+    def test_strip_frozen(self):
+        self.longMessage = True
+
+        argument_to_expected_results = [
+            ('int', 'int'),
+            ('tuple<text>', 'tuple<text>'),
+            (r'map<"!@#$%^&*()[]\ frozen >>>", int>', r'map<"!@#$%^&*()[]\ frozen >>>", int>'),  # A valid UDT name
+            ('frozen<tuple<text>>', 'tuple<text>'),
+            (r'frozen<map<"!@#$%^&*()[]\ frozen >>>", int>>', r'map<"!@#$%^&*()[]\ frozen >>>", int>'),
+            ('frozen<map<frozen<tuple<int, frozen<list<text>>, int>>, frozen<map<int, frozen<tuple<int>>>>>>',
+             'map<tuple<int, list<text>, int>, map<int, tuple<int>>>'),
+        ]
+        for argument, expected_result in argument_to_expected_results:
+            result = strip_frozen(argument)
+            self.assertEqual(result, expected_result, "strip_frozen() arg: {}".format(argument))

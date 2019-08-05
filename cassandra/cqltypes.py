@@ -28,6 +28,7 @@ the corresponding CQL or Cassandra type strings.
 # .from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 
 from __future__ import absolute_import  # to enable import io from stdlib
+import ast
 from binascii import unhexlify
 import calendar
 from collections import namedtuple
@@ -119,6 +120,73 @@ casstype_scanner = re.Scanner((
     (r'[a-zA-Z0-9_.:=>]+', lambda s, t: t),
     (r'[\s,]', None),
 ))
+
+
+def cqltype_to_python(cql_string):
+    """
+    Given a cql type string, creates a list that can be manipulated in python
+    Example:
+        int -> ['int']
+        frozen<tuple<text, int>> -> ['frozen', ['tuple', ['text', 'int']]]
+    """
+    scanner = re.Scanner((
+        (r'[a-zA-Z0-9_]+', lambda s, t: "'{}'".format(t)),
+        (r'<', lambda s, t: ', ['),
+        (r'>', lambda s, t: ']'),
+        (r'[, ]', lambda s, t: t),
+        (r'".*?"', lambda s, t: "'{}'".format(t)),
+    ))
+
+    scanned_tokens = scanner.scan(cql_string)[0]
+    hierarchy = ast.literal_eval(''.join(scanned_tokens))
+    return [hierarchy] if isinstance(hierarchy, str) else list(hierarchy)
+
+
+def python_to_cqltype(types):
+    """
+    Opposite of the `cql_to_python` function. Given a python list, creates a cql type string from the representation
+    Example:
+        ['int'] -> int
+        ['frozen', ['tuple', ['text', 'int']]] -> frozen<tuple<text, int>>
+    """
+    scanner = re.Scanner((
+        (r"'[a-zA-Z0-9_]+'", lambda s, t: t[1:-1]),
+        (r'^\[', lambda s, t: None),
+        (r'\]$', lambda s, t: None),
+        (r',\s*\[', lambda s, t: '<'),
+        (r'\]', lambda s, t: '>'),
+        (r'[, ]', lambda s, t: t),
+        (r'\'".*?"\'', lambda s, t: t[1:-1]),
+    ))
+
+    scanned_tokens = scanner.scan(repr(types))[0]
+    cql = ''.join(scanned_tokens).replace('\\\\', '\\')
+    return cql
+
+
+def _strip_frozen_from_python(types):
+    """
+    Given a python list representing a cql type, removes 'frozen'
+    Example:
+        ['frozen', ['tuple', ['text', 'int']]] -> ['tuple', ['text', 'int']]
+    """
+    while 'frozen' in types:
+        index = types.index('frozen')
+        types = types[:index] + types[index + 1] + types[index + 2:]
+    new_types = [_strip_frozen_from_python(item) if isinstance(item, list) else item for item in types]
+    return new_types
+
+
+def strip_frozen(cql):
+    """
+    Given a cql type string, and removes frozen
+    Example:
+        frozen<tuple<int>> -> tuple<int>
+    """
+    types = cqltype_to_python(cql)
+    types_without_frozen = _strip_frozen_from_python(types)
+    cql = python_to_cqltype(types_without_frozen)
+    return cql
 
 
 def lookup_casstype_simple(casstype):
