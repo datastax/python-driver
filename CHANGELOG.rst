@@ -7,6 +7,7 @@ Features
 * Add Python 3.7 support (PYTHON-1016)
 * Future-proof Mapping imports (PYTHON-1023)
 * Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
+* Include param values in cqlengine logging (PYTHON-1105)
 Bug Fixes
 ---------
 * as_cql_query UDF/UDA parameters incorrectly includes "frozen" if arguments are collections (PYTHON-1031)
