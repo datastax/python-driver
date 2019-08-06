@@ -1329,9 +1329,14 @@ class Cluster(object):
 
     def connect(self, keyspace=None, wait_for_all_pools=False):
         """
-        Creates and returns a new :class:`~.Session` object.  If `keyspace`
-        is specified, that keyspace will be the default keyspace for
+        Creates and returns a new :class:`~.Session` object.
+
+        If `keyspace` is specified, that keyspace will be the default keyspace for
         operations on the ``Session``.
+
+        `wait_for_all_pools` specifies whether this call should wait for all connection pools to be
+        established or attempted. Default is `False`, which means it will return when the first
+        successful connection is established. Remaining pools are added asynchronously.
         """
         with self._lock:
             if self.is_shutdown:
