@@ -751,13 +751,15 @@ class InsertStatement(AssignmentStatement):
         if self.if_not_exists:
             qs += ["IF NOT EXISTS"]
 
+        using_options = []
         if self.ttl:
-            qs += ["USING TTL {0}".format(self.ttl)]
+            using_options += ["TTL {}".format(self.ttl)]
 
         if self.timestamp:
-            statement = "AND TIMESTAMP {0}" if self.ttl else "USING TIMESTAMP {0}"
-            qs += [statement.format(self.timestamp_normalized)]
+            using_options += ["TIMESTAMP {}".format(self.timestamp_normalized)]
 
+        if using_options:
+            qs += ["USING {}".format(" AND ".join(using_options))]
         return ' '.join(qs)
 
 

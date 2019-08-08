@@ -74,6 +74,10 @@ class CreateWithTimestampTest(BaseTimestampTest):
         tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
         tmp.should.be.ok
 
+    def test_non_batch_syntax_with_tll_integration(self):
+        tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).ttl(30).create(count=1)
+        tmp.should.be.ok
+
     def test_non_batch_syntax_unit(self):
 
         with mock.patch.object(self.session, "execute") as m:
