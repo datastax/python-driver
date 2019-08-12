@@ -225,6 +225,12 @@ def _resolve_contact_points(contact_points, port):
             for endpoint in addrinfo]
 
 
+def _execution_profile_to_string(name):
+    if name is EXEC_PROFILE_DEFAULT:
+        return 'EXEC_PROFILE_DEFAULT'
+    return '"%s"' % (name,)
+
+
 class ExecutionProfile(object):
     load_balancing_policy = None
     """
@@ -1161,7 +1167,7 @@ class Cluster(object):
                 'to a cluster with explicitly configured contact_points will '
                 'raise an exception; please specify a load-balancing policy '
                 'in the ExecutionProfile.'
-                ''.format(name=repr(name), self=self, ep=profile))
+                ''.format(name=_execution_profile_to_string(name), self=self, ep=profile))
 
         self.profile_manager.profiles[name] = profile
         profile.load_balancing_policy.populate(self, self.metadata.all_hosts())
@@ -2383,11 +2389,6 @@ class Session(object):
             load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan,
             host=host)
 
-    def _execution_profile_to_string(self, name):
-        if name is EXEC_PROFILE_DEFAULT:
-            return 'EXEC_PROFILE_DEFAULT'
-        return '"%s"' % (name,)
-
     def get_execution_profile(self, name):
         """
         Returns the execution profile associated with the provided ``name``.
@@ -2398,9 +2399,9 @@ class Session(object):
         try:
             return profiles[name]
         except KeyError:
-            eps = [self._execution_profile_to_string(ep) for ep in profiles.keys()]
+            eps = [_execution_profile_to_string(ep) for ep in profiles.keys()]
             raise ValueError("Invalid execution_profile: %s; valid profiles are: %s." % (
-                self._execution_profile_to_string(name), ', '.join(eps)))
+                _execution_profile_to_string(name), ', '.join(eps)))
 
     def _maybe_get_execution_profile(self, ep):
         return ep if isinstance(ep, ExecutionProfile) else self.get_execution_profile(ep)
