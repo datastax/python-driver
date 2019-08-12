@@ -11,7 +11,6 @@ Bug Fixes
 ---------
 * Fix incorrect metadata for compact counter tables (PYTHON-1100)
 * Call ConnectionException with correct kwargs (PYTHON-1117)
-* An ExecutionProfile should not be added to multiple cluster objects (PYTHON-1111)
 3.18.0
 ======
 May 27, 2019

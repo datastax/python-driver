@@ -516,14 +516,3 @@ class ExecutionProfileTest(unittest.TestCase):
             )
 
         patched_logger.warning.assert_not_called()
-
-    def test_clusters_cannot_share_same_execution_profile_instance(self):
-        """ python-1111 """
-        profile = ExecutionProfile()
-        cluster1 = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
-        with self.assertRaises(ValueError) as e:
-            cluster2 = Cluster(execution_profiles={'profile': profile})
-        self.assertEqual(
-            str(e.exception),
-            "The same execution profile cannot be shared by multiple cluster instances."
-        )

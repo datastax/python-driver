@@ -74,7 +74,6 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
-from cassandra.util import UniqueValuesDict
 from cassandra.compat import Mapping
 
 
@@ -307,14 +306,10 @@ class ExecutionProfile(object):
         self.speculative_execution_policy = speculative_execution_policy or NoSpeculativeExecutionPolicy()
 
 
-class UniqueProfilesDict(UniqueValuesDict):
-    duplicate_error_message = "The same execution profile cannot be shared by multiple cluster instances."
-
-
 class ProfileManager(object):
 
     def __init__(self):
-        self.profiles = UniqueProfilesDict()
+        self.profiles = dict()
 
     def _profiles_without_explicit_lbps(self):
         names = (profile_name for
