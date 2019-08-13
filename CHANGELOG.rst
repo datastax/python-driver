@@ -8,6 +8,8 @@ Features
 * Future-proof Mapping imports (PYTHON-1023)
 * Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
 * Include param values in cqlengine logging (PYTHON-1105)
+* NTS Token Replica Map Generation is slow (PYTHON-622)
+
 Bug Fixes
 ---------
 * as_cql_query UDF/UDA parameters incorrectly includes "frozen" if arguments are collections (PYTHON-1031)
@@ -16,6 +18,7 @@ Bug Fixes
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
 * Set the proper default ExecutionProfile.row_factory value (PYTHON-1119)
+
 3.18.0
 ======
 May 27, 2019
