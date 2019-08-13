@@ -2245,8 +2245,9 @@ class Session(object):
 
         `paging_state` is an optional paging state, reused from a previous :class:`ResultSet`.
 
-        `host` is the :class:`pool.Host` that should handle the query. Using this is discouraged except in a few
-        cases, e.g., querying node-local tables and applying schema changes.
+        `host` is the :class:`cassandra.pool.Host` that should handle the query. If the host specified is down or
+        not yet connected, the query will fail with :class:`NoHostAvailable`. Using this is
+        discouraged except in a few cases, e.g., querying node-local tables and applying schema changes.
         """
         return self.execute_async(query, parameters, trace, custom_payload,
                                   timeout, execution_profile, paging_state, host).result()
