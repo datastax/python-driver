@@ -1,3 +1,11 @@
+3.20.0
+======
+Not Released
+
+Features
+--------
+* Add SNIEndPoint support (PYTHON-1084)
+
 3.19.0
 ======
 Not released

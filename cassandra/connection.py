@@ -223,6 +223,82 @@ class DefaultEndPointFactory(EndPointFactory):
         return DefaultEndPoint(self.cluster.address_translator.translate(addr), 9042)  # will eventually support port
 
 
+@total_ordering
+class SniEndPoint(EndPoint):
+    """SNI Proxy EndPoint implementation."""
+
+    def __init__(self, proxy_address, server_name, port=9042):
+        self._proxy_address = proxy_address
+        self._index = 0
+        self._resolved_address = None  # resolved address
+        self._port = port
+        self._server_name = server_name
+        self._ssl_options = {'server_hostname': server_name}
+
+    @property
+    def address(self):
+        return self._proxy_address
+
+    @property
+    def port(self):
+        return self._port
+
+    @property
+    def ssl_options(self):
+        return self._ssl_options
+
+    def resolve(self):
+        try:
+            resolved_addresses = socket.getaddrinfo(self._proxy_address, self._port,
+                                                    socket.AF_UNSPEC, socket.SOCK_STREAM)
+        except socket.gaierror:
+            log.debug('Could not resolve sni proxy hostname "%s" '
+                      'with port %d' % (self._proxy_address, self._port))
+            raise
+
+        # round-robin pick
+        self._resolved_address = sorted(addr[4][0] for addr in resolved_addresses)[self._index % len(resolved_addresses)]
+        self._index += 1
+
+        return self._resolved_address, self._port
+
+    def __eq__(self, other):
+        return (isinstance(other, SniEndPoint) and
+                self.address == other.address and self.port == other.port and
+                self._server_name == other._server_name)
+
+    def __hash__(self):
+        return hash((self.address, self.port, self._server_name))
+
+    def __lt__(self, other):
+        return ((self.address, self.port, self._server_name) <
+                (other.address, other.port, self._server_name))
+
+    def __str__(self):
+        return str("%s:%d:%s" % (self.address, self.port, self._server_name))
+
+    def __repr__(self):
+        return "<%s: %s:%d:%s>" % (self.__class__.__name__,
+                                   self.address, self.port, self._server_name)
+
+
+class SniEndPointFactory(EndPointFactory):
+
+    def __init__(self, proxy_address, port):
+        self._proxy_address = proxy_address
+        self._port = port
+
+    def create(self, row):
+        host_id = row.get("host_id")
+        if host_id is None:
+            raise ValueError("No host_id to create the SniEndPoint")
+
+        return SniEndPoint(self._proxy_address, str(host_id), self._port)
+
+    def create_from_sni(self, sni):
+        return SniEndPoint(self._proxy_address, sni, self._port)
+
+
 class _Frame(object):
     def __init__(self, version, flags, stream, opcode, body_offset, end_pos):
         self.version = version
