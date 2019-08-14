@@ -57,7 +57,7 @@ class TestConditional(BaseCassEngTestCase):
         drop_table(TestConditionalModel)
 
     def test_update_using_conditional(self):
-        t = TestConditionalModel.create(text='blah blah')
+        t = TestConditionalModel.if_not_exists().create(text='blah blah')
         t.text = 'new blah'
         with mock.patch.object(self.session, 'execute') as m:
             t.iff(text='blah blah').save()
@@ -66,7 +66,7 @@ class TestConditional(BaseCassEngTestCase):
         self.assertIn('IF "text" = %(0)s', args[0][0].query_string)
 
     def test_update_conditional_success(self):
-        t = TestConditionalModel.create(text='blah blah', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='blah blah', count=5)
         id = t.id
         t.text = 'new blah'
         t.iff(text='blah blah').save()
@@ -76,7 +76,7 @@ class TestConditional(BaseCassEngTestCase):
         self.assertEqual(updated.text, 'new blah')
 
     def test_update_failure(self):
-        t = TestConditionalModel.create(text='blah blah')
+        t = TestConditionalModel.if_not_exists().create(text='blah blah')
         t.text = 'new blah'
         t = t.iff(text='something wrong')
 
@@ -89,7 +89,7 @@ class TestConditional(BaseCassEngTestCase):
         })
 
     def test_blind_update(self):
-        t = TestConditionalModel.create(text='blah blah')
+        t = TestConditionalModel.if_not_exists().create(text='blah blah')
         t.text = 'something else'
         uid = t.id
 
@@ -100,7 +100,7 @@ class TestConditional(BaseCassEngTestCase):
         self.assertIn('IF "text" = %(1)s', args[0][0].query_string)
 
     def test_blind_update_fail(self):
-        t = TestConditionalModel.create(text='blah blah')
+        t = TestConditionalModel.if_not_exists().create(text='blah blah')
         t.text = 'something else'
         uid = t.id
         qs = TestConditionalModel.objects(id=uid).iff(text='Not dis!')
@@ -120,7 +120,7 @@ class TestConditional(BaseCassEngTestCase):
         self.assertEqual('"some_value" = %(3)s', str(tc))
 
     def test_batch_update_conditional(self):
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         id = t.id
         with BatchQuery() as b:
             t.batch(b).iff(count=5).update(text='something else')
@@ -166,7 +166,7 @@ class TestConditional(BaseCassEngTestCase):
 
     def test_delete_conditional(self):
         # DML path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             t.iff(count=9999).delete()
@@ -175,7 +175,7 @@ class TestConditional(BaseCassEngTestCase):
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
 
         # QuerySet path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             TestConditionalModel.objects(id=t.id).iff(count=9999).delete()
@@ -195,7 +195,7 @@ class TestConditional(BaseCassEngTestCase):
         """
 
         # DML path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             t.iff(count__ne=5).delete()
@@ -203,7 +203,7 @@ class TestConditional(BaseCassEngTestCase):
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 0)
 
         # QuerySet path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             TestConditionalModel.objects(id=t.id).iff(count__ne=5).delete()
@@ -222,7 +222,7 @@ class TestConditional(BaseCassEngTestCase):
         """
 
         # DML path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             t.iff(count__ne=5).update(text='nothing')
@@ -231,7 +231,7 @@ class TestConditional(BaseCassEngTestCase):
         t.delete()
 
         # QuerySet path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             TestConditionalModel.objects(id=t.id).iff(count__ne=5).update(text='nothing')
@@ -245,7 +245,7 @@ class TestConditional(BaseCassEngTestCase):
         # https://github.com/datastax/python-driver/blob/3.1.1/cassandra/cqlengine/query.py#L1197-L1200
 
         # DML path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             t.iff(count=9999).update(text=None)
@@ -254,7 +254,7 @@ class TestConditional(BaseCassEngTestCase):
         self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
 
         # QuerySet path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         self.assertEqual(TestConditionalModel.objects(id=t.id).count(), 1)
         with self.assertRaises(LWTException):
             TestConditionalModel.objects(id=t.id).iff(count=9999).update(text=None)
@@ -264,14 +264,14 @@ class TestConditional(BaseCassEngTestCase):
 
     def test_column_delete_after_update(self):
         # DML path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         t.iff(count=5).update(text=None, count=6)
 
         self.assertIsNone(t.text)
         self.assertEqual(t.count, 6)
 
         # QuerySet path
-        t = TestConditionalModel.create(text='something', count=5)
+        t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         TestConditionalModel.objects(id=t.id).iff(count=5).update(text=None, count=6)
 
         self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
@@ -288,7 +288,7 @@ class TestConditional(BaseCassEngTestCase):
         @test_category object_mapper
         """
         uuid = uuid4()
-        TestConditionalModel.create(id=uuid, text='test_for_cassandra', count=5)
+        TestConditionalModel.if_not_exists().create(id=uuid, text='test_for_cassandra', count=5)
 
         # This uses the iff method directly from the model class without
         # an instance having been created
