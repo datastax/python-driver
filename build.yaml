@@ -150,6 +150,9 @@ build:
       export PATH=$JAVA_HOME/bin:$PATH
       export PYTHONPATH=""
 
+      # Required for unix socket tests
+      sudo apt-get install socat
+
       # Install latest setuptools
       pip install --upgrade pip
       pip install -U setuptools
