@@ -5,6 +5,7 @@ Not Released
 Features
 --------
 * Add SNIEndPoint support (PYTHON-1084)
+* Add a new Endpoint type to support unix sockets (PYTHON-1098)
 
 3.19.0
 ======

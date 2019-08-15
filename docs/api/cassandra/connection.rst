@@ -17,3 +17,5 @@
 .. autoclass:: SniEndPoint
 
 .. autoclass:: SniEndPointFactory
+
+.. autoclass:: UnixSocketEndPoint
