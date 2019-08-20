@@ -19,8 +19,6 @@ except ImportError:
 import logging
 import time
 
-from concurrent.futures import ThreadPoolExecutor
-
 from mock import Mock
 
 from cassandra import OperationTimedOut
@@ -28,6 +26,7 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 from cassandra.io.asyncorereactor import AsyncoreConnection
+from tests import connection_class, thread_pool_executor_class
 from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
 from tests.integration.util import assert_quiescent_pool_state
 from tests.integration.simulacron import SimulacronBase
@@ -55,7 +54,7 @@ class TrackDownListener(HostStateListener):
     def on_remove(self, host):
         pass
 
-class ThreadTracker(ThreadPoolExecutor):
+class ThreadTracker(thread_pool_executor_class):
     called_functions = []
 
     def submit(self, fn, *args, **kwargs):
@@ -339,9 +338,9 @@ class ConnectionTests(SimulacronBase):
         self.assertEqual(listener.hosts_marked_down, [])
         assert_quiescent_pool_state(self, cluster)
 
-    def test_can_shutdown_asyncoreconnection_subclass(self):
+    def test_can_shutdown_connection_subclass(self):
         start_and_prime_singledc()
-        class ExtendedConnection(AsyncoreConnection):
+        class ExtendedConnection(connection_class):
             pass
 
         cluster = Cluster(contact_points=["127.0.0.2"],

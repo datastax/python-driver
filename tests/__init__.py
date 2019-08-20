@@ -21,6 +21,7 @@ import sys
 import socket
 import platform
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 log = logging.getLogger()
 log.setLevel('DEBUG')
@@ -58,6 +59,7 @@ def is_eventlet_time_monkey_patched():
 def is_monkey_patched():
     return is_gevent_monkey_patched() or is_eventlet_monkey_patched()
 
+thread_pool_executor_class = ThreadPoolExecutor
 
 EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
 if "gevent" in EVENT_LOOP_MANAGER:
@@ -71,6 +73,13 @@ elif "eventlet" in EVENT_LOOP_MANAGER:
 
     from cassandra.io.eventletreactor import EventletConnection
     connection_class = EventletConnection
+
+    try:
+        from futurist import GreenThreadPoolExecutor
+        thread_pool_executor_class = GreenThreadPoolExecutor
+    except:
+        # futurist is installed only with python >=3.7
+        pass
 elif "asyncore" in EVENT_LOOP_MANAGER:
     from cassandra.io.asyncorereactor import AsyncoreConnection
     connection_class = AsyncoreConnection

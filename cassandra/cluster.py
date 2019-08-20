@@ -1061,7 +1061,7 @@ class Cluster(object):
             HostDistance.REMOTE: DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST
         }
 
-        self.executor = ThreadPoolExecutor(max_workers=executor_threads)
+        self.executor = self._create_thread_pool_executor(max_workers=executor_threads)
         self.scheduler = _Scheduler(self.executor)
 
         self._lock = RLock()
@@ -1075,6 +1075,42 @@ class Cluster(object):
             self.schema_event_refresh_window, self.topology_event_refresh_window,
             self.status_event_refresh_window,
             schema_metadata_enabled, token_metadata_enabled)
+
+    def _create_thread_pool_executor(self, **kwargs):
+        """
+        Create a ThreadPoolExecutor for the cluster. In most cases, the built-in
+        `concurrent.futures.ThreadPoolExecutor` is used.
+
+        Python 3.7 and Eventlet cause the `concurrent.futures.ThreadPoolExecutor`
+        to hang indefinitely. In that case, the user needs to have the `futurist`
+        package so we can use the `futurist.GreenThreadPoolExecutor` class instead.
+
+        :param kwargs: All keyword args are passed to the ThreadPoolExecutor constructor.
+        :return: A ThreadPoolExecutor instance.
+        """
+        tpe_class = ThreadPoolExecutor
+        if sys.version_info[0] >= 3 and sys.version_info[1] >= 7:
+            try:
+                from cassandra.io.eventletreactor import EventletConnection
+                is_eventlet = issubclass(self.connection_class, EventletConnection)
+            except:
+                # Eventlet is not available or can't be detected
+                return tpe_class(**kwargs)
+
+            if is_eventlet:
+                try:
+                    from futurist import GreenThreadPoolExecutor
+                    tpe_class = GreenThreadPoolExecutor
+                except ImportError:
+                    # futurist is not available
+                    raise ImportError(
+                        ("Python 3.7 and Eventlet cause the `concurrent.futures.ThreadPoolExecutor` "
+                         "to hang indefinitely. If you want to use the Eventlet reactor, you "
+                         "need to install the `futurist` package to allow the driver to use "
+                         "the GreenThreadPoolExecutor. See https://github.com/eventlet/eventlet/issues/508 "
+                         "for more details."))
+
+        return tpe_class(**kwargs)
 
     def register_user_type(self, keyspace, user_type, klass):
         """

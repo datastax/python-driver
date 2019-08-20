@@ -12,4 +12,5 @@ gevent>=1.0
 eventlet
 cython>=0.20,<0.30
 packaging
+futurist; python_version >= '3.7'
 asynctest; python_version > '3.4'
