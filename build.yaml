@@ -62,53 +62,53 @@ schedules:
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
 
-  weekly_libev:
-    schedule: 0 10 * * 6
-    branches:
-      include: [master]
-    env_vars: |
-      EVENT_LOOP_MANAGER='libev'
+  # weekly_libev:
+  #   schedule: 0 10 * * 6
+  #   branches:
+  #     include: [master]
+  #   env_vars: |
+  #     EVENT_LOOP_MANAGER='libev'
 
-  weekly_gevent:
-    schedule: 0 14 * * 6
-    branches:
-      include: [master]
-    env_vars: |
-      EVENT_LOOP_MANAGER='gevent'
-    matrix:
-      exclude:
-        - python: [3.4, 3.5, 3.6, 3.7]
+  # weekly_gevent:
+  #   schedule: 0 14 * * 6
+  #   branches:
+  #     include: [master]
+  #   env_vars: |
+  #     EVENT_LOOP_MANAGER='gevent'
+  #   matrix:
+  #     exclude:
+  #       - python: [3.4, 3.5, 3.6, 3.7]
 
-  weekly_eventlet:
-    schedule: 0 18 * * 6
-    branches:
-      include: [master]
-    env_vars: |
-      EVENT_LOOP_MANAGER='eventlet'
+  # weekly_eventlet:
+  #   schedule: 0 18 * * 6
+  #   branches:
+  #     include: [master]
+  #   env_vars: |
+  #     EVENT_LOOP_MANAGER='eventlet'
 
-  weekly_asyncio:
-    schedule: 0 22 * * 6
-    branches:
-      include: [master]
-    env_vars: |
-      EVENT_LOOP_MANAGER='asyncio'
-    matrix:
-      exclude:
-        - python: [2.7]
+  # weekly_asyncio:
+  #   schedule: 0 22 * * 6
+  #   branches:
+  #     include: [master]
+  #   env_vars: |
+  #     EVENT_LOOP_MANAGER='asyncio'
+  #   matrix:
+  #     exclude:
+  #       - python: [2.7]
 
-  weekly_async:
-    schedule: 0 10 * * 7
-    branches:
-      include: [master]
-    env_vars: |
-      EVENT_LOOP_MANAGER='asyncore'
+  # weekly_async:
+  #   schedule: 0 10 * * 7
+  #   branches:
+  #     include: [master]
+  #   env_vars: |
+  #     EVENT_LOOP_MANAGER='asyncore'
 
-  weekly_twister:
-    schedule: 0 14 * * 7
-    branches:
-      include: [master]
-    env_vars: |
-      EVENT_LOOP_MANAGER='twisted'
+  # weekly_twister:
+  #   schedule: 0 14 * * 7
+  #   branches:
+  #     include: [master]
+  #   env_vars: |
+  #     EVENT_LOOP_MANAGER='twisted'
 
   upgrade_tests:
     schedule: adhoc
