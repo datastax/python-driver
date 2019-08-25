@@ -897,7 +897,7 @@ class Cluster(object):
 
         self.port = port
 
-        self.endpoint_factory = endpoint_factory or DefaultEndPointFactory()
+        self.endpoint_factory = endpoint_factory or DefaultEndPointFactory(port=self.port)
         self.endpoint_factory.configure(self)
 
         raw_contact_points = [cp for cp in self.contact_points if not isinstance(cp, EndPoint)]

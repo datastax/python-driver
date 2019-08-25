@@ -18,6 +18,7 @@ Bug Fixes
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
 * Set the proper default ExecutionProfile.row_factory value (PYTHON-1119)
+* Discovered node doesn´t honor the configured Cluster port on connection (PYTHON-1127)
 
 3.18.0
 ======
