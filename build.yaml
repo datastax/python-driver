@@ -164,6 +164,9 @@ build:
       pip install nose-exclude
       pip install service_identity
 
+      # Required for DBaaS and https+ssl cert
+      pip install pyopenssl ndg-httpsclient pyasn1
+
       FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
         FORCE_CYTHON=True
@@ -211,9 +214,13 @@ build:
       echo "==========RUNNING INTEGRATION TESTS=========="
       EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
+      echo "==========RUNNING ADVANCED AND CLOUD TESTS=========="
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CLOUD_PROXY_PATH="$HOME/proxy/" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=advanced_results.xml tests/integration/advanced/ || true
+
       if [ -z "$EXCLUDE_LONG" ]; then
         echo "==========RUNNING LONG INTEGRATION TESTS=========="
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
       fi
+
   - xunit:
     - "*_results.xml"

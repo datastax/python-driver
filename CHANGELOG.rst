@@ -6,6 +6,8 @@ Features
 --------
 * Add SNIEndPoint support (PYTHON-1084)
 * Add a new Endpoint type to support unix sockets (PYTHON-1098)
+* DataStax Cloud enablement (PYTHON-1075)
+* Add creds.zip support (PYTHON-1097)
 
 3.19.0
 ======
