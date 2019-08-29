@@ -403,3 +403,13 @@ level on that:
     user3_lookup = user_lookup_stmt.bind([user_id3])
     user3_lookup.consistency_level = ConsistencyLevel.ALL
     user3 = session.execute(user3_lookup)
+
+Connecting to DataStax Cloud
+----------------------------
+1. Download the secure connect bundle from your DataStax Constellation account.
+2. Connect to your cloud cluster with::
+    cloud_config = {
+        'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
+    }
+    cluster = Cluster(cloud=cloud_config)
+    session = cluster.connect()

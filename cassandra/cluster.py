@@ -18,6 +18,7 @@ This module houses the main classes you will interact with,
 """
 from __future__ import absolute_import
 
+import os
 import atexit
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
@@ -45,9 +46,11 @@ from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
                        SchemaTargetType, DriverException, ProtocolVersion,
                        UnresolvableContactPoints)
+from cassandra.auth import PlainTextAuthProvider
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported,
-                                  EndPoint, DefaultEndPoint, DefaultEndPointFactory)
+                                  EndPoint, DefaultEndPoint, DefaultEndPointFactory,
+                                  SniEndPointFactory)
 from cassandra.cqltypes import UserType
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -75,6 +78,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.compat import Mapping
+from cassandra import cloud as dscloud
 
 
 def _is_eventlet_monkey_patched():
@@ -779,6 +783,18 @@ class Cluster(object):
     documentation for :meth:`Session.timestamp_generator`.
     """
 
+    cloud = None
+    """
+    A dict of the cloud configuration. Example::
+        {
+            # path to the secure connect bundle
+            'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
+        }
+
+    The zip file will be temporarily extracted in the same directory to
+    load the configuration and certificates.
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -874,13 +890,36 @@ class Cluster(object):
                  idle_heartbeat_timeout=30,
                  no_compact=False,
                  ssl_context=None,
-                 endpoint_factory=None):
+                 endpoint_factory=None,
+                 cloud=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
+
+        if cloud is not None:
+            if contact_points is not _NOT_SET or endpoint_factory:
+                raise ValueError(("contact_points and endpoint_factory"
+                                  "cannot be specified with a cloud configuration"))
+
+            if ssl_context:
+                cloud['ssl_context'] = ssl_context
+
+            cloud_config = dscloud.get_cloud_config(cloud)
+
+            ssl_context = cloud_config.ssl_context
+            if (auth_provider is None and cloud_config.username
+                    and cloud_config.password):
+                auth_provider = PlainTextAuthProvider(cloud_config.username, cloud_config.password)
+
+            endpoint_factory = SniEndPointFactory(cloud_config.sni_host, cloud_config.sni_port)
+            contact_points = [
+                endpoint_factory.create_from_sni(host_id)
+                for host_id in cloud_config.host_ids
+            ]
+
         if contact_points is not None:
             if contact_points is _NOT_SET:
                 self._contact_points_explicit = False
