@@ -11,13 +11,12 @@ Features
 
 3.19.0
 ======
-Not released
+August 26, 2019
 
 Features
 --------
 * Add Python 3.7 support (PYTHON-1016)
 * Future-proof Mapping imports (PYTHON-1023)
-* Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
 * Include param values in cqlengine logging (PYTHON-1105)
 * NTS Token Replica Map Generation is slow (PYTHON-622)
 
@@ -28,6 +27,11 @@ Bug Fixes
 * Fix incorrect metadata for compact counter tables (PYTHON-1100)
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
+* Discovered node doesn´t honor the configured Cluster port on connection (PYTHON-1127)
+
+Other
+-----
+* Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
 * Set the proper default ExecutionProfile.row_factory value (PYTHON-1119)
 
 3.18.0

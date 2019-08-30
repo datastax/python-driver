@@ -217,6 +217,14 @@ class DefaultEndPoint(EndPoint):
 
 class DefaultEndPointFactory(EndPointFactory):
 
+    port = None
+    """
+    If set, force all endpoints to use this port.
+    """
+
+    def __init__(self, port=None):
+        self.port = port
+
     def create(self, row):
         addr = None
         if "rpc_address" in row:
@@ -227,7 +235,9 @@ class DefaultEndPointFactory(EndPointFactory):
             addr = row.get("peer")
 
         # create the endpoint with the translated address
-        return DefaultEndPoint(self.cluster.address_translator.translate(addr), 9042)  # will eventually support port
+        return DefaultEndPoint(
+            self.cluster.address_translator.translate(addr),
+            self.port if self.port is not None else 9042)
 
 
 @total_ordering

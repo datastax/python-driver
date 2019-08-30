@@ -14,6 +14,7 @@
 
 import time
 
+from cassandra.connection import ConnectionShutdown
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, FallthroughRetryPolicy
 
 try:
@@ -63,7 +64,8 @@ class MetricsTests(unittest.TestCase):
         try:
             # Ensure the nodes are actually down
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
-            with self.assertRaises(NoHostAvailable):
+            # both exceptions can happen depending on when the connection has been detected as defunct
+            with self.assertRaises((NoHostAvailable, ConnectionShutdown)):
                 self.session.execute(query)
         finally:
             get_cluster().start(wait_for_binary_proto=True, wait_other_notice=True)

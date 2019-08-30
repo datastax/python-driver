@@ -73,8 +73,7 @@ and the ``#datastax-drivers`` channel in the `DataStax Academy Slack <https://ac
 
 License
 -------
-.. |copy|   unicode:: U+000A9 .. COPYRIGHT SIGN
-|copy| DataStax, Inc.
+Copyright DataStax, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

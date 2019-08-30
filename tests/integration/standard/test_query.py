@@ -887,7 +887,8 @@ class LightweightTransactionTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Lightweight transactions, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        serial_profile = ExecutionProfile(consistency_level=ConsistencyLevel.SERIAL)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={'serial': serial_profile})
         self.session = self.cluster.connect()
 
         ddl = '''
@@ -975,7 +976,7 @@ class LightweightTransactionTests(unittest.TestCase):
         """
         for batch_type in (BatchType.UNLOGGED, BatchType.LOGGED):
             batch_statement = BatchStatement(batch_type)
-            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",
+            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;",
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 1, 10);",
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 2, 10);"], [None] * 3)
             result = self.session.execute(batch_statement)
@@ -991,7 +992,7 @@ class LightweightTransactionTests(unittest.TestCase):
             result = self.session.execute(batch_statement)
             self.assertFalse(result.was_applied)
 
-            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             # Verify the non conditional insert hasn't been inserted
             self.assertEqual(len(all_rows.current_rows), 3)
 
@@ -1017,7 +1018,7 @@ class LightweightTransactionTests(unittest.TestCase):
             result = self.session.execute(batch_statement)
             self.assertTrue(result.was_applied)
 
-            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             for i, row in enumerate(all_rows):
                 self.assertEqual((0, i, 10), (row[0], row[1], row[2]))
 
