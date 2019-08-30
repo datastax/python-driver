@@ -48,11 +48,11 @@ schedules:
     branches:
       include: [/dev-python.*/]
     env_vars: |
-      EVENT_LOOP_MANAGER='libev'
+      EVENT_LOOP_MANAGER='twisted'
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [2.7, 3.4, 3.6, 3.7]
+        - python: [3.6, 3.7]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
 
   release_test:
