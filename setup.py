@@ -416,7 +416,7 @@ def run_setup(extensions):
         url='http://github.com/datastax/python-driver',
         author='Tyler Hobbs',
         author_email='tyler@datastax.com',
-        packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine'],
+        packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.cloud'],
         keywords='cassandra,cql,orm',
         include_package_data=True,
         install_requires=dependencies,
