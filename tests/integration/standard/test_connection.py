@@ -18,6 +18,7 @@ except ImportError:
     import unittest  # noqa
 
 from functools import partial
+from mock import patch
 import logging
 from six.moves import range
 import sys
@@ -27,7 +28,7 @@ import time
 from unittest import SkipTest
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
+from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 import cassandra.io.asyncorereactor
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
@@ -55,20 +56,22 @@ def setup_module():
 class ConnectionTimeoutTest(unittest.TestCase):
 
     def setUp(self):
-        self.defaultInFlight = Connection.max_in_flight
-        Connection.max_in_flight = 2
-        self.cluster = Cluster(
-            protocol_version=PROTOCOL_VERSION,
-            load_balancing_policy=HostFilterPolicy(
-                RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
-            )
-        )
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                                   execution_profiles=
+                                   {EXEC_PROFILE_DEFAULT: ExecutionProfile(
+                                       load_balancing_policy=HostFilterPolicy(
+                                            RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
+                                       )
+                                   )
+                                   }
+                               )
+
         self.session = self.cluster.connect()
 
     def tearDown(self):
-        Connection.max_in_flight = self.defaultInFlight
         self.cluster.shutdown()
 
+    @patch('cassandra.connection.Connection.max_in_flight', 2)
     def test_in_flight_timeout(self):
         """
         Test to ensure that connection id fetching will block when max_id is reached/
@@ -85,7 +88,7 @@ class ConnectionTimeoutTest(unittest.TestCase):
         """
         futures = []
         query = '''SELECT * FROM system.local'''
-        for i in range(100):
+        for _ in range(100):
             futures.append(self.session.execute_async(query))
 
         for future in futures:

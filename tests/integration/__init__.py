@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import os
 from cassandra.cluster import Cluster
 
@@ -34,11 +35,10 @@ from itertools import groupby
 import six
 import shutil
 
-from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
+from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists,\
     InvalidRequest
-from cassandra.cluster import NoHostAvailable
-
 from cassandra.protocol import ConfigurationException
+from cassandra import ProtocolVersion
 
 try:
     from ccmlib.dse_cluster import DseCluster
@@ -105,6 +105,37 @@ def cmd_line_args_to_dict(env_var):
     return args
 
 
+def _get_cass_version_from_dse(dse_version):
+    if dse_version.startswith('4.6') or dse_version.startswith('4.5'):
+        raise Exception("Cassandra Version 2.0 not supported anymore")
+    elif dse_version.startswith('4.7') or dse_version.startswith('4.8'):
+        cass_ver = "2.1"
+    elif dse_version.startswith('5.0'):
+        cass_ver = "3.0"
+    elif dse_version.startswith('5.1'):
+        # TODO: refactor this method to use packaging.Version everywhere
+        if Version(dse_version) >= Version('5.1.2'):
+            cass_ver = "3.11"
+        else:
+            cass_ver = "3.10"
+    elif dse_version.startswith('6.0'):
+        if dse_version == '6.0.0':
+            cass_ver = '4.0.0.2284'
+        elif dse_version == '6.0.1':
+            cass_ver = '4.0.0.2349'
+        else:
+            cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
+    elif dse_version.startswith('6.7'):
+        if dse_version == '6.7.0':
+            cass_ver = "4.0.0.67"
+        else:
+            cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
+    else:
+        log.error("Unknown dse version found {0}, defaulting to 2.1".format(dse_version))
+        cass_ver = "2.1"
+    return Version(cass_ver)
+
+
 def _get_dse_version_from_cass(cass_version):
     if cass_version.startswith('2.1'):
         dse_ver = "4.8.15"
@@ -123,36 +154,46 @@ USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
 SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 
-CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
+# Supported Clusters: Cassandra, DDAC, DSE
+DSE_VERSION = None
+if os.getenv('DSE_VERSION', None):  # we are testing against DSE
+    DSE_VERSION = Version(os.getenv('DSE_VERSION', None))
+    DSE_CRED = os.getenv('DSE_CREDS', None)
+    CASSANDRA_VERSION = _get_cass_version_from_dse(DSE_VERSION.base_version)
+    CCM_VERSION = DSE_VERSION.base_version
+else:  # we are testing against Cassandra or DDAC
+    cv_string = os.getenv('CASSANDRA_VERSION', None)
+    mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
+    try:
+        cassandra_version = Version(cv_string)  # env var is set to test-dse for DDAC
+    except:
+        # fallback to MAPPED_CASSANDRA_VERSION
+        cassandra_version = Version(mcv_string)
+
+    CASSANDRA_VERSION = Version(mcv_string) if mcv_string else cassandra_version
+    CCM_VERSION = cassandra_version if mcv_string else CASSANDRA_VERSION
+
+CASSANDRA_IP = os.getenv('CLUSTER_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 
-default_cassandra_version = '3.11'
-cv_string = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
-mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
-try:
-    cassandra_version = Version(cv_string)  # env var is set to test-dse
-except:
-    # fallback to MAPPED_CASSANDRA_VERSION
-    cassandra_version = Version(mcv_string)
-CASSANDRA_VERSION = Version(mcv_string) if mcv_string else cassandra_version
-CCM_VERSION = cassandra_version if mcv_string else CASSANDRA_VERSION
-
-default_dse_version = _get_dse_version_from_cass(CASSANDRA_VERSION.base_version)
-
-DSE_VERSION = Version(os.getenv('DSE_VERSION', default_dse_version))
-
 CCM_KWARGS = {}
-if CASSANDRA_DIR:
+if DSE_VERSION:
+    log.info('Using DSE version: %s', DSE_VERSION)
+    if not CASSANDRA_DIR:
+        CCM_KWARGS['version'] = DSE_VERSION
+        if DSE_CRED:
+            log.info("Using DSE credentials file located at {0}".format(DSE_CRED))
+            CCM_KWARGS['dse_credentials_file'] = DSE_CRED
+elif CASSANDRA_DIR:
     log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
     CCM_KWARGS['install_dir'] = CASSANDRA_DIR
-
 else:
-    log.info('Using Cassandra version: %s', CASSANDRA_VERSION)
-    log.info('Using CCM version: %s', CCM_VERSION)
+    log.info('Using Cassandra version: %s', CCM_VERSION)
     CCM_KWARGS['version'] = CCM_VERSION
 
+
 #This changes the default contact_point parameter in Cluster
-def set_default_cass_ip():
+def set_default_cluster_ip():
     if CASSANDRA_IP.startswith("127.0.0."):
         return
     defaults = list(Cluster.__init__.__defaults__)
@@ -174,16 +215,24 @@ def set_default_beta_flag_true():
 
 def get_default_protocol():
     if CASSANDRA_VERSION >= Version('4.0'):
-        set_default_beta_flag_true()
-        return 5
-    elif CASSANDRA_VERSION >= Version('2.2'):
+        if DSE_VERSION:
+            return ProtocolVersion.DSE_V2
+        else:
+            set_default_beta_flag_true()
+            return ProtocolVersion.V5
+    if CASSANDRA_VERSION >= Version('3.10'):
+        if DSE_VERSION:
+            return ProtocolVersion.DSE_V1
+        else:
+            return 4
+    if CASSANDRA_VERSION >= Version('2.2'):
         return 4
     elif CASSANDRA_VERSION >= Version('2.1'):
         return 3
     elif CASSANDRA_VERSION >= Version('2.0'):
         return 2
     else:
-        return 1
+        raise Exception("Running tests with an unsupported Cassandra version: {0}".format(CASSANDRA_VERSION))
 
 
 def get_supported_protocol_versions():
@@ -193,22 +242,31 @@ def get_supported_protocol_versions():
     2.1 -> 3, 2, 1
     2.2 -> 4, 3, 2, 1
     3.X -> 4, 3
-    3.10 -> 5(beta),4,3
+    3.10(C*) -> 5(beta),4,3
+    3.10(DSE) -> DSE_V1,4,3
+    4.0(C*) -> 5(beta),4,3
+    4.0(DSE) -> DSE_v2, DSE_V1,4,3
 `   """
     if CASSANDRA_VERSION >= Version('4.0'):
-        return (3, 4, 5)
+        if DSE_VERSION:
+            return (3, 4, ProtocolVersion.DSE_V1, ProtocolVersion.DSE_V2)
+        else:
+            return (3, 4, 5)
     elif CASSANDRA_VERSION >= Version('3.10'):
-        return (3, 4)
+        if DSE_VERSION:
+            return (3, 4, ProtocolVersion.DSE_V1)
+        else:
+            return (3, 4)
     elif CASSANDRA_VERSION >= Version('3.0'):
         return (3, 4)
     elif CASSANDRA_VERSION >= Version('2.2'):
-        return (1, 2, 3, 4)
+        return (1,2, 3, 4)
     elif CASSANDRA_VERSION >= Version('2.1'):
         return (1, 2, 3)
     elif CASSANDRA_VERSION >= Version('2.0'):
         return (1, 2)
     else:
-        return (1, )
+        return (1,)
 
 
 def get_unsupported_lower_protocol():
@@ -216,7 +274,6 @@ def get_unsupported_lower_protocol():
     This is used to determine the lowest protocol version that is NOT
     supported by the version of C* running
     """
-
     if CASSANDRA_VERSION >= Version('3.0'):
         return 2
     else:
@@ -229,14 +286,24 @@ def get_unsupported_upper_protocol():
     supported by the version of C* running
     """
 
+    if CASSANDRA_VERSION >= Version('4.0'):
+        if DSE_VERSION:
+            return None
+        else:
+            return ProtocolVersion.DSE_V1
+    if CASSANDRA_VERSION >= Version('3.10'):
+        if DSE_VERSION:
+            return ProtocolVersion.DSE_V2
+        else:
+            return 5
     if CASSANDRA_VERSION >= Version('2.2'):
-        return None
-    if CASSANDRA_VERSION >= Version('2.1'):
+        return 5
+    elif CASSANDRA_VERSION >= Version('2.1'):
         return 4
     elif CASSANDRA_VERSION >= Version('2.0'):
         return 3
     else:
-        return None
+        return 2
 
 
 default_protocol_version = get_default_protocol()
@@ -260,16 +327,23 @@ notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not suppo
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
 protocolv5 = unittest.skipUnless(5 in get_supported_protocol_versions(), 'Protocol versions less than 5 are not supported')
-
 greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= Version('2.1'), 'Cassandra version 2.1 or greater required')
 greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= Version('2.2'), 'Cassandra version 2.2 or greater required')
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.0'), 'Cassandra version 3.0 or greater required')
+greaterthanorequalcass31 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.1'), 'Cassandra version 3.1 or greater required')
 greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.6'), 'Cassandra version 3.6 or greater required')
 greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.10'), 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.11'), 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
 lessthanorequalcass40 = unittest.skipIf(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
+greaterthanorequaldse67 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.7'), "DSE 6.7 or greater required for this test")
+greaterthanorequaldse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.0'), "DSE 6.0 or greater required for this test")
+greaterthanorequaldse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('5.1'), "DSE 5.1 or greater required for this test")
+greaterthanorequaldse50 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('5.0'), "DSE 5.0 or greater required for this test")
+lessthandse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('5.1'), "DSE version less than 5.1 required")
+lessthandse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('6.0'), "DSE version less than 6.0 required")
+
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
 requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "asyncore" in EVENT_LOOP_MANAGER,
@@ -316,8 +390,9 @@ def use_singledc(start=True, workloads=[]):
     use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads)
 
 
-def use_single_node(start=True, workloads=[]):
-    use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start, workloads=workloads)
+def use_single_node(start=True, workloads=[], configuration_options={}, dse_options={}):
+    use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start, workloads=workloads,
+                configuration_options=configuration_options, dse_options=dse_options)
 
 
 def remove_cluster():
@@ -343,26 +418,37 @@ def remove_cluster():
         raise RuntimeError("Failed to remove cluster after 100 attempts")
 
 
-def is_current_cluster(cluster_name, node_counts):
+def is_current_cluster(cluster_name, node_counts, workloads):
     global CCM_CLUSTER
     if CCM_CLUSTER and CCM_CLUSTER.name == cluster_name:
         if [len(list(nodes)) for dc, nodes in
                 groupby(CCM_CLUSTER.nodelist(), lambda n: n.data_center)] == node_counts:
+            for node in CCM_CLUSTER.nodelist():
+                if set(node.workloads) != set(workloads):
+                    print("node workloads don't match creating new cluster")
+                    return False
             return True
     return False
 
 
+def start_cluster_wait_for_up(cluster):
+    cluster.start(wait_for_binary_proto=True)
+    # Added to wait for slow nodes to start up
+    log.debug("Cluster started waiting for binary ports")
+    for node in CCM_CLUSTER.nodes.values():
+        wait_for_node_socket(node, 300)
+    log.debug("Binary port are open")
+
+
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, set_keyspace=True, ccm_options=None,
-                configuration_options={}, dse_cluster=False, dse_options={},
-                dse_version=None):
+                configuration_options={}, dse_options={}):
+    dse_cluster = True if DSE_VERSION else False
     if not workloads:
         workloads = []
-    if (dse_version and not dse_cluster):
-        raise ValueError('specified dse_version {} but not dse_cluster'.format(dse_version))
-    set_default_cass_ip()
+    set_default_cluster_ip()
 
-    if ccm_options is None and dse_cluster:
-        ccm_options = {"version": dse_version or DSE_VERSION}
+    if ccm_options is None and DSE_VERSION:
+        ccm_options = {"version": DSE_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
 
@@ -382,7 +468,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
             setup_keyspace(ipformat=ipformat, wait=False)
         return
 
-    if is_current_cluster(cluster_name, nodes):
+    if is_current_cluster(cluster_name, nodes, workloads):
         log.debug("Using existing cluster, matching topology: {0}".format(cluster_name))
     else:
         if CCM_CLUSTER:
@@ -395,6 +481,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
             CCM_CLUSTER.clear()
             CCM_CLUSTER.set_install_dir(**ccm_options)
             CCM_CLUSTER.set_configuration_options(configuration_options)
+            CCM_CLUSTER.set_dse_configuration_options(dse_options)
         except Exception:
             ex_type, ex, tb = sys.exc_info()
             log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
@@ -418,6 +505,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
                 if 'spark' in workloads:
                     config_options = {"initial_spark_worker_resources": 0.1}
+                    if dse_version >= Version('6.7'):
+                        log.debug("Disabling AlwaysON SQL for a DSE 6.7 Cluster")
+                        config_options['alwayson_sql_options'] = {'enabled': False}
                     CCM_CLUSTER.set_dse_configuration_options(config_options)
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)
@@ -437,6 +527,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
 
     try:
         jvm_args = []
+
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
 
         if 'graph' not in workloads:
@@ -447,10 +538,12 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 node.set_workloads(workloads)
         if start:
             log.debug("Starting CCM cluster: {0}".format(cluster_name))
-            CCM_CLUSTER.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=jvm_args)
+            CCM_CLUSTER.start(jvm_args=jvm_args, wait_for_binary_proto=True)
             # Added to wait for slow nodes to start up
+            log.debug("Cluster started waiting for binary ports")
             for node in CCM_CLUSTER.nodes.values():
-                wait_for_node_socket(node, 120)
+                wait_for_node_socket(node, 300)
+            log.debug("Binary ports are open")
             if set_keyspace:
                 setup_keyspace(ipformat=ipformat)
     except Exception:
@@ -551,15 +644,20 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
         cluster.shutdown()
 
 
-def setup_keyspace(ipformat=None, wait=True):
+def setup_keyspace(ipformat=None, wait=True, protocol_version=None):
     # wait for nodes to startup
     if wait:
         time.sleep(10)
 
-    if not ipformat:
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+    if protocol_version:
+        _protocol_version = protocol_version
     else:
-        cluster = Cluster(contact_points=["::1"], protocol_version=PROTOCOL_VERSION)
+        _protocol_version = PROTOCOL_VERSION
+
+    if not ipformat:
+        cluster = Cluster(protocol_version=_protocol_version)
+    else:
+        cluster = Cluster(contact_points=["::1"], protocol_version=_protocol_version)
     session = cluster.connect()
 
     try:
@@ -652,8 +750,8 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
         execute_with_long_wait_retry(cls.session, ddl)
 
     @classmethod
-    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, metrics=False):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, metrics_enabled=metrics)
+    def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, **cluster_kwargs):
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, **cluster_kwargs)
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
@@ -787,7 +885,11 @@ class BasicSharedKeyspaceUnitTestCaseRF3WM(BasicSharedKeyspaceUnitTestCase):
     """
     @classmethod
     def setUpClass(self):
-        self.common_setup(3, True, True, True)
+        self.common_setup(3, True, True, metrics_enabled=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_keyspace_shutdown_cluster(cls.ks_name, cls.session, cls.cluster)
 
 
 class BasicSharedKeyspaceUnitTestCaseWFunctionTable(BasicSharedKeyspaceUnitTestCase):
@@ -828,3 +930,10 @@ class BasicExistingSegregatedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
 
     def tearDown(self):
         self.cluster.shutdown()
+
+
+def assert_startswith(s, prefix):
+    if not s.startswith(prefix):
+        raise AssertionError(
+            '{} does not start with {}'.format(repr(s), repr(prefix))
+        )
