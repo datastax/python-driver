@@ -37,6 +37,7 @@ schedules:
 
   commit_branches_dev:
     schedule: per_commit
+    disable_pull_requests: true
     branches:
       include: [/dev-python.*/]
     env_vars: |
@@ -62,7 +63,7 @@ schedules:
       EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
-        - python: [2.7, 3.5]
+        - python: [3.5]
         - cassandra: ['2.2', '3.1']
 
   weekly_gevent:
