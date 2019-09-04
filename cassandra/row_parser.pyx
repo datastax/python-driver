@@ -19,23 +19,23 @@ from cassandra.deserializers import make_deserializers
 include "ioutils.pyx"
 
 def make_recv_results_rows(ColumnParser colparser):
-    def recv_results_rows(cls, f, int protocol_version, user_type_map, result_metadata):
+    def recv_results_rows(self, f, int protocol_version, user_type_map, result_metadata):
         """
         Parse protocol data given as a BytesIO f into a set of columns (e.g. list of tuples)
         This is used as the recv_results_rows method of (Fast)ResultMessage
         """
-        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
+        self.recv_results_metadata(f, user_type_map)
 
-        column_metadata = column_metadata or result_metadata
+        column_metadata = self.column_metadata or result_metadata
 
-        colnames = [c[2] for c in column_metadata]
-        coltypes = [c[3] for c in column_metadata]
+        self.column_names = [c[2] for c in column_metadata]
+        self.column_types = [c[3] for c in column_metadata]
 
-        desc = ParseDesc(colnames, coltypes, make_deserializers(coltypes),
+        desc = ParseDesc(self.column_names, self.column_types, make_deserializers(self.column_types),
                          protocol_version)
         reader = BytesIOReader(f.read())
         try:
-            parsed_rows = colparser.parse_rows(reader, desc)
+            self.parsed_rows = colparser.parse_rows(reader, desc)
         except Exception as e:
             # Use explicitly the TupleRowParser to display better error messages for column decoding failures
             rowparser = TupleRowParser()
@@ -44,7 +44,5 @@ def make_recv_results_rows(ColumnParser colparser):
             rowcount = read_int(reader)
             for i in range(rowcount):
                 rowparser.unpack_row(reader, desc)
-
-        return (paging_state, coltypes, (colnames, parsed_rows), result_metadata_id)
 
     return recv_results_rows

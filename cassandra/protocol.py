@@ -611,8 +611,6 @@ class ResultMessage(_MessageType):
     name = 'RESULT'
 
     kind = None
-    results = None
-    paging_state = None
 
     # Names match type name in module scope. Most are imported from cassandra.cqltypes (except CUSTOM_TYPE)
     type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in type_codes.__dict__.items() if not k.startswith('_'))
@@ -620,89 +618,103 @@ class ResultMessage(_MessageType):
     _FLAGS_GLOBAL_TABLES_SPEC = 0x0001
     _HAS_MORE_PAGES_FLAG = 0x0002
     _NO_METADATA_FLAG = 0x0004
+    _CONTINUOUS_PAGING_FLAG = 0x40000000
+    _CONTINUOUS_PAGING_LAST_FLAG = 0x80000000
     _METADATA_ID_FLAG = 0x0008
 
-    def __init__(self, kind, results, paging_state=None, col_types=None):
+    # These are all the things a result message might contain. They are populated according to 'kind'
+    column_names = None
+    column_types = None
+    parsed_rows = None
+    paging_state = None
+    continuous_paging_seq = None
+    continuous_paging_last = None
+    new_keyspace = None
+    column_metadata = None
+    query_id = None
+    bind_metadata = None
+    pk_indexes = None
+    schema_change_event = None
+    result_metadata_id = None
+
+    def __init__(self, kind):
         self.kind = kind
-        self.results = results
-        self.paging_state = paging_state
-        self.col_types = col_types
+
+    def recv(self, f, protocol_version, user_type_map, result_metadata):
+        if self.kind == RESULT_KIND_VOID:
+            return
+        elif self.kind == RESULT_KIND_ROWS:
+            self.recv_results_rows(f, protocol_version, user_type_map, result_metadata)
+        elif self.kind == RESULT_KIND_SET_KEYSPACE:
+            self.new_keyspace = read_string(f)
+        elif self.kind == RESULT_KIND_PREPARED:
+            self.recv_results_prepared(f, protocol_version, user_type_map)
+        elif self.kind == RESULT_KIND_SCHEMA_CHANGE:
+            self.recv_results_schema_change(f, protocol_version)
+        else:
+            raise DriverException("Unknown RESULT kind: %d" % self.kind)
 
     @classmethod
     def recv_body(cls, f, protocol_version, user_type_map, result_metadata):
         kind = read_int(f)
-        paging_state = None
-        col_types = None
-        if kind == RESULT_KIND_VOID:
-            results = None
-        elif kind == RESULT_KIND_ROWS:
-            paging_state, col_types, results, result_metadata_id = cls.recv_results_rows(
-                f, protocol_version, user_type_map, result_metadata)
-        elif kind == RESULT_KIND_SET_KEYSPACE:
-            ksname = read_string(f)
-            results = ksname
-        elif kind == RESULT_KIND_PREPARED:
-            results = cls.recv_results_prepared(f, protocol_version, user_type_map)
-        elif kind == RESULT_KIND_SCHEMA_CHANGE:
-            results = cls.recv_results_schema_change(f, protocol_version)
-        else:
-            raise DriverException("Unknown RESULT kind: %d" % kind)
-        return cls(kind, results, paging_state, col_types)
+        msg = cls(kind)
+        msg.recv(f, protocol_version, user_type_map, result_metadata)
+        return msg
 
-    @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
-        column_metadata = column_metadata or result_metadata
+    def recv_results_rows(self, f, protocol_version, user_type_map, result_metadata):
+        self.recv_results_metadata(f, user_type_map)
+        column_metadata = self.column_metadata or result_metadata
         rowcount = read_int(f)
-        rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
-        colnames = [c[2] for c in column_metadata]
-        coltypes = [c[3] for c in column_metadata]
+        rows = [self.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
+        self.column_names = [c[2] for c in column_metadata]
+        self.column_types = [c[3] for c in column_metadata]
         try:
-            parsed_rows = [
+            self.parsed_rows = [
                 tuple(ctype.from_binary(val, protocol_version)
-                      for ctype, val in zip(coltypes, row))
+                      for ctype, val in zip(self.column_types, row))
                 for row in rows]
         except Exception:
             for row in rows:
                 for i in range(len(row)):
                     try:
-                        coltypes[i].from_binary(row[i], protocol_version)
+                        self.column_typess[i].from_binary(row[i], protocol_version)
                     except Exception as e:
-                        raise DriverException('Failed decoding result column "%s" of type %s: %s' % (colnames[i],
-                                                                                                     coltypes[i].cql_parameterized_type(),
+                        raise DriverException('Failed decoding result column "%s" of type %s: %s' % (self.column_names[i],
+                                                                                                     self.column_names[i].cql_parameterized_type(),
                                                                                                      str(e)))
-        return paging_state, coltypes, (colnames, parsed_rows), result_metadata_id
 
-    @classmethod
-    def recv_results_prepared(cls, f, protocol_version, user_type_map):
-        query_id = read_binary_string(f)
+    def recv_results_prepared(self, f, protocol_version, user_type_map):
+        self.query_id = read_binary_string(f)
         if ProtocolVersion.uses_prepared_metadata(protocol_version):
-            result_metadata_id = read_binary_string(f)
+            self.result_metadata_id = read_binary_string(f)
         else:
-            result_metadata_id = None
-        bind_metadata, pk_indexes, result_metadata, _ = cls.recv_prepared_metadata(f, protocol_version, user_type_map)
-        return query_id, bind_metadata, pk_indexes, result_metadata, result_metadata_id
+            self.result_metadata_id = None
+        self.recv_prepared_metadata(f, protocol_version, user_type_map)
 
-    @classmethod
-    def recv_results_metadata(cls, f, user_type_map):
+    def recv_results_metadata(self, f, user_type_map):
         flags = read_int(f)
         colcount = read_int(f)
 
-        if flags & cls._HAS_MORE_PAGES_FLAG:
-            paging_state = read_binary_longstring(f)
-        else:
-            paging_state = None
+        if flags & self._HAS_MORE_PAGES_FLAG:
+            self.paging_state = read_binary_longstring(f)
 
-        if flags & cls._METADATA_ID_FLAG:
-            result_metadata_id = read_binary_string(f)
+        if flags & self._METADATA_ID_FLAG:
+            self.result_metadata_id = read_binary_string(f)
         else:
-            result_metadata_id = None
+            self.result_metadata_id = None
 
-        no_meta = bool(flags & cls._NO_METADATA_FLAG)
+        no_meta = bool(flags & self._NO_METADATA_FLAG)
         if no_meta:
-            return paging_state, [], result_metadata_id
+            return None
 
-        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
+        if flags & self._CONTINUOUS_PAGING_FLAG:
+            self.continuous_paging_seq = read_int(f)
+            self.continuous_paging_last = flags & self._CONTINUOUS_PAGING_LAST_FLAG
+
+        if flags & self._METADATA_ID_FLAG:
+            self.result_metadata_id = read_binary_string(f)
+
+        glob_tblspec = bool(flags & self._FLAGS_GLOBAL_TABLES_SPEC)
         if glob_tblspec:
             ksname = read_string(f)
             cfname = read_string(f)
@@ -715,12 +727,12 @@ class ResultMessage(_MessageType):
                 colksname = read_string(f)
                 colcfname = read_string(f)
             colname = read_string(f)
-            coltype = cls.read_type(f, user_type_map)
+            coltype = self.read_type(f, user_type_map)
             column_metadata.append((colksname, colcfname, colname, coltype))
-        return paging_state, column_metadata, result_metadata_id
 
-    @classmethod
-    def recv_prepared_metadata(cls, f, protocol_version, user_type_map):
+        self.column_metadata = column_metadata
+
+    def recv_prepared_metadata(self, f, protocol_version, user_type_map):
         flags = read_int(f)
         colcount = read_int(f)
         pk_indexes = None
@@ -728,7 +740,7 @@ class ResultMessage(_MessageType):
             num_pk_indexes = read_int(f)
             pk_indexes = [read_short(f) for _ in range(num_pk_indexes)]
 
-        glob_tblspec = bool(flags & cls._FLAGS_GLOBAL_TABLES_SPEC)
+        glob_tblspec = bool(flags & self._FLAGS_GLOBAL_TABLES_SPEC)
         if glob_tblspec:
             ksname = read_string(f)
             cfname = read_string(f)
@@ -741,18 +753,17 @@ class ResultMessage(_MessageType):
                 colksname = read_string(f)
                 colcfname = read_string(f)
             colname = read_string(f)
-            coltype = cls.read_type(f, user_type_map)
+            coltype = self.read_type(f, user_type_map)
             bind_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
 
         if protocol_version >= 2:
-            _, result_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
-            return bind_metadata, pk_indexes, result_metadata, result_metadata_id
-        else:
-            return bind_metadata, pk_indexes, None, None
+            self.recv_results_metadata(f, user_type_map)
 
-    @classmethod
-    def recv_results_schema_change(cls, f, protocol_version):
-        return EventMessage.recv_schema_change(f, protocol_version)
+        self.bind_metadata = bind_metadata
+        self.pk_indexes = pk_indexes
+
+    def recv_results_schema_change(self, f, protocol_version):
+        self.schema_change_event = EventMessage.recv_schema_change(f, protocol_version)
 
     @classmethod
     def read_type(cls, f, user_type_map):
@@ -1185,7 +1196,7 @@ def cython_protocol_handler(colparser):
         """
         # type_codes = ResultMessage.type_codes.copy()
         code_to_type = dict((v, k) for k, v in ResultMessage.type_codes.items())
-        recv_results_rows = classmethod(make_recv_results_rows(colparser))
+        recv_results_rows = make_recv_results_rows(colparser)
 
     class CythonProtocolHandler(_ProtocolHandler):
         """

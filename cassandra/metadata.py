@@ -1710,7 +1710,7 @@ class _SchemaParser(object):
         if not success and isinstance(result, expected_failures):
             return []
         elif success:
-            return dict_factory(*result.results) if result else []
+            return dict_factory(result.column_names, result.parsed_rows) if result else []
         else:
             raise result
 
@@ -1723,7 +1723,7 @@ class _SchemaParser(object):
         responses = self.connection.wait_for_responses((query), timeout=self.timeout, fail_on_error=False)
         (success, response) = responses[0]
         if success:
-            result = dict_factory(*response.results)
+            result = dict_factory(response.column_names, response.parsed_rows)
             return [build_func(row) for row in result]
         elif isinstance(response, InvalidRequest):
             log.debug("user types table not found")
@@ -2154,7 +2154,7 @@ class SchemaParserV22(_SchemaParser):
 
         # if we're connected to Cassandra < 2.0, the triggers table will not exist
         if triggers_success:
-            self.triggers_result = dict_factory(*triggers_result.results)
+            self.triggers_result = dict_factory(triggers_result.column_names, triggers_result.parsed_rows)
         else:
             if isinstance(triggers_result, InvalidRequest):
                 log.debug("triggers table not found")
@@ -2166,7 +2166,7 @@ class SchemaParserV22(_SchemaParser):
 
         # if we're connected to Cassandra < 2.1, the usertypes table will not exist
         if types_success:
-            self.types_result = dict_factory(*types_result.results)
+            self.types_result = dict_factory(types_result.column_names, types_result.parsed_rows)
         else:
             if isinstance(types_result, InvalidRequest):
                 log.debug("user types table not found")
@@ -2176,7 +2176,7 @@ class SchemaParserV22(_SchemaParser):
 
         # functions were introduced in Cassandra 2.2
         if functions_success:
-            self.functions_result = dict_factory(*functions_result.results)
+            self.functions_result = dict_factory(functions_result.column_names, functions_result.parsed_rows)
         else:
             if isinstance(functions_result, InvalidRequest):
                 log.debug("user functions table not found")
@@ -2185,7 +2185,7 @@ class SchemaParserV22(_SchemaParser):
 
         # aggregates were introduced in Cassandra 2.2
         if aggregates_success:
-            self.aggregates_result = dict_factory(*aggregates_result.results)
+            self.aggregates_result = dict_factory(aggregates_result.column_names, aggregates_result.parsed_rows)
         else:
             if isinstance(aggregates_result, InvalidRequest):
                 log.debug("user aggregates table not found")

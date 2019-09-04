@@ -61,7 +61,8 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 TruncateError, ServerError,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
-                                RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler)
+                                RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler,
+                                RESULT_KIND_VOID)
 from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -431,7 +432,7 @@ class Cluster(object):
     server will be automatically used.
     """
 
-    protocol_version = ProtocolVersion.V4
+    protocol_version = ProtocolVersion.DSE_V2
     """
     The maximum version of the native protocol to use.
 
@@ -2534,18 +2535,18 @@ class Session(object):
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            query_id, bind_metadata, pk_indexes, result_metadata, result_metadata_id = future.result()
+            response = future.result().one()
         except Exception:
             log.exception("Error preparing query:")
             raise
 
         prepared_keyspace = keyspace if keyspace else None
         prepared_statement = PreparedStatement.from_message(
-            query_id, bind_metadata, pk_indexes, self.cluster.metadata, query, self.keyspace,
-            self._protocol_version, result_metadata, result_metadata_id)
+            response.query_id, response.bind_metadata, response.pk_indexes, self.cluster.metadata, query, self.keyspace,
+            self._protocol_version, response.column_metadata, response.result_metadata_id)
         prepared_statement.custom_payload = future.custom_payload
 
-        self.cluster.add_prepared(query_id, prepared_statement)
+        self.cluster.add_prepared(response.query_id, prepared_statement)
 
         if self.cluster.prepare_on_all_hosts:
             host = future._current_host
@@ -3163,15 +3164,15 @@ class ControlConnection(object):
             peers_result, local_result = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
-        peers_result = dict_factory(*peers_result.results)
+        peers_result = dict_factory(peers_result.column_names, peers_result.parsed_rows)
 
         partitioner = None
         token_map = {}
 
         found_hosts = set()
-        if local_result.results:
+        if local_result.parsed_rows:
             found_hosts.add(connection.endpoint)
-            local_rows = dict_factory(*(local_result.results))
+            local_rows = dict_factory(local_result.column_names, local_result.parsed_rows)
             local_row = local_rows[0]
             cluster_name = local_row["cluster_name"]
             self._cluster.metadata.cluster_name = cluster_name
@@ -3202,7 +3203,9 @@ class ControlConnection(object):
                         success, local_rpc_address_result = connection.wait_for_response(
                             local_rpc_address_query, timeout=self._timeout, fail_on_error=False)
                         if success:
-                            row = dict_factory(*local_rpc_address_result.results)
+                            row = dict_factory(
+                                local_rpc_address_result.column_names,
+                                local_rpc_address_result.parsed_rows)
                             host.broadcast_rpc_address = row[0]['rpc_address']
                         else:
                             host.broadcast_rpc_address = connection.endpoint.address
@@ -3394,11 +3397,11 @@ class ControlConnection(object):
             return False
 
     def _get_schema_mismatches(self, peers_result, local_result, local_address):
-        peers_result = dict_factory(*peers_result.results)
+        peers_result = dict_factory(peers_result.column_names, peers_result.parsed_rows)
 
         versions = defaultdict(set)
-        if local_result.results:
-            local_row = dict_factory(*local_result.results)[0]
+        if local_result.parsed_rows:
+            local_row = dict_factory(local_result.column_names, local_result.parsed_rows)[0]
             if local_row.get("schema_version"):
                 versions[local_row.get("schema_version")].add(local_address)
 
@@ -3944,7 +3947,7 @@ class ResponseFuture(object):
                     # event loop thread.
                     if session:
                         session._set_keyspace_for_all_pools(
-                            response.results, self._set_keyspace_completed)
+                            response.new_keyspace, self._set_keyspace_completed)
                 elif response.kind == RESULT_KIND_SCHEMA_CHANGE:
                     # refresh the schema before responding, but do it in another
                     # thread instead of the event loop thread
@@ -3952,15 +3955,17 @@ class ResponseFuture(object):
                     self.session.submit(
                         refresh_schema_and_set_result,
                         self.session.cluster.control_connection,
-                        self, connection, **response.results)
+                        self, connection, **response.schema_change_event)
+                elif response.kind == RESULT_KIND_ROWS:
+                    self._paging_state = response.paging_state
+                    self._col_types = response.column_names
+                    self._col_names = response.column_types
+                    self._set_final_result(self.row_factory(
+                        response.column_names, response.parsed_rows))
+                elif response.kind == RESULT_KIND_VOID:
+                    self._set_final_result(None)
                 else:
-                    results = getattr(response, 'results', None)
-                    if results is not None and response.kind == RESULT_KIND_ROWS:
-                        self._paging_state = response.paging_state
-                        self._col_types = response.col_types
-                        self._col_names = results[0]
-                        results = self.row_factory(*results)
-                    self._set_final_result(results)
+                    self._set_final_result(response)
             elif isinstance(response, ErrorMessage):
                 retry_policy = self._retry_policy
 
@@ -4085,11 +4090,8 @@ class ResponseFuture(object):
         if isinstance(response, ResultMessage):
             if response.kind == RESULT_KIND_PREPARED:
                 if self.prepared_statement:
-                    # result metadata is the only thing that could have
-                    # changed from an alter
-                    (_, _, _,
-                     self.prepared_statement.result_metadata,
-                     new_metadata_id) = response.results
+                    self.prepared_statement.result_metadata = response.column_metadata
+                    new_metadata_id = response.result_metadata_id
                     if new_metadata_id is not None:
                         self.prepared_statement.result_metadata_id = new_metadata_id
 
