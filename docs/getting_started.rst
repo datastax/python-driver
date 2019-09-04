@@ -408,6 +408,11 @@ Connecting to DataStax Cloud
 ----------------------------
 1. Download the secure connect bundle from your DataStax Constellation account.
 2. Connect to your cloud cluster with::
+.. code-block:: python
+
+    from cassandra.cluster import Cluster
+    from cassandra.auth import PlainTextAuthProvider
+
     cloud_config = {
         'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
     }
