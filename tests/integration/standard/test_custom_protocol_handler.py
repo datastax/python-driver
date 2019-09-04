@@ -19,11 +19,11 @@ except ImportError:
 
 from cassandra.protocol import ProtocolHandler, ResultMessage, QueryMessage, UUIDType, read_int
 from cassandra.query import tuple_factory, SimpleStatement
-from cassandra.cluster import Cluster, ResponseFuture
+from cassandra.cluster import Cluster, ResponseFuture, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra import ProtocolVersion, ConsistencyLevel
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, \
-    greaterthanorequalcass30, execute_with_long_wait_retry
+    greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
@@ -66,18 +66,16 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
 
         # Ensure that we get normal uuid back first
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="custserdes")
-        session.row_factory = tuple_factory
 
         result = session.execute("SELECT schema_version FROM system.local")
         uuid_type = result[0][0]
         self.assertEqual(type(uuid_type), uuid.UUID)
 
         # use our custom protocol handlder
-
         session.client_protocol_handler = CustomTestRawRowType
-        session.row_factory = tuple_factory
         result_set = session.execute("SELECT schema_version FROM system.local")
         raw_value = result_set[0][0]
         self.assertTrue(isinstance(raw_value, binary_type))
@@ -105,10 +103,10 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         @test_category data_types:serialization
         """
         # Connect using a custom protocol handler that tracks the various types the result message is used with.
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)})
         session = cluster.connect(keyspace="custserdes")
         session.client_protocol_handler = CustomProtocolHandlerResultMessageTracked
-        session.row_factory = tuple_factory
 
         colnames = create_table_with_all_types("alltypes", session, 1)
         columns_string = ", ".join(colnames)
@@ -137,6 +135,61 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V4, uses_int_query_flag=False,
                                                         int_flag=True)
 
+    @greaterthanorequaldse51
+    def test_protocol_v5_uses_flag_int(self):
+        """
+        Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for V5
+
+        @since DSE 2.0b3 GRAPH 1.0b1
+        @jira_ticket PYTHON-694
+        @expected_result the fetch_size=1 parameter will be honored
+
+        @test_category connection
+        """
+        self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V5, uses_int_query_flag=True, beta=True,
+                                                        int_flag=True)
+
+    @greaterthanorequaldse51
+    def test_protocol_dsev1_uses_flag_int(self):
+        """
+        Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for DSE_V1
+
+        @since DSE 2.0b3 GRAPH 1.0b1
+        @jira_ticket PYTHON-694
+        @expected_result the fetch_size=1 parameter will be honored
+
+        @test_category connection
+        """
+        self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.DSE_V1, uses_int_query_flag=True,
+                                                        int_flag=True)
+
+    @greaterthanorequaldse51
+    def test_protocol_divergence_v5_fail_by_flag_uses_int(self):
+        """
+        Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for V5
+
+        @since DSE 2.0b3 GRAPH 1.0b1
+        @jira_ticket PYTHON-694
+        @expected_result the fetch_size=1 parameter will be honored
+
+        @test_category connection
+        """
+        self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V5, uses_int_query_flag=False, beta=True,
+                                                        int_flag=False)
+
+    @greaterthanorequaldse51
+    def test_protocol_divergence_dsev1_fail_by_flag_uses_int(self):
+        """
+        Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for DSE_V1
+
+        @since DSE 2.0b3 GRAPH 1.0b1
+        @jira_ticket PYTHON-694
+        @expected_result the fetch_size=1 parameter will be honored
+
+        @test_category connection
+        """
+        self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.DSE_V1, uses_int_query_flag=False,
+                                                        int_flag=False)
 
     def _send_query_message(self, session, timeout, **kwargs):
         query = "SELECT * FROM test3rf.test"
@@ -177,14 +230,13 @@ class CustomResultMessageRaw(ResultMessage):
     my_type_codes[0xc] = UUIDType
     type_codes = my_type_codes
 
-    @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-            paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
+    def recv_results_rows(self, f, protocol_version, user_type_map, result_metadata):
+            self.recv_results_metadata(f, user_type_map)
+            column_metadata = self.column_metadata or result_metadata
             rowcount = read_int(f)
-            rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
-            colnames = [c[2] for c in column_metadata]
-            coltypes = [c[3] for c in column_metadata]
-            return paging_state, coltypes, (colnames, rows), result_metadata_id
+            self.parsed_rows = [self.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
+            self.column_names = [c[2] for c in column_metadata]
+            self.column_types = [c[3] for c in column_metadata]
 
 
 class CustomTestRawRowType(ProtocolHandler):
@@ -207,19 +259,18 @@ class CustomResultMessageTracked(ResultMessage):
     type_codes = my_type_codes
     checked_rev_row_set = set()
 
-    @classmethod
-    def recv_results_rows(cls, f, protocol_version, user_type_map, result_metadata):
-        paging_state, column_metadata, result_metadata_id = cls.recv_results_metadata(f, user_type_map)
+    def recv_results_rows(self, f, protocol_version, user_type_map, result_metadata):
+        self.recv_results_metadata(f, user_type_map)
+        column_metadata = self.column_metadata or result_metadata
         rowcount = read_int(f)
-        rows = [cls.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
-        colnames = [c[2] for c in column_metadata]
-        coltypes = [c[3] for c in column_metadata]
-        cls.checked_rev_row_set.update(coltypes)
-        parsed_rows = [
+        rows = [self.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
+        self.column_names = [c[2] for c in column_metadata]
+        self.column_types = [c[3] for c in column_metadata]
+        self.checked_rev_row_set.update(self.column_types)
+        self.parsed_rows = [
             tuple(ctype.from_binary(val, protocol_version)
-                  for ctype, val in zip(coltypes, row))
+                  for ctype, val in zip(self.column_types, row))
             for row in rows]
-        return paging_state, coltypes, (colnames, parsed_rows), result_metadata_id
 
 
 class CustomProtocolHandlerResultMessageTracked(ProtocolHandler):
@@ -230,5 +281,3 @@ class CustomProtocolHandlerResultMessageTracked(ProtocolHandler):
     my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
     my_opcodes[CustomResultMessageTracked.opcode] = CustomResultMessageTracked
     message_types_by_opcode = my_opcodes
-
-

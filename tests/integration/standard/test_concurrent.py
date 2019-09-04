@@ -13,12 +13,11 @@
 # limitations under the License.
 
 from itertools import cycle
-from six import next
 import sys, logging, traceback
 
 from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeout, OperationTimedOut, \
     ReadFailure, WriteFailure
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args, ExecutionResult
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
@@ -43,11 +42,15 @@ class ClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = Cluster(
+            protocol_version=PROTOCOL_VERSION,
+            execution_profiles = {
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)
+            }
+        )
         if PROTOCOL_VERSION < 3:
             cls.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         cls.session = cls.cluster.connect()
-        cls.session.row_factory = tuple_factory
 
     @classmethod
     def tearDownClass(cls):

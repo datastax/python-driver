@@ -19,7 +19,7 @@ from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
-    set_default_cass_ip, USE_CASS_EXTERNAL
+    set_default_cass_ip, USE_CASS_EXTERNAL, start_cluster_wait_for_up
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -43,10 +43,7 @@ def setup_module():
                           'authorizer': 'CassandraAuthorizer'}
         ccm_cluster.set_configuration_options(config_options)
         log.debug("Starting ccm test cluster with %s", config_options)
-        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-        # there seems to be some race, with some versions of C* taking longer to
-        # get the auth (and default user) setup. Sleep here to give it a chance
-        time.sleep(10)
+        start_cluster_wait_for_up(ccm_cluster)
     else:
         set_default_cass_ip()
 
@@ -104,7 +101,7 @@ class AuthenticationTests(unittest.TestCase):
 
         try:
             cluster = self.cluster_as(user, passwd)
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             try:
                 self.assertTrue(session.execute('SELECT release_version FROM system.local'))
                 assert_quiescent_pool_state(self, cluster, wait=1)

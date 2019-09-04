@@ -193,7 +193,7 @@ else:
 
 
 #This changes the default contact_point parameter in Cluster
-def set_default_cluster_ip():
+def set_default_cass_ip():
     if CASSANDRA_IP.startswith("127.0.0."):
         return
     defaults = list(Cluster.__init__.__defaults__)
@@ -445,7 +445,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
     dse_cluster = True if DSE_VERSION else False
     if not workloads:
         workloads = []
-    set_default_cluster_ip()
+    set_default_cass_ip()
 
     if ccm_options is None and DSE_VERSION:
         ccm_options = {"version": DSE_VERSION}
