@@ -698,14 +698,9 @@ class ResultMessage(_MessageType):
         if flags & self._HAS_MORE_PAGES_FLAG:
             self.paging_state = read_binary_longstring(f)
 
-        if flags & self._METADATA_ID_FLAG:
-            self.result_metadata_id = read_binary_string(f)
-        else:
-            self.result_metadata_id = None
-
         no_meta = bool(flags & self._NO_METADATA_FLAG)
         if no_meta:
-            return None
+            return
 
         if flags & self._CONTINUOUS_PAGING_FLAG:
             self.continuous_paging_seq = read_int(f)
@@ -845,6 +840,7 @@ class PrepareMessage(_MessageType):
 class ExecuteMessage(_MessageType):
     opcode = 0x0A
     name = 'EXECUTE'
+
     def __init__(self, query_id, query_params, consistency_level,
                  serial_consistency_level=None, fetch_size=None,
                  paging_state=None, timestamp=None, skip_meta=False,
