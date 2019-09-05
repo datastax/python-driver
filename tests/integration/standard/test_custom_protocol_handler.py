@@ -23,7 +23,7 @@ from cassandra.cluster import Cluster, ResponseFuture, ExecutionProfile, EXEC_PR
 from cassandra import ProtocolVersion, ConsistencyLevel
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, \
-    greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51
+    greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51, greaterthanorequalcass3_10
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
@@ -135,12 +135,11 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V4, uses_int_query_flag=False,
                                                         int_flag=True)
 
-    @greaterthanorequaldse51
+    @greaterthanorequalcass3_10
     def test_protocol_v5_uses_flag_int(self):
         """
         Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for V5
 
-        @since DSE 2.0b3 GRAPH 1.0b1
         @jira_ticket PYTHON-694
         @expected_result the fetch_size=1 parameter will be honored
 
@@ -154,7 +153,6 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
         Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for DSE_V1
 
-        @since DSE 2.0b3 GRAPH 1.0b1
         @jira_ticket PYTHON-694
         @expected_result the fetch_size=1 parameter will be honored
 
@@ -163,12 +161,11 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.DSE_V1, uses_int_query_flag=True,
                                                         int_flag=True)
 
-    @greaterthanorequaldse51
+    @greaterthanorequalcass3_10
     def test_protocol_divergence_v5_fail_by_flag_uses_int(self):
         """
         Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for V5
 
-        @since DSE 2.0b3 GRAPH 1.0b1
         @jira_ticket PYTHON-694
         @expected_result the fetch_size=1 parameter will be honored
 
@@ -182,7 +179,6 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
         Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for DSE_V1
 
-        @since DSE 2.0b3 GRAPH 1.0b1
         @jira_ticket PYTHON-694
         @expected_result the fetch_size=1 parameter will be honored
 
