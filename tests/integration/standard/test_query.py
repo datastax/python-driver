@@ -28,7 +28,7 @@ from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_P
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
-    USE_CASS_EXTERNAL, greaterthanorequalcass40
+    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
@@ -122,18 +122,20 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
     def test_trace_ignores_row_factory(self):
-        self.session.row_factory = dict_factory
+        with Cluster(protocol_version=PROTOCOL_VERSION,
+                    execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}) as cluster:
 
-        query = "SELECT * FROM system.local"
-        statement = SimpleStatement(query)
-        rs = self.session.execute(statement, trace=True)
+            s = cluster.connect()
+            query = "SELECT * FROM system.local"
+            statement = SimpleStatement(query)
+            rs = s.execute(statement, trace=True)
 
-        # Ensure this does not throw an exception
-        trace = rs.get_query_trace()
-        self.assertTrue(trace.events)
-        str(trace)
-        for event in trace.events:
-            str(event)
+            # Ensure this does not throw an exception
+            trace = rs.get_query_trace()
+            self.assertTrue(trace.events)
+            str(trace)
+            for event in trace.events:
+                str(event)
 
     @local
     @greaterthanprotocolv3
@@ -773,15 +775,19 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
             self.session.execute("DROP TABLE test3rf.testtext")
 
     def test_too_many_statements(self):
+        # The actual max # of statements is 0xFFFF, but this can occasionally cause a server write timeout.
+        large_batch = 0xFFF
         max_statements = 0xFFFF
         ss = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
         b = BatchStatement(batch_type=BatchType.UNLOGGED, consistency_level=ConsistencyLevel.ONE)
 
-        # max works
-        b.add_all([ss] * max_statements, [None] * max_statements)
-        self.session.execute(b)
+        # large number works works
+        b.add_all([ss] * large_batch, [None] * large_batch)
+        self.session.execute(b, timeout=30.0)
 
+        b = BatchStatement(batch_type=BatchType.UNLOGGED, consistency_level=ConsistencyLevel.ONE)
         # max + 1 raises
+        b.add_all([ss] * max_statements, [None] * max_statements)
         self.assertRaises(ValueError, b.add, ss)
 
         # also would have bombed trying to encode
@@ -1392,6 +1398,7 @@ class BaseKeyspaceTests():
         cls.session.execute(ddl)
         cls.cluster.shutdown()
 
+
 class QueryKeyspaceTests(BaseKeyspaceTests):
 
     def test_setting_keyspace(self):
@@ -1435,7 +1442,8 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        pv = ProtocolVersion.DSE_V2 if DSE_VERSION else ProtocolVersion.V5
+        cluster = Cluster(protocol_version=pv, allow_beta_protocol_version=True)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
 
@@ -1453,7 +1461,8 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        pv = ProtocolVersion.DSE_V2 if DSE_VERSION else ProtocolVersion.V5
+        cluster = Cluster(protocol_version=pv, allow_beta_protocol_version=True)
         session = cluster.connect(self.ks_name)
         self.addCleanup(cluster.shutdown)
 
