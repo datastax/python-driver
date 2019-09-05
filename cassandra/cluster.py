@@ -875,7 +875,8 @@ class Cluster(object):
                  idle_heartbeat_timeout=30,
                  no_compact=False,
                  ssl_context=None,
-                 endpoint_factory=None):
+                 endpoint_factory=None,
+                 monitor_reporting_enabled=False):  # TODO just added for tests purpose before insights integration
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -3960,8 +3961,8 @@ class ResponseFuture(object):
                         self, connection, **response.schema_change_event)
                 elif response.kind == RESULT_KIND_ROWS:
                     self._paging_state = response.paging_state
-                    self._col_types = response.column_names
-                    self._col_names = response.column_types
+                    self._col_types = response.column_types
+                    self._col_names = response.column_names
                     self._set_final_result(self.row_factory(
                         response.column_names, response.parsed_rows))
                 elif response.kind == RESULT_KIND_VOID:

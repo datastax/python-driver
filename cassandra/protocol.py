@@ -677,10 +677,10 @@ class ResultMessage(_MessageType):
             for row in rows:
                 for i in range(len(row)):
                     try:
-                        self.column_typess[i].from_binary(row[i], protocol_version)
+                        self.column_types[i].from_binary(row[i], protocol_version)
                     except Exception as e:
                         raise DriverException('Failed decoding result column "%s" of type %s: %s' % (self.column_names[i],
-                                                                                                     self.column_names[i].cql_parameterized_type(),
+                                                                                                     self.column_types[i].cql_parameterized_type(),
                                                                                                      str(e)))
 
     def recv_results_prepared(self, f, protocol_version, user_type_map):
@@ -908,7 +908,6 @@ class ExecuteMessage(_MessageType):
                 write_consistency_level(f, self.serial_consistency_level)
             if self.timestamp is not None:
                 write_long(f, self.timestamp)
-
 
 
 class BatchMessage(_MessageType):

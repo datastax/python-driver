@@ -225,8 +225,7 @@ class ProtocolVersion(object):
 
     @classmethod
     def uses_keyspace_flag(cls, version):
-        # OSS was >= cls.V5... we should verify that this change is correct.
-        return version >= cls.DSE_V2
+        return version >= cls.V5 and version != cls.DSE_V1
 
     @classmethod
     def has_continuous_paging_support(cls, version):
