@@ -122,6 +122,19 @@ schedules:
         - python: [3.4, 3.6, 3.7]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
 
+  # Temporary, don't merge me
+  python_oss_next_tests:
+    schedule: adhoc
+    disable_pull_requests: true
+    branches:
+      include: ['oss-next']
+    env_vars: |
+      EVENT_LOOP_MANAGER='libev'
+      EXCLUDE_LONG=1
+    matrix:
+      exclude:
+        - python: [3.4, 3.6, 3.7]
+
 python:
   - 2.7
   - 3.4
@@ -133,15 +146,20 @@ os:
   - ubuntu/bionic64/python-driver
 
 cassandra:
+  - '2.0'
   - '2.1'
   - '2.2'
   - '3.0'
   - '3.11'
-  - 'test-dse'
+  - 'dse-4.8'
+  - 'dse-5.0'
+  - 'dse-5.1'
+  - 'dse-6.0'
+  - 'dse-6.7'
 
 env:
   CYTHON:
-    - CYTHON
+#    - CYTHON
     - NO_CYTHON
 
 build:
