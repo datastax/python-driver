@@ -30,7 +30,7 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        UnsupportedOperation, UserFunctionDescriptor,
                        UserAggregateDescriptor, SchemaTargetType)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
-                               int8_pack, int8_unpack, uint64_pack, header_pack,
+                               uint8_pack, int8_unpack, uint64_pack, header_pack,
                                v3_header_pack, uint32_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
@@ -387,6 +387,11 @@ class AlreadyExistsException(ConfigurationException):
         return AlreadyExists(**self.info)
 
 
+class ClientWriteError(RequestExecutionException):
+    summary = 'Client write failure.'
+    error_code = 0x8000
+
+
 class StartupMessage(_MessageType):
     opcode = 0x01
     name = 'STARTUP'
@@ -512,31 +517,34 @@ _SKIP_METADATA_FLAG = 0x02
 _PAGE_SIZE_FLAG = 0x04
 _WITH_PAGING_STATE_FLAG = 0x08
 _WITH_SERIAL_CONSISTENCY_FLAG = 0x10
-_PROTOCOL_TIMESTAMP = 0x20
+_PROTOCOL_TIMESTAMP_FLAG = 0x20
+_NAMES_FOR_VALUES_FLAG = 0x40  # not used here
 _WITH_KEYSPACE_FLAG = 0x80
 _PREPARED_WITH_KEYSPACE_FLAG = 0x01
+_PAGE_SIZE_BYTES_FLAG = 0x40000000
+_PAGING_OPTIONS_FLAG = 0x80000000
 
 
-class QueryMessage(_MessageType):
-    opcode = 0x07
-    name = 'QUERY'
+class _QueryMessage(_MessageType):
 
-    def __init__(self, query, consistency_level, serial_consistency_level=None,
-                 fetch_size=None, paging_state=None, timestamp=None, keyspace=None):
-        self.query = query
+    def __init__(self, query_params, consistency_level,
+                 serial_consistency_level=None, fetch_size=None,
+                 paging_state=None, timestamp=None, skip_meta=False,
+                 continuous_paging_options=None, keyspace=None):
+        self.query_params = query_params
         self.consistency_level = consistency_level
         self.serial_consistency_level = serial_consistency_level
         self.fetch_size = fetch_size
         self.paging_state = paging_state
         self.timestamp = timestamp
+        self.skip_meta = skip_meta
+        self.continuous_paging_options = continuous_paging_options
         self.keyspace = keyspace
-        self._query_params = None  # only used internally. May be set to a list of native-encoded values to have them sent with the request.
 
-    def send_body(self, f, protocol_version):
-        write_longstring(f, self.query)
+    def _write_query_params(self, f, protocol_version):
         write_consistency_level(f, self.consistency_level)
         flags = 0x00
-        if self._query_params is not None:
+        if self.query_params is not None:
             flags |= _VALUES_FLAG  # also v2+, but we're only setting params internally right now
 
         if self.serial_consistency_level:
@@ -565,7 +573,15 @@ class QueryMessage(_MessageType):
                     "2 or higher. Consider setting Cluster.protocol_version to 2.")
 
         if self.timestamp is not None:
-            flags |= _PROTOCOL_TIMESTAMP
+            flags |= _PROTOCOL_TIMESTAMP_FLAG
+
+        if self.continuous_paging_options:
+            if ProtocolVersion.has_continuous_paging_support(protocol_version):
+                flags |= _PAGING_OPTIONS_FLAG
+            else:
+                raise UnsupportedOperation(
+                    "Continuous paging may only be used with protocol version "
+                    "ProtocolVersion.DSE_V1 or higher. Consider setting Cluster.protocol_version to ProtocolVersion.DSE_V1.")
 
         if self.keyspace is not None:
             if ProtocolVersion.uses_keyspace_flag(protocol_version):
@@ -573,18 +589,17 @@ class QueryMessage(_MessageType):
             else:
                 raise UnsupportedOperation(
                     "Keyspaces may only be set on queries with protocol version "
-                    "5 or higher. Consider setting Cluster.protocol_version to 5.")
+                    "DSE_V2 or higher. Consider setting Cluster.protocol_version to ProtocolVersion.DSE_V2.")
 
         if ProtocolVersion.uses_int_query_flags(protocol_version):
             write_uint(f, flags)
         else:
             write_byte(f, flags)
 
-        if self._query_params is not None:
-            write_short(f, len(self._query_params))
-            for param in self._query_params:
+        if self.query_params is not None:
+            write_short(f, len(self.query_params))
+            for param in self.query_params:
                 write_value(f, param)
-
         if self.fetch_size:
             write_int(f, self.fetch_size)
         if self.paging_state:
@@ -595,6 +610,49 @@ class QueryMessage(_MessageType):
             write_long(f, self.timestamp)
         if self.keyspace is not None:
             write_string(f, self.keyspace)
+        if self.continuous_paging_options:
+            self._write_paging_options(f, self.continuous_paging_options, protocol_version)
+
+    def _write_paging_options(self, f, paging_options, protocol_version):
+        write_int(f, paging_options.max_pages)
+        write_int(f, paging_options.max_pages_per_second)
+        if ProtocolVersion.has_continuous_paging_next_pages(protocol_version):
+            write_int(f, paging_options.max_queue_size)
+
+
+class QueryMessage(_QueryMessage):
+    opcode = 0x07
+    name = 'QUERY'
+
+    def __init__(self, query, consistency_level, serial_consistency_level=None,
+                 fetch_size=None, paging_state=None, timestamp=None, continuous_paging_options=None, keyspace=None):
+        self.query = query
+        super(QueryMessage, self).__init__(None, consistency_level, serial_consistency_level, fetch_size,
+                                           paging_state, timestamp, False, continuous_paging_options, keyspace)
+
+    def send_body(self, f, protocol_version):
+        write_longstring(f, self.query)
+        self._write_query_params(f, protocol_version)
+
+
+class ExecuteMessage(_QueryMessage):
+    opcode = 0x0A
+    name = 'EXECUTE'
+
+    def __init__(self, query_id, query_params, consistency_level,
+                 serial_consistency_level=None, fetch_size=None,
+                 paging_state=None, timestamp=None, skip_meta=False,
+                 continuous_paging_options=None, result_metadata_id=None):
+        self.query_id = query_id
+        self.result_metadata_id = result_metadata_id
+        super(ExecuteMessage, self).__init__(query_params, consistency_level, serial_consistency_level, fetch_size,
+                                             paging_state, timestamp, skip_meta, continuous_paging_options)
+
+    def send_body(self, f, protocol_version):
+        write_string(f, self.query_id)
+        if ProtocolVersion.uses_prepared_metadata(protocol_version):
+            write_string(f, self.result_metadata_id)
+        self._write_query_params(f, protocol_version)
 
 
 CUSTOM_TYPE = object()
@@ -611,6 +669,8 @@ class ResultMessage(_MessageType):
     name = 'RESULT'
 
     kind = None
+    results = None
+    paging_state = None
 
     # Names match type name in module scope. Most are imported from cassandra.cqltypes (except CUSTOM_TYPE)
     type_codes = _cqltypes_by_code = dict((v, globals()[k]) for k, v in type_codes.__dict__.items() if not k.startswith('_'))
@@ -621,6 +681,8 @@ class ResultMessage(_MessageType):
     _CONTINUOUS_PAGING_FLAG = 0x40000000
     _CONTINUOUS_PAGING_LAST_FLAG = 0x80000000
     _METADATA_ID_FLAG = 0x0008
+
+    kind = None
 
     # These are all the things a result message might contain. They are populated according to 'kind'
     column_names = None
@@ -635,7 +697,6 @@ class ResultMessage(_MessageType):
     bind_metadata = None
     pk_indexes = None
     schema_change_event = None
-    result_metadata_id = None
 
     def __init__(self, kind):
         self.kind = kind
@@ -818,7 +879,7 @@ class PrepareMessage(_MessageType):
             else:
                 raise UnsupportedOperation(
                     "Keyspaces may only be set on queries with protocol version "
-                    "5 or higher. Consider setting Cluster.protocol_version to 5.")
+                    "5 or DSE_V2 or higher. Consider setting Cluster.protocol_version.")
 
         if ProtocolVersion.uses_prepare_flags(protocol_version):
             write_uint(f, flags)
@@ -829,85 +890,12 @@ class PrepareMessage(_MessageType):
                     "Attempted to set flags with value {flags:0=#8x} on"
                     "protocol version {pv}, which doesn't support flags"
                     "in prepared statements."
-                    "Consider setting Cluster.protocol_version to 5."
+                    "Consider setting Cluster.protocol_version to 5 or DSE_V2."
                     "".format(flags=flags, pv=protocol_version))
 
         if ProtocolVersion.uses_keyspace_flag(protocol_version):
             if self.keyspace:
                 write_string(f, self.keyspace)
-
-
-class ExecuteMessage(_MessageType):
-    opcode = 0x0A
-    name = 'EXECUTE'
-
-    def __init__(self, query_id, query_params, consistency_level,
-                 serial_consistency_level=None, fetch_size=None,
-                 paging_state=None, timestamp=None, skip_meta=False,
-                 result_metadata_id=None):
-        self.query_id = query_id
-        self.query_params = query_params
-        self.consistency_level = consistency_level
-        self.serial_consistency_level = serial_consistency_level
-        self.fetch_size = fetch_size
-        self.paging_state = paging_state
-        self.timestamp = timestamp
-        self.skip_meta = skip_meta
-        self.result_metadata_id = result_metadata_id
-
-    def send_body(self, f, protocol_version):
-        write_string(f, self.query_id)
-        if ProtocolVersion.uses_prepared_metadata(protocol_version):
-            write_string(f, self.result_metadata_id)
-        if protocol_version == 1:
-            if self.serial_consistency_level:
-                raise UnsupportedOperation(
-                    "Serial consistency levels require the use of protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
-                    "to support serial consistency levels.")
-            if self.fetch_size or self.paging_state:
-                raise UnsupportedOperation(
-                    "Automatic query paging may only be used with protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
-            write_short(f, len(self.query_params))
-            for param in self.query_params:
-                write_value(f, param)
-            write_consistency_level(f, self.consistency_level)
-        else:
-            write_consistency_level(f, self.consistency_level)
-            flags = _VALUES_FLAG
-            if self.serial_consistency_level:
-                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
-            if self.fetch_size:
-                flags |= _PAGE_SIZE_FLAG
-            if self.paging_state:
-                flags |= _WITH_PAGING_STATE_FLAG
-            if self.timestamp is not None:
-                if protocol_version >= 3:
-                    flags |= _PROTOCOL_TIMESTAMP
-                else:
-                    raise UnsupportedOperation(
-                        "Protocol-level timestamps may only be used with protocol version "
-                        "3 or higher. Consider setting Cluster.protocol_version to 3.")
-            if self.skip_meta:
-                flags |= _SKIP_METADATA_FLAG
-
-            if ProtocolVersion.uses_int_query_flags(protocol_version):
-                write_uint(f, flags)
-            else:
-                write_byte(f, flags)
-
-            write_short(f, len(self.query_params))
-            for param in self.query_params:
-                write_value(f, param)
-            if self.fetch_size:
-                write_int(f, self.fetch_size)
-            if self.paging_state:
-                write_longstring(f, self.paging_state)
-            if self.serial_consistency_level:
-                write_consistency_level(f, self.serial_consistency_level)
-            if self.timestamp is not None:
-                write_long(f, self.timestamp)
 
 
 class BatchMessage(_MessageType):
@@ -945,7 +933,7 @@ class BatchMessage(_MessageType):
             if self.serial_consistency_level:
                 flags |= _WITH_SERIAL_CONSISTENCY_FLAG
             if self.timestamp is not None:
-                flags |= _PROTOCOL_TIMESTAMP
+                flags |= _PROTOCOL_TIMESTAMP_FLAG
             if self.keyspace:
                 if ProtocolVersion.uses_keyspace_flag(protocol_version):
                     flags |= _WITH_KEYSPACE_FLAG
@@ -1146,7 +1134,7 @@ class _ProtocolHandler(object):
         else:
             custom_payload = None
 
-        flags &= USE_BETA_MASK # will only be set if we asserted it in connection estabishment
+        flags &= USE_BETA_MASK  # will only be set if we asserted it in connection estabishment
 
         if flags:
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
@@ -1163,6 +1151,7 @@ class _ProtocolHandler(object):
                 log.warning("Server warning: %s", w)
 
         return msg
+
 
 def cython_protocol_handler(colparser):
     """
@@ -1229,7 +1218,7 @@ def read_byte(f):
 
 
 def write_byte(f, b):
-    f.write(int8_pack(b))
+    f.write(uint8_pack(b))
 
 
 def read_int(f):
