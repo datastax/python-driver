@@ -307,7 +307,7 @@ On OSX, via homebrew:
             try:
                 from Cython.Build import cythonize
                 cython_candidates = ['cluster', 'concurrent', 'connection', 'cqltypes', 'metadata',
-                                     'pool', 'protocol', 'query', 'util']
+                                     'pool', 'hosts', 'protocol', 'query', 'util']
                 compile_args = [] if is_windows else ['-Wno-unused-function']
                 self.extensions.extend(cythonize(
                     [Extension('cassandra.%s' % m, ['cassandra/%s.py' % m],
@@ -403,7 +403,8 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = ['six >=1.9']
+    dependencies = ['six >=1.9',
+                    'geomet>=0.1,<0.2']
 
     if not PY3:
         dependencies.append('futures')
@@ -416,8 +417,8 @@ def run_setup(extensions):
         url='http://github.com/datastax/python-driver',
         author='Tyler Hobbs',
         author_email='tyler@datastax.com',
-        packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine'],
-        keywords='cassandra,cql,orm',
+        packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph', 'cassandra.insights'],
+        keywords='cassandra,cql,orm,dse,graph',
         include_package_data=True,
         install_requires=dependencies,
         tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
@@ -438,6 +439,7 @@ def run_setup(extensions):
             'Topic :: Software Development :: Libraries :: Python Modules'
         ],
         **kw)
+
 
 run_setup(None)
 

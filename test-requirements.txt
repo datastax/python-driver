@@ -1,8 +1,8 @@
 -r requirements.txt
 scales
 nose
-mock!=1.1.*
-ccm>=2.0
+mock>1.1
+ccm>=2.1.2
 unittest2
 pytz
 sure
@@ -12,5 +12,8 @@ gevent>=1.0
 eventlet
 cython>=0.20,<0.30
 packaging
+kerberos
+requests
+backports.ssl_match_hostname; python_version < '2.7.9'
 futurist; python_version >= '3.7'
 asynctest; python_version > '3.4'
