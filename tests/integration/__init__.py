@@ -351,6 +351,8 @@ requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or
                                                "This test is not suitible for environments with large clock granularity")
 requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
 requirecassandra = unittest.skipIf(DSE_VERSION, "Cassandra required")
+requiredse = unittest.skipUnless(DSE_VERSION, "DSE required")
+
 
 def wait_for_node_socket(node, timeout):
     binary_itf = node.network_interfaces['binary']
