@@ -58,8 +58,7 @@ class DseCCMClusterTest(unittest.TestCase):
         cluster_name = '{}-{}'.format(
             self.__class__.__name__, dse_version.base_version.replace('.', '_')
         )
-        use_cluster(cluster_name=cluster_name, nodes=[3],
-                    dse_cluster=True, dse_options={}, dse_version=dse_version)
+        use_cluster(cluster_name=cluster_name, nodes=[3], dse_options={})
 
         cluster = Cluster(
             allow_beta_protocol_version=(dse_version >= Version('6.7.0')))
