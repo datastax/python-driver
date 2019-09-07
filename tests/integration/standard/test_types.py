@@ -130,7 +130,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                 self.assertEqual(expected, actual)
         finally:
             if original is not None:
-                dse.deserializers.DesBytesType=original
+                cassandra.deserializers.DesBytesType=original
 
     def test_can_insert_primitive_datatypes(self):
         """
