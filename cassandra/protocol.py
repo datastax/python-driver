@@ -648,6 +648,24 @@ class ExecuteMessage(_QueryMessage):
         super(ExecuteMessage, self).__init__(query_params, consistency_level, serial_consistency_level, fetch_size,
                                              paging_state, timestamp, skip_meta, continuous_paging_options)
 
+    def _write_query_params(self, f, protocol_version):
+        if protocol_version == 1:
+            if self.serial_consistency_level:
+                raise UnsupportedOperation(
+                    "Serial consistency levels require the use of protocol version "
+                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
+                    "to support serial consistency levels.")
+            if self.fetch_size or self.paging_state:
+                raise UnsupportedOperation(
+                    "Automatic query paging may only be used with protocol version "
+                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
+            write_short(f, len(self.query_params))
+            for param in self.query_params:
+                write_value(f, param)
+            write_consistency_level(f, self.consistency_level)
+        else:
+            super(ExecuteMessage, self)._write_query_params(f, protocol_version)
+
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
         if ProtocolVersion.uses_prepared_metadata(protocol_version):
