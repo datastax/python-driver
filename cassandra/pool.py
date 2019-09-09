@@ -105,6 +105,8 @@ class Host(object):
     """
     DSE workload queried from the control connection system tables. Only populated when connecting to
     DSE with this property available. Not queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    This is a legacy attribute that does not portray multiple workloads in a uniform fashion.
+    See also :attr:`~.Host.dse_workloads`.
     """
 
     dse_workloads = None
@@ -428,7 +430,7 @@ class HostConnection(object):
 
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host)
+            conn = self._session.cluster.connection_factory(self.host.endpoint)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._keyspace)
             self._connection = conn
