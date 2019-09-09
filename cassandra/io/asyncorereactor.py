@@ -461,4 +461,4 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         return self._writable
 
     def readable(self):
-        return self._readable or (self.is_control_connection and not (self.is_defunct or self.is_closed))
+        return self._readable or ((self.is_control_connection or self._continuous_paging_sessions) and not (self.is_defunct or self.is_closed))

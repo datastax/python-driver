@@ -1049,6 +1049,34 @@ class EventMessage(_MessageType):
         return event
 
 
+class ReviseRequestMessage(_MessageType):
+
+    class RevisionType(object):
+        PAGING_CANCEL = 1
+        PAGING_BACKPRESSURE = 2
+
+    opcode = 0xFF
+    name = 'REVISE_REQUEST'
+
+    def __init__(self, op_type, op_id, next_pages=0):
+        self.op_type = op_type
+        self.op_id = op_id
+        self.next_pages = next_pages
+
+    def send_body(self, f, protocol_version):
+        write_int(f, self.op_type)
+        write_int(f, self.op_id)
+        if self.op_type == ReviseRequestMessage.RevisionType.PAGING_BACKPRESSURE:
+            if self.next_pages <= 0:
+                raise UnsupportedOperation("Continuous paging backpressure requires next_pages > 0")
+            elif not ProtocolVersion.has_continuous_paging_next_pages(protocol_version):
+                raise UnsupportedOperation(
+                    "Continuous paging backpressure may only be used with protocol version "
+                    "ProtocolVersion.DSE_V2 or higher. Consider setting Cluster.protocol_version to ProtocolVersion.DSE_V2.")
+            else:
+                write_int(f, self.next_pages)
+
+
 class _ProtocolHandler(object):
     """
     _ProtocolHander handles encoding and decoding messages.

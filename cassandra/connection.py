@@ -24,7 +24,7 @@ from six.moves import range
 import socket
 import struct
 import sys
-from threading import Thread, Event, RLock
+from threading import Thread, Event, RLock, Condition
 import time
 
 try:
@@ -45,7 +45,7 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
                                 AuthSuccessMessage, ProtocolException,
-                                RegisterMessage)
+                                RegisterMessage, ReviseRequestMessage)
 from cassandra.util import OrderedDict
 
 
@@ -306,6 +306,161 @@ class ProtocolError(Exception):
     pass
 
 
+class ContinuousPagingState(object):
+    """
+     A class for specifying continuous paging state, only supported starting with DSE_V2.
+    """
+
+    num_pages_requested = None
+    """
+    How many pages we have already requested
+    """
+
+    num_pages_received = None
+    """
+    How many pages we have already received
+    """
+
+    max_queue_size = None
+    """
+    The max queue size chosen by the user via the options
+    """
+
+    def __init__(self, max_queue_size):
+        self.num_pages_requested = max_queue_size  # the initial query requests max_queue_size
+        self.num_pages_received = 0
+        self.max_queue_size = max_queue_size
+
+
+class ContinuousPagingSession(object):
+    def __init__(self, stream_id, decoder, row_factory, connection, state):
+        self.stream_id = stream_id
+        self.decoder = decoder
+        self.row_factory = row_factory
+        self.connection = connection
+        self._condition = Condition()
+        self._stop = False
+        self._page_queue = deque()
+        self._state = state
+        self.released = False
+
+    def on_message(self, result):
+        if isinstance(result, ResultMessage):
+            self.on_page(result)
+        elif isinstance(result, ErrorMessage):
+            self.on_error(result)
+
+    def on_page(self, result):
+        with self._condition:
+            if self._state:
+                self._state.num_pages_received += 1
+            self._page_queue.appendleft((result.column_names, result.parsed_rows, None))
+            self._stop |= result.continuous_paging_last
+            self._condition.notify()
+
+        if result.continuous_paging_last:
+            self.released = True
+
+    def on_error(self, error):
+        if isinstance(error, ErrorMessage):
+            error = error.to_exception()
+
+        log.debug("Got error %s for session %s", error, self.stream_id)
+
+        with self._condition:
+            self._page_queue.appendleft((None, None, error))
+            self._stop = True
+            self._condition.notify()
+
+        self.released = True
+
+    def results(self):
+        try:
+            self._condition.acquire()
+            while True:
+                while not self._page_queue and not self._stop:
+                    self._condition.wait(timeout=5)
+                while self._page_queue:
+                    names, rows, err = self._page_queue.pop()
+                    if err:
+                        raise err
+                    self.maybe_request_more()
+                    self._condition.release()
+                    for row in self.row_factory(names, rows):
+                        yield row
+                    self._condition.acquire()
+                if self._stop:
+                    break
+        finally:
+            try:
+                self._condition.release()
+            except RuntimeError:
+                # This exception happens if the CP results are not entirely consumed
+                # and the session is terminated by the runtime. See PYTHON-1054
+                pass
+
+    def maybe_request_more(self):
+        if not self._state:
+            return
+
+        max_queue_size = self._state.max_queue_size
+        num_in_flight = self._state.num_pages_requested - self._state.num_pages_received
+        space_in_queue = max_queue_size - len(self._page_queue) - num_in_flight
+        log.debug("Session %s from %s, space in CP queue: %s, requested: %s, received: %s, num_in_flight: %s",
+                  self.stream_id, self.connection.host, space_in_queue, self._state.num_pages_requested,
+                  self._state.num_pages_received, num_in_flight)
+
+        if space_in_queue >= max_queue_size / 2:
+            self.update_next_pages(space_in_queue)
+
+    def update_next_pages(self, num_next_pages):
+        try:
+            self._state.num_pages_requested += num_next_pages
+            log.debug("Updating backpressure for session %s from %s", self.stream_id, self.connection.host)
+            with self.connection.lock:
+                self.connection.send_msg(ReviseRequestMessage(ReviseRequestMessage.RevisionType.PAGING_BACKPRESSURE,
+                                                              self.stream_id,
+                                                              next_pages=num_next_pages),
+                                         self.connection.get_request_id(),
+                                         self._on_backpressure_response)
+        except ConnectionShutdown as ex:
+            log.debug("Failed to update backpressure for session %s from %s, connection is shutdown",
+                      self.stream_id, self.connection.host)
+            self.on_error(ex)
+
+    def _on_backpressure_response(self, response):
+        if isinstance(response, ResultMessage):
+            log.debug("Paging session %s backpressure updated.", self.stream_id)
+        else:
+            log.error("Failed updating backpressure for session %s from %s: %s", self.stream_id, self.connection.host,
+                      response.to_exception() if hasattr(response, 'to_exception') else response)
+            self.on_error(response)
+
+    def cancel(self):
+        try:
+            log.debug("Canceling paging session %s from %s", self.stream_id, self.connection.host)
+            with self.connection.lock:
+                self.connection.send_msg(ReviseRequestMessage(ReviseRequestMessage.RevisionType.PAGING_CANCEL,
+                                                              self.stream_id),
+                                         self.connection.get_request_id(),
+                                         self._on_cancel_response)
+        except ConnectionShutdown:
+            log.debug("Failed to cancel session %s from %s, connection is shutdown",
+                      self.stream_id, self.connection.host)
+
+        with self._condition:
+            self._stop = True
+            self._condition.notify()
+
+    def _on_cancel_response(self, response):
+        if isinstance(response, ResultMessage):
+            log.debug("Paging session %s canceled.", self.stream_id)
+        else:
+            log.error("Failed canceling streaming session %s from %s: %s", self.stream_id, self.connection.host,
+                      response.to_exception() if hasattr(response, 'to_exception') else response)
+        self.released = True
+
+
 def defunct_on_error(f):
 
     @wraps(f)
@@ -339,6 +494,7 @@ class Connection(object):
 
     keyspace = None
     compression = True
+    _compression_type = None
     compressor = None
     decompressor = None
 
@@ -414,6 +570,7 @@ class Connection(object):
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
+        self._continuous_paging_sessions = {}
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -547,9 +704,15 @@ class Connection(object):
 
         self.last_error = exc
         self.close()
+        self.error_all_cp_sessions(exc)
         self.error_all_requests(exc)
         self.connected_event.set()
         return exc
+
+    def error_all_cp_sessions(self, exc):
+        stream_ids = list(self._continuous_paging_sessions.keys())
+        for stream_id in stream_ids:
+            self._continuous_paging_sessions[stream_id].on_error(exc)
 
     def error_all_requests(self, exc):
         with self.lock:
@@ -560,6 +723,7 @@ class Connection(object):
             return
 
         new_exc = ConnectionShutdown(str(exc))
+
         def try_callback(cb):
             try:
                 cb(new_exc)
@@ -703,7 +867,7 @@ class Connection(object):
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
-            if version > ProtocolVersion.MAX_SUPPORTED:
+            if version not in ProtocolVersion.SUPPORTED_VERSIONS:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
             # this frame header struct is everything after the version byte
@@ -748,15 +912,18 @@ class Connection(object):
             decoder = ProtocolHandler.decode_message
             result_metadata = None
         else:
-            try:
-                callback, decoder, result_metadata = self._requests.pop(stream_id)
-            # This can only happen if the stream_id was
-            # removed due to an OperationTimedOut
-            except KeyError:
-                return
-
-            with self.lock:
-                self.request_ids.append(stream_id)
+            if stream_id in self._continuous_paging_sessions:
+                paging_session = self._continuous_paging_sessions[stream_id]
+                callback = paging_session.on_message
+                decoder = paging_session.decoder
+                result_metadata = None
+            else:
+                try:
+                    callback, decoder, result_metadata = self._requests.pop(stream_id)
+                # This can only happen if the stream_id was
+                # removed due to an OperationTimedOut
+                except KeyError:
+                    return
 
         try:
             response = decoder(header.version, self.user_type_map, stream_id,
@@ -783,6 +950,29 @@ class Connection(object):
                 self.handle_pushed(response)
         except Exception:
             log.exception("Callback handler errored, ignoring:")
+
+        # done after callback because the callback might signal this as a paging session
+        if stream_id >= 0:
+            if stream_id in self._continuous_paging_sessions:
+                if self._continuous_paging_sessions[stream_id].released:
+                    self.remove_continuous_paging_session(stream_id)
+            else:
+                with self.lock:
+                    self.request_ids.append(stream_id)
+
+    def new_continuous_paging_session(self, stream_id, decoder, row_factory, state):
+        session = ContinuousPagingSession(stream_id, decoder, row_factory, self, state)
+        self._continuous_paging_sessions[stream_id] = session
+        return session
+
+    def remove_continuous_paging_session(self, stream_id):
+        try:
+            self._continuous_paging_sessions.pop(stream_id)
+            with self.lock:
+                log.debug("Returning cp session stream id %s", stream_id)
+                self.request_ids.append(stream_id)
+        except KeyError:
+            pass
 
     @defunct_on_error
     def _send_options_message(self):
@@ -855,6 +1045,7 @@ class Connection(object):
 
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
+                self._compression_type = compression_type
                 self._compressor, self.decompressor = \
                     locally_supported_compressions[compression_type]
 
@@ -893,7 +1084,10 @@ class Connection(object):
                       id(self), self.endpoint, startup_response.authenticator)
 
             if self.authenticator is None:
-                raise AuthenticationFailed('Remote end requires authentication.')
+                log.error("Failed to authenticate to %s. If you are trying to connect to a DSE cluster, "
+                          "consider using TransitionalModePlainTextAuthProvider "
+                          "if DSE authentication is configured with transitional mode" % (self.host,))
+                raise AuthenticationFailed('Remote end requires authentication')
 
             if isinstance(self.authenticator, dict):
                 log.debug("Sending credentials-based auth response on %s", self)
@@ -905,7 +1099,8 @@ class Connection(object):
                 self.authenticator.server_authenticator_class = startup_response.authenticator
                 initial_response = self.authenticator.initial_response()
                 initial_response = "" if initial_response is None else initial_response
-                self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
+                self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(),
+                              self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
                       id(self), self.endpoint, startup_response.summary_msg())
