@@ -79,9 +79,17 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, TraceUnavailable,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET,
                              HostTargetingStatement)
+from cassandra.marshal import int64_pack
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.compat import Mapping
 from cassandra.util import _resolve_contact_points_to_string_map
+
+from cassandra.insights.reporter import MonitorReporter
+from cassandra.insights.util import version_supports_insights
+
+from cassandra.graph import (graph_object_row_factory, GraphOptions, GraphSON1Serializer,
+                             GraphProtocol, GraphSON2Serializer, GraphStatement, SimpleGraphStatement)
+from cassandra.graph.query import _request_timeout_key
 
 if six.PY3:
     long = int
@@ -386,7 +394,7 @@ class GraphExecutionProfile(ExecutionProfile):
 
     def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
                  consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
-                 request_timeout=30.0, row_factory=None,  # TODO GRAPH graph_object_row_factory
+                 request_timeout=30.0, row_factory=graph_object_row_factory,
                  graph_options=None):
         """
         Default execution profile for graph execution.
@@ -408,7 +416,7 @@ class GraphAnalyticsExecutionProfile(GraphExecutionProfile):
 
     def __init__(self, load_balancing_policy=None, retry_policy=None,
                  consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
-                 request_timeout=3600. * 24. * 7., row_factory=None,  # TODO GRAPH graph_object_row_factory
+                 request_timeout=3600. * 24. * 7., row_factory=graph_object_row_factory,
                  graph_options=None):
         """
         Execution profile with timeout and load balancing appropriate for graph analytics queries.
@@ -429,7 +437,6 @@ class GraphAnalyticsExecutionProfile(GraphExecutionProfile):
                                                              graph_options)
         # ensure the graph_source is analytics, since this is the purpose of the GraphAnalyticsExecutionProfile
         self.graph_options.set_source_analytics()
-
 
 
 class ProfileManager(object):
@@ -2449,23 +2456,22 @@ class Session(object):
                 msg += " using keyspace '%s'" % self.keyspace
             raise NoHostAvailable(msg, [h.address for h in hosts])
 
-        # TODO INSIGHT
-        # cc_host = self.cluster.get_control_connection_host()
-        # valid_insights_version = (cc_host and version_supports_insights(cc_host.dse_version))
-        # if self.cluster.monitor_reporting_enabled and valid_insights_version:
-        #     self._monitor_reporter = MonitorReporter(
-        #         interval_sec=self.cluster.monitor_reporting_interval,
-        #         session=self,
-        #     )
-        # else:
-        #     if cc_host:
-        #         log.debug('Not starting MonitorReporter thread for Insights; '
-        #                   'not supported by server version {v} on '
-        #                   'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
-        #
-        # self.session_id = uuid.uuid4()
-        # log.debug('Started Session with client_id {} and session_id {}'.format(self.cluster.client_id,
-        #                                                                        self.session_id))
+        cc_host = self.cluster.get_control_connection_host()
+        valid_insights_version = (cc_host and version_supports_insights(cc_host.dse_version))
+        if self.cluster.monitor_reporting_enabled and valid_insights_version:
+            self._monitor_reporter = MonitorReporter(
+                interval_sec=self.cluster.monitor_reporting_interval,
+                session=self,
+            )
+        else:
+            if cc_host:
+                log.debug('Not starting MonitorReporter thread for Insights; '
+                          'not supported by server version {v} on '
+                          'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
+
+        self.session_id = uuid.uuid4()
+        log.debug('Started Session with client_id {} and session_id {}'.format(self.cluster.client_id,
+                                                                               self.session_id))
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False,
                 custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT,
@@ -2580,9 +2586,8 @@ class Session(object):
         object which callbacks may be attached to for asynchronous response delivery. You may also call ``ResponseFuture.result()`` to synchronously block for
         results at any time.
         """
-        # TODO GRAPH
-        # if not isinstance(query, GraphStatement):
-        #     query = SimpleGraphStatement(query)
+        if not isinstance(query, GraphStatement):
+            query = SimpleGraphStatement(query)
 
         execution_profile = self._maybe_get_execution_profile(execution_profile)  # look up instance here so we can apply the extended attributes
 
@@ -2680,6 +2685,7 @@ class Session(object):
             row_factory = self.row_factory
             load_balancing_policy = self.cluster.load_balancing_policy
             spec_exec_policy = None
+            continuous_paging_options = None
         else:
             execution_profile = self._maybe_get_execution_profile(execution_profile)
 
