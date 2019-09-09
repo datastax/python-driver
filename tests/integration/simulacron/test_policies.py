@@ -17,12 +17,13 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra import OperationTimedOut, WriteTimeout
-from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture
+from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture, EXEC_PROFILE_DEFAULT
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy, RetryPolicy, WriteType
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimulacron, SIMULACRON_JAR, \
+from tests.integration import greaterthancass21, requiressimulacron, SIMULACRON_JAR, \
     CASSANDRA_VERSION
+from tests.integration.simulacron import PROTOCOL_VERSION
 from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, \
     stop_simulacron, NO_THEN, clear_queries
 
@@ -182,7 +183,7 @@ class SpecExecTest(unittest.TestCase):
         spec = ExecutionProfile(load_balancing_policy=RoundRobinPolicy(),
                                 speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0, number_of_requests))
 
-        cluster = Cluster()
+        cluster = Cluster(compression=False)
         cluster.add_execution_profile("spec", spec)
         session = cluster.connect(wait_for_all_pools=True)
         self.addCleanup(cluster.shutdown)
@@ -192,7 +193,6 @@ class SpecExecTest(unittest.TestCase):
         def patch_and_count(f):
             def patched(*args, **kwargs):
                 next(counter)
-                print("patched")
                 f(*args, **kwargs)
             return patched
 
@@ -269,8 +269,13 @@ class RetryPolicyTests(unittest.TestCase):
         clear_queries()
 
     def set_cluster(self, retry_policy):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
-                          default_retry_policy=retry_policy)
+        self.cluster = Cluster(
+            protocol_version=PROTOCOL_VERSION,
+            compression=False,
+            execution_profiles={
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=retry_policy)
+            },
+        )
         self.session = self.cluster.connect(wait_for_all_pools=True)
         self.addCleanup(self.cluster.shutdown)
 
@@ -299,9 +304,9 @@ class RetryPolicyTests(unittest.TestCase):
             "write_type": "SIMPLE",
             "ignore_on_prepare": True
           }
-        prime_query(query_to_prime_simple, then=then, rows=None, column_types=None)
+        prime_query(query_to_prime_simple, rows=None, column_types=None, then=then)
         then["write_type"] = "CDC"
-        prime_query(query_to_prime_cdc, then=then, rows=None, column_types=None)
+        prime_query(query_to_prime_cdc, rows=None, column_types=None, then=then)
 
         with self.assertRaises(WriteTimeout):
             self.session.execute(query_to_prime_simple)

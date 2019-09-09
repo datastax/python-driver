@@ -20,8 +20,8 @@ from functools import total_ordering
 
 from cassandra.cluster import Cluster
 from cassandra.connection import DefaultEndPoint, EndPoint, EndPointFactory
-from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
-from tests.integration.simulacron import SimulacronCluster
+from tests.integration import requiressimulacron
+from tests.integration.simulacron import SimulacronCluster, PROTOCOL_VERSION
 
 
 @total_ordering
@@ -99,7 +99,8 @@ class EndPointTests(SimulacronCluster):
         cluster = Cluster(
             contact_points=[AddressEndPoint('127.0.0.1')],
             protocol_version=PROTOCOL_VERSION,
-            endpoint_factory=AddressEndPointFactory()
+            endpoint_factory=AddressEndPointFactory(),
+            compression=False,
         )
         cluster.connect(wait_for_all_pools=True)
 
