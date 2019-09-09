@@ -245,8 +245,7 @@ class Statement(object):
     keyspace = None
     """
     The string name of the keyspace this query acts on. This is used when
-    :class:`~.TokenAwarePolicy` is configured for
-    :attr:`.Cluster.load_balancing_policy`
+    :class:`~.TokenAwarePolicy` is configured in the profile load balancing policy.
 
     It is set implicitly on :class:`.BoundStatement`, and :class:`.BatchStatement`,
     but must be set explicitly on :class:`.SimpleStatement`.
@@ -1087,3 +1086,17 @@ class TraceEvent(object):
 
     def __str__(self):
         return "%s on %s[%s] at %s" % (self.description, self.source, self.thread_name, self.datetime)
+
+
+# TODO remove next major since we can target using the `host` attribute of session.execute
+class HostTargetingStatement(object):
+    """
+    Wraps any query statement and attaches a target host, making
+    it usable in a targeted LBP without modifying the user's statement.
+    """
+    def __init__(self, inner_statement, target_host):
+            self.__class__ = type(inner_statement.__class__.__name__,
+                                  (self.__class__, inner_statement.__class__),
+                                  {})
+            self.__dict__ = inner_statement.__dict__
+            self.target_host = target_host
