@@ -23,7 +23,8 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
 from functools import partial, wraps
-from itertools import groupby, count
+from itertools import groupby, count, chain
+import json
 import logging
 from warnings import warn
 from random import random
@@ -33,6 +34,7 @@ import socket
 import sys
 import time
 from threading import Lock, RLock, Thread, Event
+import uuid
 
 import weakref
 from weakref import WeakValueDictionary
@@ -45,9 +47,11 @@ from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
                        SchemaTargetType, DriverException, ProtocolVersion,
                        UnresolvableContactPoints)
+from cassandra.auth import _proxy_execute_key
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported,
-                                  EndPoint, DefaultEndPoint, DefaultEndPointFactory)
+                                  EndPoint, DefaultEndPoint, DefaultEndPointFactory,
+                                  ContinuousPagingState)
 from cassandra.cqltypes import UserType
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -67,15 +71,20 @@ from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy, IdentityTranslator, NoSpeculativeExecutionPlan,
-                                NoSpeculativeExecutionPolicy)
+                                NoSpeculativeExecutionPolicy, DSELoadBalancingPolicy)
 from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
 from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              BatchStatement, bind_params, QueryTrace, TraceUnavailable,
-                             named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
+                             named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET,
+                             HostTargetingStatement)
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.compat import Mapping
+from cassandra.util import _resolve_contact_points_to_string_map
+
+if six.PY3:
+    long = int
 
 
 def _is_eventlet_monkey_patched():
@@ -197,6 +206,47 @@ def default_lbp_factory():
     return DCAwareRoundRobinPolicy()
 
 
+class ContinuousPagingOptions(object):
+
+    class PagingUnit(object):
+        BYTES = 1
+        ROWS = 2
+
+    page_unit = None
+    """
+    Value of PagingUnit. Default is PagingUnit.ROWS.
+
+    Units refer to the :attr:`~.Statement.fetch_size` or :attr:`~.Session.default_fetch_size`.
+    """
+
+    max_pages = None
+    """
+    Max number of pages to send
+    """
+
+    max_pages_per_second = None
+    """
+    Max rate at which to send pages
+    """
+
+    max_queue_size = None
+    """
+    The maximum queue size for caching pages, only honored for protocol version DSE_V2 and higher,
+    by default it is 4 and it must be at least 2.
+    """
+
+    def __init__(self, page_unit=PagingUnit.ROWS, max_pages=0, max_pages_per_second=0, max_queue_size=4):
+        self.page_unit = page_unit
+        self.max_pages = max_pages
+        self.max_pages_per_second = max_pages_per_second
+        if max_queue_size < 2:
+            raise ValueError('ContinuousPagingOptions.max_queue_size must be 2 or greater')
+        self.max_queue_size = max_queue_size
+
+    def page_unit_bytes(self):
+        return self.page_unit == ContinuousPagingOptions.PagingUnit.BYTES
+
+
 def _addrinfo_or_none(contact_point, port):
     """
     A helper function that wraps socket.getaddrinfo and returns None
@@ -212,23 +262,17 @@ def _addrinfo_or_none(contact_point, port):
         return None
 
 
-def _resolve_contact_points(contact_points, port):
-    resolved = tuple(_addrinfo_or_none(p, port)
-                     for p in contact_points)
-
-    if resolved and all((x is None for x in resolved)):
-        raise UnresolvableContactPoints(contact_points, port)
-
-    resolved = tuple(r for r in resolved if r is not None)
-
-    return [endpoint[4][0]
-            for addrinfo in resolved
-            for endpoint in addrinfo]
-
-
 def _execution_profile_to_string(name):
-    if name is EXEC_PROFILE_DEFAULT:
-        return 'EXEC_PROFILE_DEFAULT'
+    default_profiles = {
+        EXEC_PROFILE_DEFAULT: 'EXEC_PROFILE_DEFAULT',
+        EXEC_PROFILE_GRAPH_DEFAULT: 'EXEC_PROFILE_GRAPH_DEFAULT',
+        EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT: 'EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT',
+        EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT: 'EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT',
+    }
+
+    if name in default_profiles:
+        return default_profiles[name]
+
     return '"%s"' % (name,)
 
 
@@ -285,13 +329,27 @@ class ExecutionProfile(object):
     Defaults to :class:`.NoSpeculativeExecutionPolicy` if not specified
     """
 
+    continuous_paging_options = None
+    """
+    *Note:* This feature is implemented to facilitate server integration testing. It is not intended for general use in the Python driver.
+    See :attr:`.Statement.fetch_size` or :attr:`Session.default_fetch_size` for configuring normal paging.
+
+    When set, requests will use DSE's continuous paging, which streams multiple pages without
+    intermediate requests.
+
+    This has the potential to materialize all results in memory at once if the consumer cannot keep up. Use options
+    to constrain page size and rate.
+
+    This is only available for DSE clusters.
+    """
+
     # indicates if lbp was set explicitly or uses default values
     _load_balancing_policy_explicit = False
 
     def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
                  consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
-                 request_timeout=10.0, row_factory=named_tuple_factory, speculative_execution_policy=None):
-
+                 request_timeout=10.0, row_factory=named_tuple_factory, speculative_execution_policy=None,
+                 continuous_paging_options=None):
         if load_balancing_policy is _NOT_SET:
             self._load_balancing_policy_explicit = False
             self.load_balancing_policy = default_lbp_factory()
@@ -311,6 +369,67 @@ class ExecutionProfile(object):
         self.request_timeout = request_timeout
         self.row_factory = row_factory
         self.speculative_execution_policy = speculative_execution_policy or NoSpeculativeExecutionPolicy()
+        self.continuous_paging_options = continuous_paging_options
+
+
+class GraphExecutionProfile(ExecutionProfile):
+    graph_options = None
+    """
+    :class:`.GraphOptions` to use with this execution
+
+    Default options for graph queries, initialized as follows by default::
+
+        GraphOptions(graph_language=b'gremlin-groovy')
+
+    See cassandra.graph.GraphOptions
+    """
+
+    def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
+                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 request_timeout=30.0, row_factory=None,  # TODO GRAPH graph_object_row_factory
+                 graph_options=None):
+        """
+        Default execution profile for graph execution.
+
+        See :class:`.ExecutionProfile`
+        for base attributes.
+
+        In addition to default parameters shown in the signature, this profile also defaults ``retry_policy`` to
+        :class:`cassandra.policies.NeverRetryPolicy`.
+        """
+        retry_policy = retry_policy or NeverRetryPolicy()
+        super(GraphExecutionProfile, self).__init__(load_balancing_policy, retry_policy, consistency_level,
+                                                    serial_consistency_level, request_timeout, row_factory)
+        self.graph_options = graph_options or GraphOptions(graph_source=b'g',
+                                                           graph_language=b'gremlin-groovy')
+
+
+class GraphAnalyticsExecutionProfile(GraphExecutionProfile):
+
+    def __init__(self, load_balancing_policy=None, retry_policy=None,
+                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 request_timeout=3600. * 24. * 7., row_factory=None,  # TODO GRAPH graph_object_row_factory
+                 graph_options=None):
+        """
+        Execution profile with timeout and load balancing appropriate for graph analytics queries.
+
+        See also :class:`~.GraphExecutionPolicy`.
+
+        In addition to default parameters shown in the signature, this profile also defaults ``retry_policy`` to
+        :class:`dse.policies.NeverRetryPolicy`, and ``load_balancing_policy`` to one that targets the current Spark
+        master.
+
+        Note: The graph_options.graph_source is set automatically to b'a' (analytics)
+        when using GraphAnalyticsExecutionProfile. This is mandatory to target analytics nodes.
+        """
+        load_balancing_policy = load_balancing_policy or DSELoadBalancingPolicy(default_lbp_factory())
+        graph_options = graph_options or GraphOptions(graph_language=b'gremlin-groovy')
+        super(GraphAnalyticsExecutionProfile, self).__init__(load_balancing_policy, retry_policy, consistency_level,
+                                                             serial_consistency_level, request_timeout, row_factory,
+                                                             graph_options)
+        # ensure the graph_source is analytics, since this is the purpose of the GraphAnalyticsExecutionProfile
+        self.graph_options.set_source_analytics()
+
 
 
 class ProfileManager(object):
@@ -371,6 +490,31 @@ Key for the ``Cluster`` default execution profile, used when no other profile is
 ``Session.execute(execution_profile)``.
 
 Use this as the key in ``Cluster(execution_profiles)`` to override the default profile.
+"""
+
+EXEC_PROFILE_GRAPH_DEFAULT = object()
+"""
+Key for the default graph execution profile, used when no other profile is selected in
+``Session.execute_graph(execution_profile)``.
+
+Use this as the key in :doc:`Cluster(execution_profiles) </execution_profiles>`
+to override the default graph profile.
+"""
+
+EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT = object()
+"""
+Key for the default graph system execution profile. This can be used for graph statements using the DSE graph
+system API.
+
+Selected using ``Session.execute_graph(execution_profile=EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT)``.
+"""
+
+EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT = object()
+"""
+Key for the default graph analytics execution profile. This can be used for graph statements intended to
+use Spark/analytics as the traversal source.
+
+Selected using ``Session.execute_graph(execution_profile=EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT)``.
 """
 
 
@@ -780,6 +924,34 @@ class Cluster(object):
     documentation for :meth:`Session.timestamp_generator`.
     """
 
+    monitor_reporting_enabled = True
+    """
+    A boolean indicating if monitor reporting, which sends gathered data to
+    Insights when running against DSE 6.8 and higher.
+    """
+
+    monitor_reporting_interval = 30
+    """
+    A boolean indicating if monitor reporting, which sends gathered data to
+    Insights when running against DSE 6.8 and higher.
+    """
+
+    client_id = None
+    """
+    A UUID that uniquely identifies this Cluster object to Insights. This will
+    be generated automatically unless the user provides one.
+    """
+
+    application_name = ''
+    """
+    A string identifying this application to Insights.
+    """
+
+    application_version = ''
+    """
+    A string identifiying this application's version to Insights
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -876,7 +1048,11 @@ class Cluster(object):
                  no_compact=False,
                  ssl_context=None,
                  endpoint_factory=None,
-                 monitor_reporting_enabled=False):  # TODO just added for tests purpose before insights integration
+                 application_name=None,
+                 application_version=None,
+                 monitor_reporting_enabled=True,
+                 monitor_reporting_interval=30,
+                 client_id=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -904,14 +1080,24 @@ class Cluster(object):
 
         raw_contact_points = [cp for cp in self.contact_points if not isinstance(cp, EndPoint)]
         self.endpoints_resolved = [cp for cp in self.contact_points if isinstance(cp, EndPoint)]
+        self._endpoint_map_for_insights = {repr(ep): '{ip}:{port}'.format(ip=ep.address, port=ep.port)
+                                           for ep in self.endpoints_resolved}
 
-        try:
-            self.endpoints_resolved += [DefaultEndPoint(address, self.port)
-                                        for address in _resolve_contact_points(raw_contact_points, self.port)]
-        except UnresolvableContactPoints:
-            # rethrow if no EndPoint was provided
-            if not self.endpoints_resolved:
-                raise
+        strs_resolved_map = _resolve_contact_points_to_string_map(raw_contact_points, port)
+        self.endpoints_resolved.extend(list(chain(
+            *[
+                [DefaultEndPoint(x, port) for x in xs if x is not None]
+                for xs in strs_resolved_map.values() if xs is not None
+            ]
+        )))
+        self._endpoint_map_for_insights.update(
+            {key: ['{ip}:{port}'.format(ip=ip, port=port) for ip in value]
+             for key, value in strs_resolved_map.items() if value is not None}
+        )
+
+        if contact_points and (not self.endpoints_resolved):
+            # only want to raise here if the user specified CPs but resolution failed
+            raise UnresolvableContactPoints(self._endpoint_map_for_insights)
 
         self.compression = compression
 
@@ -1029,6 +1215,8 @@ class Cluster(object):
         self.connect_timeout = connect_timeout
         self.prepare_on_all_hosts = prepare_on_all_hosts
         self.reprepare_on_up = reprepare_on_up
+        self.monitor_reporting_enabled = monitor_reporting_enabled
+        self.monitor_reporting_interval = monitor_reporting_interval
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -1077,6 +1265,13 @@ class Cluster(object):
             self.schema_event_refresh_window, self.topology_event_refresh_window,
             self.status_event_refresh_window,
             schema_metadata_enabled, token_metadata_enabled)
+
+        if client_id is None:
+            self.client_id = uuid.uuid4()
+        if application_name is not None:
+            self.application_name = application_name
+        if application_version is not None:
+            self.application_version = application_version
 
     def _create_thread_pool_executor(self, **kwargs):
         """
@@ -1360,7 +1555,6 @@ class Cluster(object):
     def protocol_downgrade(self, host_endpoint, previous_version):
         if self._protocol_version_explicit:
             raise DriverException("ProtocolError returned from server while using explicitly set client protocol_version %d" % (previous_version,))
-
         new_version = ProtocolVersion.get_lower_supported(previous_version)
         if new_version < ProtocolVersion.MIN_SUPPORTED:
             raise DriverException(
@@ -2026,6 +2220,8 @@ class Session(object):
     hosts = None
     keyspace = None
     is_shutdown = False
+    session_id = None
+    _monitor_reporter = None
 
     _row_factory = staticmethod(named_tuple_factory)
     @property
@@ -2210,6 +2406,12 @@ class Session(object):
     When compiled with Cython, there are also built-in faster alternatives. See :ref:`faster_deser`
     """
 
+    session_id = None
+    """
+    A UUID that uniquely identifies this Session to Insights. This will be
+    generated automatically.
+    """
+
     _lock = None
     _pools = None
     _profile_manager = None
@@ -2247,9 +2449,27 @@ class Session(object):
                 msg += " using keyspace '%s'" % self.keyspace
             raise NoHostAvailable(msg, [h.address for h in hosts])
 
+        # TODO INSIGHT
+        # cc_host = self.cluster.get_control_connection_host()
+        # valid_insights_version = (cc_host and version_supports_insights(cc_host.dse_version))
+        # if self.cluster.monitor_reporting_enabled and valid_insights_version:
+        #     self._monitor_reporter = MonitorReporter(
+        #         interval_sec=self.cluster.monitor_reporting_interval,
+        #         session=self,
+        #     )
+        # else:
+        #     if cc_host:
+        #         log.debug('Not starting MonitorReporter thread for Insights; '
+        #                   'not supported by server version {v} on '
+        #                   'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
+        #
+        # self.session_id = uuid.uuid4()
+        # log.debug('Started Session with client_id {} and session_id {}'.format(self.cluster.client_id,
+        #                                                                        self.session_id))
+
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False,
                 custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT,
-                paging_state=None, host=None):
+                paging_state=None, host=None, execute_as=None):
         """
         Execute the given query and synchronously wait for the response.
 
@@ -2265,9 +2485,8 @@ class Session(object):
 
         `timeout` should specify a floating-point timeout (in seconds) after
         which an :exc:`.OperationTimedOut` exception will be raised if the query
-        has not completed.  If not set, the timeout defaults to
-        :attr:`~.Session.default_timeout`.  If set to :const:`None`, there is
-        no timeout. Please see :meth:`.ResponseFuture.result` for details on
+        has not completed.  If not set, the timeout defaults to the request_timeout of the selected ``execution_profile``.
+        If set to :const:`None`, there is no timeout. Please see :meth:`.ResponseFuture.result` for details on
         the scope and effect of this timeout.
 
         If `trace` is set to :const:`True`, the query will be sent with tracing enabled.
@@ -2286,13 +2505,15 @@ class Session(object):
         `host` is the :class:`cassandra.pool.Host` that should handle the query. If the host specified is down or
         not yet connected, the query will fail with :class:`NoHostAvailable`. Using this is
         discouraged except in a few cases, e.g., querying node-local tables and applying schema changes.
+
+        `execute_as` the user that will be used on the server to execute the request.
         """
-        return self.execute_async(query, parameters, trace, custom_payload,
-                                  timeout, execution_profile, paging_state, host).result()
+
+        return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state, host, execute_as).result()
 
     def execute_async(self, query, parameters=None, trace=False, custom_payload=None,
                       timeout=_NOT_SET, execution_profile=EXEC_PROFILE_DEFAULT,
-                      paging_state=None, host=None):
+                      paging_state=None, host=None, execute_as=None):
         """
         Execute the given query and return a :class:`~.ResponseFuture` object
         which callbacks may be attached to for asynchronous response
@@ -2327,6 +2548,10 @@ class Session(object):
             ...     log.exception("Operation failed:")
 
         """
+        custom_payload = custom_payload if custom_payload else {}
+        if execute_as:
+            custom_payload[_proxy_execute_key] = six.b(execute_as)
+
         future = self._create_response_future(
             query, parameters, trace, custom_payload, timeout,
             execution_profile, paging_state, host)
@@ -2334,6 +2559,100 @@ class Session(object):
         self._on_request(future)
         future.send_request()
         return future
+
+    def execute_graph(self, query, parameters=None, trace=False, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT, execute_as=None):
+        """
+        Executes a Gremlin query string or GraphStatement synchronously,
+        and returns a ResultSet from this execution.
+
+        `parameters` is dict of named parameters to bind. The values must be
+        JSON-serializable.
+
+        `execution_profile`: Selects an execution profile for the request.
+
+        `execute_as` the user that will be used on the server to execute the request.
+        """
+        return self.execute_graph_async(query, parameters, trace, execution_profile, execute_as).result()
+
+    def execute_graph_async(self, query, parameters=None, trace=False, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT, execute_as=None):
+        """
+        Execute the graph query and return a :class:`ResponseFuture`
+        object which callbacks may be attached to for asynchronous response delivery. You may also call ``ResponseFuture.result()`` to synchronously block for
+        results at any time.
+        """
+        # TODO GRAPH
+        # if not isinstance(query, GraphStatement):
+        #     query = SimpleGraphStatement(query)
+
+        execution_profile = self._maybe_get_execution_profile(execution_profile)  # look up instance here so we can apply the extended attributes
+
+        try:
+            options = execution_profile.graph_options.copy()
+        except AttributeError:
+            raise ValueError("Execution profile for graph queries must derive from GraphExecutionProfile, and provide graph_options")
+
+        graph_parameters = None
+        if parameters:
+            graph_parameters = self._transform_params(parameters, graph_options=options)
+
+        custom_payload = options.get_options_map()
+        if execute_as:
+            custom_payload[_proxy_execute_key] = six.b(execute_as)
+        custom_payload[_request_timeout_key] = int64_pack(long(execution_profile.request_timeout * 1000))
+
+        future = self._create_response_future(query, parameters=None, trace=trace, custom_payload=custom_payload,
+                                              timeout=_NOT_SET, execution_profile=execution_profile)
+
+        future.message.query_params = graph_parameters
+        future._protocol_handler = self.client_protocol_handler
+
+        if options.is_analytics_source and isinstance(execution_profile.load_balancing_policy, DSELoadBalancingPolicy):
+            self._target_analytics_master(future)
+        else:
+            future.send_request()
+        return future
+
+    def _transform_params(self, parameters, graph_options):
+        if not isinstance(parameters, dict):
+            raise ValueError('The parameters must be a dictionary. Unnamed parameters are not allowed.')
+
+        # Serialize python types to graphson
+        serializer = GraphSON1Serializer
+        if graph_options.graph_protocol == GraphProtocol.GRAPHSON_2_0:
+            serializer = GraphSON2Serializer
+
+        serialized_parameters = {
+            p: serializer.serialize(v)
+            for p, v in six.iteritems(parameters)
+        }
+        return [json.dumps(serialized_parameters).encode('utf-8')]
+
+    def _target_analytics_master(self, future):
+        future._start_timer()
+        master_query_future = self._create_response_future("CALL DseClientTool.getAnalyticsGraphServer()",
+                                                           parameters=None, trace=False,
+                                                           custom_payload=None, timeout=future.timeout)
+        master_query_future.row_factory = tuple_factory
+        master_query_future.send_request()
+
+        cb = self._on_analytics_master_result
+        args = (master_query_future, future)
+        master_query_future.add_callbacks(callback=cb, callback_args=args, errback=cb, errback_args=args)
+
+    def _on_analytics_master_result(self, response, master_future, query_future):
+        try:
+            row = master_future.result()[0]
+            addr = row[0]['location']
+            delimiter_index = addr.rfind(':')  # assumes <ip>:<port> - not robust, but that's what is being provided
+            if delimiter_index > 0:
+                addr = addr[:delimiter_index]
+            targeted_query = HostTargetingStatement(query_future.query, addr)
+            query_future.query_plan = query_future._load_balancer.make_query_plan(self.keyspace, targeted_query)
+        except Exception:
+            log.debug("Failed querying analytics master (request might not be routed optimally). "
+                      "Make sure the session is connecting to a graph analytics datacenter.", exc_info=True)
+
+        self.submit(query_future.send_request)
 
     def _create_response_future(self, query, parameters, trace, custom_payload,
                                 timeout, execution_profile=EXEC_PROFILE_DEFAULT,
@@ -2369,6 +2688,7 @@ class Session(object):
 
             cl = query.consistency_level if query.consistency_level is not None else execution_profile.consistency_level
             serial_cl = query.serial_consistency_level if query.serial_consistency_level is not None else execution_profile.serial_consistency_level
+            continuous_paging_options = execution_profile.continuous_paging_options
 
             retry_policy = query.retry_policy or execution_profile.retry_policy
             row_factory = execution_profile.row_factory
@@ -2387,6 +2707,14 @@ class Session(object):
         else:
             timestamp = None
 
+        supports_continuous_paging_state = (
+            ProtocolVersion.has_continuous_paging_next_pages(self._protocol_version)
+        )
+        if continuous_paging_options and supports_continuous_paging_state:
+            continuous_paging_state = ContinuousPagingState(continuous_paging_options.max_queue_size)
+        else:
+            continuous_paging_state = None
+
         if isinstance(query, SimpleStatement):
             query_string = query.query_string
             statement_keyspace = query.keyspace if ProtocolVersion.uses_keyspace_flag(self._protocol_version) else None
@@ -2394,14 +2722,15 @@ class Session(object):
                 query_string = bind_params(query_string, parameters, self.encoder)
             message = QueryMessage(
                 query_string, cl, serial_cl,
-                fetch_size, timestamp=timestamp,
-                keyspace=statement_keyspace)
+                fetch_size, paging_state, timestamp,
+                continuous_paging_options, statement_keyspace)
         elif isinstance(query, BoundStatement):
             prepared_statement = query.prepared_statement
             message = ExecuteMessage(
                 prepared_statement.query_id, query.values, cl,
-                serial_cl, fetch_size,
-                timestamp=timestamp, skip_meta=bool(prepared_statement.result_metadata),
+                serial_cl, fetch_size, paging_state, timestamp,
+                skip_meta=bool(prepared_statement.result_metadata),
+                continuous_paging_options=continuous_paging_options,
                 result_metadata_id=prepared_statement.result_metadata_id)
         elif isinstance(query, BatchStatement):
             if self._protocol_version < 2:
@@ -2413,20 +2742,23 @@ class Session(object):
             message = BatchMessage(
                 query.batch_type, query._statements_and_parameters, cl,
                 serial_cl, timestamp, statement_keyspace)
+        elif isinstance(query, GraphStatement):
+            # the statement_keyspace is not aplicable to GraphStatement
+            message = QueryMessage(query.query, cl, serial_cl, fetch_size,
+                                   paging_state, timestamp,
+                                   continuous_paging_options)
 
         message.tracing = trace
-
         message.update_custom_payload(query.custom_payload)
         message.update_custom_payload(custom_payload)
         message.allow_beta_protocol_version = self.cluster.allow_beta_protocol_version
-        message.paging_state = paging_state
 
         spec_exec_plan = spec_exec_policy.new_plan(query.keyspace or self.keyspace, query) if query.is_idempotent and spec_exec_policy else None
         return ResponseFuture(
             self, message, query, timeout, metrics=self._metrics,
             prepared_statement=prepared_statement, retry_policy=retry_policy, row_factory=row_factory,
             load_balancer=load_balancing_policy, start_time=start_time, speculative_execution_plan=spec_exec_plan,
-            host=host)
+            continuous_paging_state=continuous_paging_state, host=host)
 
     def get_execution_profile(self, name):
         """
@@ -2536,14 +2868,14 @@ class Session(object):
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            response = future.result().one()
+            response = future.result()[0]
         except Exception:
             log.exception("Error preparing query:")
             raise
 
         prepared_keyspace = keyspace if keyspace else None
         prepared_statement = PreparedStatement.from_message(
-            response.query_id, response.bind_metadata, response.pk_indexes, self.cluster.metadata, query, self.keyspace,
+            response.query_id, response.bind_metadata, response.pk_indexes, self.cluster.metadata, query, prepared_keyspace,
             self._protocol_version, response.column_metadata, response.result_metadata_id)
         prepared_statement.custom_payload = future.custom_payload
 
@@ -2609,6 +2941,9 @@ class Session(object):
         for future in self._initial_connect_futures:
             future.cancel()
         wait_futures(self._initial_connect_futures)
+
+        if self._monitor_reporter:
+            self._monitor_reporter.stop()
 
         for pool in tuple(self._pools.values()):
             pool.shutdown()
@@ -2885,14 +3220,16 @@ class ControlConnection(object):
     """
 
     _SELECT_PEERS = "SELECT * FROM system.peers"
-    _SELECT_PEERS_NO_TOKENS = "SELECT host_id, peer, data_center, rack, rpc_address, release_version, schema_version FROM system.peers"
+    _SELECT_PEERS_NO_TOKENS_TEMPLATE = "SELECT host_id, peer, data_center, rack, rpc_address, {nt_col_name}, release_version, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT * FROM system.local WHERE key='local'"
     _SELECT_LOCAL_NO_TOKENS = "SELECT host_id, cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
     # Used only when token_metadata_enabled is set to False
     _SELECT_LOCAL_NO_TOKENS_RPC_ADDRESS = "SELECT rpc_address FROM system.local WHERE key='local'"
 
-    _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
+    _SELECT_SCHEMA_PEERS_TEMPLATE = "SELECT peer, {nt_col_name}, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
+
+    _MINIMUM_NATIVE_ADDRESS_VERSION = "4.0"
 
     _is_shutdown = False
     _timeout = None
@@ -3017,7 +3354,7 @@ class ControlConnection(object):
                 "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change')
             }, register_timeout=self._timeout)
 
-            sel_peers = self._SELECT_PEERS if self._token_meta_enabled else self._SELECT_PEERS_NO_TOKENS
+            sel_peers = self._peers_query_for_version(connection, self._SELECT_PEERS_NO_TOKENS_TEMPLATE)
             sel_local = self._SELECT_LOCAL if self._token_meta_enabled else self._SELECT_LOCAL_NO_TOKENS
             peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
             local_query = QueryMessage(query=sel_local, consistency_level=ConsistencyLevel.ONE)
@@ -3154,7 +3491,7 @@ class ControlConnection(object):
             cl = ConsistencyLevel.ONE
             if not self._token_meta_enabled:
                 log.debug("[control connection] Refreshing node list without token map")
-                sel_peers = self._SELECT_PEERS_NO_TOKENS
+                sel_peers = self._peers_query_for_version(connection, self._SELECT_PEERS_NO_TOKENS_TEMPLATE)
                 sel_local = self._SELECT_LOCAL_NO_TOKENS
             else:
                 log.debug("[control connection] Refreshing node list and token map")
@@ -3254,7 +3591,7 @@ class ControlConnection(object):
             host.dse_workload = row.get("workload")
             host.dse_workloads = row.get("workloads")
 
-            if partitioner and tokens:
+            if partitioner and tokens and self._token_meta_enabled:
                 token_map[host] = tokens
 
         for old_host in self._cluster.metadata.all_hosts():
@@ -3368,8 +3705,10 @@ class ControlConnection(object):
             elapsed = 0
             cl = ConsistencyLevel.ONE
             schema_mismatches = None
+            select_peers_query = self._peers_query_for_version(connection, self._SELECT_SCHEMA_PEERS_TEMPLATE)
+
             while elapsed < total_timeout:
-                peers_query = QueryMessage(query=self._SELECT_SCHEMA_PEERS, consistency_level=cl)
+                peers_query = QueryMessage(query=select_peers_query, consistency_level=cl)
                 local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
                 try:
                     timeout = min(self._timeout, total_timeout - elapsed)
@@ -3434,9 +3773,30 @@ class ControlConnection(object):
             addr = row.get("native_transport_address")
         if not addr or addr in ["0.0.0.0", "::"]:
             addr = row.get("peer")
-
         return addr
-    
+
+    def _peers_query_for_version(self, connection, peers_query_template):
+        """
+        Given a connection:
+
+        - find the server product version running on the connection's host,
+        - use that to choose the column name for the transport address (see APOLLO-1130), and
+        - use that column name in the provided peers query template.
+
+        The provided template should be a string with a format replacement
+        field named nt_col_name.
+        """
+        host_release_version = self._cluster.metadata.get_host(connection.endpoint).release_version
+        if host_release_version:
+            use_native_address_query = host_release_version >= self._MINIMUM_NATIVE_ADDRESS_VERSION
+            if use_native_address_query:
+                select_peers_query = peers_query_template.format(nt_col_name="native_transport_address")
+            else:
+                select_peers_query = peers_query_template.format(nt_col_name="rpc_address")
+        else:
+            select_peers_query = self._SELECT_PEERS
+        return select_peers_query
+
     def _signal_error(self):
         with self._lock:
             if self._is_shutdown:
@@ -3660,13 +4020,15 @@ class ResponseFuture(object):
     _timer = None
     _protocol_handler = ProtocolHandler
     _spec_execution_plan = NoSpeculativeExecutionPlan()
+    _continuous_paging_options = None
+    _continuous_paging_session = None
     _host = None
 
     _warned_timeout = False
 
     def __init__(self, session, message, query, timeout, metrics=None, prepared_statement=None,
                  retry_policy=RetryPolicy(), row_factory=None, load_balancer=None, start_time=None,
-                 speculative_execution_plan=None, host=None):
+                 speculative_execution_plan=None, continuous_paging_state=None, host=None):
         self.session = session
         # TODO: normalize handling of retry policy and row factory
         self.row_factory = row_factory or session.row_factory
@@ -3688,6 +4050,7 @@ class ResponseFuture(object):
         self._errbacks = []
         self.attempted_hosts = []
         self._start_timer()
+        self._continuous_paging_state = continuous_paging_state
 
     @property
     def _time_remaining(self):
@@ -3799,7 +4162,6 @@ class ResponseFuture(object):
             if self.timeout is not None and time.time() - self._start_time > self.timeout:
                 self._on_timeout()
                 return True
-
         if error_no_hosts:
             self._set_final_exception(NoHostAvailable(
                 "Unable to complete the operation against any hosts", self._errors))
@@ -3961,10 +4323,12 @@ class ResponseFuture(object):
                         self, connection, **response.schema_change_event)
                 elif response.kind == RESULT_KIND_ROWS:
                     self._paging_state = response.paging_state
-                    self._col_types = response.column_types
                     self._col_names = response.column_names
-                    self._set_final_result(self.row_factory(
-                        response.column_names, response.parsed_rows))
+                    self._col_types = response.column_types
+                    if getattr(self.message, 'continuous_paging_options', None):
+                        self._handle_continuous_paging_first_response(connection, response)
+                    else:
+                        self._set_final_result(self.row_factory(response.column_names, response.parsed_rows))
                 elif response.kind == RESULT_KIND_VOID:
                     self._set_final_result(None)
                 else:
@@ -4071,6 +4435,14 @@ class ResponseFuture(object):
             # almost certainly caused by a bug, but we need to set something here
             log.exception("Unexpected exception while handling result in ResponseFuture:")
             self._set_final_exception(exc)
+
+    def _handle_continuous_paging_first_response(self, connection, response):
+        self._continuous_paging_session = connection.new_continuous_paging_session(response.stream_id,
+                                                                                   self._protocol_handler.decode_message,
+                                                                                   self.row_factory,
+                                                                                   self._continuous_paging_state)
+        self._continuous_paging_session.on_message(response)
+        self._set_final_result(self._continuous_paging_session.results())
 
     def _set_keyspace_completed(self, errors):
         if not errors:
@@ -4482,8 +4854,9 @@ class ResultSet(object):
                     self._current_rows = []
                 raise
 
-        self.fetch_next_page()
-        self._page_iter = iter(self._current_rows)
+        if not self.response_future._continuous_paging_session:
+            self.fetch_next_page()
+            self._page_iter = iter(self._current_rows)
 
         return next(self._page_iter)
 
@@ -4555,6 +4928,12 @@ class ResultSet(object):
         See :meth:`.ResponseFuture.get_all_query_traces` for details.
         """
         return self.response_future.get_all_query_traces(max_wait_sec_per)
+
+    def cancel_continuous_paging(self):
+        try:
+            self.response_future._continuous_paging_session.cancel()
+        except AttributeError:
+            raise DriverException("Attempted to cancel paging with no active session. This is only for requests with ContinuousdPagingOptions.")
 
     @property
     def was_applied(self):
