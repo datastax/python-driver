@@ -19,8 +19,8 @@ import six
 
 from cassandra import ConsistencyLevel
 from cassandra.query import Statement, SimpleStatement
-from cassandra.graph.types import Vertex, Edge, Path
-from cassandra.graph.graphson import GraphSON2Reader
+from cassandra.datastax.graph.types import Vertex, Edge, Path
+from cassandra.datastax.graph.graphson import GraphSON2Reader
 
 
 # (attr, description, server option)

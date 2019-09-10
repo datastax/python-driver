@@ -31,9 +31,9 @@ def initialize_registry(insights_registry):
         EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT,
         _NOT_SET
     )
-    from cassandra.graph.query import GraphOptions
-    from cassandra.insights.registry import insights_registry
-    from cassandra.insights.util import namespace
+    from cassandra.datastax.graph import GraphOptions
+    from cassandra.datastax.insights.registry import insights_registry
+    from cassandra.datastax.insights.util import namespace
     from cassandra.policies import (
         RoundRobinPolicy,
         DCAwareRoundRobinPolicy,

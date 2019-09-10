@@ -74,7 +74,7 @@ class DseSimulacronCluster(SimulacronBase):
 
     @classmethod
     def setUpClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
+        if DSE_VERSION is None and SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
 
         cls.simulacron_cluster = start_and_prime_cluster_defaults(dse_version=DSE_VERSION,

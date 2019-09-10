@@ -28,8 +28,8 @@ import six
 
 from cassandra.policies import HostDistance
 from cassandra.util import ms_timestamp_from_datetime
-from cassandra.insights.registry import insights_registry
-from cassandra.insights.serializers import initialize_registry
+from cassandra.datastax.insights.registry import insights_registry
+from cassandra.datastax.insights.serializers  import initialize_registry
 
 log = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ class MonitorReporter(Thread):
             },
             'data': {
                 'driverName': 'DataStax Enterprise Python Driver',
-                'driverVersion': sys.modules['dse'].__version__,
+                'driverVersion': sys.modules['cassandra'].__version__,
                 'clientId': str(self._session.cluster.client_id),
                 'sessionId': str(self._session.session_id),
                 'applicationName': self._session.cluster.application_name or 'python',

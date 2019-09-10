@@ -16,7 +16,7 @@ import six
 from collections import OrderedDict
 from warnings import warn
 
-from cassandra.insights.util import namespace
+from cassandra.datastax.insights.util import namespace
 
 _NOT_SET = object()
 

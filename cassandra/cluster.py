@@ -84,12 +84,12 @@ from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.compat import Mapping
 from cassandra.util import _resolve_contact_points_to_string_map
 
-from cassandra.insights.reporter import MonitorReporter
-from cassandra.insights.util import version_supports_insights
+from cassandra.datastax.insights.reporter import MonitorReporter
+from cassandra.datastax.insights.util import version_supports_insights
 
-from cassandra.graph import (graph_object_row_factory, GraphOptions, GraphSON1Serializer,
-                             GraphProtocol, GraphSON2Serializer, GraphStatement, SimpleGraphStatement)
-from cassandra.graph.query import _request_timeout_key
+from cassandra.datastax.graph import (graph_object_row_factory, GraphOptions, GraphSON1Serializer,
+                                      GraphProtocol, GraphSON2Serializer, GraphStatement, SimpleGraphStatement)
+from cassandra.datastax.graph.query import _request_timeout_key
 
 if six.PY3:
     long = int

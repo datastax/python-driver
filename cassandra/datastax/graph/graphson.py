@@ -26,7 +26,7 @@ if six.PY3:
     import ipaddress
 
 from cassandra.util import Polygon, Point, LineString
-from cassandra.graph.types import Vertex, VertexProperty, Edge, Path
+from cassandra.datastax.graph.types import Vertex, VertexProperty, Edge, Path
 
 __all__ = ['GraphSON1Serializer', 'GraphSON1Deserializer', 'GraphSON1TypeDeserializer',
            'GraphSON2Serializer', 'GraphSON2Deserializer',
