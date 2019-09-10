@@ -37,7 +37,9 @@ from cassandra.query import SimpleStatement
 class ResponseFutureTests(unittest.TestCase):
 
     def make_basic_session(self):
-        return Mock(spec=Session, row_factory=lambda *x: list(x))
+        s = Mock(spec=Session)
+        s.cluster._default_row_factory = lambda col_names, rows: [(col_names, rows)]
+        return s
 
     def make_pool(self):
         pool = Mock()
@@ -56,8 +58,8 @@ class ResponseFutureTests(unittest.TestCase):
         message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
         return ResponseFuture(session, message, query, 1)
 
-    def make_mock_response(self, results):
-        return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, results=results, paging_state=None, col_types=None)
+    def make_mock_response(self, col_names, rows):
+        return Mock(spec=ResultMessage, kind=RESULT_KIND_ROWS, column_names=col_names, parsed_rows=rows, paging_state=None, col_types=None)
 
     def test_result_message(self):
         session = self.make_basic_session()
@@ -76,9 +78,10 @@ class ResponseFutureTests(unittest.TestCase):
 
         connection.send_msg.assert_called_once_with(rf.message, 1, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
-        rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
-        result = rf.result()
-        self.assertEqual(result, [{'col': 'val'}])
+        expected_result = (object(), object())
+        rf._set_result(None, None, None, self.make_mock_response(expected_result[0], expected_result[1]))
+        result = rf.result()[0]
+        self.assertEqual(result, expected_result)
 
     def test_unknown_result_class(self):
         session = self.make_session()
@@ -112,7 +115,7 @@ class ResponseFutureTests(unittest.TestCase):
                        'keyspace': "keyspace1", "table": "table1"}
         result = Mock(spec=ResultMessage,
                       kind=RESULT_KIND_SCHEMA_CHANGE,
-                      results=event_results)
+                      schema_change_event=event_results)
         connection = Mock()
         rf._set_result(None, connection, None, result)
         session.submit.assert_called_once_with(ANY, ANY, rf, connection, **event_results)
@@ -121,9 +124,9 @@ class ResponseFutureTests(unittest.TestCase):
         session = self.make_session()
         rf = self.make_response_future(session)
         rf.send_request()
-        result = [1, 2, 3]
-        rf._set_result(None, None, None, Mock(spec=ResultMessage, kind=999, results=result))
-        self.assertListEqual(list(rf.result()), result)
+        result = Mock(spec=ResultMessage, kind=999, results=[1, 2, 3])
+        rf._set_result(None, None, None, result)
+        self.assertEqual(rf.result()[0], result)
 
     def test_read_timeout_error_message(self):
         session = self.make_session()
@@ -309,10 +312,11 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
+        expected_result = (object(), object())
+        rf._set_result(None, None, None, self.make_mock_response(expected_result[0], expected_result[1]))
 
-        result = rf.result()
-        self.assertEqual(result, [{'col': 'val'}])
+        result = rf.result()[0]
+        self.assertEqual(result, expected_result)
 
     def test_timeout_getting_connection_from_pool(self):
         session = self.make_basic_session()
@@ -333,8 +337,9 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
 
-        rf._set_result(None, None, None, self.make_mock_response([{'col': 'val'}]))
-        self.assertEqual(rf.result(), [{'col': 'val'}])
+        expected_result = (object(), object())
+        rf._set_result(None, None, None, self.make_mock_response(expected_result[0], expected_result[1]))
+        self.assertEqual(rf.result()[0], expected_result)
 
         # make sure the exception is recorded correctly
         self.assertEqual(rf._errors, {'ip1': exc})
@@ -345,20 +350,20 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         callback = Mock()
-        expected_result = [{'col': 'val'}]
+        expected_result = (object(), object())
         arg = "positional"
         kwargs = {'one': 1, 'two': 2}
         rf.add_callback(callback, arg, **kwargs)
 
-        rf._set_result(None, None, None, self.make_mock_response(expected_result))
+        rf._set_result(None, None, None, self.make_mock_response(expected_result[0], expected_result[1]))
 
-        result = rf.result()
+        result = rf.result()[0]
         self.assertEqual(result, expected_result)
 
-        callback.assert_called_once_with(expected_result, arg, **kwargs)
+        callback.assert_called_once_with([expected_result], arg, **kwargs)
 
         # this should get called immediately now that the result is set
-        rf.add_callback(self.assertEqual, [{'col': 'val'}])
+        rf.add_callback(self.assertEqual, [expected_result])
 
     def test_errback(self):
         session = self.make_session()
@@ -390,7 +395,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         callback = Mock()
-        expected_result = [{'col': 'val'}]
+        expected_result = (object(), object())
         arg = "positional"
         kwargs = {'one': 1, 'two': 2}
         rf.add_callback(callback, arg, **kwargs)
@@ -400,13 +405,13 @@ class ResponseFutureTests(unittest.TestCase):
         kwargs2 = {'three': 3, 'four': 4}
         rf.add_callback(callback2, arg2, **kwargs2)
 
-        rf._set_result(None, None, None, self.make_mock_response(expected_result))
+        rf._set_result(None, None, None, self.make_mock_response(expected_result[0], expected_result[1]))
 
-        result = rf.result()
+        result = rf.result()[0]
         self.assertEqual(result, expected_result)
 
-        callback.assert_called_once_with(expected_result, arg, **kwargs)
-        callback2.assert_called_once_with(expected_result, arg2, **kwargs2)
+        callback.assert_called_once_with([expected_result], arg, **kwargs)
+        callback2.assert_called_once_with([expected_result], arg2, **kwargs2)
 
     def test_multiple_errbacks(self):
         session = self.make_session()
@@ -467,17 +472,17 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         callback = Mock()
-        expected_result = [{'col': 'val'}]
+        expected_result = (object(), object())
         arg = "positional"
         kwargs = {'one': 1, 'two': 2}
         rf.add_callbacks(
             callback=callback, callback_args=(arg,), callback_kwargs=kwargs,
             errback=self.assertIsInstance, errback_args=(Exception,))
 
-        rf._set_result(None, None, None, self.make_mock_response(expected_result))
-        self.assertEqual(rf.result(), expected_result)
+        rf._set_result(None, None, None, self.make_mock_response(expected_result[0], expected_result[1]))
+        self.assertEqual(rf.result()[0], expected_result)
 
-        callback.assert_called_once_with(expected_result, arg, **kwargs)
+        callback.assert_called_once_with([expected_result], arg, **kwargs)
 
     def test_prepared_query_not_found(self):
         session = self.make_session()
@@ -528,7 +533,9 @@ class ResponseFutureTests(unittest.TestCase):
         session = self.make_session()
         rf = self.make_response_future(session)
 
-        response = Mock(spec=ResultMessage, kind=RESULT_KIND_PREPARED)
+        response = Mock(spec=ResultMessage,
+                        kind=RESULT_KIND_PREPARED,
+                        result_metadata_id='foo')
         response.results = (None, None, None, None, None)
 
         rf._query = Mock(return_value=True)
