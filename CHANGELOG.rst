@@ -1,3 +1,11 @@
+3.20.0
+======
+Unreleased
+
+Bug Fixes
+---------
+* Connection setup methods prevent using ExecutionProfile in cqlengine (PYTHON-1009)
+
 3.19.0
 ======
 August 26, 2019

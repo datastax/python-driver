@@ -27,8 +27,9 @@ from tests.integration.simulacron import SimulacronCluster, PROTOCOL_VERSION
 @total_ordering
 class AddressEndPoint(EndPoint):
 
-    def __init__(self, address):
+    def __init__(self, address, port=9042):
         self._address = address
+        self._port = port
 
     @property
     def address(self):
@@ -36,14 +37,14 @@ class AddressEndPoint(EndPoint):
 
     @property
     def port(self):
-        return None
+        return self._port
 
     def resolve(self):
-        return self._address, 9042  # connection purpose
+        return self._address, self._port  # connection purpose
 
     def __eq__(self, other):
         return isinstance(other, AddressEndPoint) and \
-               self.address == other.address
+            self.address == other.address
 
     def __hash__(self):
         return hash(self.address)

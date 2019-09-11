@@ -7,7 +7,8 @@ unittest2
 pytz
 sure
 pure-sasl
-twisted[tls]==19.2.1
+twisted; python_version >= '3.5'
+twisted[tls]==19.2.1; python_version < '3.5'
 gevent>=1.0
 eventlet
 cython>=0.20,<0.30
