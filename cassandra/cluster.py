@@ -71,7 +71,8 @@ from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy, IdentityTranslator, NoSpeculativeExecutionPlan,
-                                NoSpeculativeExecutionPolicy, DSELoadBalancingPolicy)
+                                NoSpeculativeExecutionPolicy, DSELoadBalancingPolicy,
+                                NeverRetryPolicy)
 from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool, HostConnection,
                             NoConnectionsAvailable)
