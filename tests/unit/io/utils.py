@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.connection import (ConnectionException, ProtocolError,
-                                  HEADER_DIRECTION_TO_CLIENT)
-from cassandra.marshal import int32_pack, uint8_pack, uint32_pack
-from cassandra.protocol import (write_stringmultimap, write_int, write_string,
-                                SupportedMessage, ReadyMessage, ServerError)
+from cassandra.connection import (
+    ConnectionException, ProtocolError, HEADER_DIRECTION_TO_CLIENT
+)
+from cassandra.marshal import uint8_pack, uint32_pack
+from cassandra.protocol import (
+    write_stringmultimap, write_int, write_string, SupportedMessage, ReadyMessage, ServerError
+)
 from cassandra.connection import DefaultEndPoint
-
 from tests import is_monkey_patched
 
 import io
