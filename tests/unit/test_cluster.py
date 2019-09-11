@@ -195,13 +195,18 @@ class SessionTest(unittest.TestCase):
 class ProtocolVersionTests(unittest.TestCase):
 
     def test_protocol_downgrade_test(self):
-
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V2)
+        self.assertEqual(ProtocolVersion.DSE_V1, lower)
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V1)
         self.assertEqual(ProtocolVersion.V4,lower)
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V4)
         self.assertEqual(ProtocolVersion.V3,lower)
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V3)
-        self.assertEqual(0,lower)
+        self.assertEqual(ProtocolVersion.V2,lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V2)
+        self.assertEqual(ProtocolVersion.V1, lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V1)
+        self.assertEqual(0, lower)
 
         self.assertTrue(ProtocolVersion.uses_error_code_map(ProtocolVersion.DSE_V1))
         self.assertTrue(ProtocolVersion.uses_int_query_flags(ProtocolVersion.DSE_V1))

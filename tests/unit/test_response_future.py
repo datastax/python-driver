@@ -38,7 +38,7 @@ class ResponseFutureTests(unittest.TestCase):
 
     def make_basic_session(self):
         s = Mock(spec=Session)
-        s.cluster._default_row_factory = lambda col_names, rows: [(col_names, rows)]
+        s.row_factory = lambda col_names, rows: [(col_names, rows)]
         return s
 
     def make_pool(self):
