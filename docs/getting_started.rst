@@ -407,7 +407,8 @@ level on that:
 Connecting to DataStax Cloud
 ----------------------------
 1. Download the secure connect bundle from your DataStax Constellation account.
-2. Connect to your cloud cluster with::
+2. Connect to your cloud cluster with
+
 .. code-block:: python
 
     from cassandra.cluster import Cluster
