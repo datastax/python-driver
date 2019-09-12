@@ -30,7 +30,10 @@ from cassandra.datastax.graph.types import Vertex, VertexProperty, Edge, Path
 
 __all__ = ['GraphSON1Serializer', 'GraphSON1Deserializer', 'GraphSON1TypeDeserializer',
            'GraphSON2Serializer', 'GraphSON2Deserializer',
-           'GraphSON2Reader']
+           'GraphSON2Reader', 'BooleanTypeIO', 'Int16TypeIO', 'Int32TypeIO', 'DoubleTypeIO',
+           'FloatTypeIO', 'UUIDTypeIO', 'BigDecimalTypeIO', 'DurationTypeIO', 'InetTypeIO',
+           'InstantTypeIO', 'LocalDateTypeIO', 'LocalTimeTypeIO', 'Int64TypeIO', 'BigIntegerTypeIO',
+           'LocalDateTypeIO', 'PolygonTypeIO', 'PointTypeIO', 'LineStringTypeIO', 'BlobTypeIO']
 
 """
 Supported types:

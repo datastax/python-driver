@@ -23,6 +23,12 @@ from cassandra.datastax.graph.types import Vertex, Edge, Path
 from cassandra.datastax.graph.graphson import GraphSON2Reader
 
 
+__all__ = [
+    'GraphProtocol', 'GraphOptions', 'GraphStatement', 'SimpleGraphStatement',
+    'single_object_row_factory', 'graph_result_row_factory', 'graph_object_row_factory',
+    'graph_graphson2_row_factory', 'Result'
+]
+
 # (attr, description, server option)
 _graph_options = (
     ('graph_name', 'name of the targeted graph.', 'graph-name'),

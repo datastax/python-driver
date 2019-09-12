@@ -1162,6 +1162,7 @@ class Cluster(object):
                                                                                Session._default_serial_consistency_level,
                                                                                Session._default_timeout,
                                                                                Session._row_factory)
+
         # legacy mode if either of these is not default
         if load_balancing_policy or default_retry_policy:
             if execution_profiles:
@@ -1173,9 +1174,18 @@ class Cluster(object):
                  "execution profiles.", DeprecationWarning)
 
         else:
+            profiles = self.profile_manager.profiles
             if execution_profiles:
-                self.profile_manager.profiles.update(execution_profiles)
+                profiles.update(execution_profiles)
                 self._config_mode = _ConfigMode.PROFILES
+
+            # TODO should be changed to Default...
+            lbp = DSELoadBalancingPolicy(self.profile_manager.default.load_balancing_policy)
+            profiles.setdefault(EXEC_PROFILE_GRAPH_DEFAULT, GraphExecutionProfile(load_balancing_policy=lbp))
+            profiles.setdefault(EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT,
+                                GraphExecutionProfile(load_balancing_policy=lbp, request_timeout=60. * 3.))
+            profiles.setdefault(EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT,
+                                GraphAnalyticsExecutionProfile(load_balancing_policy=lbp))
 
         if self._contact_points_explicit:
             if self._config_mode is _ConfigMode.PROFILES:
