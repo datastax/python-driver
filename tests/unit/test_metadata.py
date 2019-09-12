@@ -472,7 +472,10 @@ class UserTypesTest(unittest.TestCase):
 
 class UserDefinedFunctionTest(unittest.TestCase):
     def test_as_cql_query_removes_frozen(self):
-        func = Function("ks1", "myfunction", ["frozen<tuple<int, text>>"], ["a"], "int", "java", "return 0;", True)
+        func = Function(
+            "ks1", "myfunction", ["frozen<tuple<int, text>>"], ["a"],
+            "int", "java", "return 0;", True, False, False, False
+        )
         expected_result = (
             "CREATE FUNCTION ks1.myfunction(a tuple<int, text>) "
             "CALLED ON NULL INPUT "
