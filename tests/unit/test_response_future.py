@@ -19,7 +19,7 @@ except ImportError:
 
 from mock import Mock, MagicMock, ANY
 
-from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType
+from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType, OperationTimedOut
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable, ProtocolVersion
 from cassandra.connection import Connection, ConnectionException
 from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessage,
@@ -124,6 +124,39 @@ class ResponseFutureTests(unittest.TestCase):
         result = [1, 2, 3]
         rf._set_result(None, None, None, Mock(spec=ResultMessage, kind=999, results=result))
         self.assertListEqual(list(rf.result()), result)
+
+    def test_heartbeat_defunct_deadlock(self):
+        """
+        Heartbeat defuncts all connections and clears request queues. Response future times out and even
+        if it has been removed from request queue, timeout exception must be thrown. Otherwise event loop
+        will deadlock on eventual ResponseFuture.result() call.
+
+        PYTHON-1044
+        """
+
+        connection = MagicMock(spec=Connection)
+        connection._requests = {}
+
+        pool = Mock()
+        pool.is_shutdown = False
+        pool.borrow_connection.return_value = [connection, 1]
+
+        session = self.make_basic_session()
+        session.cluster._default_load_balancing_policy.make_query_plan.return_value = [Mock(), Mock()]
+        session._pools.get.return_value = pool
+
+        query = SimpleStatement("SELECT * FROM foo")
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
+
+        rf = ResponseFuture(session, message, query, 1)
+        rf.send_request()
+
+        # Simulate Connection.error_all_requests() after heartbeat defuncts
+        connection._requests = {}
+
+        # Simulate ResponseFuture timing out
+        rf._on_timeout()
+        self.assertRaises(OperationTimedOut, rf.result)
 
     def test_read_timeout_error_message(self):
         session = self.make_session()
