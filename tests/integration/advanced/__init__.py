@@ -309,13 +309,15 @@ class BasicGraphUnitTestCase(BasicKeyspaceUnitTestCase):
         self.cass_version, self.cql_version = get_server_versions()
 
     def setUp(self):
-        self.session_setup()
-        self.reset_graph()
+        if DSE_VERSION:
+            self.session_setup()
+            self.reset_graph()
 
-        self.clear_schema()
+            self.clear_schema()
 
     def tearDown(self):
-        self.cluster.shutdown()
+        if DSE_VERSION:
+            self.cluster.shutdown()
 
     def clear_schema(self):
         self.session.execute_graph('schema.clear()')
@@ -344,18 +346,20 @@ class BasicSharedGraphUnitTestCase(BasicKeyspaceUnitTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.session_setup()
-        cls.reset_graph()
-        profiles = cls.cluster.profile_manager.profiles
-        profiles[EXEC_PROFILE_GRAPH_DEFAULT].request_timeout = 60
-        profiles[EXEC_PROFILE_GRAPH_DEFAULT].graph_options.graph_name = cls.graph_name
-        profiles[EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT].request_timeout = 60
-        profiles[EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT].graph_options.graph_name = cls.graph_name
-        cls.clear_schema()
+        if DSE_VERSION:
+            cls.session_setup()
+            cls.reset_graph()
+            profiles = cls.cluster.profile_manager.profiles
+            profiles[EXEC_PROFILE_GRAPH_DEFAULT].request_timeout = 60
+            profiles[EXEC_PROFILE_GRAPH_DEFAULT].graph_options.graph_name = cls.graph_name
+            profiles[EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT].request_timeout = 60
+            profiles[EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT].graph_options.graph_name = cls.graph_name
+            cls.clear_schema()
 
     @classmethod
     def tearDownClass(cls):
-        cls.cluster.shutdown()
+        if DSE_VERSION:
+            cls.cluster.shutdown()
 
     @classmethod
     def clear_schema(self):
@@ -406,7 +410,6 @@ def getPolygonType():
     return "Polygon().withGeoBounds()"
 
 
-
 class BasicGeometricUnitTestCase(BasicKeyspaceUnitTestCase):
     """
     This base test class is used by all the geomteric tests. It contains class level teardown and setup
@@ -424,12 +427,14 @@ class BasicGeometricUnitTestCase(BasicKeyspaceUnitTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.common_dse_setup(1)
-        cls.initalizeTables()
+        if DSE_VERSION:
+            cls.common_dse_setup(1)
+            cls.initalizeTables()
 
     @classmethod
     def tearDownClass(cls):
-        drop_keyspace_shutdown_cluster(cls.ks_name, cls.session, cls.cluster)
+        if DSE_VERSION:
+            drop_keyspace_shutdown_cluster(cls.ks_name, cls.session, cls.cluster)
 
     @classmethod
     def initalizeTables(cls):
