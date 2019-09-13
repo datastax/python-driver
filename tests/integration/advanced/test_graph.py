@@ -15,7 +15,7 @@
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest  # noqa# http://www.datastax.com/terms/datastax-dse-driver-license-terms
+    import unittest  # noqa
 
 from copy import copy
 from itertools import chain
