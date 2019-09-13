@@ -32,7 +32,7 @@ class RetryPolicyTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cluster = get_cluster()
-        cluster.start()  # make sure other nodes are restarted
+        cluster.start(wait_for_binary_proto=True)  # make sure other nodes are restarted
 
     def test_should_rethrow_on_unvailable_with_default_policy_if_cas(self):
         """

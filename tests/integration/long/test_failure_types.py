@@ -12,17 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys,logging, traceback, time, re
+import logging
+import sys
+import traceback
+import time
+from mock import Mock
 
-from cassandra import (ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
-                       FunctionFailure, ProtocolVersion)
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy
+from cassandra import (
+    ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, ReadFailure, WriteFailure,
+    FunctionFailure, ProtocolVersion,
+)
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster, get_node, \
-    requiresmallclockgranularity
-from mock import Mock
+from tests.integration import (
+    use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster,
+    get_node, start_cluster_wait_for_up, requiresmallclockgranularity,
+)
+
 
 try:
     import unittest2 as unittest
@@ -46,7 +54,7 @@ def setup_module():
         ccm_cluster.stop()
         config_options = {'tombstone_failure_threshold': 2000, 'tombstone_warn_threshold': 1000}
         ccm_cluster.set_configuration_options(config_options)
-        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        start_cluster_wait_for_up(ccm_cluster)
         setup_keyspace()
 
 
@@ -317,15 +325,17 @@ class TimeoutTimerTest(unittest.TestCase):
         """
         Setup sessions and pause node1
         """
-
-        # self.node1, self.node2, self.node3 = get_cluster().nodes.values()
-
-        node1 = ExecutionProfile(
-            load_balancing_policy=HostFilterPolicy(
-                RoundRobinPolicy(), lambda host: host.address == "127.0.0.1"
-            )
+        self.cluster = Cluster(
+            protocol_version=PROTOCOL_VERSION,
+            execution_profiles={
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(
+                    load_balancing_policy=HostFilterPolicy(
+                        RoundRobinPolicy(), lambda host: host.address == "127.0.0.1"
+                    )
+                )
+            }
         )
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={EXEC_PROFILE_DEFAULT: node1})
+
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
         self.control_connection_host_number = 1
@@ -372,13 +382,14 @@ class TimeoutTimerTest(unittest.TestCase):
             future.result()
         end_time = time.time()
         total_time = end_time-start_time
-        expected_time = self.session.default_timeout
+        expected_time = self.cluster.profile_manager.default.request_timeout
         # check timeout and ensure it's within a reasonable range
         self.assertAlmostEqual(expected_time, total_time, delta=.05)
 
         # Test with user defined timeout (Should be 1)
+        expected_time = 1
         start_time = time.time()
-        future = self.session.execute_async(ss, timeout=1)
+        future = self.session.execute_async(ss, timeout=expected_time)
         mock_callback = Mock(return_value=None)
         mock_errorback = Mock(return_value=None)
         future.add_callback(mock_callback)
@@ -388,7 +399,6 @@ class TimeoutTimerTest(unittest.TestCase):
             future.result()
         end_time = time.time()
         total_time = end_time-start_time
-        expected_time = 1
         # check timeout and ensure it's within a reasonable range
         self.assertAlmostEqual(expected_time, total_time, delta=.05)
         self.assertTrue(mock_errorback.called)

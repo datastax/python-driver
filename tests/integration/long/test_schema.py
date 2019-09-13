@@ -20,6 +20,8 @@ from cassandra.query import SimpleStatement
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
 
+import time
+
 try:
     import unittest2 as unittest
 except ImportError:
@@ -156,6 +158,8 @@ class SchemaTests(unittest.TestCase):
         cluster.shutdown()
 
     def check_and_wait_for_agreement(self, session, rs, exepected):
+        # Wait for RESULT_KIND_SCHEMA_CHANGE message to arrive
+        time.sleep(1)
         self.assertEqual(rs.response_future.is_schema_agreed, exepected)
         if not rs.response_future.is_schema_agreed:
             session.cluster.control_connection.wait_for_schema_agreement(wait_time=1000)

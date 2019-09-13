@@ -21,7 +21,16 @@ import os, sys, traceback, logging, ssl, time, math, uuid
 from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from tests.integration import PROTOCOL_VERSION, get_cluster, remove_cluster, use_single_node, EVENT_LOOP_MANAGER
+from tests.integration import (
+    PROTOCOL_VERSION, get_cluster, remove_cluster, use_single_node, start_cluster_wait_for_up, EVENT_LOOP_MANAGER,
+)
+
+if not hasattr(ssl, 'match_hostname'):
+    try:
+        from backports.ssl_match_hostname import match_hostname
+        ssl.match_hostname = match_hostname
+    except ImportError:
+        pass  # tests will fail
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +86,7 @@ def setup_cluster_ssl(client_auth=False):
         client_encyrption_options['truststore_password'] = DEFAULT_PASSWORD
 
     ccm_cluster.set_configuration_options(config_options)
-    ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+    start_cluster_wait_for_up(ccm_cluster)
 
 
 def validate_ssl_options(**kwargs):
