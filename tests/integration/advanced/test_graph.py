@@ -44,14 +44,16 @@ from tests.integration.advanced import BasicGraphUnitTestCase, use_single_node_w
     generate_line_graph, generate_multi_field_graph, generate_large_complex_graph, validate_classic_vertex, \
     validate_classic_edge, validate_path_result_type, validate_line_edge, validate_generic_vertex_result_type, \
     fetchCustomGeoType, generate_type_graph_schema, TYPE_MAP
-from tests.integration import PROTOCOL_VERSION, greaterthanorequaldse51, DSE_VERSION
+from tests.integration import PROTOCOL_VERSION, greaterthanorequaldse51, DSE_VERSION, requiredse
 
 
 def setup_module():
-    dse_options = {'graph': {'realtime_evaluation_timeout_in_seconds': 60}}
-    use_single_node_with_graph(dse_options=dse_options)
+    if DSE_VERSION:
+        dse_options = {'graph': {'realtime_evaluation_timeout_in_seconds': 60}}
+        use_single_node_with_graph(dse_options=dse_options)
 
 
+@requiredse
 class BasicGraphTest(BasicGraphUnitTestCase):
 
     def test_basic_query(self):
@@ -492,6 +494,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         self.assertEqual(json.loads(rs[0]), {'result': 123})
 
 
+@requiredse
 class GraphTypesTests(BasicGraphUnitTestCase):
 
     def test_result_types(self):
@@ -592,6 +595,7 @@ class GraphTypesTests(BasicGraphUnitTestCase):
             self.assertIsInstance(prop['value'], typ)
 
 
+@requiredse
 class GraphTimeoutTests(BasicGraphUnitTestCase):
 
         def test_should_wait_indefinitely_by_default(self):
@@ -672,6 +676,7 @@ class GraphTimeoutTests(BasicGraphUnitTestCase):
                 self.assertTrue(isinstance(e, InvalidRequest) or isinstance(e, OperationTimedOut))
 
 
+@requiredse
 class GraphProfileTests(BasicGraphUnitTestCase):
         def test_graph_profile(self):
             """
@@ -726,6 +731,7 @@ class GraphProfileTests(BasicGraphUnitTestCase):
                 local_session.execute_graph('java.util.concurrent.TimeUnit.MILLISECONDS.sleep(2000L);', execution_profile='exec_short_timeout')
 
 
+@requiredse
 class GraphMetadataTest(BasicGraphUnitTestCase):
 
     @greaterthanorequaldse51

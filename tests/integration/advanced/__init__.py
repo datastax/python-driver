@@ -132,7 +132,7 @@ else:
     TYPE_MAP["inet2"] = ["Inet()", ipaddress.IPv6Address("2001:db8:85a3:8d3:1319:8a2e:370:7348"),
                          deserializer_plus_to_ipaddressv6]
 
-if DSE_VERSION >= Version("5.1"):
+if DSE_VERSION and DSE_VERSION >= Version("5.1"):
     TYPE_MAP["datetime1"]= ["Date()", datetime.date.today(), GraphSON1Deserializer.deserialize_date]
     TYPE_MAP["time1"] = ["Time()", datetime.time(12, 6, 12, 444), GraphSON1Deserializer.deserialize_time]
     TYPE_MAP["time2"] = ["Time()", datetime.time(12, 6, 12), GraphSON1Deserializer.deserialize_time]
@@ -380,7 +380,7 @@ def fetchCustomGeoType(type):
         return None
 
 
-geo_condition = DSE_VERSION < Version('5.1')
+geo_condition = DSE_VERSION and DSE_VERSION < Version('5.1')
 def getPointType():
     if geo_condition:
         return "Point()"
