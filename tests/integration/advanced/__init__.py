@@ -33,7 +33,7 @@ from packaging.version import Version
 from cassandra.cluster import Cluster, EXEC_PROFILE_GRAPH_DEFAULT, EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT
 
 from tests.integration import PROTOCOL_VERSION, DSE_VERSION, get_server_versions, BasicKeyspaceUnitTestCase, \
-    drop_keyspace_shutdown_cluster, get_node, USE_CASS_EXTERNAL
+    drop_keyspace_shutdown_cluster, get_node, USE_CASS_EXTERNAL, CASSANDRA_IP
 from tests.integration import use_singledc, use_single_node, wait_for_node_socket
 from cassandra.protocol import ServerError
 from cassandra.util import Point, LineString, Polygon
@@ -175,7 +175,7 @@ def wait_for_spark_workers(num_of_expected_workers, timeout):
     start_time = time.time()
     while True:
         opener = build_opener(HTTPHandler)
-        request = Request("http://{0}:7080".format(DSE_IP))
+        request = Request("http://{0}:7080".format(CASSANDRA_IP))
         request.get_method = lambda: 'GET'
         connection = opener.open(request)
         match = re.search('Alive Workers:.*(\d+)</li>', connection.read().decode('utf-8'))
