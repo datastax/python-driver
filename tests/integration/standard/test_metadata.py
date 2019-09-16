@@ -82,7 +82,7 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         self.assertTrue(local_host in rpc_addrs)
 
     @unittest.skipUnless(
-        os.getenv('MAPPED_CASSANDRA_VERSION', None) is None,
+        os.getenv('MAPPED_CASSANDRA_VERSION', None) is not None,
         "Don't check the host version for test-dse")
     def test_host_release_version(self):
         """
