@@ -29,7 +29,7 @@ from cassandra.cluster import Cluster
 from packaging.version import Version
 
 
-PROTOCOL_VERSION = PROTOCOL_VERSION if (DSE_VERSION is None or DSE_VERSION >= Version('5.0')) else 3
+PROTOCOL_VERSION = min(4, PROTOCOL_VERSION if (DSE_VERSION is None or DSE_VERSION >= Version('5.0')) else 3)
 
 
 def teardown_package():
