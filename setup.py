@@ -412,12 +412,19 @@ def run_setup(extensions):
     setup(
         name='cassandra-driver',
         version=__version__,
-        description='Python driver for Cassandra',
+        description=' DataStax Driver for Apache Cassandra and DataStax products',
         long_description=long_description,
         url='http://github.com/datastax/python-driver',
-        author='Tyler Hobbs',
-        author_email='tyler@datastax.com',
-        packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph', 'cassandra.insights'],
+        project_urls={
+            'Documentation': 'https://docs.datastax.com/en/developer/python-driver/latest/',
+            'Source': 'https://github.com/datastax/python-driver/',
+            'Issues': 'https://datastax-oss.atlassian.net/browse/PYTHON',
+        },
+        author='DataStax',
+        packages=[
+            'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
+            'cassandra.insights', 'cassandra.datastax'
+        ],
         keywords='cassandra,cql,orm,dse,graph',
         include_package_data=True,
         install_requires=dependencies,

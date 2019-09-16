@@ -1,3 +1,61 @@
+3.21.0
+======
+Unreleased
+
+Merged from dse-driver:
+
+Features
+--------
+
+* Insights integration (PYTHON-1047)
+* Graph execution profiles should preserve their graph_source when graph_options is overridden (PYTHON-1021)
+* Add NodeSync metadata (PYTHON-799)
+* Add new NodeSync failure values (PYTHON-934)
+* DETERMINISTIC and MONOTONIC Clauses for Functions and Aggregates (PYTHON-955)
+* GraphOptions should show a warning for unknown parameters (PYTHON-819)
+* DSE protocol version 2 and continous paging backpressure (PYTHON-798)
+* GraphSON2 Serialization/Deserialization Support (PYTHON-775)
+* Add graph-results payload option for GraphSON format (PYTHON-773)
+* Create an AuthProvider for the DSE transitional mode (PYTHON-831)
+* Implement serializers for the Graph String API (PYTHON-778)
+* Provide deserializers for GraphSON types (PYTHON-782)
+* Add Graph DurationType support (PYTHON-607)
+* Support DSE DateRange type (PYTHON-668)
+* RLAC CQL output for materialized views (PYTHON-682)
+* Add Geom Types wkt deserializer
+* DSE Graph Client timeouts in custom payload (PYTHON-589)
+* Make DSEGSSAPIAuthProvider accept principal name (PYTHON-574)
+* Add config profiles to DSE graph execution (PYTHON-570)
+* DSE Driver version checking (PYTHON-568)
+* Distinct default timeout for graph queries (PYTHON-477)
+* Graph result parsing for known types (PYTHON-479,487)
+* Distinct read/write CL for graph execution (PYTHON-509)
+* Target graph analytics query to spark master when available (PYTHON-510)
+
+Bug Fixes
+---------
+
+* Continuous paging sessions raise RuntimeError when results are not entirely consumed (PYTHON-1054)
+* GraphSON Property deserializer should return a dict instead of a set (PYTHON-1033)
+* ResponseFuture.has_more_pages may hold the wrong value (PYTHON-946)
+* DETERMINISTIC clause in AGGREGATE misplaced in CQL generation (PYTHON-963)
+* graph module import cause a DLL issue on Windows due to its cythonizing failure (PYTHON-900)
+* Update date serialization to isoformat in graph (PYTHON-805)
+* DateRange Parse Error (PYTHON-729)
+* MontonicTimestampGenerator.__init__ ignores class defaults (PYTHON-728)
+* metadata.get_host returning None unexpectedly (PYTHON-709)
+* Sockets associated with sessions not getting cleaned up on session.shutdown() (PYTHON-673)
+* Resolve FQDN from ip address and use that as host passed to SASLClient (PYTHON-566)
+* Geospatial type implementations don't handle 'EMPTY' values. (PYTHON-481)
+* Correctly handle other types in geo type equality (PYTHON-508)
+
+Other
+-----
+* Add tests around cqlengine and continuous paging (PYTHON-872)
+* Add an abstract GraphStatement to handle different graph statements  (PYTHON-789)
+* Write documentation examples for DSE 2.0 features (PYTHON-732)
+* DSE_V1 protocol should not include all of protocol v5 (PYTHON-694)
+
 3.20.0
 ======
 Unreleased

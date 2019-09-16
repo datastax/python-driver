@@ -2,23 +2,33 @@ Releasing
 =========
 * Run the tests and ensure they all pass
 * Update CHANGELOG.rst
-
   * Check for any missing entries
   * Add today's date to the release section
 * Update the version in ``cassandra/__init__.py``
-
   * For beta releases, use a version like ``(2, 1, '0b1')``
   * For release candidates, use a version like ``(2, 1, '0rc1')``
   * When in doubt, follow PEP 440 versioning
 * Add the new version in ``docs.yaml``
-
 * Commit the changelog and version changes, e.g. ``git commit -m'version 1.0.0'``
 * Tag the release.  For example: ``git tag -a 1.0.0 -m 'version 1.0.0'``
 * Push the tag and new ``master``: ``git push origin 1.0.0 ; git push origin master``
-* Upload the package to pypi::
+* Update the `python-driver` submodule of `python-driver-wheels`,
+  commit then push. This will trigger TravisCI and the wheels building.
+* For a GA release, upload the package to pypi::
 
-    python setup.py register
-    python setup.py sdist upload
+    # Clean the working directory
+    python setup.py clean
+    rm dist/*
+
+    # Build the source distribution
+    python setup.py sdist
+
+    # Download all wheels from the jfrog repository and copy them in
+    # the dist/ directory
+    cp /path/to/wheels/*.whl dist/
+ 
+    # Upload all files
+    twine upload dist/*
 
 * On pypi, make the latest GA the only visible version
 * Update the docs (see below)
@@ -26,6 +36,12 @@ Releasing
   so that it looks like ``(x, y, z, 'postN')``
 
   * After a beta or rc release, this should look like ``(2, 1, '0b1', 'post0')``
+
+* After the release has been tagged, add a section to docs.yaml with the new tag ref::
+
+    versions:
+      - name: <version name>
+        ref: <release tag>
 
 * Commit and push
 * Update 'cassandra-test' branch to reflect new release
@@ -80,6 +96,39 @@ directory and build from scratch::
 
     rm -rf docs/_build/*
 
+Documentor
+==========
+We now also use another tool called Documentor with Sphinx source to build docs.
+This gives us versioned docs with nice integrated search. This is a private tool
+of DataStax.
+
+Dependencies
+------------
+Sphinx
+~~~~~~
+Installed as described above
+
+Documentor
+~~~~~~~~~~
+Clone and setup Documentor as specified in `the project <https://github.com/riptano/documentor#installation-and-quick-start>`_.
+This tool assumes Ruby, bundler, and npm are present.
+
+Building
+--------
+The setup script expects documentor to be in the system path. You can either add it permanently or run with something
+like this::
+
+    PATH=$PATH:<documentor repo>/bin python setup.py doc
+
+The docs will not display properly just browsing the filesystem in a browser. To view the docs as they would be in most
+web servers, use the SimpleHTTPServer module::
+
+    cd docs/_build/
+    python -m SimpleHTTPServer
+
+Then, browse to `localhost:8000 <http://localhost:8000>`_.
+
+
 Running the Tests
 =================
 In order for the extensions to be built and used in the test, run::
@@ -104,19 +153,40 @@ Use tee to capture logs and see them on your terminal::
 
     nosetests -w tests/unit/ --nocapture --nologcapture 2>&1 | tee test.log
 
-Specifying a Cassandra Version for Integration Tests
+Specifying a Cassandra/DSE Version for Integration Tests
 ----------------------------------------------------
-You can specify a cassandra version with the ``CASSANDRA_VERSION`` environment variable::
+You can specify a cassandra version with the ``CASSANDRA_VERSION`` or ``DSE_VERSION` environment variable::
 
     CASSANDRA_VERSION=2.0.9 nosetests -w tests/integration/standard
+    DSE_VERSION=6.7.4 nosetests -w tests/integration/standard
 
 You can also specify a cassandra directory (to test unreleased versions)::
 
     CASSANDRA_DIR=/home/thobbs/cassandra nosetests -w tests/integration/standard
 
-Specifying the usage of an already running Cassandra cluster
-----------------------------------------------------
-The test will start the appropriate Cassandra clusters when necessary  but if you don't want this to happen because a Cassandra cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example: 
+For this to work with DSE, you have to build it before. Once the appropriate commit is checked out, inside the ``bdp`` folder:
+
+	./gradlew clean dist
+
+Running the advanced authentication tests for DSE
+-------------------------------------------------
+These tests are in the file ``tests/integration/advanced/test_auth.py``. These tests are run the same way
+as the rest but first the we have to set the variable ADS_HOME:
+
+	git clone https://github.com/riptano/testeng-devtools.git
+	cd testeng-devtools/EmbeddedAds
+	mvn clean install
+	cp target/embedded-ads-1.0.1-SNAPSHOT-*.jar embedded-ads.jar
+	export ADS_HOME=`pwd`
+
+After this we can run the tests normally from the appropriate folder:
+
+	DSE_VERSION=6.7.4 nosetests -w tests/integration/advanced/test_auth.py
+
+Specifying the usage of an already running cluster
+--------------------------------------------------
+The test will start the appropriate Cassandra clusters when necessary  but if you don't want this to happen
+because a Cassandra cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example: 
 
 	USE_CASS_EXTERNAL=1 python setup.py nosetests -w tests/integration/standard
 
@@ -148,6 +218,10 @@ There needs to be a version of cassandra running locally so before running the b
 	
 	ccm create benchmark_cluster -v 3.0.1 -n 1 -s
 
+If testing against DSE:
+
+    ccm create 6.7.4 --dse --dse-username=your_username@datastax.com --dse-password=your_password -v 6.7.4 -n 1 -s
+
 To run the benchmarks, pick one of the files under the ``benchmarks/`` dir and run it::
 
     python benchmarks/future_batches.py
@@ -168,4 +242,28 @@ name to specify the built version::
 
     python setup.py egg_info -b-`git rev-parse --short HEAD` sdist --formats=zip
 
-The file (``dist/cassandra-driver-<version spec>.zip``) is packaged with Cassandra in ``cassandra/lib/cassandra-driver-internal-only*zip``.
+The file (``dist/cassandra-driver-<version spec>.zip``) is packaged with Cassandra in ``cassandra/lib/cassandra-driver-internal-only.zip``.
+
+Releasing an EAP
+================
+
+An EAP release is only uploaded on a private server and it is not published on pypi.
+
+* Clean the environment::
+
+    python setup.py clean
+
+* Package the source distribution::
+
+    python setup.py sdist
+
+* Test the source distribution::
+
+    pip install dist/cassandra-driver-<version>.tar.gz
+
+* Upload the package on the EAP download server.
+* Build the documentation::
+
+    python setup.py doc
+
+* Upload the docs on the EAP download server.
