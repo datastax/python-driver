@@ -16,7 +16,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from tests.integration import requiredse, CASSANDRA_VERSION, DSE_VERSION, SIMULACRON_JAR
+from tests.integration import requiredse, CASSANDRA_VERSION, DSE_VERSION, SIMULACRON_JAR, PROTOCOL_VERSION
 from tests.integration.simulacron.utils import (
     clear_queries,
     start_and_prime_singledc,
@@ -29,7 +29,8 @@ from cassandra.cluster import Cluster
 from packaging.version import Version
 
 
-PROTOCOL_VERSION = 4 if (DSE_VERSION is None or DSE_VERSION >= Version('5.0')) else 3
+PROTOCOL_VERSION = PROTOCOL_VERSION if (DSE_VERSION is None or DSE_VERSION >= Version('5.0')) else 3
+
 
 def teardown_package():
     stop_simulacron()
