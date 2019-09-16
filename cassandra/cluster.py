@@ -3730,6 +3730,7 @@ class ResponseFuture(object):
                 key = "Connection defunct by heartbeat"
                 errors = {key: "Client request timeout. See Session.execute[_async](timeout)"}
                 self._set_final_exception(OperationTimedOut(errors, self._current_host))
+                return
 
             pool = self.session._pools.get(self._current_host)
             if pool and not pool.is_shutdown:
