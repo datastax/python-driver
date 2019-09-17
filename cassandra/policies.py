@@ -1128,7 +1128,7 @@ class WrapperPolicy(LoadBalancingPolicy):
         return self._child_policy.on_remove(*args, **kwargs)
 
 
-class DSELoadBalancingPolicy(WrapperPolicy):
+class DefaultLoadBalancingPolicy(WrapperPolicy):
     """
     A :class:`.LoadBalancingPolicy` wrapper that adds the ability to target a specific host first.
 
@@ -1147,6 +1147,7 @@ class DSELoadBalancingPolicy(WrapperPolicy):
         else:
             keyspace = working_keyspace
 
+        # TODO remove next major since execute(..., host=XXX) is now available
         addr = getattr(query, 'target_host', None) if query else None
         target_host = self._cluster_metadata.get_host(addr)
 
@@ -1159,6 +1160,10 @@ class DSELoadBalancingPolicy(WrapperPolicy):
         else:
             for h in child.make_query_plan(keyspace, query):
                 yield h
+
+
+# TODO for backward compatibility, remove in next major
+DSELoadBalancingPolicy = DefaultLoadBalancingPolicy
 
 
 class NeverRetryPolicy(RetryPolicy):

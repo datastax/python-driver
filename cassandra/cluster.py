@@ -71,7 +71,7 @@ from cassandra.metadata import Metadata, protect_name, murmur3
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy, IdentityTranslator, NoSpeculativeExecutionPlan,
-                                NoSpeculativeExecutionPolicy, DSELoadBalancingPolicy,
+                                NoSpeculativeExecutionPolicy, DefaultLoadBalancingPolicy,
                                 NeverRetryPolicy)
 from cassandra.pool import (Host, _ReconnectionHandler, _HostReconnectionHandler,
                             HostConnectionPool, HostConnection,
@@ -431,7 +431,7 @@ class GraphAnalyticsExecutionProfile(GraphExecutionProfile):
         Note: The graph_options.graph_source is set automatically to b'a' (analytics)
         when using GraphAnalyticsExecutionProfile. This is mandatory to target analytics nodes.
         """
-        load_balancing_policy = load_balancing_policy or DSELoadBalancingPolicy(default_lbp_factory())
+        load_balancing_policy = load_balancing_policy or DefaultLoadBalancingPolicy(default_lbp_factory())
         graph_options = graph_options or GraphOptions(graph_language=b'gremlin-groovy')
         super(GraphAnalyticsExecutionProfile, self).__init__(load_balancing_policy, retry_policy, consistency_level,
                                                              serial_consistency_level, request_timeout, row_factory,
@@ -1179,8 +1179,7 @@ class Cluster(object):
                 profiles.update(execution_profiles)
                 self._config_mode = _ConfigMode.PROFILES
 
-            # TODO should be changed to Default...
-            lbp = DSELoadBalancingPolicy(self.profile_manager.default.load_balancing_policy)
+            lbp = DefaultLoadBalancingPolicy(self.profile_manager.default.load_balancing_policy)
             profiles.setdefault(EXEC_PROFILE_GRAPH_DEFAULT, GraphExecutionProfile(load_balancing_policy=lbp))
             profiles.setdefault(EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT,
                                 GraphExecutionProfile(load_balancing_policy=lbp, request_timeout=60. * 3.))
@@ -2622,7 +2621,7 @@ class Session(object):
         future.message.query_params = graph_parameters
         future._protocol_handler = self.client_protocol_handler
 
-        if options.is_analytics_source and isinstance(execution_profile.load_balancing_policy, DSELoadBalancingPolicy):
+        if options.is_analytics_source and isinstance(execution_profile.load_balancing_policy, DefaultLoadBalancingPolicy):
             self._target_analytics_master(future)
         else:
             future.send_request()
