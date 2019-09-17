@@ -2,6 +2,21 @@
 ======
 Unreleased
 
+Features
+--------
+
+Bug Fixes
+---------
+
+Others
+------
+
+Deprecations
+------------
+
+* DSELoadBalancingPolicy will be removed in the next major, consider using
+  the DefaultLoadBalancingPolicy.
+
 Merged from dse-driver:
 
 Features

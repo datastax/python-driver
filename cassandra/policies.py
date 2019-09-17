@@ -1163,7 +1163,15 @@ class DefaultLoadBalancingPolicy(WrapperPolicy):
 
 
 # TODO for backward compatibility, remove in next major
-DSELoadBalancingPolicy = DefaultLoadBalancingPolicy
+class DSELoadBalancingPolicy(DefaultLoadBalancingPolicy):
+    """
+    *Deprecated:* This will be removed in the next major release,
+    consider using :class:`.DefaultLoadBalancingPolicy`.
+    """
+    def __init__(self, *args):
+        super(DSELoadBalancingPolicy, self).__init__(*args)
+        warnings.warn("DSELoadBalancingPolicy will be removed in 4.0. Consider using "
+                      "DefaultLoadBalancingPolicy.", DeprecationWarning)
 
 
 class NeverRetryPolicy(RetryPolicy):
