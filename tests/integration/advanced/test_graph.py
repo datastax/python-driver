@@ -65,7 +65,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         See reference graph here
         http://www.tinkerpop.com/docs/3.0.0.M1/
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @expected_result graph should find two vertices related to marco via 'knows' edges.
 
@@ -87,7 +87,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         ensureing that each one is correct. See reference graph here
         http://www.tinkerpop.com/docs/3.0.0.M1/
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @expected_result graph should generate and all vertices and edge results should be
 
@@ -105,7 +105,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         """
         Test that the edge property deserializer return a dict, and not a set.
 
-        @since 1.5
+        @since 3.20
         @jira_ticket PYTHON-1033
         @expected_result the properties are stored in a dict
 
@@ -124,7 +124,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         Test to validate that the path version of the result type is generated correctly. It also
         tests basic path results as that is not covered elsewhere
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-479
         @expected_result path object should be unpacked correctly including all nested edges and verticies
         @test_category dse graph
@@ -145,7 +145,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         Creates a very large line graph script and executes it. Then proceeds to create a line graph script
         that is to large for the server to handle expects a server error to be returned
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @expected_result graph should generate and all vertices and edge results should be
 
@@ -164,7 +164,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         limited query against it, and ensure that the results are formated correctly and that
         the result set is properly sized.
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @expected_result result set should be properly formated and properly sized
 
@@ -185,7 +185,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
 
         Creates a very large graph. Ensures that large result sets are handled appropriately.
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @expected_result when limits of result sets are hit errors should be surfaced appropriately
 
@@ -200,7 +200,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         """
         Test to validate that parameter passing works as expected
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @expected_result parameters work as expected
 
@@ -225,7 +225,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         """
         Test to validated that graph consistency levels are properly surfaced to the base driver
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-509
         @expected_result graph consistency levels are surfaced correctly
         @test_category dse graph
@@ -295,7 +295,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
 
         Creates a very simple graph, and tries to insert a simple point type
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket DSP-8087
         @expected_result json types associated with insert is parsed correctly
 
@@ -316,7 +316,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
 
         Creates a very simple graph, and tries to insert a simple point type
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket DSP-8087
         @expected_result json types assoicated with insert is parsed correctly
 
@@ -343,7 +343,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
 
         Default is single (this is config dependent)
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-487
 
         @test_category dse graph
@@ -391,7 +391,7 @@ class BasicGraphTest(BasicGraphUnitTestCase):
         """
         Test verifying vertex property properties
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-487
 
         @test_category dse graph
@@ -501,7 +501,7 @@ class GraphTypesTests(BasicGraphUnitTestCase):
         """
         Test to validate that the edge and vertex version of results are constructed correctly.
 
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-479
         @expected_result edge/vertex result types should be unpacked correctly.
         @test_category dse graph
@@ -547,7 +547,7 @@ class GraphTypesTests(BasicGraphUnitTestCase):
         """
         Sends and reads back all the available types verifying they were written correctly
 
-        @since 2.3.0
+        @since 3.20
         @jira_ticket PYTHON-775
 
         @test_category dse graph
@@ -602,7 +602,7 @@ class GraphTimeoutTests(BasicGraphUnitTestCase):
             """
             Tests that by default the client should wait indefinitely for server timeouts
 
-            @since 1.0.0
+            @since 3.20
             @jira_ticket PYTHON-589
 
             @test_category dse graph
@@ -628,7 +628,7 @@ class GraphTimeoutTests(BasicGraphUnitTestCase):
             Tests that with explicit request_timeouts set, that a server timeout is honored if it's relieved prior to the
             client timeout
 
-            @since 1.0.0
+            @since 3.20
             @jira_ticket PYTHON-589
 
             @test_category dse graph
@@ -656,7 +656,7 @@ class GraphTimeoutTests(BasicGraphUnitTestCase):
             Tests that with explicit request_timeouts set, that a client timeout is honored if it's triggered prior to the
             server sending a timeout.
 
-            @since 1.0.0
+            @since 3.20
             @jira_ticket PYTHON-589
 
             @test_category dse graph
@@ -682,7 +682,7 @@ class GraphProfileTests(BasicGraphUnitTestCase):
             """
             Test verifying various aspects of graph config properties.
 
-            @since 1.0.0
+            @since 3.20
             @jira_ticket PYTHON-570
 
             @test_category dse graph
@@ -740,7 +740,7 @@ class GraphMetadataTest(BasicGraphUnitTestCase):
         Test to ensure dse_workloads is populated appropriately.
         Field added in DSE 5.1
 
-        @since DSE 2.0
+        @since 3.20
         @jira_ticket PYTHON-667
         @expected_result dse_workloads set is set on host model
 

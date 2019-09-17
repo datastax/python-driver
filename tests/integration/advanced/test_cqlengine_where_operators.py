@@ -75,7 +75,7 @@ class IsNotNullTests(unittest.TestCase):
         we'd have to create an index in search for the column we are using
         IsNotNull
 
-        @since 2.5
+        @since 3.20
         @jira_ticket PYTHON-968
         @expected_result InvalidRequest is arisen
 

@@ -32,7 +32,7 @@ class SparkLBTests(BasicGraphUnitTestCase):
     Test to validate that analtics query can run in a multi-node enviroment. Also check to to ensure
     that the master spark node is correctly targeted when OLAP queries are run
 
-    @since 1.0.0
+    @since 3.20
     @jira_ticket PYTHON-510
     @expected_result OLAP results should come back correctly, master spark coordinator should always be picked.
     @test_category dse graph

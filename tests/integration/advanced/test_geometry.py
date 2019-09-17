@@ -39,7 +39,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_simple(self):
         """
         This tests will attempt to insert a point, polygon, or line, using simple inline formating.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried.
@@ -51,7 +51,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_simple_prepared(self):
         """
         This tests will attempt to insert a point, polygon, or line, using prepared statements.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried.
@@ -64,7 +64,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_simple_prepared_with_bound(self):
         """
         This tests will attempt to insert a point, polygon, or line, using prepared statements and bind.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried.
@@ -78,7 +78,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_as_list(self):
         """
         This tests will attempt to insert a point, polygon, or line, as values of list.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried as a list.
@@ -92,7 +92,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_as_set(self):
         """
         This tests will attempt to insert a point, polygon, or line, as values of set.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried as a set.
@@ -106,7 +106,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_as_map_keys(self):
         """
         This tests will attempt to insert a point, polygon, or line, as keys of a map.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried as keys of a map.
@@ -120,7 +120,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_as_map_values(self):
         """
         This tests will attempt to insert a point, polygon, or line, as values of a map.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried as values of a map.
@@ -134,7 +134,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_as_tuple(self):
         """
         This tests will attempt to insert a point, polygon, or line, as values of a tuple.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried as values of a tuple.
@@ -148,7 +148,7 @@ class AbstractGeometricTypeTest():
     def test_should_insert_as_udt(self):
         """
         This tests will attempt to insert a point, polygon, or line, as members of a udt.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried as members of a udt.
@@ -167,7 +167,7 @@ class AbstractGeometricTypeTest():
     def test_should_accept_as_partition_key(self):
         """
         This tests will attempt to insert a point, polygon, or line, as a partition key.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric
         @expected_result geometric types should be able to be inserted and queried as a partition key.
@@ -190,7 +190,7 @@ class AbstractGeometricTypeTest():
     def test_insert_empty_with_string(self):
         """
         This tests will attempt to insert a point, polygon, or line, as Empty
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-481
         @test_category dse geometric
         @expected_result EMPTY as a  keyword should be honored
@@ -202,7 +202,7 @@ class AbstractGeometricTypeTest():
     def test_insert_empty_with_object(self):
         """
         This tests will attempt to insert a point, polygon, or line, as Empty
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-481
         @test_category dse geometric
         @expected_result EMPTY as a keyword should be used with empty objects

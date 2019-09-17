@@ -193,7 +193,7 @@ class RLACMetadataTests(BasicSharedKeyspaceUnitTestCase):
         """
         Checks to ensure that the RLAC table extension appends the proper cql on export to tables
 
-        @since 2.0
+        @since 3.20
         @jira_ticket PYTHON-638
         @expected_result Invalid hosts on the contact list should be excluded
 
@@ -217,7 +217,7 @@ class RLACMetadataTests(BasicSharedKeyspaceUnitTestCase):
         """
         Checks to ensure that the RLAC table extension appends the proper cql to export on mV's
 
-        @since 2.0
+        @since 3.20
         @jira_ticket PYTHON-682
         @expected_result Invalid hosts on the contact list should be excluded
 
@@ -265,7 +265,7 @@ class NodeSyncMetadataTests(BasicSharedKeyspaceUnitTestCase):
         """
         Checks to ensure that nodesync is visible through driver metadata
 
-        @since DSE6.0
+        @since 3.20
         @jira_ticket PYTHON-799
         @expected_result nodesync should be enabled
 

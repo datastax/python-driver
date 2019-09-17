@@ -144,8 +144,8 @@ class TransitionalModePlainTextAuthProvider(object):
 
     Example usage::
 
-        from dse.cluster import Cluster
-        from dse.auth import TransitionalModePlainTextAuthProvider
+        from cassandra.cluster import Cluster
+        from cassandra.auth import TransitionalModePlainTextAuthProvider
 
         auth_provider = TransitionalModePlainTextAuthProvider()
         cluster = Cluster(auth_provider=auth_provider)

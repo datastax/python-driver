@@ -77,7 +77,7 @@ class BaseContPagingTests():
     def test_continous_paging(self):
         """
         Test to ensure that various continuous paging schemes return the full set of results.
-        @since DSE 2.0
+        @since 3.20
         @jira_ticket PYTHON-615
         @expected_result various continous paging options should fetch all the results
 
@@ -91,7 +91,7 @@ class BaseContPagingTests():
     def test_page_fetch_size(self):
         """
         Test to ensure that continuous paging works appropriately with fetch size.
-        @since DSE 2.0
+        @since 3.20
         @jira_ticket PYTHON-615
         @expected_result continuous paging options should work sensibly with various fetch size
 
@@ -126,7 +126,7 @@ class BaseContPagingTests():
     def test_paging_cancel(self):
         """
         Test to ensure we can cancel a continuous paging session once it's started
-        @since DSE 2.0
+        @since 3.20
         @jira_ticket PYTHON-615
         @expected_result This query should be canceled before any sizable amount of results can be returned
         @test_category queries
@@ -143,7 +143,7 @@ class BaseContPagingTests():
     def test_con_paging_verify_writes(self):
         """
         Test to validate results with a few continuous paging options
-        @since DSE 2.0
+        @since 3.20
         @jira_ticket PYTHON-615
         @expected_result all results should be returned correctly
         @test_category queries
@@ -189,7 +189,7 @@ class BaseContPagingTests():
         """
         Test to validate that the resutls can be fetched when
         has_more_pages is False
-        @since DSE 2.5
+        @since 3.20
         @jira_ticket PYTHON-946
         @expected_result the results can be fetched
         @test_category queries

@@ -168,7 +168,7 @@ class BasicDseAuthTest(unittest.TestCase):
     def test_should_not_authenticate_with_bad_user_ticket(self):
         """
         This tests will attempt to authenticate with a user that has a valid ticket, but is not a valid dse user.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @test_category dse auth
         @expected_result NoHostAvailable exception should be thrown
@@ -181,7 +181,7 @@ class BasicDseAuthTest(unittest.TestCase):
     def test_should_not_athenticate_without_ticket(self):
         """
         This tests will attempt to authenticate with a user that is valid but has no ticket
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @test_category dse auth
         @expected_result NoHostAvailable exception should be thrown
@@ -193,7 +193,7 @@ class BasicDseAuthTest(unittest.TestCase):
     def test_connect_with_kerberos(self):
         """
         This tests will attempt to authenticate with a user that is valid and has a ticket
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @test_category dse auth
         @expected_result Client should be able to connect and run a basic query
@@ -211,7 +211,7 @@ class BasicDseAuthTest(unittest.TestCase):
     def test_connect_with_kerberos_and_graph(self):
         """
         This tests will attempt to authenticate with a user and execute a graph query
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-457
         @test_category dse auth
         @expected_result Client should be able to connect and run a basic graph query with authentication
@@ -235,7 +235,7 @@ class BasicDseAuthTest(unittest.TestCase):
         This tests will attempt to authenticate with IP, this will fail on osx.
         The success or failure of this test is dependent on a reverse dns lookup which can be impacted by your environment
         if it fails don't panic.
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-566
         @test_category dse auth
         @expected_result Client should error when ip is used
@@ -247,7 +247,7 @@ class BasicDseAuthTest(unittest.TestCase):
     def test_connect_with_explicit_principal(self):
         """
         This tests will attempt to authenticate using valid and invalid user principals
-        @since 1.0.0
+        @since 3.20
         @jira_ticket PYTHON-574
         @test_category dse auth
         @expected_result Client principals should be used by the underlying mechanism
@@ -478,7 +478,7 @@ class DseProxyAuthTest(BaseDseProxyAuthTest):
     def test_proxy_login_forbidden(self):
         """
         Test that a proxy login is forbidden by default for a user.
-        @since 2.0.0
+        @since 3.20
         @jira_ticket PYTHON-662
         @test_category dse auth
         @expected_result connect and query should not be allowed
@@ -490,7 +490,7 @@ class DseProxyAuthTest(BaseDseProxyAuthTest):
     def test_proxy_login_allowed(self):
         """
         Test that a proxy login is allowed with proper permissions.
-        @since 2.0.0
+        @since 3.20
         @jira_ticket PYTHON-662
         @test_category dse auth
         @expected_result connect and query should be allowed
@@ -502,7 +502,7 @@ class DseProxyAuthTest(BaseDseProxyAuthTest):
     def test_proxy_execute_forbidden(self):
         """
         Test that a proxy execute is forbidden by default for a user.
-        @since 2.0.0
+        @since 3.20
         @jira_ticket PYTHON-662
         @test_category dse auth
         @expected_result connect and query should not be allowed
@@ -514,7 +514,7 @@ class DseProxyAuthTest(BaseDseProxyAuthTest):
     def test_proxy_execute_allowed(self):
         """
         Test that a proxy execute is allowed with proper permissions.
-        @since 2.0.0
+        @since 3.20
         @jira_ticket PYTHON-662
         @test_category dse auth
         @expected_result connect and query should be allowed
@@ -526,7 +526,7 @@ class DseProxyAuthTest(BaseDseProxyAuthTest):
     def test_connection_with_transitional_mode(self):
         """
         Test that the driver can connect using TransitionalModePlainTextAuthProvider
-        @since 3.12
+        @since 3.20
         @jira_ticket PYTHON-831
         @test_category dse auth
         @expected_result connect and query should be allowed
