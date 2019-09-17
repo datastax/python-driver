@@ -740,8 +740,12 @@ class ClusterTests(unittest.TestCase):
                 self.assertIsNotNone(session.execute("SELECT * from system.local"))
 
             # Three conenctions to nodes plus the control connection
-            self.assertEqual(4, mock_handler.get_message_count('warning',
-                                                               "An authentication challenge was not sent"))
+            auth_warning = mock_handler.get_message_count('warning', "An authentication challenge was not sent")
+            self.assertGreaterEqual(auth_warning, 4)
+            self.assertEqual(
+                auth_warning,
+                mock_handler.get_message_count("debug", "Got ReadyMessage on new connection")
+            )
 
     def test_idle_heartbeat(self):
         interval = 2
