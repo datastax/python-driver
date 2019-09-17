@@ -19,11 +19,13 @@ except ImportError:
 
 from cassandra.protocol import ProtocolHandler, ResultMessage, QueryMessage, UUIDType, read_int
 from cassandra.query import tuple_factory, SimpleStatement
-from cassandra.cluster import Cluster, ResponseFuture, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import (Cluster, ResponseFuture, ExecutionProfile, EXEC_PROFILE_DEFAULT,
+    ContinuousPagingOptions, NoHostAvailable)
 from cassandra import ProtocolVersion, ConsistencyLevel
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, drop_keyspace_shutdown_cluster, \
-    greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51, greaterthanorequalcass3_10
+    greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51, greaterthanorequalcass3_10, \
+    greaterthanorequalcass31
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
@@ -118,6 +120,37 @@ class CustomProtocolHandlerTest(unittest.TestCase):
             self.assertEqual(actual, expected)
         # Ensure we have covered the various primitive types
         self.assertEqual(len(CustomResultMessageTracked.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
+        cluster.shutdown()
+
+    @greaterthanorequalcass31
+    def test_protocol_divergence_v5_fail_by_continuous_paging(self):
+        """
+        Test to validate that V5 and DSE_V1 diverge. ContinuousPagingOptions is not supported by V5
+
+        @since DSE 2.0b3 GRAPH 1.0b1
+        @jira_ticket PYTHON-694
+        @expected_result NoHostAvailable will be risen when the continuous_paging_options parameter is set
+
+        @test_category connection
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        session = cluster.connect()
+
+        max_pages = 4
+        max_pages_per_second = 3
+        continuous_paging_options = ContinuousPagingOptions(max_pages=max_pages,
+                                                            max_pages_per_second=max_pages_per_second)
+
+        future = self._send_query_message(session, timeout=session.default_timeout,
+                                        consistency_level=ConsistencyLevel.ONE,
+                            continuous_paging_options=continuous_paging_options)
+
+        # This should raise NoHostAvailable because continuous paging is not supported under ProtocolVersion.DSE_V1
+        with self.assertRaises(NoHostAvailable) as context:
+            future.result()
+        self.assertIn("Continuous paging may only be used with protocol version ProtocolVersion.DSE_V1 or higher",
+                    str(context.exception))
+
         cluster.shutdown()
 
     @greaterthanorequalcass30
