@@ -423,7 +423,7 @@ def run_setup(extensions):
         author='DataStax',
         packages=[
             'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
-            'cassandra.datastax'
+            'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph'
         ],
         keywords='cassandra,cql,orm,dse,graph',
         include_package_data=True,
