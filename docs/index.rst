@@ -2,7 +2,7 @@ Python Cassandra Driver
 =======================
 A Python client driver for `Apache Cassandra <http://cassandra.apache.org>`_.
 This driver works exclusively with the Cassandra Query Language v3 (CQL3)
-and Cassandra's native protocol.  Cassandra 2.1+ is supported.
+and Cassandra's native protocol.  Cassandra 2.1+ is supported, including DSE 4.7+.
 
 The driver supports Python 2.7, 3.4, 3.5, 3.6 and 3.7.
 
@@ -53,6 +53,15 @@ Contents
 :doc:`faq`
     A collection of Frequently Asked Questions
 
+:doc:`geo_types`
+    Working with DSE geometry types
+
+:doc:`graph`
+    Graph queries with DSE Graph
+
+:doc:`CHANGELOG`
+    Log of changes to the driver, organized by version.
+
 .. toctree::
    :hidden:
 
@@ -67,6 +76,9 @@ Contents
    security
    user_defined_types
    object_mapper
+   geo_types
+   graph
+   dse_auth
    dates_and_times
    faq
 
