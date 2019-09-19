@@ -2596,6 +2596,11 @@ class Session(object):
         object which callbacks may be attached to for asynchronous response delivery. You may also call ``ResponseFuture.result()`` to synchronously block for
         results at any time.
         """
+        if self.cluster._config_mode is _ConfigMode.LEGACY:
+            raise ValueError(("Cannot execute graph queries using Cluster legacy parameters. "
+                              "Consider using Execution profiles: "
+                              "https://docs.datastax.com/en/developer/python-driver/latest/execution_profiles/#execution-profiles"))
+
         if not isinstance(query, GraphStatement):
             query = SimpleGraphStatement(query)
 
