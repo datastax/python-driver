@@ -11,6 +11,7 @@ instance of :class:`~.Cluster` for each Cassandra cluster you want to interact
 with.
 
 The simplest way to create a :class:`~.Cluster` is like this:
+First, make sure you have the Cassandra driver properly :doc:`installed <installation>`.
 
 .. code-block:: python
 
@@ -39,16 +40,48 @@ behavior in some other way, this is the place to do it:
 
 .. code-block:: python
 
-    from cassandra.cluster import Cluster
-    from cassandra.policies import DCAwareRoundRobinPolicy
+    from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+    from cassandra.query import tuple_factory
 
-    cluster = Cluster(
-        ['10.1.1.3', '10.1.1.4', '10.1.1.5'],
-        load_balancing_policy=DCAwareRoundRobinPolicy(local_dc='US_EAST'),
-        port=9042)
+    profile = ExecutionProfile(row_factory=tuple_factory)
+    cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
+    session = cluster.connect()
 
+    print session.execute("SELECT release_version FROM system.local")[0]
 
-You can find a more complete list of options in the :class:`~.Cluster` documentation.
+Profiles are passed in by ``execution_profiles`` dict.
+
+In this case we can construct the base ``ExecutionProfile`` passing all attributes:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+    from cassandra.policies import WhiteListRoundRobinPolicy, DowngradingConsistencyRetryPolicy
+    from cassandra.query import tuple_factory
+
+    profile = ExecutionProfile(
+        load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']),
+        retry_policy=DowngradingConsistencyRetryPolicy(),
+        consistency_level=ConsistencyLevel.LOCAL_QUORUM,
+        serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL,
+        request_timeout=15,
+        row_factory=tuple_factory
+    )
+    cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
+    session = cluster.connect()
+
+    print session.execute("SELECT release_version FROM system.local")[0]
+
+Users are free to setup additional profiles to be used by name:
+
+.. code-block:: python
+
+    profile_long = ExecutionProfile(request_timeout=30)
+    cluster = Cluster(execution_profiles={'long': profile_long})
+    session = cluster.connect()
+    session.execute(statement, execution_profile='long')
+
+Also, parameters passed to ``Session.execute`` or attached to ``Statement``\s are still honored as before.
 
 Instantiating a :class:`~.Cluster` does not actually connect us to any nodes.
 To establish connections and begin executing queries we need a
@@ -328,10 +361,8 @@ replicas of the data you are interacting with need to respond for
 the query to be considered a success.
 
 By default, :attr:`.ConsistencyLevel.LOCAL_ONE` will be used for all queries.
-You can specify a different default for the session on :attr:`.Session.default_consistency_level`
-if the cluster is configured in legacy mode (not using execution profiles). Otherwise this can
-be done by setting the :attr:`.ExecutionProfile.consistency_level` for the execution profile with key
-:data:`~.cluster.EXEC_PROFILE_DEFAULT`.
+You can specify a different default by setting the :attr:`.ExecutionProfile.consistency_level`
+for the execution profile with key :data:`~.cluster.EXEC_PROFILE_DEFAULT`.
 To specify a different consistency level per request, wrap queries
 in a :class:`~.SimpleStatement`:
 
