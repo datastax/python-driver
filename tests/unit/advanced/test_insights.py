@@ -189,7 +189,7 @@ class TestConfigAsDict(unittest.TestCase):
                                                                                          'type': 'DCAwareRoundRobinPolicy'},
                                                                         'shuffle_replicas': False},
                                                             'type': 'TokenAwarePolicy'}},
-                               'type': 'DSELoadBalancingPolicy'},
+                               'type': 'DefaultLoadBalancingPolicy'},
              'readTimeout': 604800.0,
              'retry': {'namespace': 'cassandra.policies', 'options': {}, 'type': 'NeverRetryPolicy'},
              'serialConsistency': None,
