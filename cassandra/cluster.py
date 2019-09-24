@@ -129,6 +129,8 @@ DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 _NOT_SET = object()
 
+PRODUCT_APOLLO = "DATASTAX_APOLLO"
+
 
 class NoHostAvailable(Exception):
     """
@@ -288,11 +290,12 @@ class ExecutionProfile(object):
     Defaults to :class:`.NoSpeculativeExecutionPolicy` if not specified
     """
 
-    # indicates if lbp was set explicitly or uses default values
+    # indicates if set explicitly or uses default values
     _load_balancing_policy_explicit = False
+    _consistency_level_explicit = False
 
     def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
-                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 consistency_level=_NOT_SET, serial_consistency_level=None,
                  request_timeout=10.0, row_factory=named_tuple_factory, speculative_execution_policy=None):
 
         if load_balancing_policy is _NOT_SET:
@@ -301,8 +304,15 @@ class ExecutionProfile(object):
         else:
             self._load_balancing_policy_explicit = True
             self.load_balancing_policy = load_balancing_policy
+
+        if consistency_level is _NOT_SET:
+            self._consistency_level_explicit = False
+            self.consistency_level = ConsistencyLevel.LOCAL_ONE
+        else:
+            self._consistency_level_explicit = True
+            self.consistency_level = consistency_level
+
         self.retry_policy = retry_policy or RetryPolicy()
-        self.consistency_level = consistency_level
 
         if (serial_consistency_level is not None and
                 not ConsistencyLevel.is_serial(serial_consistency_level)):
@@ -999,12 +1009,12 @@ class Cluster(object):
             self.timestamp_generator = MonotonicTimestampGenerator()
 
         self.profile_manager = ProfileManager()
-        self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(self.load_balancing_policy,
-                                                                               self.default_retry_policy,
-                                                                               Session._default_consistency_level,
-                                                                               Session._default_serial_consistency_level,
-                                                                               Session._default_timeout,
-                                                                               Session._row_factory)
+        self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(
+            self.load_balancing_policy,
+            self.default_retry_policy,
+            request_timeout=Session._default_timeout,
+            row_factory=Session._row_factory
+        )
         # legacy mode if either of these is not default
         if load_balancing_policy or default_retry_policy:
             if execution_profiles:
@@ -1251,6 +1261,7 @@ class Cluster(object):
             profile.load_balancing_policy.on_up(host)
         futures = set()
         for session in tuple(self.sessions):
+            self._set_default_dbaas_consistency(session)
             futures.update(session.update_created_pools())
         _, not_done = wait_futures(futures, pool_wait_timeout)
         if not_done:
@@ -1470,7 +1481,17 @@ class Cluster(object):
         session = self._new_session(keyspace)
         if wait_for_all_pools:
             wait_futures(session._initial_connect_futures)
+
+        self._set_default_dbaas_consistency(session)
+
         return session
+
+    def _set_default_dbaas_consistency(self, session):
+        if session.cluster.metadata.dbaas:
+            for profile in self.profile_manager.profiles.values():
+                if not profile._consistency_level_explicit:
+                    profile.consistency_level = ConsistencyLevel.LOCAL_QUORUM
+            session._default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
     def get_connection_holders(self):
         holders = []
@@ -2977,6 +2998,8 @@ class ControlConnection(object):
 
         self._protocol_version = self._cluster.protocol_version
         self._set_new_connection(self._reconnect_internal())
+
+        self._cluster.metadata.dbaas = self._connection.product_type == PRODUCT_APOLLO
 
     def _set_new_connection(self, conn):
         """

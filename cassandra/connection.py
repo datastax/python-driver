@@ -105,7 +105,6 @@ else:
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
-
 DRIVER_NAME, DRIVER_VERSION = 'DataStax Python Driver', sys.modules['cassandra'].__version__
 
 PROTOCOL_VERSION_MASK = 0x7f
@@ -513,6 +512,7 @@ class Connection(object):
     _ssl_impl = ssl
 
     _check_hostname = False
+    product_type = None
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
@@ -618,7 +618,7 @@ class Connection(object):
     def _get_socket_addresses(self):
         address, port = self.endpoint.resolve()
 
-        if self.endpoint.socket_family == socket.AF_UNIX:
+        if hasattr(socket, 'AF_UNIX') and self.endpoint.socket_family == socket.AF_UNIX:
             return [(socket.AF_UNIX, socket.SOCK_STREAM, 0, None, address)]
 
         addresses = socket.getaddrinfo(address, port, self.endpoint.socket_family, socket.SOCK_STREAM)
@@ -920,16 +920,8 @@ class Connection(object):
 
     @defunct_on_error
     def _send_options_message(self):
-        if self.cql_version is None and (not self.compression or not locally_supported_compressions):
-            log.debug("Not sending options message for new connection(%s) to %s "
-                      "because compression is disabled and a cql version was not "
-                      "specified", id(self), self.endpoint)
-            self._compressor = None
-            self.cql_version = DEFAULT_CQL_VERSION
-            self._send_startup_message(no_compact=self.no_compact)
-        else:
-            log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.endpoint)
-            self.send_msg(OptionsMessage(), self.get_request_id(), self._handle_options_response)
+        log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.endpoint)
+        self.send_msg(OptionsMessage(), self.get_request_id(), self._handle_options_response)
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
@@ -950,6 +942,7 @@ class Connection(object):
                   id(self), self.endpoint)
         supported_cql_versions = options_response.cql_versions
         remote_supported_compressions = options_response.options['COMPRESSION']
+        self.product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
 
         if self.cql_version:
             if self.cql_version not in supported_cql_versions:
