@@ -2928,7 +2928,7 @@ class ControlConnection(object):
     # Used only when token_metadata_enabled is set to False
     _SELECT_LOCAL_NO_TOKENS_RPC_ADDRESS = "SELECT rpc_address FROM system.local WHERE key='local'"
 
-    _SELECT_SCHEMA_PEERS = "SELECT peer, rpc_address, schema_version FROM system.peers"
+    _SELECT_SCHEMA_PEERS = "SELECT peer, host_id, rpc_address, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
 
     _is_shutdown = False

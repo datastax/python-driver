@@ -22,11 +22,17 @@ import subprocess
 
 from cassandra.cluster import Cluster
 
-from tests.integration import CLOUD_PROXY_PATH
+from tests.integration import CLOUD_PROXY_PATH, USE_CASS_EXTERNAL
+
+
+def setup_package():
+    if CLOUD_PROXY_PATH and not USE_CASS_EXTERNAL:
+        start_cloud_proxy()
 
 
 def teardown_package():
-    stop_cloud_proxy()
+    if not USE_CASS_EXTERNAL:
+        stop_cloud_proxy()
 
 
 class CloudProxyCluster(unittest.TestCase):
@@ -40,21 +46,12 @@ class CloudProxyCluster(unittest.TestCase):
     session = None
 
     @classmethod
-    def setUpClass(cls):
-        if CLOUD_PROXY_PATH is not None:
-            start_cloud_proxy()
-
-    @classmethod
     def connect(cls, creds, **kwargs):
         cloud_config = {
             'secure_connect_bundle': creds,
         }
         cls.cluster = Cluster(cloud=cloud_config, protocol_version=4, **kwargs)
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        stop_cloud_proxy()
 
     def tearDown(self):
         if self.cluster:
