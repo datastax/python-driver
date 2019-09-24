@@ -12,23 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from cassandra.datastax.graph.types import Element, Vertex, VertexProperty, Edge, Path
-from cassandra.datastax.graph.query import (
-    GraphOptions, GraphProtocol, GraphStatement, SimpleGraphStatement, Result,
-    graph_object_row_factory, single_object_row_factory,
-    graph_result_row_factory, graph_graphson2_row_factory
-)
-from cassandra.datastax.graph.graphson import *
-
-
-HAVE_GREMLIN = False
 try:
     import gremlin_python
-    HAVE_GREMLIN = True
+    from cassandra.datastax.graph._serializers import *
 except ImportError:
     # gremlinpython is not installed.
     pass
-
-if HAVE_GREMLIN:
-    from cassandra.datastax.graph._dse_graph import *
