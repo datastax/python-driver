@@ -2522,7 +2522,8 @@ class Session(object):
         not yet connected, the query will fail with :class:`NoHostAvailable`. Using this is
         discouraged except in a few cases, e.g., querying node-local tables and applying schema changes.
 
-        `execute_as` the user that will be used on the server to execute the request.
+        `execute_as` the user that will be used on the server to execute the request. This is only available
+        on a DSE cluster.
         """
 
         return self.execute_async(query, parameters, trace, custom_payload, timeout, execution_profile, paging_state, host, execute_as).result()

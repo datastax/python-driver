@@ -138,7 +138,7 @@ schedules:
     schedule: adhoc
     disable_pull_requests: true
     branches:
-      include: ['oss-next']
+      include: [/oss-next.*/]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
       EXCLUDE_LONG=1

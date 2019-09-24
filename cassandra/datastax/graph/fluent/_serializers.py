@@ -31,7 +31,7 @@ from cassandra.datastax.graph.graphson import (
     GraphSON2Deserializer
 )
 
-from cassandra.datastax.graph.predicates import GeoP, TextDistanceP
+from cassandra.datastax.graph.fluent.predicates import GeoP, TextDistanceP
 from cassandra.util import Distance
 
 

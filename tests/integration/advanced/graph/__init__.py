@@ -11,10 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-try:
-    import gremlin_python
-    from cassandra.datastax.graph._predicates import *
-except ImportError:
-    # gremlinpython is not installed.
-    pass
