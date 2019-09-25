@@ -614,36 +614,42 @@ def generate_address_book_graph(session, size):
 
 
 def generate_large_complex_graph(session, size):
-        to_run = '''schema.config().option('graph.schema_mode').set('development');
-            int size = 2000;
-            List ids = new ArrayList();
-            schema.propertyKey('ts').Int().single().ifNotExists().create();
-            schema.propertyKey('sin').Int().single().ifNotExists().create();
-            schema.propertyKey('cos').Int().single().ifNotExists().create();
-            schema.propertyKey('ii').Int().single().ifNotExists().create();
-            schema.vertexLabel('lcg').properties('ts', 'sin', 'cos', 'ii').ifNotExists().create();
-            schema.edgeLabel('linked').connection('lcg', 'lcg').ifNotExists().create();
-            Vertex v = graph.addVertex(label, 'lcg');
-            v.property("ts", 100001);
-            v.property("sin", 0);
-            v.property("cos", 1);
-            v.property("ii", 0);
+    prof = session.execution_profile_clone_update(EXEC_PROFILE_GRAPH_DEFAULT, request_timeout=32)
+    to_run = '''
+        schema.config().option('graph.schema_mode').set('development');
+        schema.config().option('graph.allow_scan').set('true');
+    '''
+    session.execute_graph(to_run, execution_profile=prof)
+    to_run = '''
+        int size = 2000;
+        List ids = new ArrayList();
+        schema.propertyKey('ts').Int().single().ifNotExists().create();
+        schema.propertyKey('sin').Int().single().ifNotExists().create();
+        schema.propertyKey('cos').Int().single().ifNotExists().create();
+        schema.propertyKey('ii').Int().single().ifNotExists().create();
+        schema.vertexLabel('lcg').properties('ts', 'sin', 'cos', 'ii').ifNotExists().create();
+        schema.edgeLabel('linked').connection('lcg', 'lcg').ifNotExists().create();
+        Vertex v = graph.addVertex(label, 'lcg');
+        v.property("ts", 100001);
+        v.property("sin", 0);
+        v.property("cos", 1);
+        v.property("ii", 0);
+        ids.add(v.id());
+        Random rand = new Random();
+        for (int ii = 1; ii < size; ii++) {
+            v = graph.addVertex(label, 'lcg');
+            v.property("ii", ii);
+            v.property("ts", 100001 + ii);
+            v.property("sin", Math.sin(ii/5.0));
+            v.property("cos", Math.cos(ii/5.0));
+            Vertex u = g.V(ids.get(rand.nextInt(ids.size()))).next();
+            v.addEdge("linked", u);
+            ids.add(u.id());
             ids.add(v.id());
-            Random rand = new Random();
-            for (int ii = 1; ii < size; ii++) {
-                v = graph.addVertex(label, 'lcg');
-                v.property("ii", ii);
-                v.property("ts", 100001 + ii);
-                v.property("sin", Math.sin(ii/5.0));
-                v.property("cos", Math.cos(ii/5.0));
-                Vertex u = g.V(ids.get(rand.nextInt(ids.size()))).next();
-                v.addEdge("linked", u);
-                ids.add(u.id());
-                ids.add(v.id());
-            }
-            g.V().count();'''
-        prof = session.execution_profile_clone_update(EXEC_PROFILE_GRAPH_DEFAULT, request_timeout=32)
-        session.execute_graph(to_run, execution_profile=prof)
+        }
+        g.V().count();'''
+
+    session.execute_graph(to_run, execution_profile=prof)
 
 
 def validate_classic_vertex(test, vertex):
