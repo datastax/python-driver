@@ -164,9 +164,6 @@ build:
       pip install nose-exclude
       pip install service_identity
 
-      # Required for DBaaS and https+ssl cert
-      pip install pyopenssl ndg-httpsclient pyasn1
-
       FORCE_CYTHON=False
       if [[ $CYTHON == 'CYTHON' ]]; then
         FORCE_CYTHON=True
