@@ -10,6 +10,7 @@ Core Driver
    cassandra/cluster
    cassandra/policies
    cassandra/auth
+   cassandra/graph
    cassandra/metadata
    cassandra/metrics
    cassandra/query
@@ -46,6 +47,7 @@ DataStax Graph
 .. toctree::
    :maxdepth: 1
 
+   cassandra/datastax/graph/index
    cassandra/datastax/graph/fluent/index
    cassandra/datastax/graph/fluent/query
    cassandra/datastax/graph/fluent/predicates

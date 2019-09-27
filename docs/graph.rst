@@ -7,9 +7,9 @@ executing gremlin queries in DSE Graph.
 
 Three Execution Profiles are provided suitable for graph execution:
 
-* :data:`.cluster.EXEC_PROFILE_GRAPH_DEFAULT`
-* :data:`.cluster.EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT`
-* :data:`.cluster.EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT`
+* :data:`~.cluster.EXEC_PROFILE_GRAPH_DEFAULT`
+* :data:`~.cluster.EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT`
+* :data:`~.cluster.EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT`
 
 See :doc:`getting_started` and :doc:`execution_profiles`
 for more detail on working with profiles.

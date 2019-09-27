@@ -128,6 +128,15 @@
 .. autodata:: EXEC_PROFILE_DEFAULT
    :annotation:
 
+.. autodata:: EXEC_PROFILE_GRAPH_DEFAULT
+   :annotation:
+
+.. autodata:: EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT
+   :annotation:
+
+.. autodata:: EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT
+   :annotation:
+
 .. autoclass:: Session ()
 
    .. autoattribute:: default_timeout
