@@ -1,5 +1,5 @@
-DSE Graph Queries
-=================
+DataStax Graph Queries
+======================
 
 The Cassandra driver executes graph queries over the Cassandra native protocol. Use
 :meth:`.Session.execute_graph` or :meth:`.Session.execute_graph_async` for 
@@ -7,9 +7,9 @@ executing gremlin queries in DSE Graph.
 
 Three Execution Profiles are provided suitable for graph execution:
 
-* :data:`~.cluster.EXEC_PROFILE_GRAPH_DEFAULT`
-* :data:`~.cluster.EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT`
-* :data:`~.cluster.EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT`
+* :data:`.cluster.EXEC_PROFILE_GRAPH_DEFAULT`
+* :data:`.cluster.EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT`
+* :data:`.cluster.EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT`
 
 See :doc:`getting_started` and :doc:`execution_profiles`
 for more detail on working with profiles.
@@ -170,6 +170,8 @@ We are all set. You can now query your graph. Here are some examples::
 
 To see a more graph examples, see `DataStax Graph Examples <https://github.com/datastax/graph-examples/>`_.
 
+.. _graph-types:
+
 Graph Types
 ~~~~~~~~~~~
 
@@ -222,11 +224,12 @@ or lists by index::
     result.value  # [0, 1, 2] (list)
     result[1]  # 1 (list[1])
 
-You can use a different row factory by setting :attr:`.Session.default_graph_row_factory` or passing it to
-:meth:`.Session.execute_graph`. For example, :func:`.datastax.graph.single_object_row_factory` returns the JSON result string`,
+You can use a different row factory by setting :attr:`.cluster.ExecutionProfile.row_factory` or passing it to
+:meth:`cluster.Session.execute_graph`. For example, :func:`.datastax.graph.single_object_row_factory` returns the JSON result string,
 unparsed. :func:`.datastax.graph.graph_result_row_factory` returns parsed, but unmodified results (such that all metadata is retained,
 unlike :func:`.datastax.graph.graph_object_row_factory`, which sheds some as attributes and properties are unpacked). These results
-also provide convenience methods for converting to known types (:meth:`~.Result.as_vertex`, :meth:`~.Result.as_edge`, :meth:`~.Result.as_path`).
+also provide convenience methods for converting to known types (:meth:`.datastax.graph.Result.as_vertex`, :meth:`.datastax.graph.Result.as_edge`,
+ :meth:`.datastax.graph.Result.as_path`).
 
 Vertex and Edge properties are never unpacked since their types are unknown. If you know your graph schema and want to
 deserialize properties, use the :class:`.datastax.graph.GraphSON1Deserializer`. It provides convenient methods to deserialize by types (e.g.

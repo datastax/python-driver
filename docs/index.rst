@@ -59,6 +59,9 @@ Contents
 :doc:`graph`
     Graph queries with DSE Graph
 
+:doc:`graph_fluent`
+    DataStax Graph Fluent API
+
 :doc:`CHANGELOG`
     Log of changes to the driver, organized by version.
 
@@ -78,6 +81,7 @@ Contents
    object_mapper
    geo_types
    graph
+   graph_fluent
    dse_auth
    dates_and_times
    faq
