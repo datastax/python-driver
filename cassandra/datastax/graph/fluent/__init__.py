@@ -180,8 +180,8 @@ if HAVE_GREMLIN:
 
             .. code-block:: python
 
-                from dse.cluster import Cluster
-                from dse_graph import DseGraph
+                from cassandra.cluster import Cluster
+                from cassandra.datastax.graph.fluent import DseGraph
 
                 c = Cluster()
                 session = c.connect()
@@ -218,7 +218,7 @@ if HAVE_GREMLIN:
         @staticmethod
         def batch(*args, **kwargs):
             """
-            Returns the :class:`dse_graph.query.TraversalBatch` object allowing to
+            Returns the :class:`cassandra.datastax.graph.fluent.query.TraversalBatch` object allowing to
             execute multiple traversals in the same transaction.
             """
             return _DefaultTraversalBatch(*args, **kwargs)

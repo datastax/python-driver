@@ -233,7 +233,7 @@ which is not really verbose and quite annoying to repeat in a code base. Let's c
 
 Now, we can use our DSL that is a lot cleaner::
 
-  from dse_graph import DseGraph
+  from cassandra.datastax.graph.fluent import DseGraph
 
   # ...
   g = DseGraph.traversal_source(session=session, traversal_class=MyAppTraversalsource)
