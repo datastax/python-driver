@@ -121,6 +121,7 @@ class MonitorReporter(Thread):
         try:
             local_ipaddr = cc._connection._socket.getsockname()[0]
         except Exception as e:
+            local_ipaddr = None
             log.debug('Unable to get local socket addr from {}: {}'.format(cc._connection, e))
         hostname = socket.getfqdn()
 
