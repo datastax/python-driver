@@ -38,11 +38,8 @@ DISALLOWED_CONSISTENCIES = [
     ConsistencyLevel.ONE,
     ConsistencyLevel.TWO,
     ConsistencyLevel.THREE,
-    ConsistencyLevel.QUORUM,
-    ConsistencyLevel.ALL,
     ConsistencyLevel.EACH_QUORUM,
     ConsistencyLevel.LOCAL_ONE,
-    ConsistencyLevel.SERIAL
 ]
 
 
