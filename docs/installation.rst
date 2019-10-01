@@ -88,6 +88,18 @@ To check if the installation was successful, you can run::
 
 It should print something like "2.7.0".
 
+.. _installation-datastax-graph:
+
+(*Optional*) DataStax Graph
+---------------------------
+The driver provides an optional fluent graph API that depends on Apache TinkerPop (gremlinpython). It is
+not installed by default. To be able to build Gremlin traversals, you need to install
+the `graph` requirements::
+
+    pip install cassandra-driver[graph]
+
+See :doc:`graph_fluent` for more details about this API.
+
 (*Optional*) Compression Support
 --------------------------------
 Compression can optionally be used for communication between the driver and

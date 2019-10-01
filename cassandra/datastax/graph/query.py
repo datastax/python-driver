@@ -35,9 +35,9 @@ _graph_options = (
     ('graph_source', 'choose the graph traversal source, configured on the server side.', 'graph-source'),
     ('graph_language', 'the language used in the queries (default "gremlin-groovy")', 'graph-language'),
     ('graph_protocol', 'the graph protocol that the server should use for query results (default "graphson-1-0")', 'graph-results'),
-    ('graph_read_consistency_level', '''read `dse.ConsistencyLevel <http://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/#cassandra.ConsistencyLevel>`_ for graph queries (if distinct from session default).
+    ('graph_read_consistency_level', '''read `cassandra.ConsistencyLevel <http://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/#cassandra.ConsistencyLevel>`_ for graph queries (if distinct from session default).
 Setting this overrides the native `Statement.consistency_level <http://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/query/#cassandra.query.Statement.consistency_level>`_ for read operations from Cassandra persistence''', 'graph-read-consistency'),
-    ('graph_write_consistency_level', '''write `dse.ConsistencyLevel <http://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/#cassandra.ConsistencyLevel>`_ for graph queries (if distinct from session default).
+    ('graph_write_consistency_level', '''write `cassandra.ConsistencyLevel <http://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/#cassandra.ConsistencyLevel>`_ for graph queries (if distinct from session default).
 Setting this overrides the native `Statement.consistency_level <http://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/query/#cassandra.query.Statement.consistency_level>`_ for write operations to Cassandra persistence.''', 'graph-write-consistency')
 )
 _graph_option_names = tuple(option[0] for option in _graph_options)
@@ -121,7 +121,7 @@ class GraphOptions(object):
 
     def set_graph_protocol(self, protocol):
         """
-        Sets ``graph_protocol`` as server graph results format (See :class:`dse.graph.GraphProtocol`)
+        Sets ``graph_protocol`` as server graph results format (See :class:`cassandra.datastax.graph.GraphProtocol`)
         """
         self.graph_protocol = protocol
 
@@ -195,7 +195,7 @@ def single_object_row_factory(column_names, rows):
 
 def graph_result_row_factory(column_names, rows):
     """
-    Returns a :class:`cassandra.graph.Result` object that can load graph results and produce specific types.
+    Returns a :class:`Result <cassandra.datastax.graph.Result>` object that can load graph results and produce specific types.
     The Result JSON is deserialized and unpacked from the top-level 'result' dict.
     """
     return [Result(json.loads(row[0])['result']) for row in rows]
@@ -205,7 +205,7 @@ def graph_object_row_factory(column_names, rows):
     """
     Like :func:`~.graph_result_row_factory`, except known element types (:class:`~.Vertex`, :class:`~.Edge`) are
     converted to their simplified objects. Some low-level metadata is shed in this conversion. Unknown result types are
-    still returned as :class:`dse.graph.Result`.
+    still returned as :class:`Result <cassandra.datastax.graph.Result>`.
     """
     return _graph_object_sequence(json.loads(row[0])['result'] for row in rows)
 

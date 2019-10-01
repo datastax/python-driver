@@ -409,6 +409,10 @@ def run_setup(extensions):
     if not PY3:
         dependencies.append('futures')
 
+    _EXTRAS_REQUIRE = {
+        'graph': ['gremlinpython>=3.3.4,<3.3.9']
+    }
+
     setup(
         name='cassandra-driver',
         version=__version__,
@@ -423,11 +427,13 @@ def run_setup(extensions):
         author='DataStax',
         packages=[
             'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
-            'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph'
+            'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
+            'cassandra.datastax.graph.fluent'
         ],
         keywords='cassandra,cql,orm,dse,graph',
         include_package_data=True,
         install_requires=dependencies,
+        extras_require=_EXTRAS_REQUIRE,
         tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',

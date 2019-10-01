@@ -128,6 +128,15 @@
 .. autodata:: EXEC_PROFILE_DEFAULT
    :annotation:
 
+.. autodata:: EXEC_PROFILE_GRAPH_DEFAULT
+   :annotation:
+
+.. autodata:: EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT
+   :annotation:
+
+.. autodata:: EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT
+   :annotation:
+
 .. autoclass:: Session ()
 
    .. autoattribute:: default_timeout
@@ -152,9 +161,13 @@
 
    .. autoattribute:: client_protocol_handler
 
-   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload][, paging_state][, host])
+   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload][, paging_state][, host][, execute_as])
 
-   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload][, paging_state][, host])
+   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload][, paging_state][, host][, execute_as])
+
+   .. automethod:: execute_graph(statement[, parameters][, trace][, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT][, execute_as])
+
+   .. automethod:: execute_graph_async(statement[, parameters][, trace][, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT][, execute_as])
 
    .. automethod:: prepare(statement)
 
