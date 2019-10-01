@@ -110,8 +110,12 @@ class Metadata(object):
     token_map = None
     """ A :class:`~.TokenMap` instance describing the ring topology. """
 
+    dbaas = False
+    """ A boolean indicating if connected to a DBaaS cluster """
+
     def __init__(self):
         self.keyspaces = {}
+        self.dbaas = False
         self._hosts = {}
         self._hosts_lock = RLock()
 

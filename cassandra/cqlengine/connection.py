@@ -184,8 +184,6 @@ def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
         conn = Connection.from_session(name, session=session)
         conn.setup_session()
     else:  # use hosts argument
-        if consistency is None:
-            consistency = ConsistencyLevel.LOCAL_ONE
         conn = Connection(
             name, hosts=hosts,
             consistency=consistency, lazy_connect=lazy_connect,

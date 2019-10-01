@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License
+from cassandra.query import SimpleStatement
 
 try:
     import unittest2 as unittest
@@ -20,8 +21,8 @@ except ImportError:
 import six
 from ssl import SSLContext, PROTOCOL_TLSv1
 
-from cassandra import DriverException
-from cassandra.cluster import NoHostAvailable
+from cassandra import DriverException, ConsistencyLevel, InvalidRequest
+from cassandra.cluster import NoHostAvailable, ExecutionProfile, Cluster
 from cassandra.connection import SniEndPoint
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy, ConstantReconnectionPolicy
@@ -31,6 +32,15 @@ from mock import patch
 from tests.integration import requirescloudproxy
 from tests.integration.util import wait_until_not_raised
 from tests.integration.advanced.cloud import CloudProxyCluster, CLOUD_PROXY_SERVER
+
+DISALLOWED_CONSISTENCIES = [
+    ConsistencyLevel.ANY,
+    ConsistencyLevel.ONE,
+    ConsistencyLevel.TWO,
+    ConsistencyLevel.THREE,
+    ConsistencyLevel.EACH_QUORUM,
+    ConsistencyLevel.LOCAL_ONE,
+]
 
 
 @requirescloudproxy
@@ -103,7 +113,7 @@ class CloudTests(CloudProxyCluster):
 
         self.connect(self.creds,
                      idle_heartbeat_interval=1, idle_heartbeat_timeout=1,
-                     reconnection_policy=ConstantReconnectionPolicy(50))
+                     reconnection_policy=ConstantReconnectionPolicy(120))
 
         self.assertEqual(len(self.hosts_up()), 3)
         CLOUD_PROXY_SERVER.stop_node(1)
@@ -130,3 +140,72 @@ class CloudTests(CloudProxyCluster):
             self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLSv1))
 
         self.assertIn('Unable to connect to the metadata', str(cm.exception))
+
+    def test_default_consistency(self):
+        self.connect(self.creds)
+        self.assertEqual(self.session.default_consistency_level, ConsistencyLevel.LOCAL_QUORUM)
+        self.assertEqual(self.cluster.profile_manager.default.consistency_level, ConsistencyLevel.LOCAL_QUORUM)
+
+    def test_default_consistency_of_execution_profiles(self):
+        cloud_config = {'secure_connect_bundle': self.creds}
+        self.cluster = Cluster(cloud=cloud_config, protocol_version=4, execution_profiles={
+            'pre_create_default_ep': ExecutionProfile(),
+            'pre_create_changed_ep': ExecutionProfile(
+                consistency_level=ConsistencyLevel.LOCAL_ONE,
+            ),
+        })
+        self.cluster.add_execution_profile('pre_connect_default_ep', ExecutionProfile())
+        self.cluster.add_execution_profile(
+            'pre_connect_changed_ep',
+            ExecutionProfile(
+                consistency_level=ConsistencyLevel.LOCAL_ONE,
+            )
+        )
+        session = self.cluster.connect(wait_for_all_pools=True)
+
+        self.cluster.add_execution_profile('post_connect_default_ep', ExecutionProfile())
+        self.cluster.add_execution_profile(
+            'post_connect_changed_ep',
+            ExecutionProfile(
+                consistency_level=ConsistencyLevel.LOCAL_ONE,
+            )
+        )
+
+        for default in ['pre_create_default_ep', 'pre_connect_default_ep', 'post_connect_default_ep']:
+            cl = self.cluster.profile_manager.profiles[default].consistency_level
+            self.assertEqual(
+                cl, ConsistencyLevel.LOCAL_QUORUM,
+                "Expecting LOCAL QUORUM for profile {}, but got {} instead".format(default, cl)
+            )
+        for changed in ['pre_create_changed_ep', 'pre_connect_changed_ep', 'post_connect_changed_ep']:
+            cl = self.cluster.profile_manager.profiles[changed].consistency_level
+            self.assertEqual(
+                cl, ConsistencyLevel.LOCAL_ONE,
+                "Expecting LOCAL ONE for profile {}, but got {} instead".format(default, cl)
+            )
+
+    def test_consistency_guardrails(self):
+        self.connect(self.creds)
+        self.session.execute(
+            "CREATE KEYSPACE IF NOT EXISTS test_consistency_guardrails "
+            "with replication={'class': 'SimpleStrategy', 'replication_factor': 1}"
+        )
+        self.session.execute("CREATE TABLE IF NOT EXISTS test_consistency_guardrails.guardrails (id int primary key)")
+        for consistency in DISALLOWED_CONSISTENCIES:
+            statement = SimpleStatement(
+                "INSERT INTO test_consistency_guardrails.guardrails (id) values (1)",
+                consistency_level=consistency
+            )
+            with self.assertRaises(InvalidRequest) as e:
+                self.session.execute(statement)
+            self.assertIn('not allowed for Write Consistency Level', str(e.exception))
+
+        # Sanity check to make sure we can do a normal insert
+        statement = SimpleStatement(
+            "INSERT INTO test_consistency_guardrails.guardrails (id) values (1)",
+            consistency_level=ConsistencyLevel.LOCAL_QUORUM
+        )
+        try:
+            self.session.execute(statement)
+        except InvalidRequest:
+            self.fail("InvalidRequest was incorrectly raised for write query at LOCAL QUORUM!")

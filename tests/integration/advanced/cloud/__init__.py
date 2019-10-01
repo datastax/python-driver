@@ -89,7 +89,7 @@ class CloudProxyServer(object):
         return self.running
 
     def start_node(self, id):
-        subcommand = 'node{} start --root --wait-for-binary-proto'.format(id)
+        subcommand = 'node{} start --jvm_arg "-Ddse.product_type=DATASTAX_APOLLO" --root --wait-for-binary-proto'.format(id)
         subprocess.call(
             [self.ccm_command.format(subcommand)],
             shell=True)
