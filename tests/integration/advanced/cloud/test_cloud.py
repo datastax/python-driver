@@ -36,13 +36,7 @@ from tests.integration.advanced.cloud import CloudProxyCluster, CLOUD_PROXY_SERV
 DISALLOWED_CONSISTENCIES = [
     ConsistencyLevel.ANY,
     ConsistencyLevel.ONE,
-    ConsistencyLevel.TWO,
-    ConsistencyLevel.THREE,
-    ConsistencyLevel.QUORUM,
-    ConsistencyLevel.ALL,
-    ConsistencyLevel.EACH_QUORUM,
     ConsistencyLevel.LOCAL_ONE,
-    ConsistencyLevel.SERIAL
 ]
 
 
