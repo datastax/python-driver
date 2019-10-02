@@ -1103,6 +1103,7 @@ class ClusterTests(unittest.TestCase):
         else:
             raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
 
+    @notwindows
     def test_execute_query_timeout(self):
         with Cluster() as cluster:
             session = cluster.connect(wait_for_all_pools=True)
