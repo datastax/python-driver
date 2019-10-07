@@ -210,8 +210,6 @@ class ConnectionTests(SimulacronBase):
         class PatchedRoundRobinPolicy(RoundRobinPolicy):
             # Send always to same host
             def make_query_plan(self, working_keyspace=None, query=None):
-                print query
-                print self._live_hosts
                 if query and query.query_string == query_to_prime:
                     return filter(lambda h: h == query_host, self._live_hosts)
                 else:
