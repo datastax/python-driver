@@ -27,8 +27,9 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from tests import connection_class, thread_pool_executor_class
+from tests.unit.cython.utils import cythontest
 from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
-from tests.integration.util import assert_quiescent_pool_state
+from tests.integration.util import assert_quiescent_pool_state, late
 from tests.integration.simulacron import SimulacronBase
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
@@ -177,6 +178,80 @@ class ConnectionTests(SimulacronBase):
         # PYTHON-630 -- only the errback should be called
         errback.assert_called_once()
         callback.assert_not_called()
+
+    @cythontest
+    def test_heartbeat_defunct_deadlock(self):
+        """
+        Ensure that there is no deadlock when request is in-flight and heartbeat defuncts connection
+        @since 3.16
+        @jira_ticket PYTHON-1044
+        @expected_result an OperationTimeout is raised and no deadlock occurs
+
+        @test_category connection
+        """
+        start_and_prime_singledc()
+
+        # This is all about timing. We will need the QUERY response future to time out and the heartbeat to defunct
+        # at the same moment. The latter will schedule a QUERY retry to another node in case the pool is not
+        # already shut down.  If and only if the response future timeout falls in between the retry scheduling and
+        # its execution the deadlock occurs. The odds are low, so we need to help fate a bit:
+        # 1) Make one heartbeat messages be sent to every node
+        # 2) Our QUERY goes always to the same host
+        # 3) This host needs to defunct first
+        # 4) Open a small time window for the response future timeout, i.e. block executor threads for retry
+        #    execution and last connection to defunct
+        query_to_prime = "SELECT * from testkesypace.testtable"
+        query_host = "127.0.0.2"
+        heartbeat_interval = 1
+        heartbeat_timeout = 1
+        lag = 0.05
+        never = 9999
+
+        class PatchedRoundRobinPolicy(RoundRobinPolicy):
+            # Send always to same host
+            def make_query_plan(self, working_keyspace=None, query=None):
+                print query
+                print self._live_hosts
+                if query and query.query_string == query_to_prime:
+                    return filter(lambda h: h == query_host, self._live_hosts)
+                else:
+                    return super(PatchedRoundRobinPolicy, self).make_query_plan()
+
+        class PatchedCluster(Cluster):
+            # Make sure that QUERY connection will timeout first
+            def get_connection_holders(self):
+                holders = super(PatchedCluster, self).get_connection_holders()
+                return sorted(holders, reverse=True, key=lambda v: int(v._connection.host == query_host))
+
+            # Block executor thread like closing a dead socket could do
+            def connection_factory(self, *args, **kwargs):
+                conn = super(PatchedCluster, self).connection_factory(*args, **kwargs)
+                conn.defunct = late(seconds=2*lag)(conn.defunct)
+                return conn
+
+        cluster = PatchedCluster(
+            protocol_version=PROTOCOL_VERSION,
+            compression=False,
+            idle_heartbeat_interval=heartbeat_interval,
+            idle_heartbeat_timeout=heartbeat_timeout,
+            load_balancing_policy=PatchedRoundRobinPolicy()
+        )
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+
+        prime_query(query_to_prime, then={"delay_in_ms": never})
+
+        # Make heartbeat due
+        time.sleep(heartbeat_interval)
+
+        future = session.execute_async(query_to_prime, timeout=heartbeat_interval+heartbeat_timeout+3*lag)
+        # Delay thread execution like kernel could do
+        future._retry_task = late(seconds=4*lag)(future._retry_task)
+
+        prime_request(PrimeOptions(then={"result": "no_result", "delay_in_ms": never}))
+        prime_request(RejectConnections("unbind"))
+
+        self.assertRaisesRegexp(OperationTimedOut, "Connection defunct by heartbeat", future.result)
 
     def test_close_when_query(self):
         """
