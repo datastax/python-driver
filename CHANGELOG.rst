@@ -6,6 +6,7 @@ Bug Fixes
 ---------
 * Connection setup methods prevent using ExecutionProfile in cqlengine (PYTHON-1009)
 * Driver deadlock if all connections dropped by heartbeat whilst request in flight and request times out (PYTHON-1044)
+* Exception when use pk__token__gt filter In python 3.7 (PYTHON-1121)
 
 3.19.0
 ======
