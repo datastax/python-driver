@@ -5,6 +5,7 @@ Unreleased
 Bug Fixes
 ---------
 * Connection setup methods prevent using ExecutionProfile in cqlengine (PYTHON-1009)
+* Driver deadlock if all connections dropped by heartbeat whilst request in flight and request times out (PYTHON-1044)
 
 3.19.0
 ======

@@ -27,6 +27,7 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from tests import connection_class, thread_pool_executor_class
+from tests.unit.cython.utils import cythontest
 from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
 from tests.integration.util import assert_quiescent_pool_state, late
 from tests.integration.simulacron import SimulacronBase
@@ -178,6 +179,7 @@ class ConnectionTests(SimulacronBase):
         errback.assert_called_once()
         callback.assert_not_called()
 
+    @cythontest
     def test_heartbeat_defunct_deadlock(self):
         """
         Ensure that there is no deadlock when request is in-flight and heartbeat defuncts connection
