@@ -98,6 +98,7 @@ Bug Fixes
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
 * Discovered node doesn´t honor the configured Cluster port on connection (PYTHON-1127)
+* Exception when use pk__token__gt filter In python 3.7 (PYTHON-1121)
 
 Other
 -----
