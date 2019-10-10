@@ -17,33 +17,89 @@ from collections import OrderedDict
 import six
 
 from gremlin_python.structure.io.graphsonV2d0 import (
-    GraphSONReader,
-    GraphSONUtil,
-    VertexDeserializer,
-    VertexPropertyDeserializer,
-    PropertyDeserializer,
-    EdgeDeserializer,
-    PathDeserializer
+    GraphSONReader as GraphSONReaderV2,
+    GraphSONUtil as GraphSONUtil,  # no difference between v2 and v3
+    VertexDeserializer as VertexDeserializerV2,
+    VertexPropertyDeserializer as VertexPropertyDeserializerV2,
+    PropertyDeserializer as PropertyDeserializerV2,
+    EdgeDeserializer as EdgeDeserializerV2,
+    PathDeserializer as PathDeserializerV2
 )
 
-from cassandra.datastax.graph.graphson import (
+from gremlin_python.structure.io.graphsonV3d0 import (
+    GraphSONReader as GraphSONReaderV3,
+    VertexDeserializer as VertexDeserializerV3,
+    VertexPropertyDeserializer as VertexPropertyDeserializerV3,
+    PropertyDeserializer as PropertyDeserializerV3,
+    EdgeDeserializer as EdgeDeserializerV3,
+    PathDeserializer as PathDeserializerV3
+)
+
+try:
+    from gremlin_python.structure.io.graphsonV2d0 import (
+        TraversalMetricsDeserializer as TraversalMetricsDeserializerV2,
+        MetricsDeserializer as MetricsDeserializerV2
+    )
+    from gremlin_python.structure.io.graphsonV3d0 import (
+        TraversalMetricsDeserializer as TraversalMetricsDeserializerV3,
+        MetricsDeserializer as MetricsDeserializerV3
+    )
+except ImportError:
+    TraversalMetricsDeserializerV2 = MetricsDeserializerV2 = None
+    TraversalMetricsDeserializerV3 = MetricsDeserializerV3 = None
+
+from cassandra.graph import (
     GraphSON2Serializer,
-    GraphSON2Deserializer
+    GraphSON2Deserializer,
+    GraphSON3Serializer,
+    GraphSON3Deserializer
 )
-
+from cassandra.graph.graphson import UserTypeIO, TypeWrapperTypeIO
 from cassandra.datastax.graph.fluent.predicates import GeoP, TextDistanceP
 from cassandra.util import Distance
 
 
 __all__ = ['GremlinGraphSONReader', 'GeoPSerializer', 'TextDistancePSerializer',
-           'DistanceIO', 'gremlin_deserializers', 'deserializers', 'serializers']
+           'DistanceIO', 'gremlin_deserializers', 'deserializers', 'serializers',
+           'GremlinGraphSONReaderV2', 'GremlinGraphSONReaderV3', 'dse_graphson2_serializers',
+           'dse_graphson2_deserializers', 'dse_graphson3_serializers', 'dse_graphson3_deserializers',
+           'gremlin_graphson2_deserializers', 'gremlin_graphson3_deserializers', 'GremlinUserTypeIO']
 
 
 class _GremlinGraphSONTypeSerializer(object):
+    TYPE_KEY = "@type"
+    VALUE_KEY = "@value"
+    serializer = None
 
-    @classmethod
-    def dictify(cls, v, _):
-        return GraphSON2Serializer.serialize(v)
+    def __init__(self, serializer):
+        self.serializer = serializer
+
+    def dictify(self, v, writer):
+        value = self.serializer.serialize(v, writer)
+        if self.serializer is TypeWrapperTypeIO:
+            graphson_base_type = v.type_io.graphson_base_type
+            graphson_type = v.type_io.graphson_type
+        else:
+            graphson_base_type = self.serializer.graphson_base_type
+            graphson_type = self.serializer.graphson_type
+
+        if graphson_base_type is None:
+            out = value
+        else:
+            out = {self.TYPE_KEY: graphson_type}
+            if value is not None:
+                out[self.VALUE_KEY] = value
+
+        return out
+
+    def definition(self, value, writer=None):
+        return self.serializer.definition(value, writer)
+
+    def get_specialized_serializer(self, value):
+        ser = self.serializer.get_specialized_serializer(value)
+        if ser is not self.serializer:
+            return _GremlinGraphSONTypeSerializer(ser)
+        return self
 
 
 class _GremlinGraphSONTypeDeserializer(object):
@@ -54,20 +110,42 @@ class _GremlinGraphSONTypeDeserializer(object):
         self.deserializer = deserializer
 
     def objectify(self, v, reader):
-        return self.deserializer.deserialize(v, reader=reader)
+        return self.deserializer.deserialize(v, reader)
 
 
-def _make_gremlin_deserializer(graphson_type):
+def _make_gremlin_graphson2_deserializer(graphson_type):
     return _GremlinGraphSONTypeDeserializer(
         GraphSON2Deserializer.get_deserializer(graphson_type.graphson_type)
     )
 
 
-class GremlinGraphSONReader(GraphSONReader):
+def _make_gremlin_graphson3_deserializer(graphson_type):
+    return _GremlinGraphSONTypeDeserializer(
+        GraphSON3Deserializer.get_deserializer(graphson_type.graphson_type)
+    )
+
+
+class _GremlinGraphSONReader(object):
     """Gremlin GraphSONReader Adapter, required to use gremlin types"""
+
+    context = None
+
+    def __init__(self, context, deserializer_map=None):
+        self.context = context
+        super(_GremlinGraphSONReader, self).__init__(deserializer_map)
 
     def deserialize(self, obj):
         return self.toObject(obj)
+
+
+class GremlinGraphSONReaderV2(_GremlinGraphSONReader, GraphSONReaderV2):
+    pass
+
+# TODO remove next major
+GremlinGraphSONReader = GremlinGraphSONReaderV2
+
+class GremlinGraphSONReaderV3(_GremlinGraphSONReader, GraphSONReaderV3):
+    pass
 
 
 class GeoPSerializer(object):
@@ -100,32 +178,85 @@ class DistanceIO(object):
         return GraphSONUtil.typedValue('Distance', six.text_type(v), prefix='dse')
 
 
-serializers = OrderedDict([
-    (t, _GremlinGraphSONTypeSerializer)
-    for t in six.iterkeys(GraphSON2Serializer.get_type_definitions())
+GremlinUserTypeIO = _GremlinGraphSONTypeSerializer(UserTypeIO)
+
+# GraphSON2
+dse_graphson2_serializers = OrderedDict([
+    (t, _GremlinGraphSONTypeSerializer(s))
+    for t, s in six.iteritems(GraphSON2Serializer.get_type_definitions())
 ])
 
-# Predicates
-serializers.update(OrderedDict([
+dse_graphson2_serializers.update(OrderedDict([
     (Distance, DistanceIO),
     (GeoP, GeoPSerializer),
     (TextDistanceP, TextDistancePSerializer)
 ]))
 
-deserializers = {
-    k: _make_gremlin_deserializer(v)
+# TODO remove next major, this is just in case someone was using it
+serializers = dse_graphson2_serializers
+
+dse_graphson2_deserializers = {
+    k: _make_gremlin_graphson2_deserializer(v)
     for k, v in six.iteritems(GraphSON2Deserializer.get_type_definitions())
 }
 
-deserializers.update({
+dse_graphson2_deserializers.update({
     "dse:Distance": DistanceIO,
 })
 
-gremlin_deserializers = deserializers.copy()
-gremlin_deserializers.update({
-    'g:Vertex': VertexDeserializer,
-    'g:VertexProperty': VertexPropertyDeserializer,
-    'g:Edge': EdgeDeserializer,
-    'g:Property': PropertyDeserializer,
-    'g:Path': PathDeserializer
+# TODO remove next major, this is just in case someone was using it
+deserializers = dse_graphson2_deserializers
+
+gremlin_graphson2_deserializers = dse_graphson2_deserializers.copy()
+gremlin_graphson2_deserializers.update({
+    'g:Vertex': VertexDeserializerV2,
+    'g:VertexProperty': VertexPropertyDeserializerV2,
+    'g:Edge': EdgeDeserializerV2,
+    'g:Property': PropertyDeserializerV2,
+    'g:Path': PathDeserializerV2
 })
+
+if TraversalMetricsDeserializerV2:
+    gremlin_graphson2_deserializers.update({
+        'g:TraversalMetrics': TraversalMetricsDeserializerV2,
+        'g:lMetrics': MetricsDeserializerV2
+    })
+
+# TODO remove next major, this is just in case someone was using it
+gremlin_deserializers = gremlin_graphson2_deserializers
+
+# GraphSON3
+dse_graphson3_serializers = OrderedDict([
+    (t, _GremlinGraphSONTypeSerializer(s))
+    for t, s in six.iteritems(GraphSON3Serializer.get_type_definitions())
+])
+
+dse_graphson3_serializers.update(OrderedDict([
+    (Distance, DistanceIO),
+    (GeoP, GeoPSerializer),
+    (TextDistanceP, TextDistancePSerializer)
+]))
+
+dse_graphson3_deserializers = {
+    k: _make_gremlin_graphson3_deserializer(v)
+    for k, v in six.iteritems(GraphSON3Deserializer.get_type_definitions())
+}
+
+dse_graphson3_deserializers.update({
+    "dse:Distance": DistanceIO
+})
+
+gremlin_graphson3_deserializers = dse_graphson3_deserializers.copy()
+gremlin_graphson3_deserializers.update({
+    'g:Vertex': VertexDeserializerV3,
+    'g:VertexProperty': VertexPropertyDeserializerV3,
+    'g:Edge': EdgeDeserializerV3,
+    'g:Property': PropertyDeserializerV3,
+    'g:Path': PathDeserializerV3
+})
+
+if TraversalMetricsDeserializerV3:
+    gremlin_graphson3_deserializers.update({
+        'g:TraversalMetrics': TraversalMetricsDeserializerV3,
+        'g:Metrics': MetricsDeserializerV3
+    })

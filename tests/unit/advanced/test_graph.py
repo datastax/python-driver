@@ -236,7 +236,9 @@ class GraphTypeTests(unittest.TestCase):
 
 class GraphOptionTests(unittest.TestCase):
 
-    opt_mapping = dict((t[0], t[2]) for t in _graph_options if not t[0].endswith('consistency_level'))  # cl excluded from general tests because it requires mapping to names
+    opt_mapping = dict((t[0], t[2]) for t in _graph_options if not
+        (t[0].endswith('consistency_level') or  # cl excluded from general tests because it requires mapping to names
+         t[0] == 'graph_protocol'))  # default is None
 
     api_params = dict((p, str(i)) for i, p in enumerate(opt_mapping))
 
@@ -245,8 +247,15 @@ class GraphOptionTests(unittest.TestCase):
         self._verify_api_params(opts, self.api_params)
         self._verify_api_params(GraphOptions(), {
             'graph_source': 'g',
-            'graph_language': 'gremlin-groovy',
-            'graph_protocol': GraphProtocol.GRAPHSON_1_0
+            'graph_language': 'gremlin-groovy'
+        })
+
+    def test_with_graph_protocol(self):
+        opts = GraphOptions(graph_protocol='graphson-2-0')
+        self.assertEqual(opts._graph_options, {
+            'graph-source': b'g',
+            'graph-language': b'gremlin-groovy',
+            'graph-results': b'graphson-2-0'
         })
 
     def test_init_unknown_kwargs(self):
@@ -311,7 +320,10 @@ class GraphOptionTests(unittest.TestCase):
     def _verify_api_params(self, opts, api_params):
         self.assertEqual(len(opts._graph_options), len(api_params))
         for name, value in api_params.items():
-            value = six.b(value)
+            try:
+                value = six.b(value)
+            except:
+                pass  # already bytes
             self.assertEqual(getattr(opts, name), value)
             self.assertEqual(opts._graph_options[self.opt_mapping[name]], value)
 

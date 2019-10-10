@@ -30,10 +30,9 @@ from cassandra.cluster import EXEC_PROFILE_GRAPH_DEFAULT, Cluster, NoHostAvailab
 from cassandra.protocol import Unauthorized
 from cassandra.query import SimpleStatement
 from tests.integration import (get_cluster, greaterthanorequaldse51,
-                               remove_cluster, requiredse)
-from tests.integration.advanced import (ADS_HOME, DSE_VERSION,
-                                        generate_classic, reset_graph,
-                                        use_single_node_with_graph)
+                               remove_cluster, requiredse, DSE_VERSION)
+from tests.integration.advanced import ADS_HOME, use_single_node_with_graph
+from tests.integration.advanced.graph import reset_graph, ClassicGraphFixtures
 
 
 log = logging.getLogger(__name__)
@@ -225,7 +224,7 @@ class BasicDseAuthTest(unittest.TestCase):
         reset_graph(self.session, self._testMethodName.lower())
         profiles = self.cluster.profile_manager.profiles
         profiles[EXEC_PROFILE_GRAPH_DEFAULT].graph_options.graph_name = self._testMethodName.lower()
-        generate_classic(self.session)
+        self.session.execute_graph(ClassicGraphFixtures.classic())
 
         rs = self.session.execute_graph('g.V()')
         self.assertIsNotNone(rs)

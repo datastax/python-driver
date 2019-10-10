@@ -169,7 +169,7 @@ class TestConfigAsDict(unittest.TestCase):
              'serialConsistency': None,
              'speculativeExecution': {'namespace': 'cassandra.policies',
                                       'options': {}, 'type': 'NoSpeculativeExecutionPolicy'},
-             'graphOptions': {'graphProtocol': 'graphson-1.0',
+             'graphOptions': {'graphProtocol': None,
                               'language': 'gremlin-groovy',
                               'source': 'g'},
              }
@@ -195,7 +195,7 @@ class TestConfigAsDict(unittest.TestCase):
              'serialConsistency': None,
              'speculativeExecution': {'namespace': 'cassandra.policies',
                                       'options': {}, 'type': 'NoSpeculativeExecutionPolicy'},
-             'graphOptions': {'graphProtocol': 'graphson-1.0',
+             'graphOptions': {'graphProtocol': None,
                               'language': 'gremlin-groovy',
                               'source': 'a'},
              }

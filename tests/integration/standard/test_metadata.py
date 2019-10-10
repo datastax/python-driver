@@ -2007,14 +2007,21 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
 
         # Format can very slightly between versions, strip out whitespace for consistency sake
-        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
-                        "s=>org.apache.cassandra.db.marshal.UTF8Type,"
-                        "i=>org.apache.cassandra.db.marshal.Int32Type)'"
-                        in dct_table.as_cql_query().replace(" ", ""))
+        try:
+            self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
+                            "s=>org.apache.cassandra.db.marshal.UTF8Type,"
+                            "i=>org.apache.cassandra.db.marshal.Int32Type)'"
+                            in dct_table.as_cql_query().replace(" ", ""))
+        except:
+            # C* 4.0
+            self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
+                            "i=>org.apache.cassandra.db.marshal.Int32Type,"
+                            "s=>org.apache.cassandra.db.marshal.UTF8Type)'"
+                            in dct_table.as_cql_query().replace(" ", ""))
 
 
 @greaterthanorequalcass30
-class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
+class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
