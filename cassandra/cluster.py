@@ -37,16 +37,6 @@ from threading import Lock, RLock, Thread, Event
 import weakref
 from weakref import WeakValueDictionary
 
-try:
-    from cassandra.io.twistedreactor import TwistedConnection
-except ImportError:
-    TwistedConnection = None
-
-try:
-    from weakref import WeakSet
-except ImportError:
-    from cassandra.util import WeakSet  # NOQA
-
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
                        SchemaTargetType, DriverException, ProtocolVersion,
@@ -84,6 +74,21 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.compat import Mapping
 from cassandra.datastax import cloud as dscloud
+
+try:
+    from cassandra.io.twistedreactor import TwistedConnection
+except ImportError:
+    TwistedConnection = None
+
+try:
+    from cassandra.io.eventletreactor import EventletConnection
+except ImportError:
+    EventletConnection = None
+
+try:
+    from weakref import WeakSet
+except ImportError:
+    from cassandra.util import WeakSet  # NOQA
 
 
 def _is_eventlet_monkey_patched():
@@ -922,7 +927,7 @@ class Cluster(object):
 
             cloud_config = dscloud.get_cloud_config(
                 cloud,
-                create_pyopenssl_context=self.connection_class is TwistedConnection
+                create_pyopenssl_context=self.connection_class in [TwistedConnection, EventletConnection]
             )
 
             ssl_context = cloud_config.ssl_context

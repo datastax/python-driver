@@ -5,6 +5,7 @@ Unreleased
 Features
 --------
 * Allow passing ssl context for Twisted (PYTHON-1161)
+* Allow passing ssl context for Eventlet (PYTHON-1162)
 * Cloud Twisted support (PYTHON-1163)
 
 3.20.0
