@@ -2,6 +2,10 @@
 ======
 Unreleased
 
+Features
+--------
+* Use 4.0 schema parser in 4 alpha and snapshot builds (PYTHON-1158)
+
 Bug Fixes
 ---------
 * Connection setup methods prevent using ExecutionProfile in cqlengine (PYTHON-1009)
