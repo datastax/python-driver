@@ -2770,7 +2770,7 @@ class MaterializedViewMetadata(object):
 
 def get_schema_parser(connection, server_version, timeout):
     version = Version(server_version)
-    if version >= Version('4.0.0'):
+    if version >= Version('4-a'):
         return SchemaParserV4(connection, timeout)
     if version >= Version('3.0.0'):
         return SchemaParserV3(connection, timeout)
