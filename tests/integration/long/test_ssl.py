@@ -19,8 +19,12 @@ except ImportError:
 
 import os, sys, traceback, logging, ssl, time, math, uuid
 from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.connection import DefaultEndPoint
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+
+from OpenSSL import SSL, crypto
+
 from tests.integration import PROTOCOL_VERSION, get_cluster, remove_cluster, use_single_node, EVENT_LOOP_MANAGER
 
 log = logging.getLogger(__name__)
@@ -28,26 +32,30 @@ log = logging.getLogger(__name__)
 DEFAULT_PASSWORD = "pythondriver"
 
 # Server keystore trust store locations
-SERVER_KEYSTORE_PATH = "tests/integration/long/ssl/.keystore"
-SERVER_TRUSTSTORE_PATH = "tests/integration/long/ssl/.truststore"
+SERVER_KEYSTORE_PATH = os.path.abspath("tests/integration/long/ssl/.keystore")
+SERVER_TRUSTSTORE_PATH = os.path.abspath("tests/integration/long/ssl/.truststore")
 
 # Client specific keys/certs
-CLIENT_CA_CERTS = 'tests/integration/long/ssl/cassandra.pem'
-DRIVER_KEYFILE = "tests/integration/long/ssl/driver.key"
-DRIVER_KEYFILE_ENCRYPTED = "tests/integration/long/ssl/driver_encrypted.key"
-DRIVER_CERTFILE = "tests/integration/long/ssl/driver.pem"
-DRIVER_CERTFILE_BAD = "tests/integration/long/ssl/python_driver_bad.pem"
+CLIENT_CA_CERTS = os.path.abspath("tests/integration/long/ssl/cassandra.pem")
+DRIVER_KEYFILE = os.path.abspath("tests/integration/long/ssl/driver.key")
+DRIVER_KEYFILE_ENCRYPTED = os.path.abspath("tests/integration/long/ssl/driver_encrypted.key")
+DRIVER_CERTFILE = os.path.abspath("tests/integration/long/ssl/driver.pem")
+DRIVER_CERTFILE_BAD = os.path.abspath("tests/integration/long/ssl/python_driver_bad.pem")
 
+USES_PYOPENSSL = "twisted" in EVENT_LOOP_MANAGER or "eventlet" in EVENT_LOOP_MANAGER
 if "twisted" in EVENT_LOOP_MANAGER:
     import OpenSSL
     ssl_version = OpenSSL.SSL.TLSv1_METHOD
-    verify_certs = {'cert_reqs': OpenSSL.SSL.VERIFY_PEER,
+    verify_certs = {'cert_reqs': SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT,
                     'check_hostname': True}
-
 else:
     ssl_version = ssl.PROTOCOL_TLSv1
     verify_certs = {'cert_reqs': ssl.CERT_REQUIRED,
                     'check_hostname': True}
+
+
+def verify_callback(connection, x509, errnum, errdepth, ok):
+    return ok
 
 
 def setup_cluster_ssl(client_auth=False):
@@ -60,20 +68,15 @@ def setup_cluster_ssl(client_auth=False):
     ccm_cluster = get_cluster()
     ccm_cluster.stop()
 
-    # Fetch the absolute path to the keystore for ccm.
-    abs_path_server_keystore_path = os.path.abspath(SERVER_KEYSTORE_PATH)
-
     # Configure ccm to use ssl.
-
     config_options = {'client_encryption_options': {'enabled': True,
-                                                    'keystore': abs_path_server_keystore_path,
+                                                    'keystore': SERVER_KEYSTORE_PATH,
                                                     'keystore_password': DEFAULT_PASSWORD}}
 
     if(client_auth):
-        abs_path_server_truststore_path = os.path.abspath(SERVER_TRUSTSTORE_PATH)
         client_encyrption_options = config_options['client_encryption_options']
         client_encyrption_options['require_client_auth'] = True
-        client_encyrption_options['truststore'] = abs_path_server_truststore_path
+        client_encyrption_options['truststore'] = SERVER_TRUSTSTORE_PATH
         client_encyrption_options['truststore_password'] = DEFAULT_PASSWORD
 
     ccm_cluster.set_configuration_options(config_options)
@@ -83,6 +86,7 @@ def setup_cluster_ssl(client_auth=False):
 def validate_ssl_options(**kwargs):
         ssl_options = kwargs.get('ssl_options', None)
         ssl_context = kwargs.get('ssl_context', None)
+        hostname = kwargs.get('hostname', '127.0.0.1')
 
         # find absolute path to client CA_CERTS
         tries = 0
@@ -90,8 +94,12 @@ def validate_ssl_options(**kwargs):
             if tries > 5:
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
-                cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                                  ssl_options=ssl_options, ssl_context=ssl_context)
+                cluster = Cluster(
+                    contact_points=[DefaultEndPoint(hostname)],
+                    protocol_version=PROTOCOL_VERSION,
+                    ssl_options=ssl_options,
+                    ssl_context=ssl_context
+                )
                 session = cluster.connect(wait_for_all_pools=True)
                 break
             except Exception:
@@ -145,46 +153,10 @@ class SSLConnectionTests(unittest.TestCase):
         """
 
         # find absolute path to client CA_CERTS
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        ssl_options = {'ca_certs': abs_path_ca_cert_path,'ssl_version': ssl_version}
+        ssl_options = {'ca_certs': CLIENT_CA_CERTS,'ssl_version': ssl_version}
         validate_ssl_options(ssl_options=ssl_options)
 
-    def test_can_connect_with_ssl_long_running(self):
-        """
-        Test to validate that long running ssl connections continue to function past thier timeout window
 
-        @since 3.6.0
-        @jira_ticket PYTHON-600
-        @expected_result The client can connect via SSL and preform some basic operations over a period of longer then a minute
-
-        @test_category connection:ssl
-        """
-
-        # find absolute path to client CA_CERTS
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        ssl_options = {'ca_certs': abs_path_ca_cert_path,
-                       'ssl_version': ssl_version}
-        tries = 0
-        while True:
-            if tries > 5:
-                raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
-            try:
-                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
-                session = cluster.connect(wait_for_all_pools=True)
-                break
-            except Exception:
-                ex_type, ex, tb = sys.exc_info()
-                log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
-                del tb
-                tries += 1
-
-        # attempt a few simple commands.
-
-        for i in range(8):
-            rs = session.execute("SELECT * FROM system.local")
-            time.sleep(10)
-
-        cluster.shutdown()
 
     def test_can_connect_with_ssl_ca_host_match(self):
         """
@@ -200,9 +172,7 @@ class SSLConnectionTests(unittest.TestCase):
         @test_category connection:ssl
         """
 
-        # find absolute path to client CA_CERTS
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+        ssl_options = {'ca_certs': CLIENT_CA_CERTS,
                        'ssl_version': ssl_version}
         ssl_options.update(verify_certs)
 
@@ -235,14 +205,10 @@ class SSLConnectionAuthTests(unittest.TestCase):
         @test_category connection:ssl
         """
 
-        # Need to get absolute paths for certs/key
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE)
-        abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE)
-        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+        ssl_options = {'ca_certs': CLIENT_CA_CERTS,
                        'ssl_version': ssl_version,
-                       'keyfile': abs_driver_keyfile,
-                       'certfile': abs_driver_certfile}
+                       'keyfile': DRIVER_KEYFILE,
+                       'certfile': DRIVER_CERTFILE}
         validate_ssl_options(ssl_options=ssl_options)
 
     def test_can_connect_with_ssl_client_auth_host_name(self):
@@ -260,15 +226,10 @@ class SSLConnectionAuthTests(unittest.TestCase):
         @test_category connection:ssl
         """
 
-        # Need to get absolute paths for certs/key
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE)
-        abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE)
-
-        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+        ssl_options = {'ca_certs': CLIENT_CA_CERTS,
                        'ssl_version': ssl_version,
-                       'keyfile': abs_driver_keyfile,
-                       'certfile': abs_driver_certfile}
+                       'keyfile': DRIVER_KEYFILE,
+                       'certfile': DRIVER_CERTFILE}
         ssl_options.update(verify_certs)
 
         validate_ssl_options(ssl_options=ssl_options)
@@ -286,8 +247,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
         @test_category connection:ssl
         """
 
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': CLIENT_CA_CERTS,
                                                                           'ssl_version': ssl_version})
         # attempt to connect and expect an exception
 
@@ -309,18 +269,23 @@ class SSLConnectionAuthTests(unittest.TestCase):
         @test_category connection:ssl
         """
 
-        # Setup absolute paths to key/cert files
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE)
-        abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE_BAD)
-
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': abs_path_ca_cert_path,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': CLIENT_CA_CERTS,
                                                                           'ssl_version': ssl_version,
-                                                                          'keyfile': abs_driver_keyfile,
-                                                                          'certfile': abs_driver_certfile})
+                                                                          'keyfile': DRIVER_KEYFILE,
+                                                                          'certfile': DRIVER_CERTFILE_BAD})
         with self.assertRaises(NoHostAvailable) as context:
             cluster.connect()
         cluster.shutdown()
+
+    def test_cannot_connect_with_invalid_hostname(self):
+        ssl_options = {'ca_certs': CLIENT_CA_CERTS,
+                       'ssl_version': ssl_version,
+                       'keyfile': DRIVER_KEYFILE,
+                       'certfile': DRIVER_CERTFILE}
+        ssl_options.update(verify_certs)
+
+        with self.assertRaises(Exception):
+            validate_ssl_options(ssl_options=ssl_options, hostname='localhost')
 
 
 class SSLSocketErrorTests(unittest.TestCase):
@@ -345,8 +310,7 @@ class SSLSocketErrorTests(unittest.TestCase):
 
         @test_category connection:ssl
         """
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        ssl_options = {'ca_certs': abs_path_ca_cert_path,
+        ssl_options = {'ca_certs': CLIENT_CA_CERTS,
                        'ssl_version': ssl_version}
         cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
         session = cluster.connect(wait_for_all_pools=True)
@@ -388,9 +352,15 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
 
         @test_category connection:ssl
         """
-        abs_path_ca_cert_path = os.path.abspath(CLIENT_CA_CERTS)
-        ssl_context = ssl.SSLContext(ssl_version)
-        ssl_context.load_verify_locations(abs_path_ca_cert_path)
+        if USES_PYOPENSSL:
+            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context.load_verify_locations(CLIENT_CA_CERTS)
+            if "twisted" not in EVENT_LOOP_MANAGER:
+                ssl_context.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verify_callback)
+        else:
+            ssl_context = ssl.SSLContext(ssl_version)
+            ssl_context.load_verify_locations(CLIENT_CA_CERTS)
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
         validate_ssl_options(ssl_context=ssl_context)
 
     def test_can_connect_with_ssl_client_auth_password_private_key(self):
@@ -406,8 +376,94 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
         """
         abs_driver_keyfile = os.path.abspath(DRIVER_KEYFILE_ENCRYPTED)
         abs_driver_certfile = os.path.abspath(DRIVER_CERTFILE)
-        ssl_context = ssl.SSLContext(ssl_version)
-        ssl_context.load_cert_chain(certfile=abs_driver_certfile,
-                                    keyfile=abs_driver_keyfile,
-                                    password='cassandra')
-        validate_ssl_options(ssl_context=ssl_context)
+        ssl_options = {}
+
+        if USES_PYOPENSSL:
+            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context.use_certificate_file(abs_driver_certfile)
+            with open(abs_driver_keyfile) as keyfile:
+                key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b'cassandra')
+            ssl_context.use_privatekey(key)
+            if "twisted" in EVENT_LOOP_MANAGER:
+                ssl_options["cert_reqs"] = SSL.VERIFY_NONE
+            else:
+                ssl_context.set_verify(SSL.VERIFY_NONE, verify_callback)
+        else:
+            ssl_context = ssl.SSLContext(ssl_version)
+            ssl_context.load_cert_chain(certfile=abs_driver_certfile,
+                                        keyfile=abs_driver_keyfile,
+                                        password="cassandra")
+            ssl_context.verify_mode = ssl.CERT_NONE
+        validate_ssl_options(ssl_context=ssl_context, ssl_options=ssl_options)
+
+    def test_can_connect_with_ssl_conext_ca_host_match(self):
+        """
+        Test to validate that we are able to connect to a cluster using a SSLContext
+        using client auth, an encrypted keyfile, and host matching
+        """
+        ssl_options = {}
+        if USES_PYOPENSSL:
+            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context.use_certificate_file(DRIVER_CERTFILE)
+            with open(DRIVER_KEYFILE_ENCRYPTED) as keyfile:
+                key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b'cassandra')
+            ssl_context.use_privatekey(key)
+            ssl_context.load_verify_locations(CLIENT_CA_CERTS)
+            if "twisted" not in EVENT_LOOP_MANAGER:
+                ssl_context.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verify_callback)
+            ssl_options["check_hostname"] = True
+        else:
+            ssl_context = ssl.SSLContext(ssl_version)
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
+            ssl_context.load_verify_locations(CLIENT_CA_CERTS)
+            ssl_context.load_cert_chain(
+                certfile=DRIVER_CERTFILE,
+                keyfile=DRIVER_KEYFILE_ENCRYPTED,
+                password="cassandra",
+            )
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
+            ssl_options["check_hostname"] = True
+        validate_ssl_options(ssl_context=ssl_context, ssl_options=ssl_options)
+
+    def test_cannot_connect_ssl_context_with_invalid_hostname(self):
+        ssl_options = {}
+        if USES_PYOPENSSL:
+            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context.use_certificate_file(DRIVER_CERTFILE)
+            with open(DRIVER_KEYFILE_ENCRYPTED) as keyfile:
+                key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b"cassandra")
+            ssl_context.use_privatekey(key)
+            ssl_context.load_verify_locations(CLIENT_CA_CERTS)
+            if "twisted" in EVENT_LOOP_MANAGER:
+                ssl_context.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verify_callback)
+            ssl_options["check_hostname"] = True
+        else:
+            ssl_context = ssl.SSLContext(ssl_version)
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
+            ssl_context.load_verify_locations(CLIENT_CA_CERTS)
+            ssl_context.load_cert_chain(
+                certfile=DRIVER_CERTFILE,
+                keyfile=DRIVER_KEYFILE_ENCRYPTED,
+                password="cassandra",
+            )
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
+            ssl_options["check_hostname"] = True
+        with self.assertRaises(Exception):
+            validate_ssl_options(ssl_context=ssl_context, ssl_options=ssl_options, hostname="localhost")
+
+    def test_twisted_cannot_connect_after_calling_set_verify(self):
+        if "twisted" not in EVENT_LOOP_MANAGER:
+            self.skipTest("Twisted-only test")
+        ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+        ssl_context.use_certificate_file(DRIVER_CERTFILE)
+        with open(DRIVER_KEYFILE_ENCRYPTED) as keyfile:
+            key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b'cassandra')
+        ssl_context.use_privatekey(key)
+        ssl_context.load_verify_locations(CLIENT_CA_CERTS)
+        if "twisted" in EVENT_LOOP_MANAGER:
+            ssl_context.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, verify_callback)
+        ssl_options = {"check_hostname": True}
+        with self.assertRaises(Exception) as e:
+            validate_ssl_options(ssl_context=ssl_context, ssl_options=ssl_options, hostname="localhost")
+
+

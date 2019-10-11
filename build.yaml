@@ -216,6 +216,7 @@ build:
           "tests/integration/standard/test_metrics.py"
           "tests/integration/standard/test_query.py"
           "tests/integration/simulacron/test_endpoint.py"
+          "tests/integration/long/test_ssl.py"
         )
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml ${EVENT_LOOP_TESTS[@]} || true
         exit 0

@@ -61,11 +61,11 @@ SSL should be used when client encryption is enabled in Cassandra.
 To give you as much control as possible over your SSL configuration, our SSL
 API takes a user-created `SSLContext` instance from the Python standard library.
 These docs will include some examples for how to achieve common configurations,
-but the `ssl.SSLContext` documentation gives a more complete description of
-what is possible.
+but the `ssl.SSLContext <https://docs.python.org/3/library/ssl.html#ssl.SSLContext>`_ documentation
+what is possible.	gives a more complete description of what is possible.
 
 To enable SSL with version 3.17.0 and higher, you will need to set :attr:`.Cluster.ssl_context` to a
-``ssl.SSLContext`` instance to enable SSL. Optionally, you can also set :attr:`.Cluster.ssl_options`
+``SSLContext`` instance to enable SSL. Optionally, you can also set :attr:`.Cluster.ssl_options`
 to a dict of options. These will be passed as kwargs to ``ssl.SSLContext.wrap_socket()``
 when new sockets are created.
 
@@ -77,6 +77,21 @@ keystore files with these intructions:
 It might be also useful to learn about the different levels of identity verification to understand the examples:
 
 * `Using SSL in DSE drivers <https://docs.datastax.com/en/dse/6.7/dse-dev/datastax_enterprise/appDevGuide/sslDrivers.html>`_
+
+SSL with Twisted
+^^^^^^^^^^^^^^^^
+Twisted uses an alternative SSL implementation called pyOpenSSL, so if your `Cluster`'s connection class is
+:class:`~cassandra.io.eventletreactor.TwistedConnection`, you must pass a
+`pyOpenSSL context <https://www.pyopenssl.org/en/stable/api/ssl.html#context-objects>`_ instead.
+An example is provided in these docs, and more details can be found in the
+`documentation <https://www.pyopenssl.org/en/stable/api/ssl.html#context-objects>`_.
+pyOpenSSL is not installed by the driver and must be installed separately.
+
+When creating the context using Twisted, the
+`set_verify <https://www.pyopenssl.org/en/stable/api/ssl.html#OpenSSL.SSL.Context.set_verify>`_ call should not be used.
+Rather, set `cert_reqs` on :attr:`.Cluster.ssl_options` if the default certificate
+verification method is insufficient for your use case.
+This is done so we can perform the hostname verification within the driver.
 
 SSL Configuration Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -239,6 +254,26 @@ The following driver code specifies that the connection should use two-way verif
 The driver uses ``SSLContext`` directly to give you many other options in configuring SSL. Consider reading the `Python SSL documentation <https://docs.python.org/library/ssl.html#ssl.SSLContext>`_
 for more details about ``SSLContext`` configuration.
 
+**Server verifies client and client verifies server using Twisted and pyOpenSSL**
+.. code-block:: python
+    from OpenSSL import SSL, crypto
+    from cassandra.cluster import Cluster
+    from cassandra.io.twistedreactor import TwistedConnection
+
+    ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+    ssl_context.use_certificate_file('/path/to/client.crt_signed')
+    with open('/path/to/client.key') as keyfile:
+        key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b'password')
+    ssl_context.use_privatekey(key)
+    ssl_context.load_verify_locations('/path/to/rootca.crt')
+    cluster = Cluster(
+        contact_points=['127.0.0.1'],
+        connection_class=TwistedConnection,
+        ssl_context=ssl_context,
+        ssl_options={'check_hostname': True},
+    )
+    session = cluster.connect()
+
 Versions 3.16.0 and lower
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -271,8 +306,3 @@ the `python ssl documentation <https://docs.python.org/2/library/ssl.html#ssl.wr
 your configuration. For further reading, Andrew Mussey has published a thorough guide on
 `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.
 
-SSL with Twisted
-++++++++++++++++
-
-In case the twisted event loop is used pyOpenSSL must be installed or an exception will be risen. Also
-to set the ``ssl_version`` and ``cert_reqs`` in ``ssl_opts`` the appropriate constants from pyOpenSSL are expected.
