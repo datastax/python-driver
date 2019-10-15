@@ -86,7 +86,7 @@ class CloudTests(CloudProxyCluster):
         self.assertEqual(self.cluster.auth_provider.password, 'invalid')
 
     def test_support_overriding_ssl_context(self):
-        with self.assertRaises(DriverException):
+        with self.assertRaises(ValueError):
             # will fail since the ssl_context is
             self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLSv1))
 
