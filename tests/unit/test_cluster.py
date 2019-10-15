@@ -17,6 +17,7 @@ except ImportError:
     import unittest  # noqa
 
 import logging
+import six
 
 from mock import patch, Mock
 
@@ -215,12 +216,19 @@ class ExecutionProfileTest(unittest.TestCase):
 
         self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
 
-        default_profile = cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT]
+        default_profile = session.get_execution_profile(EXEC_PROFILE_DEFAULT)
         rf = session.execute_async("query")
         self._verify_response_future_profile(rf, default_profile)
 
         rf = session.execute_async("query", execution_profile='non-default')
         self._verify_response_future_profile(rf, non_default_profile)
+
+        for name, ep in six.iteritems(cluster.profile_manager.profiles):
+            self.assertEqual(ep, session.get_execution_profile(name))
+
+        # invalid ep
+        with self.assertRaises(ValueError):
+            session.get_execution_profile('non-existent')
 
     def test_serial_consistency_level_validation(self):
         # should pass
@@ -353,7 +361,7 @@ class ExecutionProfileTest(unittest.TestCase):
 
         # default and one named
         for profile in (EXEC_PROFILE_DEFAULT, 'one'):
-            active = cluster.profile_manager.profiles[profile]
+            active = session.get_execution_profile(profile)
             clone = session.execution_profile_clone_update(profile)
             self.assertIsNot(clone, active)
 

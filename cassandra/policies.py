@@ -155,8 +155,6 @@ class RoundRobinPolicy(LoadBalancingPolicy):
     A subclass of :class:`.LoadBalancingPolicy` which evenly
     distributes queries across all nodes in the cluster,
     regardless of what datacenter the nodes may be in.
-
-    This load balancing policy is used by default.
     """
     _live_hosts = frozenset(())
     _position = 0
@@ -230,7 +228,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
         self._position = 0
-        self._contact_points = []
+        self._endpoints = []
         LoadBalancingPolicy.__init__(self)
 
     def _dc(self, host):
@@ -241,7 +239,9 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             self._dc_live_hosts[dc] = tuple(set(dc_hosts))
 
         if not self.local_dc:
-            self._contact_points = cluster.contact_points_resolved
+            self._endpoints = [
+                endpoint
+                for endpoint in cluster.endpoints_resolved]
 
         self._position = randint(0, len(hosts) - 1) if hosts else 0
 
@@ -284,13 +284,13 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         # not worrying about threads because this will happen during
         # control connection startup/refresh
         if not self.local_dc and host.datacenter:
-            if host.address in self._contact_points:
+            if host.endpoint in self._endpoints:
                 self.local_dc = host.datacenter
                 log.info("Using datacenter '%s' for DCAwareRoundRobinPolicy (via host '%s'); "
                          "if incorrect, please specify a local_dc to the constructor, "
                          "or limit contact points to local cluster nodes" %
-                         (self.local_dc, host.address))
-                del self._contact_points
+                         (self.local_dc, host.endpoint))
+                del self._endpoints
 
         dc = self._dc(host)
         with self._hosts_lock:
@@ -657,6 +657,10 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
     A :class:`.ReconnectionPolicy` subclass which exponentially increases
     the length of the delay inbetween each reconnection attempt up to
     a set maximum delay.
+
+    A random amount of jitter (+/- 15%) will be added to the pure exponential
+    delay value to avoid the situations where many reconnection handlers are
+    trying to reconnect at exactly the same time.
     """
 
     # TODO: max_attempts is 64 to preserve legacy default behavior
@@ -691,12 +695,18 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
                 yield self.max_delay
             else:
                 try:
-                    yield min(self.base_delay * (2 ** i), self.max_delay)
+                    yield self._add_jitter(min(self.base_delay * (2 ** i), self.max_delay))
                 except OverflowError:
                     overflowed = True
                     yield self.max_delay
 
             i += 1
+
+    # Adds -+ 15% to the delay provided
+    def _add_jitter(self, value):
+        jitter = randint(85, 115)
+        delay = (jitter * value) / 100
+        return min(max(self.base_delay, delay), self.max_delay)
 
 
 class RetryPolicy(object):
@@ -837,6 +847,31 @@ class RetryPolicy(object):
         """
         return (self.RETRY_NEXT_HOST, None) if retry_num == 0 else (self.RETHROW, None)
 
+    def on_request_error(self, query, consistency, error, retry_num):
+        """
+        This is called when an unexpected error happens. This can be in the
+        following situations:
+
+        * On a connection error
+        * On server errors: overloaded, isBootstrapping, serverError, etc.
+
+        `query` is the :class:`.Statement` that timed out.
+
+        `consistency` is the :class:`.ConsistencyLevel` that the operation was
+        attempted at.
+
+        `error` the instance of the exception.
+
+        `retry_num` counts how many times the operation has been retried, so
+        the first time this method is called, `retry_num` will be 0.
+
+        The default, it triggers a retry on the next host in the query plan
+        with the same consistency level.
+        """
+        # TODO revisit this for the next major
+        # To preserve the same behavior than before, we don't take retry_num into account
+        return self.RETRY_NEXT_HOST, None
+
 
 class FallthroughRetryPolicy(RetryPolicy):
     """
@@ -851,6 +886,9 @@ class FallthroughRetryPolicy(RetryPolicy):
         return self.RETHROW, None
 
     def on_unavailable(self, *args, **kwargs):
+        return self.RETHROW, None
+
+    def on_request_error(self, *args, **kwargs):
         return self.RETHROW, None
 
 

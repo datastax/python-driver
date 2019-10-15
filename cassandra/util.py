@@ -487,9 +487,6 @@ class WeakSet(object):
         return len(self.intersection(other)) == 0
 
 
-from bisect import bisect_left
-
-
 class SortedSet(object):
     '''
     A sorted set based on sorted list
@@ -593,7 +590,7 @@ class SortedSet(object):
         return self
 
     def __contains__(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         return i < len(self._items) and self._items[i] == item
 
     def __delitem__(self, i):
@@ -603,7 +600,7 @@ class SortedSet(object):
         del self._items[i:j]
 
     def add(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         if i < len(self._items):
             if self._items[i] != item:
                 self._items.insert(i, item)
@@ -637,7 +634,7 @@ class SortedSet(object):
         return self._items.pop()
 
     def remove(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         if i < len(self._items):
             if self._items[i] == item:
                 self._items.pop(i)
@@ -648,18 +645,8 @@ class SortedSet(object):
         union = sortedset()
         union._items = list(self._items)
         for other in others:
-            if isinstance(other, self.__class__):
-                i = 0
-                for item in other._items:
-                    i = bisect_left(union._items, item, i)
-                    if i < len(union._items):
-                        if item != union._items[i]:
-                            union._items.insert(i, item)
-                    else:
-                        union._items.append(item)
-            else:
-                for item in other:
-                    union.add(item)
+            for item in other:
+                union.add(item)
         return union
 
     def intersection(self, *others):
@@ -685,42 +672,48 @@ class SortedSet(object):
 
     def _diff(self, other):
         diff = sortedset()
-        if isinstance(other, self.__class__):
-            i = 0
-            for item in self._items:
-                i = bisect_left(other._items, item, i)
-                if i < len(other._items):
-                    if item != other._items[i]:
-                        diff._items.append(item)
-                else:
-                    diff._items.append(item)
-        else:
-            for item in self._items:
-                if item not in other:
-                    diff.add(item)
+        for item in self._items:
+            if item not in other:
+                diff.add(item)
         return diff
 
     def _intersect(self, other):
         isect = sortedset()
-        if isinstance(other, self.__class__):
-            i = 0
-            for item in self._items:
-                i = bisect_left(other._items, item, i)
-                if i < len(other._items):
-                    if item == other._items[i]:
-                        isect._items.append(item)
-                else:
-                    break
-        else:
-            for item in self._items:
-                if item in other:
-                    isect.add(item)
+        for item in self._items:
+            if item in other:
+                isect.add(item)
         return isect
+
+    def _find_insertion(self, x):
+        # this uses bisect_left algorithm unless it has elements it can't compare,
+        # in which case it defaults to grouping non-comparable items at the beginning or end,
+        # and scanning sequentially to find an insertion point
+        a = self._items
+        lo = 0
+        hi = len(a)
+        try:
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if a[mid] < x: lo = mid + 1
+                else: hi = mid
+        except TypeError:
+            # could not compare a[mid] with x
+            # start scanning to find insertion point while swallowing type errors
+            lo = 0
+            compared_one = False  # flag is used to determine whether uncomparables are grouped at the front or back
+            while lo < hi:
+                try:
+                    if a[lo] == x or a[lo] >= x: break
+                    compared_one = True
+                except TypeError:
+                    if compared_one: break
+                lo += 1
+        return lo
 
 sortedset = SortedSet  # backwards-compatibility
 
 
-from collections import Mapping
+from cassandra.compat import Mapping
 from six.moves import cPickle
 
 
@@ -739,7 +732,7 @@ class OrderedMap(Mapping):
         ['value', 'value2']
 
     These constructs are needed to support nested collections in Cassandra 2.1.3+,
-    where frozen collections can be specified as parameters to others\*::
+    where frozen collections can be specified as parameters to others::
 
         CREATE TABLE example (
             ...
@@ -750,7 +743,7 @@ class OrderedMap(Mapping):
     This class derives from the (immutable) Mapping API. Objects in these maps
     are not intended be modified.
 
-    \* Note: Because of the way Cassandra encodes nested types, when using the
+    Note: Because of the way Cassandra encodes nested types, when using the
     driver with nested collections, :attr:`~.Cluster.protocol_version` must be 3
     or higher.
 
@@ -1232,3 +1225,104 @@ class Duration(object):
             abs(self.days),
             abs(self.nanoseconds)
         )
+
+
+@total_ordering
+class Version(object):
+    """
+    Internal minimalist class to compare versions.
+    A valid version is: <int>.<int>.<int>.<int or str>.
+
+    TODO: when python2 support is removed, use packaging.version.
+    """
+
+    _version = None
+    major = None
+    minor = 0
+    patch = 0
+    build = 0
+    prerelease = 0
+
+    def __init__(self, version):
+        self._version = version
+        if '-' in version:
+            version_without_prerelease, self.prerelease = version.split('-')
+        else:
+            version_without_prerelease = version
+        parts = list(reversed(version_without_prerelease.split('.')))
+        if len(parts) > 4:
+            raise ValueError("Invalid version: {}. Only 4 "
+                             "components plus prerelease are supported".format(version))
+
+        self.major = int(parts.pop())
+        self.minor = int(parts.pop()) if parts else 0
+        self.patch = int(parts.pop()) if parts else 0
+
+        if parts:  # we have a build version
+            build = parts.pop()
+            try:
+                self.build = int(build)
+            except ValueError:
+                self.build = build
+
+    def __hash__(self):
+        return self._version
+
+    def __repr__(self):
+        version_string = "Version({0}, {1}, {2}".format(self.major, self.minor, self.patch)
+        if self.build:
+            version_string += ", {}".format(self.build)
+        if self.prerelease:
+            version_string += ", {}".format(self.prerelease)
+        version_string += ")"
+
+        return version_string
+
+    def __str__(self):
+        return self._version
+
+    @staticmethod
+    def _compare_version_part(version, other_version, cmp):
+        if not (isinstance(version, six.integer_types) and
+                isinstance(other_version, six.integer_types)):
+            version = str(version)
+            other_version = str(other_version)
+
+        return cmp(version, other_version)
+
+    def __eq__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+
+        return (self.major == other.major and
+                self.minor == other.minor and
+                self.patch == other.patch and
+                self._compare_version_part(self.build, other.build, lambda s, o: s == o) and
+                self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s == o)
+                )
+
+    def __gt__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+
+        is_major_ge = self.major >= other.major
+        is_minor_ge = self.minor >= other.minor
+        is_patch_ge = self.patch >= other.patch
+        is_build_gt = self._compare_version_part(self.build, other.build, lambda s, o: s > o)
+        is_build_ge = self._compare_version_part(self.build, other.build, lambda s, o: s >= o)
+
+        # By definition, a prerelease comes BEFORE the actual release, so if a version
+        # doesn't have a prerelease, it's automatically greater than anything that does
+        if self.prerelease and not other.prerelease:
+            is_prerelease_gt = False
+        elif other.prerelease and not self.prerelease:
+            is_prerelease_gt = True
+        else:
+            is_prerelease_gt = self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s > o) \
+
+        return (self.major > other.major or
+                (is_major_ge and self.minor > other.minor) or
+                (is_major_ge and is_minor_ge and self.patch > other.patch) or
+                (is_major_ge and is_minor_ge and is_patch_ge and is_build_gt) or
+                (is_major_ge and is_minor_ge and is_patch_ge and is_build_ge and is_prerelease_gt)
+                )

@@ -94,6 +94,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         # pk__token equality
         r = TokenTestModel.objects(pk__token=functions.Token(last_token))
         self.assertEqual(len(r), 1)
+        r.all()  # Attempt to obtain queryset for results. This has thrown an exception in the past
 
     def test_compound_pk_token_function(self):
 

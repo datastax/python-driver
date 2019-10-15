@@ -260,13 +260,13 @@ class TwistedConnection(Connection):
                 )
 
             self.connector = reactor.connectSSL(
-                host=self.host, port=self.port,
+                host=self.endpoint.address, port=self.port,
                 factory=TwistedConnectionClientFactory(self),
-                contextFactory=_SSLContextFactory(self.ssl_options, self._check_hostname, self.host),
+                contextFactory=_SSLContextFactory(self.ssl_options, self._check_hostname, self.endpoint.address),
                 timeout=self.connect_timeout)
         else:
             self.connector = reactor.connectTCP(
-                host=self.host, port=self.port,
+                host=self.endpoint.address, port=self.port,
                 factory=TwistedConnectionClientFactory(self),
                 timeout=self.connect_timeout)
 
@@ -289,13 +289,13 @@ class TwistedConnection(Connection):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection (%s) to %s", id(self), self.host)
+        log.debug("Closing connection (%s) to %s", id(self), self.endpoint)
         reactor.callFromThread(self.connector.disconnect)
-        log.debug("Closed socket to %s", self.host)
+        log.debug("Closed socket to %s", self.endpoint)
 
         if not self.is_defunct:
             self.error_all_requests(
-                ConnectionShutdown("Connection to %s was closed" % self.host))
+                ConnectionShutdown("Connection to %s was closed" % self.endpoint))
             # don't leave in-progress operations hanging
             self.connected_event.set()
 

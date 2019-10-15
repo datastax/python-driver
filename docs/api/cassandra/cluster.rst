@@ -70,6 +70,8 @@
 
    .. autoattribute:: timestamp_generator
 
+   .. autoattribute:: endpoint_factory
+
    .. automethod:: connect
 
    .. automethod:: shutdown
@@ -116,7 +118,7 @@
 
    .. automethod:: set_meta_refresh_enabled
 
-.. autoclass:: ExecutionProfile (load_balancing_policy=<object object>, retry_policy=None, consistency_level=LOCAL_ONE, serial_consistency_level=None, request_timeout=10.0, row_factory=<function tuple_factory>, speculative_execution_policy=None)
+.. autoclass:: ExecutionProfile (load_balancing_policy=<object object>, retry_policy=None, consistency_level=LOCAL_ONE, serial_consistency_level=None, request_timeout=10.0, row_factory=<function named_tuple_factory>, speculative_execution_policy=None)
    :members:
    :exclude-members: consistency_level
 
@@ -150,15 +152,17 @@
 
    .. autoattribute:: client_protocol_handler
 
-   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload])
+   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload][, paging_state][, host])
 
-   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload])
+   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload][, paging_state][, host])
 
    .. automethod:: prepare(statement)
 
    .. automethod:: shutdown()
 
    .. automethod:: set_keyspace(keyspace)
+
+   .. automethod:: get_execution_profile
 
    .. automethod:: execution_profile_clone_update
 

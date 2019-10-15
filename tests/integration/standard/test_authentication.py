@@ -19,7 +19,7 @@ from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
-    set_default_cass_ip
+    set_default_cass_ip, USE_CASS_EXTERNAL
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 
 def setup_module():
-    if CASSANDRA_IP.startswith("127.0.0."):
+    if CASSANDRA_IP.startswith("127.0.0.") and not USE_CASS_EXTERNAL:
         use_singledc(start=False)
         ccm_cluster = get_cluster()
         ccm_cluster.stop()
@@ -59,7 +59,6 @@ class AuthenticationTests(unittest.TestCase):
     """
     Tests to cover basic authentication functionality
     """
-
     def get_authentication_provider(self, username, password):
         """
         Return correct authentication provider based on protocol version.
@@ -77,9 +76,24 @@ class AuthenticationTests(unittest.TestCase):
             return PlainTextAuthProvider(username=username, password=password)
 
     def cluster_as(self, usr, pwd):
-        return Cluster(protocol_version=PROTOCOL_VERSION,
-                       idle_heartbeat_interval=0,
-                       auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+        # test we can connect at least once with creds
+        # to ensure the role manager is setup
+        for _ in range(5):
+            try:
+                cluster = Cluster(
+                    protocol_version=PROTOCOL_VERSION,
+                    idle_heartbeat_interval=0,
+                    auth_provider=self.get_authentication_provider(username='cassandra', password='cassandra'))
+                cluster.connect(wait_for_all_pools=True)
+
+                return Cluster(
+                    protocol_version=PROTOCOL_VERSION,
+                    idle_heartbeat_interval=0,
+                    auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+            except Exception as e:
+                time.sleep(5)
+
+        raise Exception('Unable to connect with creds: {}/{}'.format(usr, pwd))
 
     def test_auth_connect(self):
         user = 'u'
@@ -150,7 +164,6 @@ class SaslAuthenticatorTests(AuthenticationTests):
     """
     Test SaslAuthProvider as PlainText
     """
-
     def setUp(self):
         if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest('Sasl authentication not available for protocol v1')

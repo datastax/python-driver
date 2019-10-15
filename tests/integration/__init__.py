@@ -32,6 +32,7 @@ from threading import Event
 from subprocess import call
 from itertools import groupby
 import six
+import shutil
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists, \
     InvalidRequest
@@ -125,7 +126,7 @@ SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 
-default_cassandra_version = '3.11'
+default_cassandra_version = '3.11.4'
 cv_string = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
 mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
 try:
@@ -245,11 +246,12 @@ PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
 
 
 def local_decorator_creator():
-    if not CASSANDRA_IP.startswith("127.0.0."):
+    if USE_CASS_EXTERNAL or not CASSANDRA_IP.startswith("127.0.0."):
         return unittest.skip('Tests only runs against local C*')
 
     def _id_and_mark(f):
         f.local = True
+        return f
 
     return _id_and_mark
 
@@ -350,9 +352,11 @@ def is_current_cluster(cluster_name, node_counts):
     return False
 
 
-def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], set_keyspace=True, ccm_options=None,
+def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, set_keyspace=True, ccm_options=None,
                 configuration_options={}, dse_cluster=False, dse_options={},
                 dse_version=None):
+    if not workloads:
+        workloads = []
     if (dse_version and not dse_cluster):
         raise ValueError('specified dse_version {} but not dse_cluster'.format(dse_version))
     set_default_cass_ip()
@@ -361,6 +365,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
         ccm_options = {"version": dse_version or DSE_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
+
+    if 'version' in ccm_options and not isinstance(ccm_options['version'], Version):
+        ccm_options['version'] = Version(ccm_options['version'])
 
     cassandra_version = ccm_options.get('version', CCM_VERSION)
     dse_version = ccm_options.get('version', DSE_VERSION)
@@ -400,6 +407,11 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
 
             log.debug("Creating new CCM cluster, {0}, with args {1}".format(cluster_name, ccm_options))
 
+            # Make sure we cleanup old cluster dir if it exists
+            cluster_path = os.path.join(path, cluster_name)
+            if os.path.exists(cluster_path):
+                shutil.rmtree(cluster_path)
+
             if dse_cluster:
                 CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
                 CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
@@ -433,7 +445,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=[], se
         if 'graph' not in workloads:
             if PROTOCOL_VERSION >= 4:
                 jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
-        if(len(workloads) > 0):
+        if len(workloads) > 0:
             for node in CCM_CLUSTER.nodes.values():
                 node.set_workloads(workloads)
         if start:

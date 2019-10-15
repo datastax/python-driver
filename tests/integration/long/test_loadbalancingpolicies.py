@@ -673,7 +673,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         # white list policy should not allow reconnecting to ignored hosts
         force_stop(3)
         self._wait_for_nodes_down([3])
-        self.assertFalse(cluster.metadata._hosts[IP_FORMAT % 3].is_currently_reconnecting())
+        self.assertFalse(cluster.metadata.get_host(IP_FORMAT % 3).is_currently_reconnecting())
 
         self.coordinator_stats.reset_counts()
         force_stop(2)
@@ -734,4 +734,4 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         # policy should not allow reconnecting to ignored host
         force_stop(2)
         self._wait_for_nodes_down([2])
-        self.assertFalse(cluster.metadata._hosts[ignored_address].is_currently_reconnecting())
+        self.assertFalse(cluster.metadata.get_host(ignored_address).is_currently_reconnecting())

@@ -288,7 +288,7 @@ class Column(object):
     @property
     def db_field_name(self):
         """ Returns the name of the cql name of this column """
-        return self.db_field or self.column_name
+        return self.db_field if self.db_field is not None else self.column_name
 
     @property
     def db_index_name(self):
@@ -1071,7 +1071,7 @@ class _PartitionKeysToken(Column):
     """
 
     def __init__(self, model):
-        self.partition_columns = model._partition_keys.values()
+        self.partition_columns = list(model._partition_keys.values())
         super(_PartitionKeysToken, self).__init__(partition_key=True)
 
     @property

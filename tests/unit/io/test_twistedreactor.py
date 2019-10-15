@@ -18,6 +18,8 @@ except ImportError:
     import unittest
 from mock import Mock, patch
 
+from cassandra.connection import DefaultEndPoint
+
 try:
     from twisted.test import proto_helpers
     from twisted.python.failure import Failure
@@ -126,7 +128,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.reactor_run_patcher = patch('twisted.internet.reactor.run')
         self.mock_reactor_cft = self.reactor_cft_patcher.start()
         self.mock_reactor_run = self.reactor_run_patcher.start()
-        self.obj_ut = twistedreactor.TwistedConnection('1.2.3.4',
+        self.obj_ut = twistedreactor.TwistedConnection(DefaultEndPoint('1.2.3.4'),
                                                        cql_version='3.0.1')
 
     def tearDown(self):

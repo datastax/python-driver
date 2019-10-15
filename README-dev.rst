@@ -54,6 +54,11 @@ To build the docs, run::
 
     python setup.py doc
 
+Upload the Docs
+=================
+
+This is deprecated. The docs is now only published on https://docs.datastax.com.
+
 To upload the docs, checkout the ``gh-pages`` branch and copy the entire
 contents all of ``docs/_build/X.Y.Z/*`` into the root of the ``gh-pages`` branch
 and then push that branch to github.

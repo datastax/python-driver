@@ -23,6 +23,7 @@ import logging
 import six
 import sys
 import time
+import os
 from packaging.version import Version
 from mock import Mock, patch
 
@@ -54,7 +55,7 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
     @local
     def test_broadcast_listen_address(self):
         """
-        Check to ensure that the broadcast and listen adresss is populated correctly
+        Check to ensure that the broadcast, rpc_address, listen adresss and host are is populated correctly
 
         @since 3.3
         @jira_ticket PYTHON-332
@@ -62,15 +63,25 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        # All nodes should have the broadcast_address set
+        # All nodes should have the broadcast_address, rpc_address and host_id set
         for host in self.cluster.metadata.all_hosts():
             self.assertIsNotNone(host.broadcast_address)
+            self.assertIsNotNone(host.broadcast_rpc_address)
+            self.assertIsNotNone(host.host_id)
         con = self.cluster.control_connection.get_connections()[0]
         local_host = con.host
+
         # The control connection node should have the listen address set.
         listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
         self.assertTrue(local_host in listen_addrs)
 
+        # The control connection node should have the broadcast_rpc_address set.
+        rpc_addrs = [host.broadcast_rpc_address for host in self.cluster.metadata.all_hosts()]
+        self.assertTrue(local_host in rpc_addrs)
+
+    @unittest.skipUnless(
+        os.getenv('MAPPED_CASSANDRA_VERSION', None) is None,
+        "Don't check the host version for test-dse")
     def test_host_release_version(self):
         """
         Checks the hosts release version and validates that it is equal to the
@@ -390,6 +401,53 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
     def test_composite_in_compound_primary_key_ordering(self):
         create_statement = self.make_create_statement(["a", "b"], ["c"], ["d", "e"])
         create_statement += " WITH CLUSTERING ORDER BY (c DESC)"
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_compact_storage(self):
+        create_statement = self.make_create_statement(["a"], [], ["b"])
+        create_statement += " WITH COMPACT STORAGE"
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_dense_compact_storage(self):
+        create_statement = self.make_create_statement(["a"], ["b"], ["c"])
+        create_statement += " WITH COMPACT STORAGE"
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_counter(self):
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text PRIMARY KEY, a1 counter)"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_counter_with_compact_storage(self):
+        """ PYTHON-1100 """
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text PRIMARY KEY, a1 counter) WITH COMPACT STORAGE"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_counter_with_dense_compact_storage(self):
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text, c1 text, a1 counter, PRIMARY KEY (key, c1)) WITH COMPACT STORAGE"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
         self.check_create_statement(tablemeta, create_statement)

@@ -18,7 +18,7 @@ except ImportError:
 
 import datetime
 
-from cassandra.util import Date, Time, Duration
+from cassandra.util import Date, Time, Duration, Version
 
 
 class DateTests(unittest.TestCase):
@@ -206,4 +206,89 @@ class DurationTests(unittest.TestCase):
         self.assertEqual(str(Duration(52, 23, 564564)), "52mo23d564564ns")
 
 
+class VersionTests(unittest.TestCase):
 
+    def test_version_parsing(self):
+        versions = [
+            ('2.0.0', (2, 0, 0, 0, 0)),
+            ('3.1.0', (3, 1, 0, 0, 0)),
+            ('2.4.54', (2, 4, 54, 0, 0)),
+            ('3.1.1.12', (3, 1, 1, 12, 0)),
+            ('3.55.1.build12', (3, 55, 1, 'build12', 0)),
+            ('3.55.1.20190429-TEST', (3, 55, 1, 20190429, 'TEST')),
+            ('4.0-SNAPSHOT', (4, 0, 0, 0, 'SNAPSHOT')),
+        ]
+
+        for str_version, expected_result in versions:
+            v = Version(str_version)
+            self.assertEqual(str_version, str(v))
+            self.assertEqual(v.major, expected_result[0])
+            self.assertEqual(v.minor, expected_result[1])
+            self.assertEqual(v.patch, expected_result[2])
+            self.assertEqual(v.build, expected_result[3])
+            self.assertEqual(v.prerelease, expected_result[4])
+
+        # not supported version formats
+        with self.assertRaises(ValueError):
+            Version('2.1.hello')
+
+        with self.assertRaises(ValueError):
+            Version('2.test.1')
+
+        with self.assertRaises(ValueError):
+            Version('test.1.0')
+
+        with self.assertRaises(ValueError):
+            Version('1.0.0.0.1')
+
+    def test_version_compare(self):
+        # just tests a bunch of versions
+
+        # major wins
+        self.assertTrue(Version('3.3.0') > Version('2.5.0'))
+        self.assertTrue(Version('3.3.0') > Version('2.5.0.66'))
+        self.assertTrue(Version('3.3.0') > Version('2.5.21'))
+
+        # minor wins
+        self.assertTrue(Version('2.3.0') > Version('2.2.0'))
+        self.assertTrue(Version('2.3.0') > Version('2.2.7'))
+        self.assertTrue(Version('2.3.0') > Version('2.2.7.9'))
+
+        # patch wins
+        self.assertTrue(Version('2.3.1') > Version('2.3.0'))
+        self.assertTrue(Version('2.3.1') > Version('2.3.0.4post0'))
+        self.assertTrue(Version('2.3.1') > Version('2.3.0.44'))
+
+        # various
+        self.assertTrue(Version('2.3.0.1') > Version('2.3.0.0'))
+        self.assertTrue(Version('2.3.0.680') > Version('2.3.0.670'))
+        self.assertTrue(Version('2.3.0.681') > Version('2.3.0.680'))
+        self.assertTrue(Version('2.3.0.1build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
+        self.assertTrue(Version('2.3.0.build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
+        self.assertTrue(Version('2.3.0') < Version('2.3.0.build'))
+
+        self.assertTrue(Version('4-a') <= Version('4.0.0'))
+        self.assertTrue(Version('4-a') <= Version('4.0-alpha1'))
+        self.assertTrue(Version('4-a') <= Version('4.0-beta1'))
+        self.assertTrue(Version('4.0.0') >= Version('4.0.0'))
+        self.assertTrue(Version('4.0.0.421') >= Version('4.0.0'))
+        self.assertTrue(Version('4.0.1') >= Version('4.0.0'))
+        self.assertTrue(Version('2.3.0') == Version('2.3.0'))
+        self.assertTrue(Version('2.3.32') == Version('2.3.32'))
+        self.assertTrue(Version('2.3.32') == Version('2.3.32.0'))
+        self.assertTrue(Version('2.3.0.build') == Version('2.3.0.build'))
+
+        self.assertTrue(Version('4') == Version('4.0.0'))
+        self.assertTrue(Version('4.0') == Version('4.0.0.0'))
+        self.assertTrue(Version('4.0') > Version('3.9.3'))
+
+        self.assertTrue(Version('4.0') > Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0.build5-SNAPSHOT') == Version('4.0.0.build5-SNAPSHOT'))
+        self.assertTrue(Version('4.1-SNAPSHOT') > Version('4.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))
+        self.assertTrue(Version('4.0.0.build6-SNAPSHOT') > Version('4.0.0.build5-SNAPSHOT'))
+        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0-SNAPSHOT1'))
+        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0.0-SNAPSHOT1'))

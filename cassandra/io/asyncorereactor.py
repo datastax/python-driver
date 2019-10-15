@@ -362,22 +362,22 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection (%s) to %s", id(self), self.host)
+        log.debug("Closing connection (%s) to %s", id(self), self.endpoint)
         self._writable = False
         self._readable = False
 
         # We don't have to wait for this to be closed, we can just schedule it
         self.create_timer(0, partial(asyncore.dispatcher.close, self))
 
-        log.debug("Closed socket to %s", self.host)
+        log.debug("Closed socket to %s", self.endpoint)
 
         if not self.is_defunct:
             self.error_all_requests(
-                ConnectionShutdown("Connection to %s was closed" % self.host))
+                ConnectionShutdown("Connection to %s was closed" % self.endpoint))
 
             #This happens when the connection is shutdown while waiting for the ReadyMessage
             if not self.connected_event.is_set():
-                self.last_error = ConnectionShutdown("Connection to %s was closed" % self.host)
+                self.last_error = ConnectionShutdown("Connection to %s was closed" % self.endpoint)
 
             # don't leave in-progress operations hanging
             self.connected_event.set()
@@ -426,12 +426,14 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         except socket.error as err:
             if ssl and isinstance(err, ssl.SSLError):
                 if err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
-                    return
+                    if not self._iobuf.tell():
+                        return
                 else:
                     self.defunct(err)
                     return
             elif err.args[0] in NONBLOCKING:
-                return
+                if not self._iobuf.tell():
+                    return
             else:
                 self.defunct(err)
                 return

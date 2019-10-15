@@ -4,13 +4,14 @@ nose
 mock!=1.1.*
 ccm>=2.0
 unittest2
-PyYAML
 pytz
 sure
 pure-sasl
-twisted[tls]
+twisted; python_version >= '3.5'
+twisted[tls]==19.2.1; python_version < '3.5'
 gevent>=1.0
 eventlet
 cython>=0.20,<0.30
 packaging
+futurist; python_version >= '3.7'
 asynctest; python_version > '3.4'

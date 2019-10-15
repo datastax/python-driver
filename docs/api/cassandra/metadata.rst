@@ -14,7 +14,7 @@
 
 .. autoclass:: Metadata ()
    :members:
-   :exclude-members: rebuild_schema, rebuild_token_map, add_host, remove_host, get_host
+   :exclude-members: rebuild_schema, rebuild_token_map, add_host, remove_host
 
 Schemas
 -------

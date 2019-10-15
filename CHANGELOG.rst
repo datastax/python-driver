@@ -1,6 +1,77 @@
+3.20.0
+======
+Unreleased
+
+Features
+--------
+* Use 4.0 schema parser in 4 alpha and snapshot builds (PYTHON-1158)
+
+Bug Fixes
+---------
+* Connection setup methods prevent using ExecutionProfile in cqlengine (PYTHON-1009)
+* Driver deadlock if all connections dropped by heartbeat whilst request in flight and request times out (PYTHON-1044)
+* Exception when use pk__token__gt filter In python 3.7 (PYTHON-1121)
+
+Other
+-----
+
+* Convert print statement to print function in docs and comments
+
+3.19.0
+======
+August 26, 2019
+
+Features
+--------
+* Add Python 3.7 support (PYTHON-1016)
+* Future-proof Mapping imports (PYTHON-1023)
+* Include param values in cqlengine logging (PYTHON-1105)
+* NTS Token Replica Map Generation is slow (PYTHON-622)
+
+Bug Fixes
+---------
+* as_cql_query UDF/UDA parameters incorrectly includes "frozen" if arguments are collections (PYTHON-1031)
+* cqlengine does not currently support combining TTL and TIMESTAMP on INSERT (PYTHON-1093)
+* Fix incorrect metadata for compact counter tables (PYTHON-1100)
+* Call ConnectionException with correct kwargs (PYTHON-1117)
+* Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
+* Discovered node doesn´t honor the configured Cluster port on connection (PYTHON-1127)
+
+Other
+-----
+* Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
+* Set the proper default ExecutionProfile.row_factory value (PYTHON-1119)
+
+3.18.0
+======
+May 27, 2019
+
+Features
+--------
+
+* Abstract Host Connection information (PYTHON-1079)
+* Improve version parsing to support a non-integer 4th component (PYTHON-1091)
+* Expose on_request_error method in the RetryPolicy (PYTHON-1064)
+* Add jitter to ExponentialReconnectionPolicy (PYTHON-1065)
+
+Bug Fixes
+---------
+
+* Fix error when preparing queries with beta protocol v5 (PYTHON-1081)
+* Accept legacy empty strings as column names (PYTHON-1082)
+* Let util.SortedSet handle uncomparable elements (PYTHON-1087)
+
+3.17.1
+======
+May 2, 2019
+
+Bug Fixes
+---------
+* Socket errors EAGAIN/EWOULDBLOCK are not handled properly and cause timeouts (PYTHON-1089)
+
 3.17.0
 ======
-NOT RELEASED
+February 19, 2019
 
 Features
 --------
@@ -8,6 +79,8 @@ Features
 * Add Cluster ssl_context option to enable SSL (PYTHON-995)
 * Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
 * Introduce new method ConsistencyLevel.is_serial (PYTHON-1067)
+* Add Session.get_execution_profile (PYTHON-932)
+* Add host kwarg to Session.execute/execute_async APIs to send a query to a specific node (PYTHON-993)
 
 Bug Fixes
 ---------
@@ -18,7 +91,7 @@ Other
 -----
 * Fail faster on incorrect lz4 import (PYTHON-1042)
 * Bump Cython dependency version to 0.29 (PYTHON-1036)
-* Convert print statement to print function in docs and comments
+* Expand Driver SSL Documentation (PYTHON-740)
 
 Deprecations
 ------------

@@ -9,6 +9,10 @@ The legacy configuration remains intact, but legacy and Execution Profile APIs
 cannot be used simultaneously on the same client ``Cluster``. Legacy configuration
 will be removed in the next major release (4.0).
 
+An execution profile and its parameters should be unique across ``Cluster`` instances.
+For example, an execution profile and its ``LoadBalancingPolicy`` should
+not be applied to more than one ``Cluster`` instance.
+
 This document explains how Execution Profiles relate to existing settings, and shows how to use the new profiles for
 request execution.
 

@@ -14,7 +14,7 @@
 
 from binascii import unhexlify
 from bisect import bisect_left
-from collections import defaultdict, Mapping
+from collections import defaultdict
 from functools import total_ordering
 from hashlib import md5
 from itertools import islice, cycle
@@ -40,9 +40,10 @@ from cassandra.encoder import Encoder
 from cassandra.marshal import varint_unpack
 from cassandra.protocol import QueryMessage
 from cassandra.query import dict_factory, bind_params
-from cassandra.util import OrderedDict
+from cassandra.util import OrderedDict, Version
 from cassandra.pool import HostDistance
-
+from cassandra.connection import EndPoint
+from cassandra.compat import Mapping
 
 log = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class Metadata(object):
 
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
-        server_version = self.get_host(connection.host).release_version
+        server_version = self.get_host(connection.endpoint).release_version
         parser = get_schema_parser(connection, server_version, timeout)
 
         if not target_type:
@@ -317,17 +318,30 @@ class Metadata(object):
         """
         with self._hosts_lock:
             try:
-                return self._hosts[host.address], False
+                return self._hosts[host.endpoint], False
             except KeyError:
-                self._hosts[host.address] = host
+                self._hosts[host.endpoint] = host
                 return host, True
 
     def remove_host(self, host):
         with self._hosts_lock:
-            return bool(self._hosts.pop(host.address, False))
+            return bool(self._hosts.pop(host.endpoint, False))
 
-    def get_host(self, address):
-        return self._hosts.get(address)
+    def get_host(self, endpoint_or_address):
+        """
+        Find a host in the metadata for a specific endpoint. If a string inet address is passed,
+        iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` attribute.
+        """
+        if not isinstance(endpoint_or_address, EndPoint):
+            return self._get_host_by_address(endpoint_or_address)
+
+        return self._hosts.get(endpoint_or_address)
+
+    def _get_host_by_address(self, address):
+        for host in six.itervalues(self._hosts):
+            if host.broadcast_rpc_address == address:
+                return host
+        return None
 
     def all_hosts(self):
         """
@@ -522,7 +536,12 @@ class NetworkTopologyStrategy(ReplicationStrategy):
                 racks_placed = set()
                 racks_this_dc = dc_racks[dc]
                 hosts_this_dc = len(hosts_per_dc[dc])
-                for token_offset in islice(cycle(token_offsets), index, index + num_tokens):
+
+                for token_offset_index in six.moves.range(index, index+num_tokens):
+                    if token_offset_index >= len(token_offsets):
+                        token_offset_index = token_offset_index - len(token_offsets)
+
+                    token_offset = token_offsets[token_offset_index]
                     host = token_to_host_owner[ring[token_offset]]
                     if replicas_remaining == 0 or replicas_this_dc == hosts_this_dc:
                         break
@@ -894,9 +913,9 @@ class Aggregate(object):
         sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        type_list = ', '.join(self.argument_types)
+        type_list = ', '.join([types.strip_frozen(arg_type) for arg_type in self.argument_types])
         state_func = protect_name(self.state_func)
-        state_type = self.state_type
+        state_type = types.strip_frozen(self.state_type)
 
         ret = "CREATE AGGREGATE %(keyspace)s.%(name)s(%(type_list)s)%(sep)s" \
               "SFUNC %(state_func)s%(sep)s" \
@@ -987,7 +1006,7 @@ class Function(object):
         sep = '\n    ' if formatted else ' '
         keyspace = protect_name(self.keyspace)
         name = protect_name(self.name)
-        arg_list = ', '.join(["%s %s" % (protect_name(n), t)
+        arg_list = ', '.join(["%s %s" % (protect_name(n), types.strip_frozen(t))
                              for n, t in zip(self.argument_names, self.argument_types)])
         typ = self.return_type
         lang = self.language
@@ -2024,7 +2043,7 @@ class SchemaParserV22(_SchemaParser):
             # other normal columns
             for col_row in col_rows:
                 column_meta = self._build_column_metadata(table_meta, col_row)
-                if column_meta.name:
+                if column_meta.name is not None:
                     table_meta.columns[column_meta.name] = column_meta
                     index_meta = self._build_index_metadata(column_meta, col_row)
                     if index_meta:
@@ -2312,9 +2331,9 @@ class SchemaParserV3(SchemaParserV22):
             table_meta.options = self._build_table_options(row)
             flags = row.get('flags', set())
             if flags:
-                compact_static = False
-                table_meta.is_compact_storage = 'dense' in flags or 'super' in flags or 'compound' not in flags
                 is_dense = 'dense' in flags
+                compact_static = not is_dense and 'super' not in flags and 'compound' not in flags
+                table_meta.is_compact_storage = is_dense or 'super' in flags or 'compound' not in flags
             elif virtual:
                 compact_static = False
                 table_meta.is_compact_storage = False
@@ -2750,10 +2769,10 @@ class MaterializedViewMetadata(object):
 
 
 def get_schema_parser(connection, server_version, timeout):
-    server_major_version = int(server_version.split('.')[0])
-    if server_major_version >= 4:
+    version = Version(server_version)
+    if version >= Version('4-a'):
         return SchemaParserV4(connection, timeout)
-    if server_major_version >= 3:
+    if version >= Version('3.0.0'):
         return SchemaParserV3(connection, timeout)
     else:
         # we could further specialize by version. Right now just refactoring the
@@ -2819,3 +2838,4 @@ def group_keys_by_replica(session, keyspace, table, keys):
             keys_per_host[NO_VALID_REPLICA].append(key)
 
     return dict(keys_per_host)
+

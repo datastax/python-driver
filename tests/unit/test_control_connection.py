@@ -17,6 +17,8 @@ try:
 except ImportError:
     import unittest  # noqa
 
+import six
+
 from concurrent.futures import ThreadPoolExecutor
 from mock import Mock, ANY, call
 
@@ -24,6 +26,7 @@ from cassandra import OperationTimedOut, SchemaTargetType, SchemaChangeType
 from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
 from cassandra.cluster import ControlConnection, _Scheduler, ProfileManager, EXEC_PROFILE_DEFAULT, ExecutionProfile
 from cassandra.pool import Host
+from cassandra.connection import EndPoint, DefaultEndPoint, DefaultEndPointFactory
 from cassandra.policies import (SimpleConvictionPolicy, RoundRobinPolicy,
                                 ConstantReconnectionPolicy, IdentityTranslator)
 
@@ -34,9 +37,9 @@ class MockMetadata(object):
 
     def __init__(self):
         self.hosts = {
-            "192.168.1.0": Host("192.168.1.0", SimpleConvictionPolicy),
-            "192.168.1.1": Host("192.168.1.1", SimpleConvictionPolicy),
-            "192.168.1.2": Host("192.168.1.2", SimpleConvictionPolicy)
+            DefaultEndPoint("192.168.1.0"): Host(DefaultEndPoint("192.168.1.0"), SimpleConvictionPolicy),
+            DefaultEndPoint("192.168.1.1"): Host(DefaultEndPoint("192.168.1.1"), SimpleConvictionPolicy),
+            DefaultEndPoint("192.168.1.2"): Host(DefaultEndPoint("192.168.1.2"), SimpleConvictionPolicy)
         }
         for host in self.hosts.values():
             host.set_up()
@@ -45,8 +48,13 @@ class MockMetadata(object):
         self.partitioner = None
         self.token_map = {}
 
-    def get_host(self, rpc_address):
-        return self.hosts.get(rpc_address)
+    def get_host(self, endpoint_or_address):
+        if not isinstance(endpoint_or_address, EndPoint):
+            for host in six.itervalues(self.hosts):
+                if host.address == endpoint_or_address:
+                    return host
+        else:
+            return self.hosts.get(endpoint_or_address)
 
     def all_hosts(self):
         return self.hosts.values()
@@ -73,9 +81,10 @@ class MockCluster(object):
         self.scheduler = Mock(spec=_Scheduler)
         self.executor = Mock(spec=ThreadPoolExecutor)
         self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(RoundRobinPolicy())
+        self.endpoint_factory = DefaultEndPointFactory().configure(self)
 
-    def add_host(self, address, datacenter, rack, signal=False, refresh_nodes=True):
-        host = Host(address, SimpleConvictionPolicy, datacenter, rack)
+    def add_host(self, endpoint, datacenter, rack, signal=False, refresh_nodes=True):
+        host = Host(endpoint, SimpleConvictionPolicy, datacenter, rack)
         self.added_hosts.append(host)
         return host
 
@@ -94,7 +103,7 @@ class MockConnection(object):
     is_defunct = False
 
     def __init__(self):
-        self.host = "192.168.1.0"
+        self.endpoint = DefaultEndPoint("192.168.1.0")
         self.local_results = [
             ["schema_version", "cluster_name", "data_center", "rack", "partitioner", "release_version", "tokens"],
             [["a", "foocluster", "dc1", "rack1", "Murmur3Partitioner", "2.2.0", ["0", "100", "200"]]]
@@ -224,7 +233,7 @@ class ControlConnectionTest(unittest.TestCase):
 
         # change the schema version on one of the existing entries
         self.connection.peer_results[1][1][3] = 'c'
-        self.cluster.metadata.get_host('192.168.1.1').is_up = False
+        self.cluster.metadata.get_host(DefaultEndPoint('192.168.1.1')).is_up = False
 
         self.assertTrue(self.control_connection.wait_for_schema_agreement())
         self.assertEqual(self.time.clock, 0)
@@ -236,8 +245,8 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.peer_results[1].append(
             ["0.0.0.0", PEER_IP, "b", "dc1", "rack1", ["3", "103", "203"]]
         )
-        host = Host("0.0.0.0", SimpleConvictionPolicy)
-        self.cluster.metadata.hosts[PEER_IP] = host
+        host = Host(DefaultEndPoint("0.0.0.0"), SimpleConvictionPolicy)
+        self.cluster.metadata.hosts[DefaultEndPoint("foobar")] = host
         host.is_up = False
 
         # even though the new host has a different schema version, it's
@@ -348,7 +357,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, None)
 
         event = {
             'change_type': 'REMOVED_NODE',
@@ -364,7 +373,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_topology_change(event)
-        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, '1.2.3.4')
+        self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_nodes_if_not_up, None)
 
     def test_handle_status_change(self):
         event = {
@@ -382,7 +391,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.cluster.scheduler.reset_mock()
         self.control_connection._handle_status_change(event)
-        host = self.cluster.metadata.hosts['192.168.1.0']
+        host = self.cluster.metadata.hosts[DefaultEndPoint('192.168.1.0')]
         self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.cluster.on_up, host)
 
         self.cluster.scheduler.schedule.reset_mock()
@@ -399,7 +408,7 @@ class ControlConnectionTest(unittest.TestCase):
             'address': ('192.168.1.0', 9000)
         }
         self.control_connection._handle_status_change(event)
-        host = self.cluster.metadata.hosts['192.168.1.0']
+        host = self.cluster.metadata.hosts[DefaultEndPoint('192.168.1.0')]
         self.assertIs(host, self.cluster.down_host)
 
     def test_handle_schema_change(self):
@@ -454,7 +463,7 @@ class ControlConnectionTest(unittest.TestCase):
         cc_no_schema_refresh._handle_status_change(status_event)
         cc_no_schema_refresh._handle_topology_change(topo_event)
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_schema_refresh.refresh_node_list_and_token_map),
-                                                            call(ANY, cc_no_schema_refresh._refresh_nodes_if_not_up, '1.2.3.4')])
+                                                            call(ANY, cc_no_schema_refresh._refresh_nodes_if_not_up, None)])
 
         cc_no_topo_refresh = ControlConnection(cluster, 1, 0, -1, 0)
         cluster.scheduler.reset_mock()
