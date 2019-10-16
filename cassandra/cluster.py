@@ -18,7 +18,6 @@ This module houses the main classes you will interact with,
 """
 from __future__ import absolute_import
 
-import os
 import atexit
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
@@ -78,7 +77,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET)
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.compat import Mapping
-from cassandra import cloud as dscloud
+from cassandra.datastax import cloud as dscloud
 
 
 def _is_eventlet_monkey_patched():

@@ -85,10 +85,11 @@ class CloudTests(CloudProxyCluster):
         self.assertEqual(self.cluster.auth_provider.username, 'invalid')
         self.assertEqual(self.cluster.auth_provider.password, 'invalid')
 
-    def test_support_overriding_ssl_context(self):
-        with self.assertRaises(ValueError):
-            # will fail since the ssl_context is
+    def test_error_overriding_ssl_context(self):
+        with self.assertRaises(ValueError) as cm:
             self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLSv1))
+
+        self.assertIn('cannot be specified with a cloud configuration', str(cm.exception))
 
     def test_error_when_bundle_doesnt_exist(self):
         try:
@@ -134,7 +135,7 @@ class CloudTests(CloudProxyCluster):
 
     def test_metadata_ssl_error(self):
         with self.assertRaises(DriverException) as cm:
-            self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLSv1))
+            self.connect(self.creds_invalid_ca)
 
         self.assertIn('Unable to connect to the metadata', str(cm.exception))
 

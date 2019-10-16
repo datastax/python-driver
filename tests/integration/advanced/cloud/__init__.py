@@ -41,6 +41,7 @@ class CloudProxyCluster(unittest.TestCase):
     creds = os.path.join(creds_dir, 'creds-v1.zip')
     creds_no_auth = os.path.join(creds_dir, 'creds-v1-wo-creds.zip')
     creds_unreachable = os.path.join(creds_dir, 'creds-v1-unreachable.zip')
+    creds_invalid_ca = os.path.join(creds_dir, 'creds-v1-invalid-ca.zip')
 
     cluster, connect = None, False
     session = None

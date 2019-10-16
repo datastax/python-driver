@@ -13,7 +13,7 @@ except ImportError:
 
 import os
 
-from cassandra import cloud
+from cassandra.datastax import cloud
 
 from mock import patch
 
@@ -56,7 +56,7 @@ class CloudTests(unittest.TestCase):
 
     def test_read_cloud_config_from_zip(self):
 
-        with patch('cassandra.cloud.read_metadata_info', side_effect=self._read_metadata_info_side_effect):
+        with patch('cassandra.datastax.cloud.read_metadata_info', side_effect=self._read_metadata_info_side_effect):
             config = cloud.get_cloud_config(self.config_zip)
 
         self._check_config(config)
