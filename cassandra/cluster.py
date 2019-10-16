@@ -128,8 +128,6 @@ DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST = 2
 
 _NOT_SET = object()
 
-PRODUCT_APOLLO = "DATASTAX_APOLLO"
-
 
 class NoHostAvailable(Exception):
     """
@@ -2995,7 +2993,7 @@ class ControlConnection(object):
         self._protocol_version = self._cluster.protocol_version
         self._set_new_connection(self._reconnect_internal())
 
-        self._cluster.metadata.dbaas = self._connection.product_type == PRODUCT_APOLLO
+        self._cluster.metadata.dbaas = self._connection._product_type == dscloud.PRODUCT_APOLLO
 
     def _set_new_connection(self, conn):
         """

@@ -512,7 +512,7 @@ class Connection(object):
     _ssl_impl = ssl
 
     _check_hostname = False
-    product_type = None
+    _product_type = None
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
@@ -942,7 +942,7 @@ class Connection(object):
                   id(self), self.endpoint)
         supported_cql_versions = options_response.cql_versions
         remote_supported_compressions = options_response.options['COMPRESSION']
-        self.product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
+        self._product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
 
         if self.cql_version:
             if self.cql_version not in supported_cql_versions:
