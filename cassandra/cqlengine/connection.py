@@ -17,7 +17,7 @@ import logging
 import six
 import threading
 
-from cassandra.cluster import Cluster, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist, ConsistencyLevel
+from cassandra.cluster import Cluster, _ConfigMode, _NOT_SET, NoHostAvailable, UserTypeDoesNotExist, ConsistencyLevel
 from cassandra.query import SimpleStatement, dict_factory
 
 from cassandra.cqlengine import CQLEngineException
@@ -108,9 +108,6 @@ class Connection(object):
                 self.lazy_connect = True
             raise
 
-        if self.consistency is not None:
-            self.session.default_consistency_level = self.consistency
-
         if DEFAULT_CONNECTION in _connections and _connections[DEFAULT_CONNECTION] == self:
             cluster = _connections[DEFAULT_CONNECTION].cluster
             session = _connections[DEFAULT_CONNECTION].session
@@ -118,7 +115,14 @@ class Connection(object):
         self.setup_session()
 
     def setup_session(self):
-        self.session.row_factory = dict_factory
+        if self.cluster._config_mode == _ConfigMode.PROFILES:
+            self.cluster.profile_manager.default.row_factory = dict_factory
+            if self.consistency is not None:
+                self.cluster.profile_manager.default.consistency_level = self.consistency
+        else:
+            self.session.row_factory = dict_factory
+            if self.consistency is not None:
+                self.session.default_consistency_level = self.consistency
         enc = self.session.encoder
         enc.mapping[tuple] = enc.cql_encode_tuple
         _register_known_types(self.session.cluster)
@@ -182,7 +186,6 @@ def register_connection(name, hosts=None, consistency=None, lazy_connect=False,
                 "Session configuration arguments and 'session' argument are mutually exclusive"
             )
         conn = Connection.from_session(name, session=session)
-        conn.setup_session()
     else:  # use hosts argument
         conn = Connection(
             name, hosts=hosts,
@@ -279,8 +282,12 @@ def set_session(s):
         if conn.session:
             log.warning("configuring new default session for cqlengine when one was already set")
 
-    if s.row_factory is not dict_factory:
-        raise CQLEngineException("Failed to initialize: 'Session.row_factory' must be 'dict_factory'.")
+    if not any([
+        s.cluster.profile_manager.default.row_factory is dict_factory and s.cluster._config_mode in [_ConfigMode.PROFILES, _ConfigMode.UNCOMMITTED],
+        s.row_factory is dict_factory and s.cluster._config_mode in [_ConfigMode.LEGACY, _ConfigMode.UNCOMMITTED],
+    ]):
+        raise CQLEngineException("Failed to initialize: row_factory must be 'dict_factory'")
+
     conn.session = s
     conn.cluster = s.cluster
 

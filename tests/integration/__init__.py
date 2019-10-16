@@ -127,7 +127,7 @@ CLOUD_PROXY_PATH = os.getenv('CLOUD_PROXY_PATH', None)
 CASSANDRA_IP = os.getenv('CASSANDRA_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 
-default_cassandra_version = '3.11'
+default_cassandra_version = '3.11.4'
 cv_string = os.getenv('CASSANDRA_VERSION', default_cassandra_version)
 mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
 try:
@@ -367,6 +367,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
         ccm_options = {"version": dse_version or DSE_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
+
+    if 'version' in ccm_options and not isinstance(ccm_options['version'], Version):
+        ccm_options['version'] = Version(ccm_options['version'])
 
     cassandra_version = ccm_options.get('version', CCM_VERSION)
     dse_version = ccm_options.get('version', DSE_VERSION)

@@ -1071,7 +1071,7 @@ class _PartitionKeysToken(Column):
     """
 
     def __init__(self, model):
-        self.partition_columns = model._partition_keys.values()
+        self.partition_columns = list(model._partition_keys.values())
         super(_PartitionKeysToken, self).__init__(partition_key=True)
 
     @property

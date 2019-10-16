@@ -3778,10 +3778,14 @@ class ResponseFuture(object):
         if self._connection is not None:
             try:
                 self._connection._requests.pop(self._req_id)
-            # This prevents the race condition of the
-            # event loop thread just receiving the waited message
-            # If it arrives after this, it will be ignored
+            # PYTHON-1044
+            # This request might have been removed from the connection after the latter was defunct by heartbeat.
+            # We should still raise OperationTimedOut to reject the future so that the main event thread will not
+            # wait for it endlessly
             except KeyError:
+                key = "Connection defunct by heartbeat"
+                errors = {key: "Client request timeout. See Session.execute[_async](timeout)"}
+                self._set_final_exception(OperationTimedOut(errors, self._current_host))
                 return
 
             pool = self.session._pools.get(self._current_host)
