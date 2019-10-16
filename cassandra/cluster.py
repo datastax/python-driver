@@ -910,12 +910,9 @@ class Cluster(object):
         """
 
         if cloud is not None:
-            if contact_points is not _NOT_SET or endpoint_factory:
-                raise ValueError(("contact_points and endpoint_factory"
-                                  "cannot be specified with a cloud configuration"))
-
-            if ssl_context:
-                cloud['ssl_context'] = ssl_context
+            if contact_points is not _NOT_SET or endpoint_factory or ssl_context:
+                raise ValueError("contact_points, endpoint_factory and ssl_context "
+                                 "cannot be specified with a cloud configuration")
 
             cloud_config = dscloud.get_cloud_config(cloud)
 

@@ -27,6 +27,7 @@ Features
 * Configurable `load balancing <http://datastax.github.io/python-driver/api/cassandra/policies.html#load-balancing>`_ and `retry policies <http://datastax.github.io/python-driver/api/cassandra/policies.html#retrying-failed-operations>`_
 * `Concurrent execution utilities <http://datastax.github.io/python-driver/api/cassandra/concurrent.html>`_
 * `Object mapper <http://datastax.github.io/python-driver/object_mapper.html>`_
+* `Connecting to DataStax Apollo database (cloud) <https://docs.datastax.com/en/developer/python-driver/latest/cloud/>`_
 
 Installation
 ------------

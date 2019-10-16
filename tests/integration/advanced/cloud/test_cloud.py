@@ -36,10 +36,7 @@ from tests.integration.advanced.cloud import CloudProxyCluster, CLOUD_PROXY_SERV
 DISALLOWED_CONSISTENCIES = [
     ConsistencyLevel.ANY,
     ConsistencyLevel.ONE,
-    ConsistencyLevel.TWO,
-    ConsistencyLevel.THREE,
-    ConsistencyLevel.EACH_QUORUM,
-    ConsistencyLevel.LOCAL_ONE,
+    ConsistencyLevel.LOCAL_ONE
 ]
 
 
@@ -89,7 +86,7 @@ class CloudTests(CloudProxyCluster):
         self.assertEqual(self.cluster.auth_provider.password, 'invalid')
 
     def test_support_overriding_ssl_context(self):
-        with self.assertRaises(DriverException):
+        with self.assertRaises(ValueError):
             # will fail since the ssl_context is
             self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLSv1))
 
