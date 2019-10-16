@@ -1,9 +1,10 @@
 3.20.0
 ======
-Unreleased
+Not Released
 
 Features
 --------
+* DataStax Apollo Support (PYTHON-1074)
 * Use 4.0 schema parser in 4 alpha and snapshot builds (PYTHON-1158)
 
 Bug Fixes

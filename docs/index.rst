@@ -50,6 +50,9 @@ Contents
 :doc:`dates_and_times`
     Some discussion on the driver's approach to working with timestamp, date, time types
 
+:doc:`cloud`
+    A guide to connecting to Datastax Apollo
+
 :doc:`faq`
     A collection of Frequently Asked Questions
 
@@ -68,6 +71,7 @@ Contents
    user_defined_types
    object_mapper
    dates_and_times
+   cloud
    faq
 
 Getting Help

@@ -105,7 +105,6 @@ else:
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
-
 DRIVER_NAME, DRIVER_VERSION = 'DataStax Python Driver', sys.modules['cassandra'].__version__
 
 PROTOCOL_VERSION_MASK = 0x7f
@@ -143,6 +142,13 @@ class EndPoint(object):
         SSL options specific to this endpoint.
         """
         return None
+
+    @property
+    def socket_family(self):
+        """
+        The socket family of the endpoint.
+        """
+        return socket.AF_UNSPEC
 
     def resolve(self):
         """
@@ -231,6 +237,123 @@ class DefaultEndPointFactory(EndPointFactory):
         return DefaultEndPoint(
             self.cluster.address_translator.translate(addr),
             self.port if self.port is not None else 9042)
+
+
+@total_ordering
+class SniEndPoint(EndPoint):
+    """SNI Proxy EndPoint implementation."""
+
+    def __init__(self, proxy_address, server_name, port=9042):
+        self._proxy_address = proxy_address
+        self._index = 0
+        self._resolved_address = None  # resolved address
+        self._port = port
+        self._server_name = server_name
+        self._ssl_options = {'server_hostname': server_name}
+
+    @property
+    def address(self):
+        return self._proxy_address
+
+    @property
+    def port(self):
+        return self._port
+
+    @property
+    def ssl_options(self):
+        return self._ssl_options
+
+    def resolve(self):
+        try:
+            resolved_addresses = socket.getaddrinfo(self._proxy_address, self._port,
+                                                    socket.AF_UNSPEC, socket.SOCK_STREAM)
+        except socket.gaierror:
+            log.debug('Could not resolve sni proxy hostname "%s" '
+                      'with port %d' % (self._proxy_address, self._port))
+            raise
+
+        # round-robin pick
+        self._resolved_address = sorted(addr[4][0] for addr in resolved_addresses)[self._index % len(resolved_addresses)]
+        self._index += 1
+
+        return self._resolved_address, self._port
+
+    def __eq__(self, other):
+        return (isinstance(other, SniEndPoint) and
+                self.address == other.address and self.port == other.port and
+                self._server_name == other._server_name)
+
+    def __hash__(self):
+        return hash((self.address, self.port, self._server_name))
+
+    def __lt__(self, other):
+        return ((self.address, self.port, self._server_name) <
+                (other.address, other.port, self._server_name))
+
+    def __str__(self):
+        return str("%s:%d:%s" % (self.address, self.port, self._server_name))
+
+    def __repr__(self):
+        return "<%s: %s:%d:%s>" % (self.__class__.__name__,
+                                   self.address, self.port, self._server_name)
+
+
+class SniEndPointFactory(EndPointFactory):
+
+    def __init__(self, proxy_address, port):
+        self._proxy_address = proxy_address
+        self._port = port
+
+    def create(self, row):
+        host_id = row.get("host_id")
+        if host_id is None:
+            raise ValueError("No host_id to create the SniEndPoint")
+
+        return SniEndPoint(self._proxy_address, str(host_id), self._port)
+
+    def create_from_sni(self, sni):
+        return SniEndPoint(self._proxy_address, sni, self._port)
+
+
+@total_ordering
+class UnixSocketEndPoint(EndPoint):
+    """
+    Unix Socket EndPoint implementation.
+    """
+
+    def __init__(self, unix_socket_path):
+        self._unix_socket_path = unix_socket_path
+
+    @property
+    def address(self):
+        return self._unix_socket_path
+
+    @property
+    def port(self):
+        return None
+
+    @property
+    def socket_family(self):
+        return socket.AF_UNIX
+
+    def resolve(self):
+        return self.address, None
+
+    def __eq__(self, other):
+        return (isinstance(other, UnixSocketEndPoint) and
+                self._unix_socket_path == other._unix_socket_path)
+
+    def __hash__(self):
+        return hash(self._unix_socket_path)
+
+    def __lt__(self, other):
+        return self._unix_socket_path < other._unix_socket_path
+
+    def __str__(self):
+        return str("%s" % (self._unix_socket_path,))
+
+    def __repr__(self):
+        return "<%s: %s>" % (self.__class__.__name__, self._unix_socket_path)
 
 
 class _Frame(object):
@@ -389,6 +512,7 @@ class Connection(object):
     _ssl_impl = ssl
 
     _check_hostname = False
+    _product_type = None
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
@@ -491,13 +615,22 @@ class Connection(object):
         else:
             return conn
 
-    def _connect_socket(self):
-        sockerr = None
-        inet_address, port = self.endpoint.resolve()
-        addresses = socket.getaddrinfo(inet_address, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+    def _get_socket_addresses(self):
+        address, port = self.endpoint.resolve()
+
+        if hasattr(socket, 'AF_UNIX') and self.endpoint.socket_family == socket.AF_UNIX:
+            return [(socket.AF_UNIX, socket.SOCK_STREAM, 0, None, address)]
+
+        addresses = socket.getaddrinfo(address, port, self.endpoint.socket_family, socket.SOCK_STREAM)
         if not addresses:
             raise ConnectionException("getaddrinfo returned empty list for %s" % (self.endpoint,))
-        for (af, socktype, proto, canonname, sockaddr) in addresses:
+
+        return addresses
+
+    def _connect_socket(self):
+        sockerr = None
+        addresses = self._get_socket_addresses()
+        for (af, socktype, proto, _, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
                 if self.ssl_context:
@@ -521,7 +654,8 @@ class Connection(object):
                 sockerr = err
 
         if sockerr:
-            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror or sockerr))
+            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" %
+                               ([a[4] for a in addresses], sockerr.strerror or sockerr))
 
         if self.sockopts:
             for args in self.sockopts:
@@ -786,16 +920,8 @@ class Connection(object):
 
     @defunct_on_error
     def _send_options_message(self):
-        if self.cql_version is None and (not self.compression or not locally_supported_compressions):
-            log.debug("Not sending options message for new connection(%s) to %s "
-                      "because compression is disabled and a cql version was not "
-                      "specified", id(self), self.endpoint)
-            self._compressor = None
-            self.cql_version = DEFAULT_CQL_VERSION
-            self._send_startup_message(no_compact=self.no_compact)
-        else:
-            log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.endpoint)
-            self.send_msg(OptionsMessage(), self.get_request_id(), self._handle_options_response)
+        log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.endpoint)
+        self.send_msg(OptionsMessage(), self.get_request_id(), self._handle_options_response)
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
@@ -816,6 +942,7 @@ class Connection(object):
                   id(self), self.endpoint)
         supported_cql_versions = options_response.cql_versions
         remote_supported_compressions = options_response.options['COMPRESSION']
+        self._product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
 
         if self.cql_version:
             if self.cql_version not in supported_cql_versions:
