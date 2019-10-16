@@ -20,10 +20,19 @@ To connect to a DataStax Apollo cluster:
     session = cluster.connect()
 
 Apollo Differences
-=================
+==================
 In most circumstances, the client code for interacting with an Apollo cluster will be the same as interacting with any other Cassandra cluster. The exceptions being:
 
  * A cloud configuration must be passed to a :class:`~.Cluster` instance via the `cloud` attribute (as demonstrated above).
  * An SSL connection will be established automatically. Manual SSL configuration is not allowed, and using `ssl_context` or `ssl_options` will result in an exception.
  * A :class:`~.Cluster`'s `contact_points` attribute should not be used. The cloud config contains all of the necessary contact information.
  * If a consistency level is not specified for an execution profile or query, then :attr:`.ConsistencyLevel.LOCAL_QUORUM` will be used as the default.
+
+Limitations
+===========
+
+Event loops
+-----------
+
+Twisted and Evenlet aren't supported yet. These event loops are still using the old way to configure
+SSL (ssl_options), which is not compatible with the secure connect bundle provided by Apollo.
