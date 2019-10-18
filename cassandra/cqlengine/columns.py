@@ -933,7 +933,7 @@ class Map(BaseContainerColumn):
     """
     Stores a key -> value map (dictionary)
 
-    http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_map_t.html
+    https://docs.datastax.com/en/dse/6.7/cql/cql/cql_using/useMap.html
     """
 
     _python_type_hashable = False
