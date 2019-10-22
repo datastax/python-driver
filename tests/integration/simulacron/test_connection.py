@@ -19,13 +19,14 @@ except ImportError:
 import logging
 import time
 
-from mock import Mock
+from mock import Mock, patch
 
 from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 from cassandra.io.asyncorereactor import AsyncoreConnection
+from cassandra.connection import DEFAULT_CQL_VERSION
 from tests import connection_class, thread_pool_executor_class
 from tests.unit.cython.utils import cythontest
 from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
@@ -75,9 +76,20 @@ class OrderedRoundRobinPolicy(RoundRobinPolicy):
         return hosts
 
 
+def _send_options_message(self):
+    """
+    Mock that doesn't the OptionMessage. It is required for the heart_beat_timeout
+    test to avoid a condition where the CC tries to reconnect in the executor but can't
+    since we prime that message."""
+    self._compressor = None
+    self.cql_version = DEFAULT_CQL_VERSION
+    self._send_startup_message(no_compact=self.no_compact)
+
+
 @requiressimulacron
 class ConnectionTests(SimulacronBase):
 
+    @patch('cassandra.connection.Connection._send_options_message', _send_options_message)
     def test_heart_beat_timeout(self):
         """
         Test to ensure the hosts are marked as down after a OTO is received.
