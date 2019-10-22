@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License
+from cassandra.datastax.cloud import parse_metadata_info
 from cassandra.query import SimpleStatement
 
 try:
@@ -90,6 +91,23 @@ class CloudTests(CloudProxyCluster):
             self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLSv1))
 
         self.assertIn('cannot be specified with a cloud configuration', str(cm.exception))
+
+    def test_error_overriding_ssl_options(self):
+        with self.assertRaises(ValueError) as cm:
+            self.connect(self.creds, ssl_options={'check_hostname': True})
+
+        self.assertIn('cannot be specified with a cloud configuration', str(cm.exception))
+
+    def _bad_hostname_metadata(self, config, http_data):
+        config = parse_metadata_info(config, http_data)
+        config.sni_host = "127.0.0.1"
+        return config
+
+    def test_verify_hostname(self):
+        with patch('cassandra.datastax.cloud.parse_metadata_info', wraps=self._bad_hostname_metadata):
+            with self.assertRaises(NoHostAvailable) as e:
+                self.connect(self.creds)
+            self.assertIn("hostname", str(e.exception))
 
     def test_error_when_bundle_doesnt_exist(self):
         try:
