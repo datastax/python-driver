@@ -793,6 +793,7 @@ class Cluster(object):
     cloud = None
     """
     A dict of the cloud configuration. Example::
+        
         {
             # path to the secure connect bundle
             'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
