@@ -22,6 +22,8 @@ sections:
       # build extensions like libev
       CASS_DRIVER_NO_CYTHON=1 python setup.py build_ext --inplace --force
 versions:
+  - name: '3.20'
+    ref: babfe339
   - name: '3.19'
     ref: ac2471f9
   - name: '3.18'
@@ -57,3 +59,7 @@ redirects:
 rewrites:
   - search: cassandra.apache.org/doc/cql3/CQL.html
     replace: cassandra.apache.org/doc/cql3/CQL-3.0.html
+  - search: http://www.datastax.com/documentation/cql/3.1/
+    replace: https://docs.datastax.com/en/archived/cql/3.1/
+  - search: http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
+    replace: https://docs.datastax.com/en/dse/6.7/cql/cql/cql_reference/cql_commands/cqlBatch.html

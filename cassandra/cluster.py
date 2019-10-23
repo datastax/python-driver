@@ -793,6 +793,7 @@ class Cluster(object):
     cloud = None
     """
     A dict of the cloud configuration. Example::
+        
         {
             # path to the secure connect bundle
             'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
@@ -907,13 +908,14 @@ class Cluster(object):
         """
 
         if cloud is not None:
-            if contact_points is not _NOT_SET or endpoint_factory or ssl_context:
-                raise ValueError("contact_points, endpoint_factory and ssl_context "
+            if contact_points is not _NOT_SET or endpoint_factory or ssl_context or ssl_options:
+                raise ValueError("contact_points, endpoint_factory, ssl_context, and ssl_options "
                                  "cannot be specified with a cloud configuration")
 
             cloud_config = dscloud.get_cloud_config(cloud)
 
             ssl_context = cloud_config.ssl_context
+            ssl_options = {'check_hostname': True}
             if (auth_provider is None and cloud_config.username
                     and cloud_config.password):
                 auth_provider = PlainTextAuthProvider(cloud_config.username, cloud_config.password)
