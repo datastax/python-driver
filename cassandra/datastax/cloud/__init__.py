@@ -18,7 +18,13 @@ import json
 import tempfile
 import shutil
 from six.moves.urllib.request import urlopen
-from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+
+_HAS_SSL = True
+try:
+    from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+except:
+    _HAS_SSL = False
+
 from zipfile import ZipFile
 
 # 2.7 vs 3.x
@@ -70,6 +76,9 @@ class CloudConfig(object):
 
 
 def get_cloud_config(cloud_config):
+    if not _HAS_SSL:
+        raise DriverException("A Python installation with SSL is required to connect to a cloud cluster.")
+
     if 'secure_connect_bundle' not in cloud_config:
         raise ValueError("The cloud config doesn't have a secure_connect_bundle specified.")
 
