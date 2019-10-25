@@ -1,6 +1,6 @@
 3.20.0
 ======
-Not Released
+October 28, 2019
 
 Features
 --------
