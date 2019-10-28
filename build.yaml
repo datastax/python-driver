@@ -1,6 +1,7 @@
 schedules:
   nightly_master:
     schedule: nightly
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
