@@ -28,7 +28,7 @@ from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.python.failure import Failure
 from zope.interface import implementer
 
-from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
+from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager, ConnectionException
 
 try:
     from OpenSSL import SSL
@@ -77,6 +77,7 @@ class TwistedConnectionProtocol(protocol.Protocol):
 
     def connectionLost(self, reason):
         # reason is a Failure instance
+        log.debug("Connect lost: %s", reason)
         self.connection.defunct(reason.value)
 
 
@@ -134,9 +135,9 @@ class TwistedLoop(object):
 
 
 @implementer(IOpenSSLClientConnectionCreator)
-class SSLCreator(object):
-    def __init__(self, host, ssl_context, ssl_options, check_hostname, timeout):
-        self.host = host
+class _SSLCreator(object):
+    def __init__(self, endpoint, ssl_context, ssl_options, check_hostname, timeout):
+        self.endpoint = endpoint
         self.ssl_options = ssl_options
         self.check_hostname = check_hostname
         self.timeout = timeout
@@ -163,9 +164,9 @@ class SSLCreator(object):
 
     def info_callback(self, connection, where, ret):
         if where & SSL.SSL_CB_HANDSHAKE_DONE:
-            if self.check_hostname and self.host != connection.get_peer_certificate().get_subject().commonName:
+            if self.check_hostname and self.endpoint.address != connection.get_peer_certificate().get_subject().commonName:
                 transport = connection.get_app_data()
-                transport.failVerification(Failure(Exception("Hostname verification failed")))
+                transport.failVerification(Failure(ConnectionException("Hostname verification failed", self.endpoint)))
 
     def clientConnectionForTLS(self, tlsProtocol):
         connection = SSL.Connection(self.context, None)
@@ -213,7 +214,7 @@ class TwistedConnection(Connection):
         self._loop.maybe_start()
 
     def _check_pyopenssl(self):
-        if self.ssl_options:
+        if self.ssl_context or self.ssl_options:
             if not _HAS_SSL:
                 raise ImportError(
                     str(import_exception) +
@@ -231,29 +232,29 @@ class TwistedConnection(Connection):
             # Cool they enforce strong security, but we have to be able to turn it off
             self._check_pyopenssl()
 
-            ssl_options = SSLCreator(
-                self.endpoint.address,
+            ssl_connection_creator = _SSLCreator(
+                self.endpoint,
                 self.ssl_context if self.ssl_context else None,
                 self.ssl_options,
                 self._check_hostname,
                 self.connect_timeout,
             )
 
-            point = SSL4ClientEndpoint(
+            endpoint = SSL4ClientEndpoint(
                 reactor,
                 host,
                 port,
-                sslContextFactory=ssl_options,
+                sslContextFactory=ssl_connection_creator,
                 timeout=self.connect_timeout,
             )
         else:
-            point = TCP4ClientEndpoint(
+            endpoint = TCP4ClientEndpoint(
                 reactor,
                 host,
                 port,
                 timeout=self.connect_timeout
             )
-        connectProtocol(point, TwistedConnectionProtocol(self))
+        connectProtocol(endpoint, TwistedConnectionProtocol(self))
 
     def client_connection_made(self, transport):
         """

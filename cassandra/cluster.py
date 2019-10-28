@@ -36,6 +36,12 @@ from threading import Lock, RLock, Thread, Event
 
 import weakref
 from weakref import WeakValueDictionary
+
+try:
+    from cassandra.io.twistedreactor import TwistedConnection
+except ImportError:
+    TwistedConnection = None
+
 try:
     from weakref import WeakSet
 except ImportError:
@@ -906,13 +912,18 @@ class Cluster(object):
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
+        if connection_class is not None:
+            self.connection_class = connection_class
 
         if cloud is not None:
             if contact_points is not _NOT_SET or endpoint_factory or ssl_context or ssl_options:
                 raise ValueError("contact_points, endpoint_factory, ssl_context, and ssl_options "
                                  "cannot be specified with a cloud configuration")
 
-            cloud_config = dscloud.get_cloud_config(cloud)
+            cloud_config = dscloud.get_cloud_config(
+                cloud,
+                create_pyopenssl_context=self.connection_class is TwistedConnection
+            )
 
             ssl_context = cloud_config.ssl_context
             ssl_options = {'check_hostname': True}
@@ -993,9 +1004,6 @@ class Cluster(object):
             if isinstance(address_translator, type):
                 raise TypeError("address_translator should not be a class, it should be an instance of that class")
             self.address_translator = address_translator
-
-        if connection_class is not None:
-            self.connection_class = connection_class
 
         if timestamp_generator is not None:
             if not callable(timestamp_generator):
