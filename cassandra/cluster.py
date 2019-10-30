@@ -47,7 +47,7 @@ from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
                        SchemaTargetType, DriverException, ProtocolVersion,
                        UnresolvableContactPoints)
-from cassandra.auth import _proxy_execute_key
+from cassandra.auth import _proxy_execute_key, PlainTextAuthProvider
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported,
                                   EndPoint, DefaultEndPoint, DefaultEndPointFactory,

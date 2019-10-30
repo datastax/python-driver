@@ -27,9 +27,10 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 
 from tests import connection_class, thread_pool_executor_class
-from tests.integration import PROTOCOL_VERSION, requiressimulacron
+from tests.integration import requiressimulacron
 from tests.integration.util import assert_quiescent_pool_state, late
-from tests.integration.simulacron import SimulacronBase
+# important to import the patch PROTOCOL_VERSION from the simulacron module
+from tests.integration.simulacron import SimulacronBase, PROTOCOL_VERSION
 from cassandra.connection import DEFAULT_CQL_VERSION
 from tests.unit.cython.utils import cythontest
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
@@ -323,7 +324,7 @@ class ConnectionTests(SimulacronBase):
                     cluster_name="{}/{}".format(simulacron_cluster.cluster_name, last_host))
 
         roundrobin_lbp = OrderedRoundRobinPolicy()
-        cluster = Cluster(compression=False,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
                           execution_profiles={
@@ -377,7 +378,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_interval = 1
 
         listener = TrackDownListener()
-        cluster = Cluster(compression=False,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout)
         session = cluster.connect(wait_for_all_pools=True)
@@ -408,7 +409,7 @@ class ConnectionTests(SimulacronBase):
         prime_query(query_to_prime, then=NO_THEN)
 
         listener = TrackDownListener()
-        cluster = Cluster(compression=False)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         session = cluster.connect(wait_for_all_pools=True)
         cluster.register_listener(listener)
 
@@ -429,7 +430,8 @@ class ConnectionTests(SimulacronBase):
         class ExtendedConnection(connection_class):
             pass
 
-        cluster = Cluster(contact_points=["127.0.0.2"],
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          contact_points=["127.0.0.2"],
                           connection_class=ExtendedConnection,
                           compression=False)
         cluster.connect()
@@ -443,7 +445,7 @@ class ConnectionTests(SimulacronBase):
 
         listener = TrackDownListener()
 
-        cluster = Cluster(['127.0.0.1'],
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1'],
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           executor_threads=16,
