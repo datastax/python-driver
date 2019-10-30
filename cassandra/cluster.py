@@ -357,7 +357,7 @@ class ExecutionProfile(object):
     _consistency_level_explicit = False
 
     def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
-                 consistency_level=ConsistencyLevel._NOT_SET, serial_consistency_level=None,
+                 consistency_level=_NOT_SET, serial_consistency_level=None,
                  request_timeout=10.0, row_factory=named_tuple_factory, speculative_execution_policy=None,
                  continuous_paging_options=None):
 
