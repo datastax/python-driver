@@ -13,3 +13,9 @@
 
 .. autoclass:: EndPointFactory
    :members:
+
+.. autoclass:: SniEndPoint
+
+.. autoclass:: SniEndPointFactory
+
+.. autoclass:: UnixSocketEndPoint

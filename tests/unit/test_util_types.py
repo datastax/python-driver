@@ -267,6 +267,9 @@ class VersionTests(unittest.TestCase):
         self.assertTrue(Version('2.3.0.build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
         self.assertTrue(Version('2.3.0') < Version('2.3.0.build'))
 
+        self.assertTrue(Version('4-a') <= Version('4.0.0'))
+        self.assertTrue(Version('4-a') <= Version('4.0-alpha1'))
+        self.assertTrue(Version('4-a') <= Version('4.0-beta1'))
         self.assertTrue(Version('4.0.0') >= Version('4.0.0'))
         self.assertTrue(Version('4.0.0.421') >= Version('4.0.0'))
         self.assertTrue(Version('4.0.1') >= Version('4.0.0'))

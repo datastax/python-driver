@@ -20,17 +20,14 @@ Contents
 :doc:`getting_started`
     A guide through the first steps of connecting to Cassandra and executing queries
 
-:doc:`object_mapper`
-    Introduction to the integrated object mapper, cqlengine
-
-:doc:`api/index`
-    The API documentation.
-
-:doc:`upgrading`
-    A guide to upgrading versions of the driver
-
 :doc:`execution_profiles`
     An introduction to a more flexible way of configuring request execution
+
+:doc:`lwt`
+    Working with results of conditional requests
+
+:doc:`object_mapper`
+    Introduction to the integrated object mapper, cqlengine
 
 :doc:`performance`
     Tips for getting good performance.
@@ -38,20 +35,20 @@ Contents
 :doc:`query_paging`
     Notes on paging large query results
 
-:doc:`lwt`
-    Working with results of conditional requests
+:doc:`security`
+    An overview of the security features of the driver
+
+:doc:`upgrading`
+    A guide to upgrading versions of the driver
 
 :doc:`user_defined_types`
     Working with Cassandra 2.1's user-defined types
 
-:doc:`security`
-    An overview of the security features of the driver
-
 :doc:`dates_and_times`
     Some discussion on the driver's approach to working with timestamp, date, time types
 
-:doc:`faq`
-    A collection of Frequently Asked Questions
+:doc:`cloud`
+    A guide to connecting to Datastax Apollo
 
 :doc:`geo_types`
     Working with DSE geometry types
@@ -64,6 +61,12 @@ Contents
 
 :doc:`CHANGELOG`
     Log of changes to the driver, organized by version.
+
+:doc:`faq`
+    A collection of Frequently Asked Questions
+
+:doc:`api/index`
+    The API documentation.
 
 .. toctree::
    :hidden:
@@ -84,6 +87,7 @@ Contents
    graph_fluent
    dse_auth
    dates_and_times
+   cloud
    faq
 
 Getting Help

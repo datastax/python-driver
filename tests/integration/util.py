@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from tests.integration import PROTOCOL_VERSION
+from functools import wraps
 import time
 
 
@@ -96,3 +97,13 @@ def wait_until_not_raised(condition, delay, max_attempts):
 
     # last attempt, let the exception raise
     condition()
+
+
+def late(seconds=1):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            time.sleep(seconds)
+            func(*args, **kwargs)
+        return wrapper
+    return decorator

@@ -153,6 +153,7 @@ def _get_dse_version_from_cass(cass_version):
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
 SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
+CLOUD_PROXY_PATH = os.getenv('CLOUD_PROXY_PATH', None)
 
 # Supported Clusters: Cassandra, DDAC, DSE
 DSE_VERSION = None
@@ -352,6 +353,7 @@ requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or
 requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
 requirecassandra = unittest.skipIf(DSE_VERSION, "Cassandra required")
 requiredse = unittest.skipUnless(DSE_VERSION, "DSE required")
+requirescloudproxy = unittest.skipIf(CLOUD_PROXY_PATH is None, "Cloud Proxy path hasn't been specified")
 
 
 def wait_for_node_socket(node, timeout):
@@ -454,6 +456,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
         ccm_options = {"version": DSE_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
+
+    if 'version' in ccm_options and not isinstance(ccm_options['version'], Version):
+        ccm_options['version'] = Version(ccm_options['version'])
 
     cassandra_version = ccm_options.get('version', CCM_VERSION)
     dse_version = ccm_options.get('version', DSE_VERSION)
