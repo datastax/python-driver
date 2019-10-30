@@ -98,11 +98,18 @@ Other
 
 3.20.0
 ======
-Unreleased
+October 28, 2019
+
+Features
+--------
+* DataStax Apollo Support (PYTHON-1074)
+* Use 4.0 schema parser in 4 alpha and snapshot builds (PYTHON-1158)
 
 Bug Fixes
 ---------
 * Connection setup methods prevent using ExecutionProfile in cqlengine (PYTHON-1009)
+* Driver deadlock if all connections dropped by heartbeat whilst request in flight and request times out (PYTHON-1044)
+* Exception when use pk__token__gt filter In python 3.7 (PYTHON-1121)
 
 3.19.0
 ======

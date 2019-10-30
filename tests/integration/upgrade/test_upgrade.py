@@ -28,7 +28,7 @@ except ImportError:
 
 # Previous Cassandra upgrade
 two_to_three_path = upgrade_paths([
-    UpgradePath("2.2.9-3.11", {"version": "2.2.9"}, {"version": "3.11"}, {}),
+    UpgradePath("2.2.9-3.11", {"version": "2.2.9"}, {"version": "3.11.4"}, {}),
 ])
 
 # Previous DSE upgrade
@@ -186,7 +186,7 @@ class UpgradeTestsMetadata(UpgradeBase):
 
 
 two_to_three_with_auth_path = upgrade_paths([
-    UpgradePath("2.2.9-3.11-auth", {"version": "2.2.9"}, {"version": "3.11"},
+    UpgradePath("2.2.9-3.11-auth", {"version": "2.2.9"}, {"version": "3.11.4"},
                 {'authenticator': 'PasswordAuthenticator',
                  'authorizer': 'CassandraAuthorizer'}),
 ])

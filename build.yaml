@@ -1,6 +1,7 @@
 schedules:
   nightly_master:
     schedule: nightly
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
@@ -50,6 +51,7 @@ schedules:
 
   release_test:
     schedule: per_commit
+    disable_pull_requests: true
     branches:
       include: [/release-.+/]
     env_vars: |
@@ -69,6 +71,7 @@ ngdg:
 
   weekly_master:
     schedule: 0 10 * * 6
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
@@ -80,6 +83,7 @@ ngdg:
 
   weekly_gevent:
     schedule: 0 14 * * 6
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
@@ -91,6 +95,7 @@ ngdg:
 
   weekly_eventlet:
     schedule: 0 18 * * 6
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
@@ -102,6 +107,7 @@ ngdg:
 
   weekly_asyncio:
     schedule: 0 22 * * 6
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
@@ -113,6 +119,7 @@ ngdg:
 
   weekly_async:
     schedule: 0 10 * * 7
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
@@ -124,6 +131,7 @@ ngdg:
 
   weekly_twister:
     schedule: 0 14 * * 7
+    disable_pull_requests: true
     branches:
       include: [master]
     env_vars: |
@@ -191,6 +199,9 @@ build:
       export PATH=$JAVA_HOME/bin:$PATH
       export PYTHONPATH=""
       export CCM_MAX_HEAP_SIZE=1024M
+
+      # Required for unix socket tests
+      sudo apt-get install socat
 
       # Install latest setuptools
       pip install --upgrade pip
@@ -277,9 +288,13 @@ build:
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_DIR=$CCM_INSTALL_DIR DSE_VERSION=$DSE_VERSION ADS_HOME=$HOME/ VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=dse_results.xml tests/integration/advanced/ || true
       fi
 
+      echo "==========RUNNING ADVANCED AND CLOUD TESTS=========="
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CLOUD_PROXY_PATH="$HOME/proxy/" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=advanced_results.xml tests/integration/advanced/ || true
+
       if [ -z "$EXCLUDE_LONG" ]; then
         echo "==========RUNNING LONG INTEGRATION TESTS=========="
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
       fi
+
   - xunit:
     - "*_results.xml"

@@ -72,6 +72,8 @@
 
    .. autoattribute:: endpoint_factory
 
+   .. autoattribute:: cloud
+
    .. automethod:: connect
 
    .. automethod:: shutdown

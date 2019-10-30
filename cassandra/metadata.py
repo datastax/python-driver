@@ -109,8 +109,12 @@ class Metadata(object):
     token_map = None
     """ A :class:`~.TokenMap` instance describing the ring topology. """
 
+    dbaas = False
+    """ A boolean indicating if connected to a DBaaS cluster """
+
     def __init__(self):
         self.keyspaces = {}
+        self.dbaas = False
         self._hosts = {}
         self._hosts_lock = RLock()
 
@@ -3173,7 +3177,7 @@ def get_schema_parser(connection, server_version, dse_version, timeout):
         elif v >= Version('6.0.0'):
             return SchemaParserDSE60(connection, timeout)
 
-    if version >= Version('4.0.0'):
+    if version >= Version('4-a'):
         return SchemaParserV4(connection, timeout)
     elif version >= Version('3.0.0'):
         return SchemaParserV3(connection, timeout)
