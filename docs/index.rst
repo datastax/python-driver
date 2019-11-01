@@ -54,7 +54,10 @@ Contents
     Working with DSE geometry types
 
 :doc:`graph`
-    Graph queries with DSE Graph
+    Graph queries with the Core engine
+
+:doc:`classic_graph`
+    Graph queries with the Classic engine
 
 :doc:`graph_fluent`
     DataStax Graph Fluent API
@@ -84,6 +87,7 @@ Contents
    object_mapper
    geo_types
    graph
+   classic_graph
    graph_fluent
    dse_auth
    dates_and_times

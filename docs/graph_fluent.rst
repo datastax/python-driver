@@ -11,7 +11,7 @@ The fluent API adds graph features to the core driver::
 The Graph fluent API depends on Apache TinkerPop and is not installed by default. Make sure
 you have the Graph requirements are properly :ref:`installed <installation-datastax-graph>`.
 
-You might be interested in reading the :doc:`DSE Graph Getting Started documentation <graph>` to
+You might be interested in reading the :doc:`DataStax Graph Getting Started documentation <graph>` to
 understand the basics of creating a graph and its schema.
 
 Graph Traversal Queries
@@ -31,7 +31,7 @@ a `Session` object, or implicitly::
     g.addV('genre').property('genreId', 1).property('name', 'Action').next()
 
     # implicit execution caused by iterating over results
-    for v in g.V().has('genre', 'name', 'Drama').in('belongsTo').valueMap():
+    for v in g.V().has('genre', 'name', 'Drama').in_('belongsTo').valueMap():
         print(v)
 
 These :ref:`Python types <graph-types>` are also supported transparently::
@@ -71,6 +71,27 @@ If you want to change execution property defaults, please see the :doc:`Executio
 for a more generalized discussion of the API. Graph traversal queries use the same execution profile defined for DSE graph. If you
 need to change the default properties, please refer to the :doc:`DSE Graph query documentation page <graph>`
 
+Configuring a Traversal Execution Profile for the Core graph engine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To execute a traversal query with graphs that use the core engine, you need to configure
+a graphson3 execution profile:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster, EXEC_PROFILE_GRAPH_DEFAULT
+    from cassandra.datastax.graph import GraphProtocol
+    from cassandra.datastax.graph.fluent import DseGraph
+
+    ep_graphson3 = DseGraph.create_execution_profile(
+        'my_core_graph_name',
+        graph_protocol=GraphProtocol.GRAPHSON_3_0
+    )
+    cluster = Cluster(execution_profiles={EXEC_PROFILE_GRAPH_DEFAULT: ep_graphson3})
+
+    g = DseGraph.traversal_source(session)
+    print g.V().toList()
+
 
 Explicit Graph Traversal Execution with a DSE Session
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,6 +120,22 @@ Below is an example of explicit execution. For this example, assume the schema h
         pprint(result.value)
     for result in session.execute_graph(v_query):
         pprint(result.value)
+
+Converting a traversal to a bytecode query for core graphs require some more work, because we
+need the cluster context for UDT and tuple types:
+
+.. code-block:: python
+
+    g = DseGraph.traversal_source(session=session)
+    context = {
+        'cluster': cluster,
+        'graph_name': 'the_graph_for_the_query'
+    }
+    addV_query = DseGraph.query_from_traversal(
+        g.addV('genre').property('genreId', 1).property('name', 'Action'),
+        graph_protocol=GraphProtocol.GRAPHSON_3_0,
+        context=context
+    )
 
 Implicit Graph Traversal Execution with TinkerPop
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

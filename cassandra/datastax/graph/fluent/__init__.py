@@ -190,7 +190,7 @@ if HAVE_GREMLIN:
             :param traversal: The GraphTraversal object
             :param graph_protocol: The graph protocol. Default is `DseGraph.DSE_GRAPH_QUERY_PROTOCOL`.
             :param context: The dict of the serialization context, needed for GraphSON3 (tuple, udt).
-                            e.g: {'cluster': dse_cluster, 'graph_name': name}
+                            e.g: {'cluster': cluster, 'graph_name': name}
             """
 
             if isinstance(traversal, GraphTraversal):

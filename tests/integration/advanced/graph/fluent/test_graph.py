@@ -654,6 +654,20 @@ class ImplicitExecutionTest(_AbstractTraversalTest):
             key = prop.key
             _validate_prop(key, value, self)
 
+    def test_iterate_step(self):
+        """
+        Test to validate that the iterate() step work on all dse versions.
+
+        @jira_ticket PYTHON-1155
+        @expected_result iterate step works
+
+        @test_category dse graph
+        """
+
+        g = self.fetch_traversal_source()
+        generate_classic(self.session)
+        g.addV('person').property('name', 'Person1').iterate()
+
 
 class ExplicitExecutionBase(GraphUnitTestCase):
 

@@ -34,6 +34,9 @@ Schemas
 .. autoclass:: TableMetadata ()
    :members:
 
+.. autoclass:: TableMetadataV3 ()
+   :members:
+
 .. autoclass:: ColumnMetadata ()
    :members:
 
@@ -41,6 +44,12 @@ Schemas
    :members:
 
 .. autoclass:: MaterializedViewMetadata ()
+   :members:
+
+.. autoclass:: VertexMetadata ()
+   :members:
+
+.. autoclass:: EdgeMetadata ()
    :members:
 
 Tokens and Ring Topology
