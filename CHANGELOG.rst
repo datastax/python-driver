@@ -4,6 +4,7 @@ Unreleased
 
 Features
 --------
+* Remove *read_repair_chance table options (PYTHON-1140)
 
 Bug Fixes
 ---------
