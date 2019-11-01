@@ -2570,14 +2570,22 @@ class SchemaParserDSE60(SchemaParserV3):
 
 class SchemaParserV4(SchemaParserV3):
 
-    recognized_table_options = tuple(
-        opt for opt in
-        SchemaParserV3.recognized_table_options
-        if opt not in (
-            # removed in V4: CASSANDRA-13910
-            'dclocal_read_repair_chance', 'read_repair_chance'
-        )
-    )
+    recognized_table_options = (
+        'additional_write_policy',
+        'bloom_filter_fp_chance',
+        'caching',
+        'cdc',
+        'comment',
+        'compaction',
+        'compression',
+        'crc_check_chance',
+        'default_time_to_live',
+        'gc_grace_seconds',
+        'max_index_interval',
+        'memtable_flush_period_in_ms',
+        'min_index_interval',
+        'read_repair',
+        'speculative_retry')
 
     _SELECT_VIRTUAL_KEYSPACES = 'SELECT * from system_virtual_schema.keyspaces'
     _SELECT_VIRTUAL_TABLES = 'SELECT * from system_virtual_schema.tables'
