@@ -25,7 +25,7 @@ from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
 from tests.integration import execute_until_pass
-from tests.integration.advanced.cloud import CloudProxyCluster
+from tests.integration.cloud import CloudProxyCluster
 
 log = logging.getLogger(__name__)
 
