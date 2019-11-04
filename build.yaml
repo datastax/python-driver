@@ -288,8 +288,8 @@ build:
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_DIR=$CCM_INSTALL_DIR DSE_VERSION=$DSE_VERSION ADS_HOME=$HOME/ VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=dse_results.xml tests/integration/advanced/ || true
       fi
 
-      echo "==========RUNNING ADVANCED AND CLOUD TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CLOUD_PROXY_PATH="$HOME/proxy/" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=advanced_results.xml tests/integration/advanced/ || true
+      echo "==========RUNNING CLOUD TESTS=========="
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CLOUD_PROXY_PATH="$HOME/proxy/" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=advanced_results.xml tests/integration/cloud/ || true
 
       if [ -z "$EXCLUDE_LONG" ]; then
         echo "==========RUNNING LONG INTEGRATION TESTS=========="

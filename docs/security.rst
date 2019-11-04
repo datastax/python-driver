@@ -61,8 +61,8 @@ SSL should be used when client encryption is enabled in Cassandra.
 To give you as much control as possible over your SSL configuration, our SSL
 API takes a user-created `SSLContext` instance from the Python standard library.
 These docs will include some examples for how to achieve common configurations,
-but the `ssl.SSLContext` documentation gives a more complete description of
-what is possible.
+but the `ssl.SSLContext <https://docs.python.org/3/library/ssl.html#ssl.SSLContext>`_ documentation
+gives a more complete description of what is possible.
 
 To enable SSL with version 3.17.0 and higher, you will need to set :attr:`.Cluster.ssl_context` to a
 ``ssl.SSLContext`` instance to enable SSL. Optionally, you can also set :attr:`.Cluster.ssl_options`
@@ -77,6 +77,15 @@ keystore files with these intructions:
 It might be also useful to learn about the different levels of identity verification to understand the examples:
 
 * `Using SSL in DSE drivers <https://docs.datastax.com/en/dse/6.7/dse-dev/datastax_enterprise/appDevGuide/sslDrivers.html>`_
+
+SSL with Twisted
+^^^^^^^^^^^^^^^^
+Twisted uses an alternative SSL implementation called pyOpenSSL, so if your `Cluster`'s connection class is
+:class:`~cassandra.io.twistedreactor.TwistedConnection`, you must pass a
+`pyOpenSSL context <https://www.pyopenssl.org/en/stable/api/ssl.html#context-objects>`_ instead.
+An example is provided in these docs, and more details can be found in the
+`documentation <https://www.pyopenssl.org/en/stable/api/ssl.html#context-objects>`_.
+pyOpenSSL is not installed by the driver and must be installed separately.
 
 SSL Configuration Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -238,6 +247,28 @@ The following driver code specifies that the connection should use two-way verif
 
 The driver uses ``SSLContext`` directly to give you many other options in configuring SSL. Consider reading the `Python SSL documentation <https://docs.python.org/library/ssl.html#ssl.SSLContext>`_
 for more details about ``SSLContext`` configuration.
+
+**Server verifies client and client verifies server using Twisted and pyOpenSSL**
+
+.. code-block:: python
+
+    from OpenSSL import SSL, crypto
+    from cassandra.cluster import Cluster
+    from cassandra.io.twistedreactor import TwistedConnection
+
+    ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+    ssl_context.set_verify(SSL.VERIFY_PEER, callback=lambda _1, _2, _3, _4, ok: ok)
+    ssl_context.use_certificate_file('/path/to/client.crt_signed')
+    ssl_context.use_privatekey_file('/path/to/client.key')
+    ssl_context.load_verify_locations('/path/to/rootca.crt')
+
+    cluster = Cluster(
+        contact_points=['127.0.0.1'],
+        connection_class=TwistedConnection,
+        ssl_context=ssl_context,
+        ssl_options={'check_hostname': True}
+    )
+    session = cluster.connect()
 
 Versions 3.16.0 and lower
 ^^^^^^^^^^^^^^^^^^^^^^^^^

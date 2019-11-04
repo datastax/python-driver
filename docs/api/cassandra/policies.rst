@@ -32,6 +32,12 @@ Load Balancing
    .. automethod:: distance
    .. automethod:: make_query_plan
 
+.. autoclass:: DefaultLoadBalancingPolicy
+   :members:
+
+.. autoclass:: DSELoadBalancingPolicy
+   :members:
+
 Translating Server Node Addresses
 ---------------------------------
 
