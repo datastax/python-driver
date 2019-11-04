@@ -654,7 +654,7 @@ class ImplicitExecutionTest(_AbstractTraversalTest):
             key = prop.key
             _validate_prop(key, value, self)
 
-    def test_iterate_step(self):
+    def _test_iterate_step(self, schema, graphson):
         """
         Test to validate that the iterate() step work on all dse versions.
 
@@ -664,7 +664,7 @@ class ImplicitExecutionTest(_AbstractTraversalTest):
         @test_category dse graph
         """
 
-        g = self.fetch_traversal_source()
+        g = self.fetch_traversal_source(graphson)
         generate_classic(self.session)
         g.addV('person').property('name', 'Person1').iterate()
 
