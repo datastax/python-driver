@@ -107,7 +107,7 @@ class CloudTests(CloudProxyCluster):
         with patch('cassandra.datastax.cloud.parse_metadata_info', wraps=self._bad_hostname_metadata):
             with self.assertRaises(NoHostAvailable) as e:
                 self.connect(self.creds)
-            self.assertIn("hostname", str(e.exception))
+            self.assertIn("hostname", str(e.exception).lower())
 
     def test_error_when_bundle_doesnt_exist(self):
         try:

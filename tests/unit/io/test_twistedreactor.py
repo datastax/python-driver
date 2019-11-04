@@ -65,9 +65,7 @@ class TestTwistedProtocol(unittest.TestCase):
         self.tr = proto_helpers.StringTransportWithDisconnection()
         self.tr.connector = Mock()
         self.mock_connection = Mock()
-        self.tr.connector.factory = twistedreactor.TwistedConnectionClientFactory(
-            self.mock_connection)
-        self.obj_ut = twistedreactor.TwistedConnectionProtocol()
+        self.obj_ut = twistedreactor.TwistedConnectionProtocol(self.mock_connection)
         self.tr.protocol = self.obj_ut
 
     def tearDown(self):
@@ -90,32 +88,6 @@ class TestTwistedProtocol(unittest.TestCase):
         self.obj_ut.dataReceived('foobar')
         self.assertTrue(self.mock_connection.handle_read.called)
         self.mock_connection._iobuf.write.assert_called_with("foobar")
-
-
-class TestTwistedClientFactory(unittest.TestCase):
-    def setUp(self):
-        if twistedreactor is None:
-            raise unittest.SkipTest("Twisted libraries not available")
-        twistedreactor.TwistedConnection.initialize_reactor()
-        self.mock_connection = Mock()
-        self.obj_ut = twistedreactor.TwistedConnectionClientFactory(
-            self.mock_connection)
-
-    def test_client_connection_failed(self):
-        """
-        Verify that connection failed causes the connection object to close.
-        """
-        exc = Exception('a test')
-        self.obj_ut.clientConnectionFailed(None, Failure(exc))
-        self.mock_connection.defunct.assert_called_with(exc)
-
-    def test_client_connection_lost(self):
-        """
-        Verify that connection lost causes the connection object to close.
-        """
-        exc = Exception('a test')
-        self.obj_ut.clientConnectionLost(None, Failure(exc))
-        self.mock_connection.defunct.assert_called_with(exc)
 
 
 class TestTwistedConnection(unittest.TestCase):
@@ -143,15 +115,6 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut._loop._cleanup()
         self.mock_reactor_run.assert_called_with(installSignalHandlers=False)
 
-    @patch('twisted.internet.reactor.connectTCP')
-    def test_add_connection(self, mock_connectTCP):
-        """
-        Verify that add_connection() gives us a valid twisted connector.
-        """
-        self.obj_ut.add_connection()
-        self.assertTrue(self.obj_ut.connector is not None)
-        self.assertTrue(mock_connectTCP.called)
-
     def test_client_connection_made(self):
         """
         Verifiy that _send_options_message() is called in
@@ -166,8 +129,10 @@ class TestTwistedConnection(unittest.TestCase):
         """
         Verify that close() disconnects the connector and errors callbacks.
         """
+        transport = Mock()
         self.obj_ut.error_all_requests = Mock()
         self.obj_ut.add_connection()
+        self.obj_ut.client_connection_made(transport)
         self.obj_ut.is_closed = False
         self.obj_ut.close()
 

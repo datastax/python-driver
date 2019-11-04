@@ -34,5 +34,5 @@ Limitations
 
 Event loops
 ^^^^^^^^^^^
-Twisted and Evenlet aren't supported yet. These event loops are still using the old way to configure
+Evenlet isn't supported yet. Eventlet still uses the old way to configure
 SSL (ssl_options), which is not compatible with the secure connect bundle provided by Apollo.
