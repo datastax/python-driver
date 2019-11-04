@@ -4,6 +4,82 @@ Upgrading
 .. toctree::
    :maxdepth: 1
 
+Upgrading from dse-driver
+-------------------------
+
+Since 3.21.0, cassandra-driver fully supports DataStax products. dse-driver and
+dse-graph users should now migrate to cassandra-driver to benefit from latest bug fixes
+and new features. The upgrade to this new unified driver version is straightforward
+with no major API changes.
+
+Installation
+^^^^^^^^^^^^
+
+Only the `cassandra-driver` package should be installed. `dse-driver` and `dse-graph`
+are not required anymore::
+
+    pip install cassandra-driver
+
+If you need the Graph *Fluent* API (features provided by dse-graph)::
+
+    pip install cassandra-driver[graph]
+
+See :doc:`installation` for more details.
+
+Import from the cassandra module
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There is no `dse` module, so you should import from the `cassandra` module. You
+need to change only the first module of your import statements, not the submodules.
+
+.. code-block:: python
+
+    from dse.cluster import Cluster, EXEC_PROFILE_GRAPH_DEFAULT
+    from dse.auth import PlainTextAuthProvider
+    from dse.policies import WhiteListRoundRobinPolicy
+
+    # becomes
+
+    from cassandra.cluster import Cluster, EXEC_PROFILE_GRAPH_DEFAULT
+    from cassandra.auth import PlainTextAuthProvider
+    from cassandra.policies import WhiteListRoundRobinPolicy
+
+dse-graph
+^^^^^^^^^
+
+dse-graph features are now built-in in cassandra-driver. The only change you need
+to do is your import statements:
+
+.. code-block:: python
+
+    from dse_graph import ..
+    from dse_graph.query import ..
+
+    # becomes
+
+    from cassandra.datastax.graph.fluent import ..
+    from cassandra.datastax.graph.fluent.query import ..
+
+See :mod:`~.datastax.graph.fluent`.
+
+Session.execute and Session.execute_async API
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Although it is not common to use this API with positional arguments, it is
+important to be aware that the `host` and `execute_as` parameters have had
+their positional order swapped. This is only because `execute_as` was added
+in dse-driver before `host`.
+
+See :meth:`.Session.execute`.
+
+Deprecations
+^^^^^^^^^^^^
+
+These changes are optional, but recommended:
+
+* Importing from `cassandra.graph` is deprecated. Consider importing from `cassandra.datastax.graph`.
+* Use :class:`~.policies.DefaultLoadBalancingPolicy` instead of DSELoadBalancingPolicy.
+
 Upgrading to 3.0
 ----------------
 Version 3.0 of the DataStax Python driver for Apache Cassandra
@@ -46,7 +122,7 @@ materialize a list using the iterator:
     results = session.execute("SELECT * FROM system.local")
     row_list = list(results)
 
-For backward compatability, :class:`~.ResultSet` supports indexing. When
+For backward compatibility, :class:`~.ResultSet` supports indexing. When
 accessed at an index, a `~.ResultSet` object will materialize all its pages:
 
 .. code-block:: python
