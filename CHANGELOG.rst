@@ -1,3 +1,12 @@
+3.21.0
+======
+Unreleased
+
+Features
+--------
+* Allow passing ssl context for Twisted (PYTHON-1161)
+* Cloud Twisted support (PYTHON-1163)
+
 3.20.0
 ======
 October 28, 2019
