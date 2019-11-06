@@ -7,6 +7,14 @@ Features
 * Allow passing ssl context for Twisted (PYTHON-1161)
 * Cloud Twisted support (PYTHON-1163)
 
+3.20.1
+======
+November 6, 2019
+
+Bug Fixes
+---------
+* ValueError: too many values to unpack (expected 2)" when there are two dashes in server version number (PYTHON-1172)
+
 3.20.0
 ======
 October 28, 2019
