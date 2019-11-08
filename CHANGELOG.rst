@@ -8,7 +8,8 @@ Features
 * ssl context and cloud support for Eventlet (PYTHON-1162)
 * Cloud Twisted support (PYTHON-1163)
 * Add additional_write_policy and read_repair to system schema parsing (PYTHON-1048)
-* Remove *read_repair_chance* table options (PYTHON-1140)
+* Remove *read_repair_chance table options (PYTHON-1140)
+* Flexible version parsing (PYTHON-1174)
 * [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 
 Bug Fixes

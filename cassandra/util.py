@@ -1929,19 +1929,31 @@ class Version(object):
             version_without_prerelease = version
         parts = list(reversed(version_without_prerelease.split('.')))
         if len(parts) > 4:
-            raise ValueError("Invalid version: {}. Only 4 "
-                             "components plus prerelease are supported".format(version))
+            prerelease_string = "-{}".format(self.prerelease) if self.prerelease else ""
+            log.warning("Unrecognized version: {}. Only 4 components plus prerelease are supported. "
+                        "Assuming version as {}{}".format(version, '.'.join(parts[:-5:-1]), prerelease_string))
 
-        self.major = int(parts.pop())
-        self.minor = int(parts.pop()) if parts else 0
-        self.patch = int(parts.pop()) if parts else 0
+        try:
+            self.major = int(parts.pop())
+        except ValueError:
+            six.reraise(
+                ValueError,
+                ValueError("Couldn't parse version {}. Version should start with a number".format(version)),
+                sys.exc_info()[2]
+            )
+        try:
+            self.minor = int(parts.pop()) if parts else 0
+            self.patch = int(parts.pop()) if parts else 0
 
-        if parts:  # we have a build version
-            build = parts.pop()
-            try:
-                self.build = int(build)
-            except ValueError:
-                self.build = build
+            if parts:  # we have a build version
+                build = parts.pop()
+                try:
+                    self.build = int(build)
+                except ValueError:
+                    self.build = build
+        except ValueError:
+            assumed_version = "{}.{}.{}.{}-{}".format(self.major, self.minor, self.patch, self.build, self.prerelease)
+            log.warning("Unrecognized version {}. Assuming version as {}".format(version, assumed_version))
 
     def __hash__(self):
         return self._version
