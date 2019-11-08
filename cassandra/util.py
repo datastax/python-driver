@@ -1924,7 +1924,7 @@ class Version(object):
     def __init__(self, version):
         self._version = version
         if '-' in version:
-            version_without_prerelease, self.prerelease = version.split('-')
+            version_without_prerelease, self.prerelease = version.split('-', 1)
         else:
             version_without_prerelease = version
         parts = list(reversed(version_without_prerelease.split('.')))

@@ -4,6 +4,8 @@ Unreleased
 
 Features
 --------
+* Allow passing ssl context for Twisted (PYTHON-1161)
+* Cloud Twisted support (PYTHON-1163)
 * Add additional_write_policy and read_repair to system schema parsing (PYTHON-1048)
 * Remove *read_repair_chance table options (PYTHON-1140)
 
@@ -72,6 +74,14 @@ Other
 * Add an abstract GraphStatement to handle different graph statements  (PYTHON-789)
 * Write documentation examples for DSE 2.0 features (PYTHON-732)
 * DSE_V1 protocol should not include all of protocol v5 (PYTHON-694)
+
+3.20.1
+======
+November 6, 2019
+
+Bug Fixes
+---------
+* ValueError: too many values to unpack (expected 2)" when there are two dashes in server version number (PYTHON-1172)
 
 3.20.0
 ======
