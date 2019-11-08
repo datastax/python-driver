@@ -563,6 +563,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertRaises(ValueError, rf.result)
 
     def test_repeat_orig_query_after_succesful_reprepare(self):
+        query_id = b'abc123'  # Just a random binary string so we don't hit id mismatch exception
         session = self.make_session()
         rf = self.make_response_future(session)
 
@@ -570,12 +571,14 @@ class ResponseFutureTests(unittest.TestCase):
                         kind=RESULT_KIND_PREPARED,
                         result_metadata_id='foo')
         response.results = (None, None, None, None, None)
+        response.query_id = query_id
 
         rf._query = Mock(return_value=True)
         rf._execute_after_prepare('host', None, None, response)
         rf._query.assert_called_once_with('host')
 
         rf.prepared_statement = Mock()
+        rf.prepared_statement.query_id = query_id
         rf._query = Mock(return_value=True)
         rf._execute_after_prepare('host', None, None, response)
         rf._query.assert_called_once_with('host')

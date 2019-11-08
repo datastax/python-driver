@@ -19,6 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
+from binascii import hexlify
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
@@ -4559,6 +4560,15 @@ class ResponseFuture(object):
         if isinstance(response, ResultMessage):
             if response.kind == RESULT_KIND_PREPARED:
                 if self.prepared_statement:
+                    if self.prepared_statement.query_id != response.query_id:
+                        self._set_final_exception(DriverException(
+                            "ID mismatch while trying to reprepare (expected {expected}, got {got}). "
+                            "This prepared statement won't work anymore. "
+                            "This usually happens when you run a 'USE...' "
+                            "query after the statement was prepared.".format(
+                                expected=hexlify(self.prepared_statement.query_id), got=hexlify(response.query_id)
+                            )
+                        ))
                     self.prepared_statement.result_metadata = response.column_metadata
                     new_metadata_id = response.result_metadata_id
                     if new_metadata_id is not None:
