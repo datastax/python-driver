@@ -78,12 +78,12 @@ from cassandra.datastax import cloud as dscloud
 try:
     from cassandra.io.twistedreactor import TwistedConnection
 except ImportError:
-    TwistedConnection = None
+    TwistedConnection = type(None)
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
 except ImportError:
-    EventletConnection = None
+    EventletConnection = type(None)
 
 try:
     from weakref import WeakSet
