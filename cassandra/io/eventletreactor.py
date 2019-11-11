@@ -94,6 +94,7 @@ class EventletConnection(Connection):
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
+        self.uses_legacy_ssl_options = self.ssl_options and not self.ssl_context
         self._write_queue = Queue()
 
         self._connect_socket()
@@ -103,18 +104,15 @@ class EventletConnection(Connection):
         self._send_options_message()
 
     def _wrap_socket_from_context(self):
-        if isinstance(self.ssl_context, eventlet.green.ssl.GreenSSLContext):
-            super(EventletConnection, self)._wrap_socket_from_context()
-        else:
-            _check_pyopenssl()
-            self._socket = SSL.Connection(self.ssl_context, self._socket)
-            self._socket.set_connect_state()
-            if self.ssl_options and 'server_hostname' in self.ssl_options:
-                # This is necessary for SNI
-                self._socket.set_tlsext_host_name(self.ssl_options['server_hostname'].encode('ascii'))
+        _check_pyopenssl()
+        self._socket = SSL.Connection(self.ssl_context, self._socket)
+        self._socket.set_connect_state()
+        if self.ssl_options and 'server_hostname' in self.ssl_options:
+            # This is necessary for SNI
+            self._socket.set_tlsext_host_name(self.ssl_options['server_hostname'].encode('ascii'))
 
     def _initiate_connection(self, sockaddr):
-        if isinstance(self.ssl_context, eventlet.green.ssl.GreenSSLContext):
+        if self.uses_legacy_ssl_options:
             super(EventletConnection, self)._initiate_connection(sockaddr)
         else:
             self._socket.connect(sockaddr)
@@ -122,7 +120,7 @@ class EventletConnection(Connection):
                 self._socket.do_handshake()
 
     def _match_hostname(self):
-        if isinstance(self.ssl_context, eventlet.green.ssl.GreenSSLContext) or not self.ssl_context:
+        if self.uses_legacy_ssl_options:
             super(EventletConnection, self)._match_hostname()
         else:
             cert_name = self._socket.get_peer_certificate().get_subject().commonName
