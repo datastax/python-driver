@@ -15,6 +15,8 @@
 import logging
 import copy
 
+from concurrent.futures import Future
+
 HAVE_GREMLIN = False
 try:
     import gremlin_python
@@ -117,8 +119,7 @@ if HAVE_GREMLIN:
             self.graph_name = graph_name
             self.execution_profile = execution_profile
 
-        def submit(self, bytecode):
-
+        def _prepare_query(self, bytecode):
             query = DseGraph.query_from_traversal(bytecode)
             ep = self.session.execution_profile_clone_update(self.execution_profile,
                                                              row_factory=graph_traversal_row_factory)
@@ -126,12 +127,43 @@ if HAVE_GREMLIN:
             graph_options.graph_language = DseGraph.DSE_GRAPH_QUERY_LANGUAGE
             if self.graph_name:
                 graph_options.graph_name = self.graph_name
-
             ep.graph_options = graph_options
+
+            return query, ep
+
+        @staticmethod
+        def _handle_query_results(result_set, gremlin_future):
+            try:
+                traversers = [Traverser(t) for t in result_set]
+                gremlin_future.set_result(
+                    RemoteTraversal(iter(traversers), TraversalSideEffects())
+                )
+            except Exception as e:
+                gremlin_future.set_exception(e)
+
+        @staticmethod
+        def _handle_query_error(response, gremlin_future):
+            gremlin_future.set_exception(response)
+
+        def submit(self, bytecode):
+            # the only reason I don't use submitAsync here
+            # is to avoid an unuseful future wrap
+            query, ep = self._prepare_query(bytecode)
 
             traversers = self.session.execute_graph(query, execution_profile=ep)
             traversers = [Traverser(t) for t in traversers]
             return RemoteTraversal(iter(traversers), TraversalSideEffects())
+
+        def submitAsync(self, bytecode):
+            query, ep = self._prepare_query(bytecode)
+
+            # to be compatible with gremlinpython, we need to return a concurrent.futures.Future
+            gremlin_future = Future()
+            response_future = self.session.execute_graph_async(query, execution_profile=ep)
+            response_future.add_callback(self._handle_query_results, gremlin_future)
+            response_future.add_errback(self._handle_query_error, gremlin_future)
+
+            return gremlin_future
 
         def __str__(self):
             return "<DSESessionRemoteGraphConnection: graph_name='{0}'>".format(self.graph_name)

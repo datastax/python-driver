@@ -14,6 +14,9 @@
 
 
 import sys
+
+from concurrent.futures import Future
+
 from cassandra.datastax.graph.fluent import DseGraph
 from gremlin_python.process.graph_traversal import GraphTraversal, GraphTraversalSource
 from gremlin_python.process.traversal import P
@@ -34,6 +37,7 @@ from six import string_types
 import six
 if six.PY3:
     import ipaddress
+
 
 def setup_module():
     if DSE_VERSION:
@@ -398,13 +402,13 @@ class AbstractTraversalTest():
 
 
 @requiredse
-class ImplicitExecutionTest(AbstractTraversalTest, BasicGraphUnitTestCase):
+class BaseImplicitExecutionTest(BasicGraphUnitTestCase):
     """
     This test class will execute all tests of the AbstractTraversalTestClass using implicit execution
     This all traversal will be run directly using toList()
     """
     def setUp(self):
-        super(ImplicitExecutionTest, self).setUp()
+        super(BaseImplicitExecutionTest, self).setUp()
         if DSE_VERSION:
             self.ep = DseGraph().create_execution_profile(self.graph_name)
             self.cluster.add_execution_profile(self.graph_name, self.ep)
@@ -485,6 +489,70 @@ class ImplicitExecutionTest(AbstractTraversalTest, BasicGraphUnitTestCase):
             value = prop.value
             key = prop.key
             _validate_prop(key, value, self)
+
+
+@requiredse
+class ImplicitExecutionTest(BaseImplicitExecutionTest, AbstractTraversalTest):
+    pass
+
+
+@requiredse
+class ImplicitAsyncExecutionTest(BaseImplicitExecutionTest):
+    """
+    Test to validate that the traversal async execution works properly.
+
+    @since 3.21.0
+    @jira_ticket PYTHON-1129
+
+    @test_category dse graph
+    """
+
+    def _validate_results(self, results):
+        results = list(results)
+        self.assertEqual(len(results), 2)
+        self.assertIn('vadas', results)
+        self.assertIn('josh', results)
+
+    def test_promise(self):
+        generate_classic(self.session)
+        g = self.fetch_traversal_source()
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        self._validate_results(traversal_future.result())
+
+    def test_promise_error_is_propagated(self):
+        generate_classic(self.session)
+        g = DseGraph().traversal_source(self.session, 'wrong_graph', execution_profile=self.ep)
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        with self.assertRaises(Exception):
+            traversal_future.result()
+
+    def test_promise_callback(self):
+        generate_classic(self.session)
+        g = self.fetch_traversal_source()
+        future = Future()
+
+        def cb(f):
+            future.set_result(f.result())
+
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        traversal_future.add_done_callback(cb)
+        self._validate_results(future.result())
+
+    def test_promise_callback_on_error(self):
+        generate_classic(self.session)
+        g = DseGraph().traversal_source(self.session, 'wrong_graph', execution_profile=self.ep)
+        future = Future()
+
+        def cb(f):
+            try:
+                f.result()
+            except Exception as e:
+                future.set_exception(e)
+
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        traversal_future.add_done_callback(cb)
+        with self.assertRaises(Exception):
+            future.result()
 
 
 @requiredse
