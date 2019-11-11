@@ -34,5 +34,4 @@ Limitations
 
 Event loops
 ^^^^^^^^^^^
-Evenlet isn't supported yet. Eventlet still uses the old way to configure
-SSL (ssl_options), which is not compatible with the secure connect bundle provided by Apollo.
+Evenlet isn't yet supported for python 3.7+ due to an `issue in Eventlet <https://github.com/eventlet/eventlet/issues/526>`_.

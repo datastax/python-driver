@@ -927,7 +927,7 @@ class Cluster(object):
 
             cloud_config = dscloud.get_cloud_config(
                 cloud,
-                create_pyopenssl_context=self.connection_class in [TwistedConnection, EventletConnection]
+                create_pyopenssl_context=issubclass(self.connection_class, (TwistedConnection, EventletConnection))
             )
 
             ssl_context = cloud_config.ssl_context

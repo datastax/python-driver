@@ -29,8 +29,9 @@ from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerMan
 try:
     from eventlet.green.OpenSSL import SSL
     _PYOPENSSL = True
-except ImportError as no_pyopenssl_error:
+except ImportError as e:
     _PYOPENSSL = False
+    no_pyopenssl_error = e
 
 
 log = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ def _check_pyopenssl():
     if not _PYOPENSSL:
         raise ImportError(
             "{}, pyOpenSSL must be installed to enable "
-            "SSL support with the Twisted event loop".format(str(no_pyopenssl_error))
+            "SSL support with the Eventlet event loop".format(str(no_pyopenssl_error))
         )
 
 
