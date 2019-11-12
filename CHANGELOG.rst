@@ -5,6 +5,7 @@ Unreleased
 Features
 --------
 * Allow passing ssl context for Twisted (PYTHON-1161)
+* ssl context and cloud support for Eventlet (PYTHON-1162)
 * Cloud Twisted support (PYTHON-1163)
 * Add additional_write_policy and read_repair to system schema parsing (PYTHON-1048)
 * Remove *read_repair_chance* table options (PYTHON-1140)

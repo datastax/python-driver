@@ -78,10 +78,10 @@ It might be also useful to learn about the different levels of identity verifica
 
 * `Using SSL in DSE drivers <https://docs.datastax.com/en/dse/6.7/dse-dev/datastax_enterprise/appDevGuide/sslDrivers.html>`_
 
-SSL with Twisted
-^^^^^^^^^^^^^^^^
-Twisted uses an alternative SSL implementation called pyOpenSSL, so if your `Cluster`'s connection class is
-:class:`~cassandra.io.twistedreactor.TwistedConnection`, you must pass a
+SSL with Twisted or Eventlet
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Twisted and Eventlet both use an alternative SSL implementation called pyOpenSSL, so if your `Cluster`'s connection class is
+:class:`~cassandra.io.twistedreactor.TwistedConnection` or :class:`~cassandra.io.eventletreactor.EventletConnection`, you must pass a
 `pyOpenSSL context <https://www.pyopenssl.org/en/stable/api/ssl.html#context-objects>`_ instead.
 An example is provided in these docs, and more details can be found in the
 `documentation <https://www.pyopenssl.org/en/stable/api/ssl.html#context-objects>`_.
@@ -269,6 +269,10 @@ for more details about ``SSLContext`` configuration.
         ssl_options={'check_hostname': True}
     )
     session = cluster.connect()
+
+
+Connecting using Eventlet would look similar except instead of importing and using ``TwistedConnection``, you would
+import and use ``EventletConnection``, including the appropriate monkey-patching.
 
 Versions 3.16.0 and lower
 ^^^^^^^^^^^^^^^^^^^^^^^^^

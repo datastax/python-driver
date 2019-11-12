@@ -51,7 +51,7 @@ DRIVER_KEYFILE_ENCRYPTED = os.path.abspath("tests/integration/long/ssl/driver_en
 DRIVER_CERTFILE = os.path.abspath("tests/integration/long/ssl/driver.pem")
 DRIVER_CERTFILE_BAD = os.path.abspath("tests/integration/long/ssl/python_driver_bad.pem")
 
-USES_PYOPENSSL = "twisted" in EVENT_LOOP_MANAGER
+USES_PYOPENSSL = "twisted" in EVENT_LOOP_MANAGER or "eventlet" in EVENT_LOOP_MANAGER
 if "twisted" in EVENT_LOOP_MANAGER:
     import OpenSSL
     ssl_version = OpenSSL.SSL.TLSv1_METHOD
