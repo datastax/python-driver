@@ -813,9 +813,12 @@ class _SimpleParameterizedType(_ParameterizedType):
         for _ in range(numelements):
             itemlen = unpack(byts[p:p + length])
             p += length
-            item = byts[p:p + itemlen]
-            p += itemlen
-            result.append(subtype.from_binary(item, inner_proto))
+            if itemlen < 0:
+                result.append(None)
+            else:
+                item = byts[p:p + itemlen]
+                p += itemlen
+                result.append(subtype.from_binary(item, inner_proto))
         return cls.adapter(result)
 
     @classmethod
@@ -867,14 +870,23 @@ class MapType(_ParameterizedType):
         for _ in range(numelements):
             key_len = unpack(byts[p:p + length])
             p += length
-            keybytes = byts[p:p + key_len]
-            p += key_len
+            if key_len < 0:
+                keybytes = None
+                key = None
+            else:
+                keybytes = byts[p:p + key_len]
+                p += key_len
+                key = key_type.from_binary(keybytes, inner_proto)
+
             val_len = unpack(byts[p:p + length])
             p += length
-            valbytes = byts[p:p + val_len]
-            p += val_len
-            key = key_type.from_binary(keybytes, inner_proto)
-            val = value_type.from_binary(valbytes, inner_proto)
+            if val_len < 0:
+                val = None
+            else:
+                valbytes = byts[p:p + val_len]
+                p += val_len
+                val = value_type.from_binary(valbytes, inner_proto)
+
             themap._insert_unchecked(key, keybytes, val)
         return themap
 
