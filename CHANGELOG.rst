@@ -11,6 +11,7 @@ Features
 * Remove *read_repair_chance table options (PYTHON-1140)
 * Flexible version parsing (PYTHON-1174)
 * [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
+* Support NULL in collection deserializer (PYTHON-1123)
 
 Bug Fixes
 ---------
