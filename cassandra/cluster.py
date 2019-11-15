@@ -1106,6 +1106,7 @@ class Cluster(object):
             self.connection_class = connection_class
 
         if cloud is not None:
+            self.cloud = cloud
             if contact_points is not _NOT_SET or endpoint_factory or ssl_context or ssl_options:
                 raise ValueError("contact_points, endpoint_factory, ssl_context, and ssl_options "
                                  "cannot be specified with a cloud configuration")
@@ -1242,7 +1243,7 @@ class Cluster(object):
             profiles.setdefault(EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT,
                                 GraphAnalyticsExecutionProfile(load_balancing_policy=lbp))
 
-        if self._contact_points_explicit:
+        if self._contact_points_explicit and not self.cloud:  # avoid this warning for cloud users.
             if self._config_mode is _ConfigMode.PROFILES:
                 default_lbp_profiles = self.profile_manager._profiles_without_explicit_lbps()
                 if default_lbp_profiles:

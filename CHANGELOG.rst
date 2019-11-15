@@ -11,8 +11,9 @@ Features
 * Handle prepared id mismatch when repreparing on the fly (PYTHON-1124)
 * Remove *read_repair_chance table options (PYTHON-1140)
 * Flexible version parsing (PYTHON-1174)
-* [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 * Support NULL in collection deserializer (PYTHON-1123)
+* Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
+* [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 
 Bug Fixes
 ---------
