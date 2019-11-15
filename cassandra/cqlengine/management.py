@@ -232,7 +232,7 @@ def _sync_table(model, connection=None):
         except CQLEngineException as ex:
             # 1.2 doesn't return cf names, so we have to examine the exception
             # and ignore if it says the column family already exists
-            if "Cannot add already existing column family" not in unicode(ex):
+            if "Cannot add already existing column family" not in six.text_type(ex):
                 raise
     else:
         log.debug(format_log_context("sync_table checking existing table %s", keyspace=ks_name, connection=connection), cf_name)
