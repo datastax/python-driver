@@ -16,6 +16,7 @@ Features
 
 Bug Fixes
 ---------
+* re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
 
 Others
 ------
@@ -79,10 +80,6 @@ Other
 * Add an abstract GraphStatement to handle different graph statements  (PYTHON-789)
 * Write documentation examples for DSE 2.0 features (PYTHON-732)
 * DSE_V1 protocol should not include all of protocol v5 (PYTHON-694)
-
-Bug Fixes
----------
-* re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
 
 3.20.1
 ======
