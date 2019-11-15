@@ -8,6 +8,10 @@ Features
 * ssl context and cloud support for Eventlet (PYTHON-1162)
 * Cloud Twisted support (PYTHON-1163)
 
+Bug Fixes
+---------
+* re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
+
 3.20.1
 ======
 November 6, 2019
