@@ -18,6 +18,7 @@ Features
 Bug Fixes
 ---------
 * re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
+* asyncio message chunks can be processed discontinuously (PYTHON-1185)
 
 Others
 ------
