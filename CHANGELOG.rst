@@ -82,6 +82,14 @@ Other
 * Write documentation examples for DSE 2.0 features (PYTHON-732)
 * DSE_V1 protocol should not include all of protocol v5 (PYTHON-694)
 
+3.20.2
+======
+November 19, 2019
+
+Bug Fixes
+---------
+* Fix import error for old python installation without SSLContext (PYTHON-1183)
+
 3.20.1
 ======
 November 6, 2019
