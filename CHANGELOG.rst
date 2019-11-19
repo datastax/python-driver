@@ -12,6 +12,14 @@ Bug Fixes
 ---------
 * re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
 
+3.20.2
+======
+November 19, 2019
+
+Bug Fixes
+---------
+* Fix import error for old python installation without SSLContext (PYTHON-1183)
+
 3.20.1
 ======
 November 6, 2019
