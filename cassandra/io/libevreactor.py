@@ -343,7 +343,7 @@ class LibevConnection(Connection):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if ssl and isinstance(err, ssl.SSLError):
+            if isinstance(err, ssl.SSLError):
                 if err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
                     if not self._iobuf.tell():
                         return

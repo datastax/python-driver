@@ -22,6 +22,7 @@ from threading import Lock, Thread, Event
 import time
 import weakref
 import sys
+import ssl
 
 from six.moves import range
 
@@ -31,11 +32,6 @@ except ImportError:
     from cassandra.util import WeakSet  # noqa
 
 import asyncore
-
-try:
-    import ssl
-except ImportError:
-    ssl = None  # NOQA
 
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING, Timer, TimerManager
 
@@ -424,7 +420,7 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if ssl and isinstance(err, ssl.SSLError):
+            if isinstance(err, ssl.SSLError):
                 if err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
                     if not self._iobuf.tell():
                         return
