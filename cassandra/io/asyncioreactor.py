@@ -83,6 +83,7 @@ class AsyncioConnection(Connection):
     _loop_thread = None
 
     _write_queue = None
+    _write_queue_lock = None
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
@@ -91,6 +92,7 @@ class AsyncioConnection(Connection):
         self._socket.setblocking(0)
 
         self._write_queue = asyncio.Queue(loop=self._loop)
+        self._write_queue_lock = asyncio.Lock(loop=self._loop)
 
         # see initialize_reactor -- loop is running in a separate thread, so we
         # have to use a threadsafe call
@@ -157,20 +159,28 @@ class AsyncioConnection(Connection):
     def push(self, data):
         buff_size = self.out_buffer_size
         if len(data) > buff_size:
+            chunks = []
             for i in range(0, len(data), buff_size):
-                self._push_chunk(data[i:i + buff_size])
+                chunks.append(data[i:i + buff_size])
         else:
-            self._push_chunk(data)
+            chunks = [data]
 
-    def _push_chunk(self, chunk):
         if self._loop_thread.ident != get_ident():
             asyncio.run_coroutine_threadsafe(
-                self._write_queue.put(chunk),
+                self._push_msg(chunks),
                 loop=self._loop
             )
         else:
             # avoid races/hangs by just scheduling this, not using threadsafe
-            self._loop.create_task(self._write_queue.put(chunk))
+            self._loop.create_task(self._push_msg(chunks))
+
+    @asyncio.coroutine
+    def _push_msg(self, chunks):
+        # This lock ensures all chunks of a message are sequential in the Queue
+        with (yield from self._write_queue_lock):
+            for chunk in chunks:
+                self._write_queue.put_nowait(chunk)
+
 
     @asyncio.coroutine
     def handle_write(self):

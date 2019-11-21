@@ -355,6 +355,7 @@ requirecassandra = unittest.skipIf(DSE_VERSION, "Cassandra required")
 requiredse = unittest.skipUnless(DSE_VERSION, "DSE required")
 requirescloudproxy = unittest.skipIf(CLOUD_PROXY_PATH is None, "Cloud Proxy path hasn't been specified")
 
+libevtest = unittest.skipUnless(EVENT_LOOP_MANAGER=="libev", "Test timing designed for libev loop")
 
 def wait_for_node_socket(node, timeout):
     binary_itf = node.network_interfaces['binary']
