@@ -26,11 +26,7 @@ import struct
 import sys
 from threading import Thread, Event, RLock, Condition
 import time
-
-try:
-    import ssl
-except ImportError:
-    ssl = None  # NOQA
+import ssl
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
