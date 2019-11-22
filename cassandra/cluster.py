@@ -2029,6 +2029,10 @@ class Cluster(object):
             listener.on_remove(host)
         self.control_connection.on_remove(host)
 
+        reconnection_handler = host.get_and_set_reconnection_handler(None)
+        if reconnection_handler:
+            reconnection_handler.cancel()
+
     def signal_connection_failure(self, host, connection_exc, is_host_addition, expect_host_to_be_down=False):
         is_down = host.signal_connection_failure(connection_exc)
         if is_down:
