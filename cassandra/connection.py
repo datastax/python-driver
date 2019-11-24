@@ -185,6 +185,7 @@ class DefaultEndPoint(EndPoint):
     def __init__(self, address, port=9042):
         self._address = address
         self._port = port
+        self._ssl_options = {'server_hostname': address}
 
     @property
     def address(self):
@@ -193,6 +194,10 @@ class DefaultEndPoint(EndPoint):
     @property
     def port(self):
         return self._port
+
+    @property
+    def ssl_options(self):
+        return self._ssl_options
 
     def resolve(self):
         return self._address, self._port

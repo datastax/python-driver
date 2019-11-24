@@ -399,6 +399,17 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
             ssl_context.verify_mode = ssl.CERT_REQUIRED
         validate_ssl_options(ssl_context=ssl_context)
 
+    def test_can_connect_with_sslcontext_default_context(self):
+        """
+        Test to validate that we are able to connect to a cluster using a SSLContext created from create_default_context().
+
+        @expected_result The client can connect via SSL and preform some basic operations
+
+        @test_category connection:ssl
+        """
+        ssl_context = ssl.create_default_context(cafile=CLIENT_CA_CERTS)
+        validate_ssl_options(ssl_context=ssl_context)
+
     def test_can_connect_with_ssl_client_auth_password_private_key(self):
         """
         Identical test to SSLConnectionAuthTests.test_can_connect_with_ssl_client_auth,
