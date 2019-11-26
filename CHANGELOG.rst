@@ -11,6 +11,7 @@ Features
 Bug Fixes
 ---------
 * re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
+* Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set
 
 3.20.2
 ======
