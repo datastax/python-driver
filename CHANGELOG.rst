@@ -29,9 +29,22 @@ Unreleased
 
 Features
 --------
+* Allow passing ssl context for Twisted (PYTHON-1161)
+* ssl context and cloud support for Eventlet (PYTHON-1162)
+* Cloud Twisted support (PYTHON-1163)
+* Add additional_write_policy and read_repair to system schema parsing (PYTHON-1048)
+* Handle prepared id mismatch when repreparing on the fly (PYTHON-1124)
+* Remove *read_repair_chance table options (PYTHON-1140)
+* Flexible version parsing (PYTHON-1174)
+* Support NULL in collection deserializer (PYTHON-1123)
+* Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
+* [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 
 Bug Fixes
 ---------
+* re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
+* asyncio message chunks can be processed discontinuously (PYTHON-1185)
+* Reconnect attempts persist after downed node removed from peers (PYTHON-1181)
 
 Others
 ------
@@ -95,6 +108,22 @@ Other
 * Add an abstract GraphStatement to handle different graph statements  (PYTHON-789)
 * Write documentation examples for DSE 2.0 features (PYTHON-732)
 * DSE_V1 protocol should not include all of protocol v5 (PYTHON-694)
+
+3.20.2
+======
+November 19, 2019
+
+Bug Fixes
+---------
+* Fix import error for old python installation without SSLContext (PYTHON-1183)
+
+3.20.1
+======
+November 6, 2019
+
+Bug Fixes
+---------
+* ValueError: too many values to unpack (expected 2)" when there are two dashes in server version number (PYTHON-1172)
 
 3.20.0
 ======

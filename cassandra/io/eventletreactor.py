@@ -15,7 +15,6 @@
 
 # Originally derived from MagnetoDB source:
 #   https://github.com/stackforge/magnetodb/blob/2015.1.0b1/magnetodb/common/cassandra/io/eventletreactor.py
-
 import eventlet
 from eventlet.green import socket
 from eventlet.queue import Queue
@@ -27,9 +26,23 @@ import time
 from six.moves import xrange
 
 from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
+try:
+    from eventlet.green.OpenSSL import SSL
+    _PYOPENSSL = True
+except ImportError as e:
+    _PYOPENSSL = False
+    no_pyopenssl_error = e
 
 
 log = logging.getLogger(__name__)
+
+
+def _check_pyopenssl():
+    if not _PYOPENSSL:
+        raise ImportError(
+            "{}, pyOpenSSL must be installed to enable "
+            "SSL support with the Eventlet event loop".format(str(no_pyopenssl_error))
+        )
 
 
 class EventletConnection(Connection):
@@ -81,6 +94,7 @@ class EventletConnection(Connection):
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
+        self.uses_legacy_ssl_options = self.ssl_options and not self.ssl_context
         self._write_queue = Queue()
 
         self._connect_socket()
@@ -88,6 +102,31 @@ class EventletConnection(Connection):
         self._read_watcher = eventlet.spawn(lambda: self.handle_read())
         self._write_watcher = eventlet.spawn(lambda: self.handle_write())
         self._send_options_message()
+
+    def _wrap_socket_from_context(self):
+        _check_pyopenssl()
+        self._socket = SSL.Connection(self.ssl_context, self._socket)
+        self._socket.set_connect_state()
+        if self.ssl_options and 'server_hostname' in self.ssl_options:
+            # This is necessary for SNI
+            self._socket.set_tlsext_host_name(self.ssl_options['server_hostname'].encode('ascii'))
+
+    def _initiate_connection(self, sockaddr):
+        if self.uses_legacy_ssl_options:
+            super(EventletConnection, self)._initiate_connection(sockaddr)
+        else:
+            self._socket.connect(sockaddr)
+            if self.ssl_context or self.ssl_options:
+                self._socket.do_handshake()
+
+    def _match_hostname(self):
+        if self.uses_legacy_ssl_options:
+            super(EventletConnection, self)._match_hostname()
+        else:
+            cert_name = self._socket.get_peer_certificate().get_subject().commonName
+            if cert_name != self.endpoint.address:
+                raise Exception("Hostname verification failed! Certificate name '{}' "
+                                "doesn't endpoint '{}'".format(cert_name, self.endpoint.address))
 
     def close(self):
         with self.lock:

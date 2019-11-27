@@ -29,7 +29,8 @@ from cassandra.cqltypes import (
     CassandraType, DateRangeType, DateType, DecimalType,
     EmptyValue, LongType, SetType, UTF8Type,
     cql_typename, int8_pack, int64_pack, lookup_casstype,
-    lookup_casstype_simple, parse_casstype_args
+    lookup_casstype_simple, parse_casstype_args,
+    int32_pack, Int32Type, ListType, MapType
 )
 from cassandra.encoder import cql_quote
 from cassandra.pool import Host
@@ -225,6 +226,46 @@ class TypeTests(unittest.TestCase):
         # Large date overflow (PYTHON-452)
         expected = 2177403010.123
         self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2038, 12, 31, 10, 10, 10, 123000))
+
+    def test_collection_null_support(self):
+        """
+        Test that null values in collection are decoded properly.
+
+        @jira_ticket PYTHON-1123
+        """
+        int_list = ListType.apply_parameters([Int32Type])
+        value = (
+                int32_pack(2) +  # num items
+                int32_pack(-1) +  # size of item1
+                int32_pack(4) +  # size of item2
+                int32_pack(42)  # item2
+        )
+        self.assertEqual(
+            [None, 42],
+            int_list.deserialize(value, 3)
+        )
+
+        set_list = SetType.apply_parameters([Int32Type])
+        self.assertEqual(
+            {None, 42},
+            set(set_list.deserialize(value, 3))
+        )
+
+        value = (
+                int32_pack(2) +  # num items
+                int32_pack(4) +  # key size of item1
+                int32_pack(42) +  # key item1
+                int32_pack(-1) +  # value size of item1
+                int32_pack(-1) +  # key size of item2
+                int32_pack(4) +  # value size of item2
+                int32_pack(42)  # value of item2
+        )
+
+        map_list = MapType.apply_parameters([Int32Type, Int32Type])
+        self.assertEqual(
+            [(42, None), (None, 42)],
+            map_list.deserialize(value, 3)._items  # OrderedMapSerializedKey
+        )
 
     def test_write_read_string(self):
         with tempfile.TemporaryFile() as f:

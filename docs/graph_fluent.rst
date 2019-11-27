@@ -146,7 +146,8 @@ that session. We call this *implicit execution* because the `Session` is not
 explicitly involved. Everything is managed internally by TinkerPop while
 traversing the graph and the results are TinkerPop types as well.
 
-For example:
+Synchronous Example
+-------------------
 
 .. code-block:: python
 
@@ -154,8 +155,36 @@ For example:
     g = DseGraph.traversal_source(session)
     # implicitly execute the query by traversing the TraversalSource
     g.addV('genre').property('genreId', 1).property('name', 'Action').next()
-    # view the results of the execution
-    pprint(g.V().toList())
+
+    # blocks until the query is completed and return the results
+    results = g.V().toList()
+    pprint(results)
+
+Asynchronous Exemple
+--------------------
+
+You can execute a graph traversal query asynchronously by using `.promise()`. It returns a
+python `Future <https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future>`_.
+
+.. code-block:: python
+
+    # Build the GraphTraversalSource
+    g = DseGraph.traversal_source(session)
+    # implicitly execute the query by traversing the TraversalSource
+    g.addV('genre').property('genreId', 1).property('name', 'Action').next()  # not async
+
+    # get a future and wait
+    future = g.V().promise()
+    results = list(future.result())
+    pprint(results)
+
+    # or set a callback
+    def cb(f):
+        results = list(f.result())
+        pprint(results)
+    future = g.V().promise()
+    future.add_done_callback(cb)
+    # do other stuff...
 
 Specify the Execution Profile explicitly
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

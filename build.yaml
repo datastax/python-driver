@@ -46,8 +46,8 @@ schedules:
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [2.7, 3.4, 3.6, 3.7]
-        - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
+        - python: [2.7, 3.4, 3.7]
+        - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse', dse-4.8', 'dse-5.0']
 
   release_test:
     schedule: per_commit
@@ -258,6 +258,7 @@ build:
           "tests/integration/standard/test_metrics.py"
           "tests/integration/standard/test_query.py"
           "tests/integration/simulacron/test_endpoint.py"
+          "tests/integration/long/test_ssl.py"
         )
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml ${EVENT_LOOP_TESTS[@]} || true
         exit 0

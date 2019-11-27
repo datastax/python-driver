@@ -217,6 +217,11 @@ class VersionTests(unittest.TestCase):
             ('3.55.1.build12', (3, 55, 1, 'build12', 0)),
             ('3.55.1.20190429-TEST', (3, 55, 1, 20190429, 'TEST')),
             ('4.0-SNAPSHOT', (4, 0, 0, 0, 'SNAPSHOT')),
+            ('1.0.5.4.3', (1, 0, 5, 4, 0)),
+            ('1-SNAPSHOT', (1, 0, 0, 0, 'SNAPSHOT')),
+            ('4.0.1.2.3.4.5-ABC-123-SNAP-TEST.blah', (4, 0, 1, 2, 'ABC-123-SNAP-TEST.blah')),
+            ('2.1.hello', (2, 1, 0, 0, 0)),
+            ('2.test.1', (2, 0, 0, 0, 0)),
         ]
 
         for str_version, expected_result in versions:
@@ -230,16 +235,7 @@ class VersionTests(unittest.TestCase):
 
         # not supported version formats
         with self.assertRaises(ValueError):
-            Version('2.1.hello')
-
-        with self.assertRaises(ValueError):
-            Version('2.test.1')
-
-        with self.assertRaises(ValueError):
             Version('test.1.0')
-
-        with self.assertRaises(ValueError):
-            Version('1.0.0.0.1')
 
     def test_version_compare(self):
         # just tests a bunch of versions
@@ -292,3 +288,5 @@ class VersionTests(unittest.TestCase):
         self.assertTrue(Version('4.0.0.build6-SNAPSHOT') > Version('4.0.0.build5-SNAPSHOT'))
         self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0-SNAPSHOT1'))
         self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0.0-SNAPSHOT1'))
+
+        self.assertTrue(Version('4.0.0-alpha1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))

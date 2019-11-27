@@ -26,11 +26,7 @@ import struct
 import sys
 from threading import Thread, Event, RLock, Condition
 import time
-
-try:
-    import ssl
-except ImportError:
-    ssl = None  # NOQA
+import ssl
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
@@ -772,6 +768,15 @@ class Connection(object):
         else:
             return conn
 
+    def _wrap_socket_from_context(self):
+        self._socket = self.ssl_context.wrap_socket(self._socket, **(self.ssl_options or {}))
+
+    def _initiate_connection(self, sockaddr):
+        self._socket.connect(sockaddr)
+
+    def _match_hostname(self):
+        ssl.match_hostname(self._socket.getpeercert(), self.endpoint.address)
+
     def _get_socket_addresses(self):
         address, port = self.endpoint.resolve()
 
@@ -791,17 +796,16 @@ class Connection(object):
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
                 if self.ssl_context:
-                    self._socket = self.ssl_context.wrap_socket(self._socket,
-                                                                **(self.ssl_options or {}))
+                    self._wrap_socket_from_context()
                 elif self.ssl_options:
                     if not self._ssl_impl:
                         raise RuntimeError("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
-                self._socket.connect(sockaddr)
+                self._initiate_connection(sockaddr)
                 self._socket.settimeout(None)
                 if self._check_hostname:
-                    ssl.match_hostname(self._socket.getpeercert(), self.endpoint.address)
+                    self._match_hostname()
                 sockerr = None
                 break
             except socket.error as err:

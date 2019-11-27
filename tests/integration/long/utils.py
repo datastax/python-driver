@@ -93,7 +93,7 @@ def force_stop(node):
 
 
 def decommission(node):
-    if DSE_VERSION >= Version("5.1") or CASSANDRA_VERSION >= Version("4.0"):
+    if (DSE_VERSION and DSE_VERSION >= Version("5.1")) or CASSANDRA_VERSION >= Version("4.0"):
         # CASSANDRA-12510
         get_node(node).decommission(force=True)
     else:

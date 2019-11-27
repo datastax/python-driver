@@ -124,8 +124,6 @@ class EmptyColumnTests(SimulacronCluster):
                     "caching": {"keys": "ALL", "rows_per_partition": "NONE"},
                     "comment": "comment",
                     "gc_grace_seconds": 60000,
-                    "dclocal_read_repair_chance": 0.1,
-                    "read_repair_chance": 0.1,
                     "keyspace_name": "testks",
                     "table_name": "testtable",
                     "columnfamily_name": "testtable",  # C* 2.2
@@ -140,8 +138,6 @@ class EmptyColumnTests(SimulacronCluster):
                 "caching": "map<ascii, ascii>",
                 "comment": "ascii",
                 "gc_grace_seconds": "int",
-                "dclocal_read_repair_chance": "double",
-                "read_repair_chance": "double",
                 "keyspace_name": "ascii",
                 "table_name": "ascii",
                 "columnfamily_name": "ascii",
