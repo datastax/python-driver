@@ -57,17 +57,17 @@ schedules:
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
 
-ngdg:
+  tmpngdg:
     schedule: adhoc
     branches:
-      include: [ngdg_master_ft]
+      include: [merge_ossnext_ngdg]
     env_vars: |
       EVENT_LOOP_MANAGER='libev'
       EXCLUDE_LONG=1
     matrix:
       exclude:
         - python: [2.7, 3.4, 3.6, 3.7]
-        - cassandra: ['dse-4.8', 'dse-5.0', dse-6.0', 'dse-6.7']
+        - cassandra: ['2.1', '2.2', '3.0', '3.11', 'dse-4.8', 'dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7']
 
   weekly_master:
     schedule: 0 10 * * 6
