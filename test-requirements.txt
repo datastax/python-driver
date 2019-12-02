@@ -18,5 +18,5 @@ requests
 backports.ssl_match_hostname; python_version < '2.7.9'
 futurist; python_version >= '3.7'
 asynctest; python_version > '3.4'
-gremlinpython>=3.4.0,<3.5.0
+gremlinpython==3.3.4
 ipaddress; python_version < '3.3.0'
