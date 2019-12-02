@@ -616,7 +616,14 @@ class Connection(object):
             return conn
 
     def _wrap_socket_from_context(self):
-        self._socket = self.ssl_context.wrap_socket(self._socket, **(self.ssl_options or {}))
+        ssl_options = self.ssl_options or {}
+        # PYTHON-1186: set the server_hostname only if the SSLContext has
+        # check_hostname enabled and it is not already provided by the EndPoint ssl options
+        if (self.ssl_context.check_hostname and
+                'server_hostname' not in ssl_options):
+            ssl_options = ssl_options.copy()
+            ssl_options['server_hostname'] = self.endpoint.address
+        self._socket = self.ssl_context.wrap_socket(self._socket, **ssl_options)
 
     def _initiate_connection(self, sockaddr):
         self._socket.connect(sockaddr)
