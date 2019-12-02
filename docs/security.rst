@@ -70,7 +70,7 @@ to a dict of options. These will be passed as kwargs to ``ssl.SSLContext.wrap_so
 when new sockets are created.
 
 If you create your SSLContext using `ssl.create_default_context <https://docs.python.org/3/library/ssl.html#ssl.create_default_context>`_,
-be aware that SSLContext.check_hostname is set to True by default. So the hostname validation will be done
+be aware that SSLContext.check_hostname is set to True by default, so the hostname validation will be done
 by Python and not the driver. For this reason, we need to set the server_hostname at best effort, which is the
 resolved ip address. If this validation needs to be done against the FQDN, consider enabling it using the ssl_options
 as described in the following examples or implement your own :class:`~.connection.EndPoint` and
