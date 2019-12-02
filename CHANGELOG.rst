@@ -11,7 +11,8 @@ Features
 Bug Fixes
 ---------
 * re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
-* Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set
+* Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set (PYTHON-1186)
+* ResponseFuture._set_result crashes on connection error when used with PrepareMessage (PYTHON-1187)
 
 3.20.2
 ======
