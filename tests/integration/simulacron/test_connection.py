@@ -27,7 +27,7 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 
 from tests import connection_class, thread_pool_executor_class
-from tests.integration import requiressimulacron
+from tests.integration import requiressimulacron, libevtest
 from tests.integration.util import assert_quiescent_pool_state, late
 # important to import the patch PROTOCOL_VERSION from the simulacron module
 from tests.integration.simulacron import SimulacronBase, PROTOCOL_VERSION
@@ -194,6 +194,7 @@ class ConnectionTests(SimulacronBase):
         callback.assert_not_called()
 
     @cythontest
+    @libevtest
     def test_heartbeat_defunct_deadlock(self):
         """
         Ensure that there is no deadlock when request is in-flight and heartbeat defuncts connection

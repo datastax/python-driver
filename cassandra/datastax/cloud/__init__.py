@@ -15,8 +15,10 @@
 import os
 import logging
 import json
+import sys
 import tempfile
 import shutil
+import six
 from six.moves.urllib.request import urlopen
 
 _HAS_SSL = True
@@ -135,7 +137,8 @@ def read_metadata_info(config, cloud_config):
         response = urlopen(url, context=config.ssl_context, timeout=timeout)
     except Exception as e:
         log.exception(e)
-        raise DriverException("Unable to connect to the metadata service at %s" % url)
+        raise DriverException("Unable to connect to the metadata service at %s. "
+                              "Check the cluster status in the Constellation cloud console. " % url)
 
     if response.code != 200:
         raise DriverException(("Error while fetching the metadata at: %s. "
@@ -177,8 +180,12 @@ def _ssl_context_from_cert(ca_cert_location, cert_location, key_location):
 def _pyopenssl_context_from_cert(ca_cert_location, cert_location, key_location):
     try:
         from OpenSSL import SSL
-    except ImportError:
-        return None
+    except ImportError as e:
+        six.reraise(
+            ImportError,
+            ImportError("PyOpenSSL must be installed to connect to Apollo with the Eventlet or Twisted event loops"),
+            sys.exc_info()[2]
+        )
     ssl_context = SSL.Context(SSL.TLSv1_METHOD)
     ssl_context.set_verify(SSL.VERIFY_PEER, callback=lambda _1, _2, _3, _4, ok: ok)
     ssl_context.use_certificate_file(cert_location)

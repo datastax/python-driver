@@ -19,7 +19,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
-from cassandra import InvalidRequest
+from cassandra import InvalidRequest, DriverException
 
 from cassandra import ConsistencyLevel, ProtocolVersion
 from cassandra.cluster import Cluster
@@ -396,6 +396,22 @@ class PreparedStatementTests(unittest.TestCase):
 
         with self.assertRaises(InvalidRequest):
             self.session.execute(prepared, [0])
+
+    def test_fail_if_different_query_id_on_reprepare(self):
+        """ PYTHON-1124 and CASSANDRA-15252 """
+        keyspace = "test_fail_if_different_query_id_on_reprepare"
+        self.session.execute(
+            "CREATE KEYSPACE IF NOT EXISTS {} WITH replication = "
+            "{{'class': 'SimpleStrategy', 'replication_factor': 1}}".format(keyspace)
+        )
+        self.session.execute("CREATE TABLE IF NOT EXISTS {}.foo(k int PRIMARY KEY)".format(keyspace))
+        prepared = self.session.prepare("SELECT * FROM {}.foo WHERE k=?".format(keyspace))
+        self.session.execute("DROP TABLE {}.foo".format(keyspace))
+        self.session.execute("CREATE TABLE {}.foo(k int PRIMARY KEY)".format(keyspace))
+        self.session.execute("USE {}".format(keyspace))
+        with self.assertRaises(DriverException) as e:
+            self.session.execute(prepared, [0])
+        self.assertIn("ID mismatch", str(e.exception))
 
 
 @greaterthanorequalcass40

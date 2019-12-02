@@ -33,7 +33,7 @@ from cassandra.cqlengine.usertype import UserType
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
-INCLUDE_REPAIR = not (DSE_VERSION and DSE_VERSION >= Version('6.0.7'))
+INCLUDE_REPAIR = not CASSANDRA_VERSION >= Version('4-a')  # This should cover DSE 6.0+
 
 
 class KeyspaceManagementTest(BaseCassEngTestCase):

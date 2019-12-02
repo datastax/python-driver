@@ -19,6 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
+from binascii import hexlify
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
@@ -38,16 +39,6 @@ import uuid
 
 import weakref
 from weakref import WeakValueDictionary
-
-try:
-    from cassandra.io.twistedreactor import TwistedConnection
-except ImportError:
-    TwistedConnection = None
-
-try:
-    from weakref import WeakSet
-except ImportError:
-    from cassandra.util import WeakSet  # NOQA
 
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
@@ -100,6 +91,21 @@ from cassandra.datastax.graph import (graph_object_row_factory, GraphOptions, Gr
                                       GraphSON3Serializer)
 from cassandra.datastax.graph.query import _request_timeout_key, _GraphSONContextRowFactory
 from cassandra.datastax import cloud as dscloud
+
+try:
+    from cassandra.io.twistedreactor import TwistedConnection
+except ImportError:
+    TwistedConnection = None
+
+try:
+    from cassandra.io.eventletreactor import EventletConnection
+except ImportError:
+    EventletConnection = None
+
+try:
+    from weakref import WeakSet
+except ImportError:
+    from cassandra.util import WeakSet  # NOQA
 
 if six.PY3:
     long = int
@@ -1104,14 +1110,14 @@ class Cluster(object):
             self.connection_class = connection_class
 
         if cloud is not None:
+            self.cloud = cloud
             if contact_points is not _NOT_SET or endpoint_factory or ssl_context or ssl_options:
                 raise ValueError("contact_points, endpoint_factory, ssl_context, and ssl_options "
                                  "cannot be specified with a cloud configuration")
 
-            cloud_config = dscloud.get_cloud_config(
-                cloud,
-                create_pyopenssl_context=self.connection_class is TwistedConnection
-            )
+            uses_twisted = TwistedConnection and issubclass(self.connection_class, TwistedConnection)
+            uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
+            cloud_config = dscloud.get_cloud_config(cloud, create_pyopenssl_context=uses_twisted or uses_eventlet)
 
             ssl_context = cloud_config.ssl_context
             ssl_options = {'check_hostname': True}
@@ -1241,7 +1247,7 @@ class Cluster(object):
             profiles.setdefault(EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT,
                                 GraphAnalyticsExecutionProfile(load_balancing_policy=lbp))
 
-        if self._contact_points_explicit:
+        if self._contact_points_explicit and not self.cloud:  # avoid this warning for cloud users.
             if self._config_mode is _ConfigMode.PROFILES:
                 default_lbp_profiles = self.profile_manager._profiles_without_explicit_lbps()
                 if default_lbp_profiles:
@@ -2026,6 +2032,10 @@ class Cluster(object):
         for listener in self.listeners:
             listener.on_remove(host)
         self.control_connection.on_remove(host)
+
+        reconnection_handler = host.get_and_set_reconnection_handler(None)
+        if reconnection_handler:
+            reconnection_handler.cancel()
 
     def signal_connection_failure(self, host, connection_exc, is_host_addition, expect_host_to_be_down=False):
         is_down = host.signal_connection_failure(connection_exc)
@@ -4648,6 +4658,15 @@ class ResponseFuture(object):
         if isinstance(response, ResultMessage):
             if response.kind == RESULT_KIND_PREPARED:
                 if self.prepared_statement:
+                    if self.prepared_statement.query_id != response.query_id:
+                        self._set_final_exception(DriverException(
+                            "ID mismatch while trying to reprepare (expected {expected}, got {got}). "
+                            "This prepared statement won't work anymore. "
+                            "This usually happens when you run a 'USE...' "
+                            "query after the statement was prepared.".format(
+                                expected=hexlify(self.prepared_statement.query_id), got=hexlify(response.query_id)
+                            )
+                        ))
                     self.prepared_statement.result_metadata = response.column_metadata
                     new_metadata_id = response.result_metadata_id
                     if new_metadata_id is not None:

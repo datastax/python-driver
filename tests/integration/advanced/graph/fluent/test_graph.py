@@ -17,6 +17,7 @@ import datetime
 import six
 import time
 from collections import namedtuple
+from concurrent.futures import Future
 from packaging.version import Version
 
 from cassandra import cluster
@@ -33,16 +34,17 @@ from gremlin_python.structure.graph import Vertex as TravVertex, VertexProperty 
 from tests.integration import DSE_VERSION, greaterthanorequaldse68
 from tests.integration.advanced.graph import GraphUnitTestCase, \
     ClassicGraphSchema, CoreGraphSchema, \
-    validate_classic_vertex, validate_classic_edge, validate_generic_vertex_result_type,\
+    validate_classic_vertex, validate_classic_edge, validate_generic_vertex_result_type, \
     validate_classic_edge_properties, validate_line_edge, \
     validate_generic_edge_result_type, validate_path_result_type, VertexLabel, \
-    GraphTestConfiguration
+    GraphTestConfiguration, BasicGraphUnitTestCase
 from tests.integration import greaterthanorequaldse60, requiredse
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+
 
 import ipaddress
 
@@ -58,17 +60,23 @@ def check_equality_base(testcase, original, read_value):
         testcase.assertEqual(original, read_value)
 
 
+def create_traversal_profiles(cluster, graph_name):
+    ep_graphson2 = DseGraph().create_execution_profile(graph_name,
+                                                            graph_protocol=GraphProtocol.GRAPHSON_2_0)
+    ep_graphson3 = DseGraph().create_execution_profile(graph_name,
+                                                            graph_protocol=GraphProtocol.GRAPHSON_3_0)
+
+    cluster.add_execution_profile('traversal_graphson2', ep_graphson2)
+    cluster.add_execution_profile('traversal_graphson3', ep_graphson3)
+
+    return ep_graphson2, ep_graphson3
+
+
 class _AbstractTraversalTest(GraphUnitTestCase):
 
     def setUp(self):
         super(_AbstractTraversalTest, self).setUp()
-        self.ep_graphson2 = DseGraph().create_execution_profile(self.graph_name,
-                                                                graph_protocol=GraphProtocol.GRAPHSON_2_0)
-        self.ep_graphson3 = DseGraph().create_execution_profile(self.graph_name,
-                                                                graph_protocol=GraphProtocol.GRAPHSON_3_0)
-
-        self.cluster.add_execution_profile('traversal_graphson2', self.ep_graphson2)
-        self.cluster.add_execution_profile('traversal_graphson3', self.ep_graphson3)
+        self.ep_graphson2, self.ep_graphson3 = create_traversal_profiles(self.cluster, self.graph_name)
 
     def _test_basic_query(self, schema, graphson):
         """
@@ -569,12 +577,17 @@ class _AbstractTraversalTest(GraphUnitTestCase):
 
 
 @requiredse
-@GraphTestConfiguration.generate_tests(traversal=True)
-class ImplicitExecutionTest(_AbstractTraversalTest):
+class BaseImplicitExecutionTest(GraphUnitTestCase):
     """
     This test class will execute all tests of the AbstractTraversalTestClass using implicit execution
     This all traversal will be run directly using toList()
     """
+    def setUp(self):
+        super(BaseImplicitExecutionTest, self).setUp()
+        if DSE_VERSION:
+            self.ep = DseGraph().create_execution_profile(self.graph_name)
+            self.cluster.add_execution_profile(self.graph_name, self.ep)
+
     @staticmethod
     def fetch_key_from_prop(property):
         return property.key
@@ -654,19 +667,86 @@ class ImplicitExecutionTest(_AbstractTraversalTest):
             key = prop.key
             _validate_prop(key, value, self)
 
+
+@requiredse
+@GraphTestConfiguration.generate_tests(traversal=True)
+class ImplicitExecutionTest(BaseImplicitExecutionTest, _AbstractTraversalTest):
     def _test_iterate_step(self, schema, graphson):
         """
         Test to validate that the iterate() step work on all dse versions.
-
         @jira_ticket PYTHON-1155
         @expected_result iterate step works
-
         @test_category dse graph
         """
 
         g = self.fetch_traversal_source(graphson)
-        generate_classic(self.session)
+        self.execute_graph(schema.fixtures.classic(), graphson)
         g.addV('person').property('name', 'Person1').iterate()
+
+
+@requiredse
+@GraphTestConfiguration.generate_tests(traversal=True)
+class ImplicitAsyncExecutionTest(BaseImplicitExecutionTest):
+    """
+    Test to validate that the traversal async execution works properly.
+
+    @since 3.21.0
+    @jira_ticket PYTHON-1129
+
+    @test_category dse graph
+    """
+
+    def setUp(self):
+        super(ImplicitAsyncExecutionTest, self).setUp()
+        self.ep_graphson2, self.ep_graphson3 = create_traversal_profiles(self.cluster, self.graph_name)
+
+
+    def _validate_results(self, results):
+        results = list(results)
+        self.assertEqual(len(results), 2)
+        self.assertIn('vadas', results)
+        self.assertIn('josh', results)
+
+    def _test_promise(self, schema, graphson):
+        self.execute_graph(schema.fixtures.classic(), graphson)
+        g = self.fetch_traversal_source(graphson)
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        self._validate_results(traversal_future.result())
+
+    def _test_promise_error_is_propagated(self, schema, graphson):
+        self.execute_graph(schema.fixtures.classic(), graphson)
+        g = DseGraph().traversal_source(self.session, 'wrong_graph', execution_profile=self.ep)
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        with self.assertRaises(Exception):
+            traversal_future.result()
+
+    def _test_promise_callback(self, schema, graphson):
+        self.execute_graph(schema.fixtures.classic(), graphson)
+        g = self.fetch_traversal_source(graphson)
+        future = Future()
+
+        def cb(f):
+            future.set_result(f.result())
+
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        traversal_future.add_done_callback(cb)
+        self._validate_results(future.result())
+
+    def _test_promise_callback_on_error(self, schema, graphson):
+        self.execute_graph(schema.fixtures.classic(), graphson)
+        g = DseGraph().traversal_source(self.session, 'wrong_graph', execution_profile=self.ep)
+        future = Future()
+
+        def cb(f):
+            try:
+                f.result()
+            except Exception as e:
+                future.set_exception(e)
+
+        traversal_future = g.V().has('name', 'marko').out('knows').values('name').promise()
+        traversal_future.add_done_callback(cb)
+        with self.assertRaises(Exception):
+            future.result()
 
 
 class ExplicitExecutionBase(GraphUnitTestCase):
@@ -791,13 +871,7 @@ class BatchStatementTests(ExplicitExecutionBase):
 
     def setUp(self):
         super(BatchStatementTests, self).setUp()
-        self.ep_graphson2 = DseGraph().create_execution_profile(self.graph_name,
-                                                                graph_protocol=GraphProtocol.GRAPHSON_2_0)
-        self.ep_graphson3 = DseGraph().create_execution_profile(self.graph_name,
-                                                                graph_protocol=GraphProtocol.GRAPHSON_3_0)
-
-        self.cluster.add_execution_profile('traversal_graphson2', self.ep_graphson2)
-        self.cluster.add_execution_profile('traversal_graphson3', self.ep_graphson3)
+        self.ep_graphson2, self.ep_graphson3 = create_traversal_profiles(self.cluster, self.graph_name)
 
     def _test_batch_with_schema(self, schema, graphson):
         """
@@ -938,9 +1012,7 @@ class GraphPagingTest(GraphUnitTestCase):
     def setUp(self):
         super(GraphPagingTest, self).setUp()
         self.addCleanup(reset_paging_options)
-        self.ep_graphson3 = DseGraph().create_execution_profile(self.graph_name,
-                                                                graph_protocol=GraphProtocol.GRAPHSON_3_0)
-        self.cluster.add_execution_profile('traversal_graphson3', self.ep_graphson3)
+        self.ep_graphson2, self.ep_graphson3 = create_traversal_profiles(self.cluster, self.graph_name)
 
     def _setup_data(self, schema, graphson):
         self.execute_graph(
