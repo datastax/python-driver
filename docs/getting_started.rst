@@ -434,3 +434,43 @@ level on that:
     user3_lookup = user_lookup_stmt.bind([user_id3])
     user3_lookup.consistency_level = ConsistencyLevel.ALL
     user3 = session.execute(user3_lookup)
+
+Speculative Execution
+^^^^^^^^^^^^^^^^^^^^^
+
+Speculative execution is a way to minimize latency by preemptively executing several
+instances of the same query against different nodes. For more details about this
+technique, see `Speculative Execution with DataStax Drivers <https://docs.datastax.com/en/devapp/doc/devapp/driversSpeculativeRetry.html>`_.
+
+To enable speculative execution:
+
+* Configure a :class:`~.policies.SpeculativeExecutionPolicy` with the ExecutionProfile
+* Mark your query as idempotent, which mean it can be applied multiple
+  times without changing the result of the initial application.
+  See `Query Idempotence <https://docs.datastax.com/en/devapp/doc/devapp/driversQueryIdempotence.html>`_ for more details.
+
+
+Example:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+    from cassandra.policies import ConstantSpeculativeExecutionPolicy
+    from cassandra.query import SimpleStatement
+
+    # Configure the speculative execution policy
+    ep = ExecutionProfile(
+        speculative_execution_policy=ConstantSpeculativeExecutionPolicy(delay=.5, max_attempts=10)
+    )
+    cluster = Cluster(..., execution_profiles={EXEC_PROFILE_DEFAULT: ep})
+    session = cluster.connect()
+
+    # Mark the query idempotent
+    query = SimpleStatement(
+        "UPDATE my_table SET list_col = [1] WHERE pk = 1",
+        is_idempotent=True
+    )
+
+    # Execute. A new query will be sent to the server every 0.5 second
+    # until we receive a response, for a max number attempts of 10.
+    session.execute(query)
