@@ -4550,8 +4550,9 @@ class ResponseFuture(object):
                     log.warning("Host %s error: %s.", host, response.summary)
                     if self._metrics is not None:
                         self._metrics.on_other_error()
+                    cl = getattr(self.message, 'consistency_level', None)
                     retry = retry_policy.on_request_error(
-                        self.query, self.message.consistency_level, error=response,
+                        self.query, cl, error=response,
                         retry_num=self._query_retries)
                 elif isinstance(response, PreparedQueryNotFound):
                     if self.prepared_statement:
@@ -4608,9 +4609,9 @@ class ResponseFuture(object):
                     self._metrics.on_connection_error()
                 if not isinstance(response, ConnectionShutdown):
                     self._connection.defunct(response)
+                cl = getattr(self.message, 'consistency_level', None)
                 retry = self._retry_policy.on_request_error(
-                    self.query, self.message.consistency_level, error=response,
-                    retry_num=self._query_retries)
+                    self.query, cl, error=response, retry_num=self._query_retries)
                 self._handle_retry_decision(retry, response, host)
             elif isinstance(response, Exception):
                 if hasattr(response, 'to_exception'):

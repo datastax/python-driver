@@ -203,6 +203,28 @@ class ResponseFutureTests(unittest.TestCase):
         rf._set_result(None, None, None, result)
         self.assertRaises(Exception, rf.result)
 
+    def test_request_error_with_prepare_message(self):
+        session = self.make_session()
+        query = SimpleStatement("SELECT * FROM foobar")
+        retry_policy = Mock()
+        retry_policy.on_request_error.return_value = (RetryPolicy.RETHROW, None)
+        message = PrepareMessage(query=query)
+
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
+        rf._query_retries = 1
+        rf.send_request()
+        result = Mock(spec=OverloadedErrorMessage)
+        result.to_exception.return_value = result
+        rf._set_result(None, None, None, result)
+        self.assertIsInstance(rf._final_exception, OverloadedErrorMessage)
+
+        rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
+        rf._query_retries = 1
+        rf.send_request()
+        result = Mock(spec=ConnectionException)
+        rf._set_result(None, None, None, result)
+        self.assertIsInstance(rf._final_exception, ConnectionException)
+
     def test_retry_policy_says_ignore(self):
         session = self.make_session()
         query = SimpleStatement("INSERT INFO foo (a, b) VALUES (1, 2)")
