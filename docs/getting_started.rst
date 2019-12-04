@@ -110,7 +110,6 @@ by executing a ``USE <keyspace>`` query:
     # or you can do this instead
     session.execute('USE users')
 
-
 Executing Queries
 -----------------
 Now that we have a :class:`.Session` we can begin to execute queries. The simplest
@@ -153,13 +152,45 @@ examples are equivalent:
 If you prefer another result format, such as a ``dict`` per row, you
 can change the :attr:`~.Session.row_factory` attribute.
 
-For queries that will be run repeatedly, you should use
-`Prepared statements <#prepared-statements>`_.
+As mentioned in our `Drivers Best Practices Guide <https://docs.datastax.com/en/devapp/doc/devapp/driversBestPractices.html#driversBestPractices__usePreparedStatements>`_,
+it is highly recommended to use `Prepared statements <#prepared-statement>`_ for your
+frequently run queries.
+
+.. _prepared-statement:
+
+Prepared Statements
+-------------------
+Prepared statements are queries that are parsed by Cassandra and then saved
+for later use.  When the driver uses a prepared statement, it only needs to
+send the values of parameters to bind.  This lowers network traffic
+and CPU utilization within Cassandra because Cassandra does not have to
+re-parse the query each time.
+
+To prepare a query, use :meth:`.Session.prepare()`:
+
+.. code-block:: python
+
+    user_lookup_stmt = session.prepare("SELECT * FROM users WHERE user_id=?")
+
+    users = []
+    for user_id in user_ids_to_query:
+        user = session.execute(user_lookup_stmt, [user_id])
+        users.append(user)
+
+:meth:`~.Session.prepare()` returns a :class:`~.PreparedStatement` instance
+which can be used in place of :class:`~.SimpleStatement` instances or literal
+string queries.  It is automatically prepared against all nodes, and the driver
+handles re-preparing against new nodes and restarted nodes when necessary.
+
+Note that the placeholders for prepared statements are ``?`` characters.  This
+is different than for simple, non-prepared statements (although future versions
+of the driver may use the same placeholders for both).
 
 Passing Parameters to CQL Queries
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-When executing non-prepared statements, the driver supports two forms of
-parameter place-holders: positional and named.
+Althought it is not recommended, you can also pass parameters to non-prepared
+statements. The driver supports two forms of parameter place-holders: positional
+and named.
 
 Positional parameters are used with a ``%s`` placeholder.  For example,
 when you execute:
@@ -375,34 +406,6 @@ in a :class:`~.SimpleStatement`:
         "INSERT INTO users (name, age) VALUES (%s, %s)",
         consistency_level=ConsistencyLevel.QUORUM)
     session.execute(query, ('John', 42))
-
-Prepared Statements
--------------------
-Prepared statements are queries that are parsed by Cassandra and then saved
-for later use.  When the driver uses a prepared statement, it only needs to
-send the values of parameters to bind.  This lowers network traffic
-and CPU utilization within Cassandra because Cassandra does not have to
-re-parse the query each time.
-
-To prepare a query, use :meth:`.Session.prepare()`:
-
-.. code-block:: python
-
-    user_lookup_stmt = session.prepare("SELECT * FROM users WHERE user_id=?")
-
-    users = []
-    for user_id in user_ids_to_query:
-        user = session.execute(user_lookup_stmt, [user_id])
-        users.append(user)
-
-:meth:`~.Session.prepare()` returns a :class:`~.PreparedStatement` instance
-which can be used in place of :class:`~.SimpleStatement` instances or literal
-string queries.  It is automatically prepared against all nodes, and the driver
-handles re-preparing against new nodes and restarted nodes when necessary.
-
-Note that the placeholders for prepared statements are ``?`` characters.  This
-is different than for simple, non-prepared statements (although future versions
-of the driver may use the same placeholders for both).
 
 Setting a Consistency Level with Prepared Statements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
