@@ -72,7 +72,7 @@ Getting Help
 ------------
 Your best options for getting help with the driver are the
 `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
-and the ``#datastax-drivers`` channel in the `DataStax Academy Slack <https://academy.datastax.com/slack>`_.
+and the `DataStax Community <https://community.datastax.com>`_.
 
 License
 -------

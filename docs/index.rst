@@ -96,7 +96,7 @@ Visit the :doc:`FAQ section <faq>` in this documentation.
 
 Please send questions to the `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_.
 
-Alternatively, you can use the `#datastax-drivers` channel in the DataStax Acadamy Slack to ask questions in real time.
+Alternatively, you can use the `DataStax Community <https://community.datastax.com>`_.
 
 Reporting Issues
 ----------------
