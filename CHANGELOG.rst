@@ -45,6 +45,7 @@ Bug Fixes
 * re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
 * asyncio message chunks can be processed discontinuously (PYTHON-1185)
 * Reconnect attempts persist after downed node removed from peers (PYTHON-1181)
+* Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set (PYTHON-1186)
 
 Others
 ------
