@@ -8,7 +8,7 @@ schedules:
       EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_long_test:
@@ -20,7 +20,7 @@ schedules:
       EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_branches:
@@ -33,7 +33,7 @@ schedules:
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_branches_dev:
@@ -46,7 +46,7 @@ schedules:
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [2.7, 3.4, 3.7]
+        - python: [2.7, 3.4, 3.7, 3.8]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse', dse-4.8', 'dse-5.0']
 
   release_test:
@@ -138,7 +138,7 @@ schedules:
       JUST_UPGRADE=True
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
 
   # TODO: Temporary, don't merge me
@@ -152,7 +152,7 @@ schedules:
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
 
 python:
   - 2.7
@@ -160,6 +160,7 @@ python:
   - 3.5
   - 3.6
   - 3.7
+  - 3.8
 
 os:
   - ubuntu/bionic64/python-driver

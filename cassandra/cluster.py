@@ -1352,7 +1352,7 @@ class Cluster(object):
         Create a ThreadPoolExecutor for the cluster. In most cases, the built-in
         `concurrent.futures.ThreadPoolExecutor` is used.
 
-        Python 3.7 and Eventlet cause the `concurrent.futures.ThreadPoolExecutor`
+        Python 3.7+ and Eventlet cause the `concurrent.futures.ThreadPoolExecutor`
         to hang indefinitely. In that case, the user needs to have the `futurist`
         package so we can use the `futurist.GreenThreadPoolExecutor` class instead.
 
@@ -1375,7 +1375,7 @@ class Cluster(object):
                 except ImportError:
                     # futurist is not available
                     raise ImportError(
-                        ("Python 3.7 and Eventlet cause the `concurrent.futures.ThreadPoolExecutor` "
+                        ("Python 3.7+ and Eventlet cause the `concurrent.futures.ThreadPoolExecutor` "
                          "to hang indefinitely. If you want to use the Eventlet reactor, you "
                          "need to install the `futurist` package to allow the driver to use "
                          "the GreenThreadPoolExecutor. See https://github.com/eventlet/eventlet/issues/508 "
