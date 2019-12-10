@@ -234,3 +234,18 @@ An EAP release is only uploaded on a private server and it is not published on p
     python setup.py doc
 
 * Upload the docs on the EAP download server.
+
+Adding a New Python Runtime Support
+===================================
+
+* Add the new python version to our jenkins image:
+  https://github.com/riptano/openstack-jenkins-drivers/
+
+* Add the new python version in job-creator:
+  https://github.com/riptano/job-creator/
+
+* Run the tests and ensure they all pass
+  * also test all event loops
+
+* Update the wheels building repo to support that version:
+  https://github.com/riptano/python-dse-driver-wheels

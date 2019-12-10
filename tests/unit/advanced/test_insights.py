@@ -230,9 +230,9 @@ class TestConfigAsDict(unittest.TestCase):
 
     def test_whitelist_round_robin_policy(self):
         self.assertEqual(
-            insights_registry.serialize(WhiteListRoundRobinPolicy(['123.123'])),
+            insights_registry.serialize(WhiteListRoundRobinPolicy(['127.0.0.3'])),
             {'namespace': 'cassandra.policies',
-             'options': {'allowed_hosts': ('123.123',)},
+             'options': {'allowed_hosts': ('127.0.0.3',)},
              'type': 'WhiteListRoundRobinPolicy'}
         )
 
