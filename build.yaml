@@ -196,7 +196,12 @@ build:
 
       pip install git+ssh://git@github.com/riptano/ccm-private.git
 
-      pip install -r test-requirements.txt
+      if [ -n "$CCM_IS_DSE" ]; then
+        pip install -r test-datastax-requirements.txt
+      else
+        pip install -r test-requirements.txt
+      fi
+
       pip install nose-ignore-docstring
       pip install nose-exclude
       pip install service_identity
