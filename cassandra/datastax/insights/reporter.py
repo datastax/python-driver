@@ -135,14 +135,23 @@ class MonitorReporter(Thread):
             'ignored': host_distances_counter[HostDistance.IGNORED]
         }
 
-        compression_type = cc._connection._compression_type if cc._connection else 'NONE'
+        try:
+            compression_type = cc._connection._compression_type
+        except AttributeError:
+            compression_type = 'NONE'
 
-        if self._session.cluster.ssl_context:
-            cert_validation = self._session.cluster.ssl_context.verify_mode == ssl.CERT_REQUIRED
-        elif self._session.cluster.ssl_options:
-            cert_validation = self._session.cluster.ssl_options.get('cert_reqs') == ssl.CERT_REQUIRED
-        else:
-            cert_validation = None
+        cert_validation = None
+        try:
+            if self._session.cluster.ssl_context:
+                if isinstance(self._session.cluster.ssl_context, ssl.SSLContext):
+                    cert_validation = self._session.cluster.ssl_context.verify_mode == ssl.CERT_REQUIRED
+                else:  # pyopenssl
+                    from OpenSSL import SSL
+                    cert_validation = self._session.cluster.ssl_context.get_verify_mode() != SSL.VERIFY_NONE
+            elif self._session.cluster.ssl_options:
+                cert_validation = self._session.cluster.ssl_options.get('cert_reqs') == ssl.CERT_REQUIRED
+        except Exception as e:
+            log.debug('Unable to get the cert validation: {}'.format(e))
 
         uname_info = platform.uname()
 
@@ -157,7 +166,7 @@ class MonitorReporter(Thread):
                 },
             },
             'data': {
-                'driverName': 'DataStax Enterprise Python Driver',
+                'driverName': 'DataStax Python Driver',
                 'driverVersion': sys.modules['cassandra'].__version__,
                 'clientId': str(self._session.cluster.client_id),
                 'sessionId': str(self._session.session_id),

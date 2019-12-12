@@ -23,6 +23,7 @@ Bug Fixes
 * Reconnect attempts persist after downed node removed from peers (PYTHON-1181)
 * Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set (PYTHON-1186)
 * ResponseFuture._set_result crashes on connection error when used with PrepareMessage (PYTHON-1187)
+* Insights fail to serialize the startup message when the SSL Context is from PyOpenSSL (PYTHON-1192)
 
 Others
 ------
