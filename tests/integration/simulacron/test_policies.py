@@ -17,9 +17,10 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra import OperationTimedOut, WriteTimeout
-from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture, EXEC_PROFILE_DEFAULT, NoHostAvailable
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy, RetryPolicy, WriteType
+from cassandra.protocol import OverloadedErrorMessage, IsBootstrappingErrorMessage, TruncateError, ServerError
 
 from tests.integration import greaterthancass21, requiressimulacron, SIMULACRON_JAR, \
     CASSANDRA_VERSION
@@ -242,7 +243,7 @@ class CounterRetryPolicy(RetryPolicy):
 
     def on_request_error(self, query, consistency, error, retry_num):
         next(self.request_error)
-        return self.IGNORE, None
+        return self.RETHROW, None
 
     def reset_counters(self):
         self.write_timeout = count()
@@ -429,14 +430,20 @@ class RetryPolicyTests(unittest.TestCase):
         retry_policy = CounterRetryPolicy()
         self.set_cluster(retry_policy)
 
-        for e in [overloaded_error, bootstrapping_error, truncate_error, server_error]:
+        for prime_error, exc in [
+            (overloaded_error, OverloadedErrorMessage),
+            (bootstrapping_error, IsBootstrappingErrorMessage),
+            (truncate_error, TruncateError),
+            (server_error, ServerError)]:
+
+            clear_queries()
             query_to_prime = "SELECT * from simulacron_keyspace.simulacron_table;"
-            prime_query(query_to_prime, then=e, rows=None, column_types=None)
+            prime_query(query_to_prime, then=prime_error, rows=None, column_types=None)
             rf = self.session.execute_async(query_to_prime)
-            try:
+
+            with self.assertRaises(exc):
                 rf.result()
-            except:
-                pass
+
             self.assertEqual(len(rf.attempted_hosts), 1)  # no retry
 
         self.assertEqual(next(retry_policy.request_error), 4)
@@ -446,11 +453,12 @@ class RetryPolicyTests(unittest.TestCase):
         self.set_cluster(retry_policy)
 
         for e in [overloaded_error, bootstrapping_error, truncate_error, server_error]:
+            clear_queries()
             query_to_prime = "SELECT * from simulacron_keyspace.simulacron_table;"
             prime_query(query_to_prime, then=e, rows=None, column_types=None)
             rf = self.session.execute_async(query_to_prime)
-            try:
+
+            with self.assertRaises(NoHostAvailable):
                 rf.result()
-            except:
-                pass
+
             self.assertEqual(len(rf.attempted_hosts), 3)  # all 3 nodes failed
