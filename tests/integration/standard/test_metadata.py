@@ -2007,10 +2007,15 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
 
         # Format can very slightly between versions, strip out whitespace for consistency sake
-        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
-                        "s=>org.apache.cassandra.db.marshal.UTF8Type,"
-                        "i=>org.apache.cassandra.db.marshal.Int32Type)'"
-                        in dct_table.as_cql_query().replace(" ", ""))
+        table_text = dct_table.as_cql_query().replace(" ", "")
+        dynamic_type_text = "c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
+        self.assertIn("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(", table_text)
+        # Types within in the composite can come out in random order, so grab the type definition and find each one
+        type_definition_start = table_text.index("(", table_text.find(dynamic_type_text))
+        type_definition_end = table_text.index(")")
+        type_definition_text = table_text[type_definition_start:type_definition_end]
+        self.assertIn("s=>org.apache.cassandra.db.marshal.UTF8Type", type_definition_text)
+        self.assertIn("i=>org.apache.cassandra.db.marshal.Int32Type", type_definition_text)
 
 
 @greaterthanorequalcass30
@@ -2018,7 +2023,7 @@ class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
     def tearDown(self):
         self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))

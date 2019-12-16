@@ -16,6 +16,8 @@ import logging
 import sys
 import traceback
 import time
+
+from ccmlib.dse_cluster import DseCluster
 from mock import Mock
 
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy
@@ -29,7 +31,7 @@ from cassandra.query import SimpleStatement
 from tests.integration import (
     use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster,
     get_node, start_cluster_wait_for_up, requiresmallclockgranularity,
-)
+    local)
 
 
 try:
@@ -40,6 +42,7 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
+@local
 def setup_module():
     """
     We need some custom setup for this module. All unit tests in this module

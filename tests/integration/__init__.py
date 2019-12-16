@@ -125,7 +125,7 @@ def _get_cass_version_from_dse(dse_version):
             cass_ver = '4.0.0.2349'
         else:
             cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
-    elif dse_version.startswith('6.7'):
+    elif Version(dse_version) >= Version('6.7'):
         if dse_version == '6.7.0':
             cass_ver = "4.0.0.67"
         else:

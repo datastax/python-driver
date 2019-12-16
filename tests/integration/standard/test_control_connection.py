@@ -14,6 +14,7 @@
 #
 #
 #
+from cassandra import InvalidRequest
 
 try:
     import unittest2 as unittest
@@ -43,7 +44,7 @@ class ControlConnectionTests(unittest.TestCase):
     def tearDown(self):
         try:
             self.session.execute("DROP KEYSPACE keyspacetodrop ")
-        except (ConfigurationException):
+        except (ConfigurationException, InvalidRequest):
             # we already removed the keyspace.
             pass
         self.cluster.shutdown()
