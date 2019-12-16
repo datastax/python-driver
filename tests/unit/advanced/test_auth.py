@@ -21,7 +21,10 @@ except ImportError:
 
 from cassandra.auth import DSEGSSAPIAuthProvider
 
+from tests.integration import requiredse
 
+# This auth provider requires kerberos and puresals
+@requiredse
 class TestGSSAPI(unittest.TestCase):
 
     def test_host_resolution(self):
