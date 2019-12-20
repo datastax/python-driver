@@ -14,6 +14,7 @@ Features
 * Support NULL in collection deserializer (PYTHON-1123)
 * Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
 * Add Python 3.8 support (PYTHON-1189)
+* Add new DSE CQL keywords (PYTHON-1122)
 * [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 
 Bug Fixes
