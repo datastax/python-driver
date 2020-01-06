@@ -1,3 +1,5 @@
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fdatastax%2Fpython-driver.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fdatastax%2Fpython-driver?ref=badge_shield)
+
 DataStax Python Driver for Apache Cassandra
 ===========================================
 
@@ -87,3 +89,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fdatastax%2Fpython-driver.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fdatastax%2Fpython-driver?ref=badge_large)
