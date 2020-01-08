@@ -179,7 +179,7 @@ cassandra:
 env:
   CYTHON:
     - CYTHON
-#    - NO_CYTHON
+    - NO_CYTHON
 
 build:
   - script: |

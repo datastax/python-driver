@@ -33,7 +33,7 @@ from packaging.version import Version
 from cassandra.cluster import Cluster, EXEC_PROFILE_GRAPH_DEFAULT, EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT
 
 from tests.integration import PROTOCOL_VERSION, DSE_VERSION, get_server_versions, BasicKeyspaceUnitTestCase, \
-    drop_keyspace_shutdown_cluster, get_node, USE_CASS_EXTERNAL, CASSANDRA_IP
+    drop_keyspace_shutdown_cluster, get_node, USE_CASS_EXTERNAL, CASSANDRA_IP, set_default_cass_ip
 from tests.integration import use_singledc, use_single_node, wait_for_node_socket
 from cassandra.protocol import ServerError
 from cassandra.util import Point, LineString, Polygon
@@ -216,7 +216,7 @@ def use_cluster_with_graph(num_nodes):
     when started all at once.
     """
     if USE_CASS_EXTERNAL:
-        set_default_dse_ip()
+        set_default_cass_ip()
         return
 
     # Create the cluster but don't start it.
@@ -705,4 +705,4 @@ def validate_path_result_type(test, path):
         elif isinstance(obj, Vertex):
             validate_classic_vertex(test, obj)
         else:
-            test.fail("Invalid object found in path " + str(object.type))
+            test.fail("Invalid object found in path " + str(obj.type))

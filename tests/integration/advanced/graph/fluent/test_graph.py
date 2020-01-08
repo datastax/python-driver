@@ -468,7 +468,7 @@ class BaseImplicitExecutionTest(BasicGraphUnitTestCase):
             elif isinstance(obj, TravVertex):
                 self._validate_classic_vertex(g, obj)
             else:
-                self.fail("Invalid object found in path " + str(object.type))
+                self.fail("Invalid object found in path " + str(obj.type))
 
     def _validate_meta_property(self, g, vertex):
         meta_props =  g.V(vertex.id).properties().toList()
