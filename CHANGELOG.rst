@@ -28,6 +28,8 @@ Bug Fixes
 
 Others
 ------
+* The driver has a new dependency: geomet. It comes from the dse-driver unification and
+  is used to support DSE geo types.
 
 Deprecations
 ------------

@@ -2962,7 +2962,7 @@ class Session(object):
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            response = future.result()[0]
+            response = future.result().one()
         except Exception:
             log.exception("Error preparing query:")
             raise

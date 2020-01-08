@@ -1168,8 +1168,8 @@ class DSELoadBalancingPolicy(DefaultLoadBalancingPolicy):
     *Deprecated:* This will be removed in the next major release,
     consider using :class:`.DefaultLoadBalancingPolicy`.
     """
-    def __init__(self, *args):
-        super(DSELoadBalancingPolicy, self).__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super(DSELoadBalancingPolicy, self).__init__(*args, **kwargs)
         warnings.warn("DSELoadBalancingPolicy will be removed in 4.0. Consider using "
                       "DefaultLoadBalancingPolicy.", DeprecationWarning)
 

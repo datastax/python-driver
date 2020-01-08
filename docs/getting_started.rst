@@ -47,7 +47,7 @@ behavior in some other way, this is the place to do it:
     cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
     session = cluster.connect()
 
-    print session.execute("SELECT release_version FROM system.local")[0]
+    print(session.execute("SELECT release_version FROM system.local").one())
 
 Profiles are passed in by ``execution_profiles`` dict.
 
@@ -70,7 +70,7 @@ In this case we can construct the base ``ExecutionProfile`` passing all attribut
     cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
     session = cluster.connect()
 
-    print session.execute("SELECT release_version FROM system.local")[0]
+    print(session.execute("SELECT release_version FROM system.local").one())
 
 Users are free to setup additional profiles to be used by name:
 
