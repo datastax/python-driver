@@ -16,14 +16,20 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from tests.integration.simulacron import SimulacronCluster
-from tests.integration import (requiressimulacron, PROTOCOL_VERSION)
-from tests.integration.simulacron.utils import prime_query
+import logging
+from packaging.version import Version
+
+import cassandra
+from tests.integration.simulacron import SimulacronCluster, SimulacronBase
+from tests.integration import (requiressimulacron, PROTOCOL_VERSION, DSE_VERSION, MockLoggingHandler)
+from tests.integration.simulacron.utils import prime_query, start_and_prime_singledc
 
 from cassandra import (WriteTimeout, WriteType,
                        ConsistencyLevel, UnresolvableContactPoints)
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ControlConnection
 
+
+PROTOCOL_VERSION = min(4, PROTOCOL_VERSION if (DSE_VERSION is None or DSE_VERSION >= Version('5.0')) else 3)
 
 @requiressimulacron
 class ClusterTests(SimulacronCluster):
@@ -78,3 +84,30 @@ class ClusterDNSResolutionTests(SimulacronCluster):
             self.cluster = Cluster(['dns.invalid'],
                                    protocol_version=PROTOCOL_VERSION,
                                    compression=False)
+
+
+@requiressimulacron
+class DuplicateRpcTest(SimulacronCluster):
+    connect = False
+
+    def test_duplicate(self):
+        mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cassandra.cluster.__name__)
+        logger.addHandler(mock_handler)
+        address_column = "native_transport_address" if DSE_VERSION and DSE_VERSION > Version("6.0") else "rpc_address"
+        rows = [
+            {"peer": "127.0.0.1", "data_center": "dc", "host_id": "dontcare1", "rack": "rack1",
+             "release_version": "3.11.4", address_column: "127.0.0.1", "schema_version": "dontcare", "tokens": "1"},
+            {"peer": "127.0.0.2", "data_center": "dc", "host_id": "dontcare2", "rack": "rack1",
+             "release_version": "3.11.4", address_column: "127.0.0.2", "schema_version": "dontcare", "tokens": "2"},
+        ]
+        prime_query(ControlConnection._SELECT_PEERS, rows=rows)
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
+        session = cluster.connect(wait_for_all_pools=True)
+
+        warnings = mock_handler.messages.get("warning")
+        self.assertEqual(len(warnings), 1)
+        self.assertTrue('multiple hosts with the same endpoint' in warnings[0])
+        logger.removeHandler(mock_handler)
+        cluster.shutdown()

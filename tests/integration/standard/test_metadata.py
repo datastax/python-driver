@@ -723,7 +723,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         try:
             self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT a, b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
                                  .format(self.keyspace_name, self.function_table_name))
             self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
@@ -745,7 +745,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster3.connect()
         try:
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT a, b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
                                  .format(self.keyspace_name, self.function_table_name))
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
             cluster3.refresh_materialized_view_metadata(self.keyspace_name, 'mv2')
@@ -2094,7 +2094,7 @@ class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
 
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
 
 @greaterthanorequalcass30
@@ -2237,7 +2237,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, year ASC, month ASC, day ASC)""".format(self.keyspace_name)
 
         self.session.execute(create_mv)
 

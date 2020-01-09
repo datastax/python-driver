@@ -1480,52 +1480,6 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         cluster.shutdown()
 
 
-@local
-class DuplicateRpcTest(unittest.TestCase):
-
-    load_balancing_policy = HostFilterPolicy(RoundRobinPolicy(),
-                                             lambda host: host.address == "127.0.0.1")
-
-    def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                               execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=self.load_balancing_policy)})
-        self.session = self.cluster.connect()
-
-        self.address_column = "native_transport_address" if DSE_VERSION and DSE_VERSION >= Version("6.0") else "rpc_address"
-        self.session.execute("UPDATE system.peers SET {} = '127.0.0.1' WHERE peer='127.0.0.2'".
-                             format(self.address_column))
-
-    def tearDown(self):
-        self.session.execute("UPDATE system.peers SET {} = '127.0.0.2' WHERE peer='127.0.0.2'".
-                             format(self.address_column))
-        self.cluster.shutdown()
-
-    def test_duplicate(self):
-        """
-        Test duplicate RPC addresses.
-
-        Modifies the system.peers table to make hosts have the same rpc address. Ensures such hosts are filtered out and a message is logged
-
-        @since 3.4
-        @jira_ticket PYTHON-366
-        @expected_result only one hosts' metadata will be populated
-
-        @test_category metadata
-        """
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cassandra.cluster.__name__)
-        logger.addHandler(mock_handler)
-        test_cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                               execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=self.load_balancing_policy)})
-
-        test_cluster.connect()
-        warnings = mock_handler.messages.get("warning")
-        self.assertEqual(len(warnings), 1)
-        self.assertTrue('multiple' in warnings[0])
-        logger.removeHandler(mock_handler)
-        test_cluster.shutdown()
-
-
 @protocolv5
 class BetaProtocolTest(unittest.TestCase):
 
