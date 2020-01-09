@@ -20,6 +20,54 @@ You can use ``pip install --pre cassandra-driver`` if you need to install a beta
 
 ***Note**: if intending to use optional extensions, install the `dependencies <#optional-non-python-dependencies>`_ first. The driver may need to be reinstalled if dependencies are added after the initial installation.
 
+Verifying your Installation
+---------------------------
+To check if the installation was successful, you can run::
+
+    python -c 'import cassandra; print cassandra.__version__'
+
+It should print something like "3.21.0".
+
+.. _installation-datastax-graph:
+
+(*Optional*) DataStax Graph
+---------------------------
+The driver provides an optional fluent graph API that depends on Apache TinkerPop (gremlinpython). It is
+not installed by default. To be able to build Gremlin traversals, you need to install
+the `graph` requirements::
+
+    pip install cassandra-driver[graph]
+
+See :doc:`graph_fluent` for more details about this API.
+
+(*Optional*) Compression Support
+--------------------------------
+Compression can optionally be used for communication between the driver and
+Cassandra.  There are currently two supported compression algorithms:
+snappy (in Cassandra 1.2+) and LZ4 (only in Cassandra 2.0+).  If either is
+available for the driver and Cassandra also supports it, it will
+be used automatically.
+
+For lz4 support::
+
+    pip install lz4
+
+For snappy support::
+
+    pip install python-snappy
+
+(If using a Debian Linux derivative such as Ubuntu, it may be easier to
+just run ``apt-get install python-snappy``.)
+
+(*Optional*) Metrics Support
+----------------------------
+The driver has built-in support for capturing :attr:`.Cluster.metrics` about
+the queries you run.  However, the ``scales`` library is required to
+support this::
+
+    pip install scales
+
+
 Speeding Up Installation
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -79,53 +127,6 @@ installed. You can find the list of dependencies in
 Once the dependencies are installed, simply run::
 
     python setup.py install
-
-Verifying your Installation
----------------------------
-To check if the installation was successful, you can run::
-
-    python -c 'import cassandra; print cassandra.__version__'
-
-It should print something like "2.7.0".
-
-.. _installation-datastax-graph:
-
-(*Optional*) DataStax Graph
----------------------------
-The driver provides an optional fluent graph API that depends on Apache TinkerPop (gremlinpython). It is
-not installed by default. To be able to build Gremlin traversals, you need to install
-the `graph` requirements::
-
-    pip install cassandra-driver[graph]
-
-See :doc:`graph_fluent` for more details about this API.
-
-(*Optional*) Compression Support
---------------------------------
-Compression can optionally be used for communication between the driver and
-Cassandra.  There are currently two supported compression algorithms:
-snappy (in Cassandra 1.2+) and LZ4 (only in Cassandra 2.0+).  If either is
-available for the driver and Cassandra also supports it, it will
-be used automatically.
-
-For lz4 support::
-
-    pip install lz4
-
-For snappy support::
-
-    pip install python-snappy
-
-(If using a Debian Linux derivative such as Ubuntu, it may be easier to
-just run ``apt-get install python-snappy``.)
-
-(*Optional*) Metrics Support
-----------------------------
-The driver has built-in support for capturing :attr:`.Cluster.metrics` about
-the queries you run.  However, the ``scales`` library is required to
-support this::
-
-    pip install scales
 
 
 (*Optional*) Non-python Dependencies
