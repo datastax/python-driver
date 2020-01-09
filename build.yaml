@@ -153,19 +153,6 @@ schedules:
         - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
 
-  # TODO: Temporary, don't merge me
-  python_oss_next_tests:
-    schedule: adhoc
-    disable_pull_requests: true
-    branches:
-      include: [/oss-next.*/]
-    env_vars: |
-      EVENT_LOOP_MANAGER='libev'
-      EXCLUDE_LONG=1
-    matrix:
-      exclude:
-        - python: [3.4, 3.6, 3.7, 3.8]
-
 python:
   - 2.7
   - 3.4
@@ -192,7 +179,7 @@ cassandra:
 env:
   CYTHON:
     - CYTHON
-#    - NO_CYTHON
+    - NO_CYTHON
 
 build:
   - script: |
@@ -210,7 +197,12 @@ build:
 
       pip install git+ssh://git@github.com/riptano/ccm-private.git
 
-      pip install -r test-requirements.txt
+      if [ -n "$CCM_IS_DSE" ]; then
+        pip install -r test-datastax-requirements.txt
+      else
+        pip install -r test-requirements.txt
+      fi
+
       pip install nose-ignore-docstring
       pip install nose-exclude
       pip install service_identity
@@ -276,14 +268,6 @@ build:
 
       echo "==========RUNNING INTEGRATION TESTS=========="
       EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
-
-      # TODO: Temporary, don't merge this 2.1 stuff...
-      # if [ "$CCM_CASSANDRA_VERSION" == "2.1.21" ]; then
-      #   echo "Testing cassandra 2.1 with protocol V2"
-      #   PROTOCOL_VERSION=2 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_v2_results.xml tests/integration/standard/ || true
-      #   echo "Testing cassandra 2.1 with protocol V1"
-      #   PROTOCOL_VERSION=1 EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_v1_results.xml tests/integration/standard/ || true
-      # fi
 
       if [ -n "$DSE_VERSION" ] && ! [[ $DSE_VERSION == "4.8"* ]]; then
         echo "==========RUNNING DSE INTEGRATION TESTS=========="

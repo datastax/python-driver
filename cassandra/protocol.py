@@ -589,7 +589,7 @@ class _QueryMessage(_MessageType):
             else:
                 raise UnsupportedOperation(
                     "Keyspaces may only be set on queries with protocol version "
-                    "DSE_V2 or higher. Consider setting Cluster.protocol_version to ProtocolVersion.DSE_V2.")
+                    "5 or DSE_V2 or higher. Consider setting Cluster.protocol_version.")
 
         if ProtocolVersion.uses_int_query_flags(protocol_version):
             write_uint(f, flags)

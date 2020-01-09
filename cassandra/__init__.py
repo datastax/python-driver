@@ -191,7 +191,7 @@ class ProtocolVersion(object):
 
     MAX_SUPPORTED = max(SUPPORTED_VERSIONS)
     """
-    Maximum protocol versioni supported by this driver.
+    Maximum protocol version supported by this driver.
     """
 
     @classmethod

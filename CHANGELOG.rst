@@ -39,6 +39,7 @@ Features
 * Support NULL in collection deserializer (PYTHON-1123)
 * Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
 * Add Python 3.8 support (PYTHON-1189)
+* Add new DSE CQL keywords (PYTHON-1122)
 * [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 
 Bug Fixes
@@ -48,9 +49,12 @@ Bug Fixes
 * Reconnect attempts persist after downed node removed from peers (PYTHON-1181)
 * Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set (PYTHON-1186)
 * ResponseFuture._set_result crashes on connection error when used with PrepareMessage (PYTHON-1187)
+* Insights fail to serialize the startup message when the SSL Context is from PyOpenSSL (PYTHON-1192)
 
 Others
 ------
+* The driver has a new dependency: geomet. It comes from the dse-driver unification and
+  is used to support DSE geo types.
 
 Deprecations
 ------------

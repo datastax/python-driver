@@ -450,7 +450,7 @@ class GraphAnalyticsExecutionProfile(GraphExecutionProfile):
         See also :class:`~.GraphExecutionPolicy`.
 
         In addition to default parameters shown in the signature, this profile also defaults ``retry_policy`` to
-        :class:`dse.policies.NeverRetryPolicy`, and ``load_balancing_policy`` to one that targets the current Spark
+        :class:`cassandra.policies.NeverRetryPolicy`, and ``load_balancing_policy`` to one that targets the current Spark
         master.
 
         Note: The graph_options.graph_source is set automatically to b'a' (analytics)
@@ -3055,7 +3055,7 @@ class Session(object):
         future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
         try:
             future.send_request()
-            response = future.result()[0]
+            response = future.result().one()
         except Exception:
             log.exception("Error preparing query:")
             raise
