@@ -17,13 +17,11 @@ import logging
 import time
 
 from collections import defaultdict
-from ccmlib.node import Node, ToolError
+from packaging.version import Version
 
-from nose.tools import assert_in
-from cassandra.query import named_tuple_factory
-from cassandra.cluster import ConsistencyLevel
+from tests.integration import (get_node, get_cluster, wait_for_node_socket,
+                               DSE_VERSION, CASSANDRA_VERSION)
 
-from tests.integration import get_node, get_cluster, wait_for_node_socket
 
 IP_FORMAT = '127.0.0.%s'
 
@@ -60,10 +58,6 @@ class CoordinatorStats():
 
 def create_schema(cluster, session, keyspace, simple_strategy=True,
                   replication_factor=1, replication_strategy=None):
-    row_factory = session.row_factory
-    session.row_factory = named_tuple_factory
-    session.default_consistency_level = ConsistencyLevel.QUORUM
-
     if keyspace in cluster.metadata.keyspaces.keys():
         session.execute('DROP KEYSPACE %s' % keyspace, timeout=20)
 
@@ -83,9 +77,6 @@ def create_schema(cluster, session, keyspace, simple_strategy=True,
     session.execute(ddl % keyspace, timeout=10)
     session.execute('USE %s' % keyspace)
 
-    session.row_factory = row_factory
-    session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
-
 
 def start(node):
     get_node(node).start()
@@ -102,17 +93,11 @@ def force_stop(node):
 
 
 def decommission(node):
-    try:
-        get_node(node).decommission()
-    except ToolError as e:
-        expected_errs = (('Not enough live nodes to maintain replication '
-                          'factor in keyspace system_distributed'),
-                         'Perform a forceful decommission to ignore.')
-        for err in expected_errs:
-            assert_in(err, e.stdout)
-        # in this case, we're running against a C* version with CASSANDRA-12510
-        # applied and need to decommission with `--force`
+    if (DSE_VERSION and DSE_VERSION >= Version("5.1")) or CASSANDRA_VERSION >= Version("4.0"):
+        # CASSANDRA-12510
         get_node(node).decommission(force=True)
+    else:
+        get_node(node).decommission()
     get_node(node).stop()
 
 
@@ -120,24 +105,29 @@ def bootstrap(node, data_center=None, token=None):
     log.debug('called bootstrap('
               'node={node}, data_center={data_center}, '
               'token={token})')
-    node_instance = Node('node%s' % node,
-                         get_cluster(),
-                         auto_bootstrap=False,
-                         thrift_interface=(IP_FORMAT % node, 9160),
-                         storage_interface=(IP_FORMAT % node, 7000),
-                         binary_interface=(IP_FORMAT % node, 9042),
-                         jmx_port=str(7000 + 100 * node),
-                         remote_debug_port=0,
-                         initial_token=token if token else node * 10)
-    get_cluster().add(node_instance, is_seed=False, data_center=data_center)
+    cluster = get_cluster()
+    # for now assumes cluster has at least one node
+    node_type = type(next(iter(cluster.nodes.values())))
+    node_instance = node_type(
+        'node%s' % node,
+        cluster,
+        auto_bootstrap=False,
+        thrift_interface=(IP_FORMAT % node, 9160),
+        storage_interface=(IP_FORMAT % node, 7000),
+        binary_interface=(IP_FORMAT % node, 9042),
+        jmx_port=str(7000 + 100 * node),
+        remote_debug_port=0,
+        initial_token=token if token else node * 10
+    )
+    cluster.add(node_instance, is_seed=False, data_center=data_center)
 
     try:
-        start(node)
+        node_instance.start()
     except Exception as e0:
         log.debug('failed 1st bootstrap attempt with: \n{}'.format(e0))
         # Try only twice
         try:
-            start(node)
+            node_instance.start()
         except Exception as e1:
             log.debug('failed 2nd bootstrap attempt with: \n{}'.format(e1))
             log.error('Added node failed to start twice.')

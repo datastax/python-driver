@@ -29,7 +29,7 @@ class MisconfiguredAuthenticationTests(unittest.TestCase):
                 'authenticator': 'PasswordAuthenticator',
                 'authorizer': 'CassandraAuthorizer',
             })
-            ccm_cluster.start()
+            ccm_cluster.start(wait_for_binary_proto=True)
 
             cls.ccm_cluster = ccm_cluster
 

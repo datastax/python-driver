@@ -11,6 +11,7 @@ instance of :class:`~.Cluster` for each Cassandra cluster you want to interact
 with.
 
 The simplest way to create a :class:`~.Cluster` is like this:
+First, make sure you have the Cassandra driver properly :doc:`installed <installation>`.
 
 .. code-block:: python
 
@@ -39,16 +40,48 @@ behavior in some other way, this is the place to do it:
 
 .. code-block:: python
 
-    from cassandra.cluster import Cluster
-    from cassandra.policies import DCAwareRoundRobinPolicy
+    from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+    from cassandra.query import tuple_factory
 
-    cluster = Cluster(
-        ['10.1.1.3', '10.1.1.4', '10.1.1.5'],
-        load_balancing_policy=DCAwareRoundRobinPolicy(local_dc='US_EAST'),
-        port=9042)
+    profile = ExecutionProfile(row_factory=tuple_factory)
+    cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
+    session = cluster.connect()
 
+    print(session.execute("SELECT release_version FROM system.local").one())
 
-You can find a more complete list of options in the :class:`~.Cluster` documentation.
+Profiles are passed in by ``execution_profiles`` dict.
+
+In this case we can construct the base ``ExecutionProfile`` passing all attributes:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+    from cassandra.policies import WhiteListRoundRobinPolicy, DowngradingConsistencyRetryPolicy
+    from cassandra.query import tuple_factory
+
+    profile = ExecutionProfile(
+        load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']),
+        retry_policy=DowngradingConsistencyRetryPolicy(),
+        consistency_level=ConsistencyLevel.LOCAL_QUORUM,
+        serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL,
+        request_timeout=15,
+        row_factory=tuple_factory
+    )
+    cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
+    session = cluster.connect()
+
+    print(session.execute("SELECT release_version FROM system.local").one())
+
+Users are free to setup additional profiles to be used by name:
+
+.. code-block:: python
+
+    profile_long = ExecutionProfile(request_timeout=30)
+    cluster = Cluster(execution_profiles={'long': profile_long})
+    session = cluster.connect()
+    session.execute(statement, execution_profile='long')
+
+Also, parameters passed to ``Session.execute`` or attached to ``Statement``\s are still honored as before.
 
 Instantiating a :class:`~.Cluster` does not actually connect us to any nodes.
 To establish connections and begin executing queries we need a
@@ -76,7 +109,6 @@ by executing a ``USE <keyspace>`` query:
     session.set_keyspace('users')
     # or you can do this instead
     session.execute('USE users')
-
 
 Executing Queries
 -----------------
@@ -120,13 +152,45 @@ examples are equivalent:
 If you prefer another result format, such as a ``dict`` per row, you
 can change the :attr:`~.Session.row_factory` attribute.
 
-For queries that will be run repeatedly, you should use
-`Prepared statements <#prepared-statements>`_.
+As mentioned in our `Drivers Best Practices Guide <https://docs.datastax.com/en/devapp/doc/devapp/driversBestPractices.html#driversBestPractices__usePreparedStatements>`_,
+it is highly recommended to use `Prepared statements <#prepared-statement>`_ for your
+frequently run queries.
+
+.. _prepared-statement:
+
+Prepared Statements
+-------------------
+Prepared statements are queries that are parsed by Cassandra and then saved
+for later use.  When the driver uses a prepared statement, it only needs to
+send the values of parameters to bind.  This lowers network traffic
+and CPU utilization within Cassandra because Cassandra does not have to
+re-parse the query each time.
+
+To prepare a query, use :meth:`.Session.prepare()`:
+
+.. code-block:: python
+
+    user_lookup_stmt = session.prepare("SELECT * FROM users WHERE user_id=?")
+
+    users = []
+    for user_id in user_ids_to_query:
+        user = session.execute(user_lookup_stmt, [user_id])
+        users.append(user)
+
+:meth:`~.Session.prepare()` returns a :class:`~.PreparedStatement` instance
+which can be used in place of :class:`~.SimpleStatement` instances or literal
+string queries.  It is automatically prepared against all nodes, and the driver
+handles re-preparing against new nodes and restarted nodes when necessary.
+
+Note that the placeholders for prepared statements are ``?`` characters.  This
+is different than for simple, non-prepared statements (although future versions
+of the driver may use the same placeholders for both).
 
 Passing Parameters to CQL Queries
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-When executing non-prepared statements, the driver supports two forms of
-parameter place-holders: positional and named.
+Althought it is not recommended, you can also pass parameters to non-prepared
+statements. The driver supports two forms of parameter place-holders: positional
+and named.
 
 Positional parameters are used with a ``%s`` placeholder.  For example,
 when you execute:
@@ -328,10 +392,8 @@ replicas of the data you are interacting with need to respond for
 the query to be considered a success.
 
 By default, :attr:`.ConsistencyLevel.LOCAL_ONE` will be used for all queries.
-You can specify a different default for the session on :attr:`.Session.default_consistency_level`
-if the cluster is configured in legacy mode (not using execution profiles). Otherwise this can
-be done by setting the :attr:`.ExecutionProfile.consistency_level` for the execution profile with key
-:data:`~.cluster.EXEC_PROFILE_DEFAULT`.
+You can specify a different default by setting the :attr:`.ExecutionProfile.consistency_level`
+for the execution profile with key :data:`~.cluster.EXEC_PROFILE_DEFAULT`.
 To specify a different consistency level per request, wrap queries
 in a :class:`~.SimpleStatement`:
 
@@ -344,34 +406,6 @@ in a :class:`~.SimpleStatement`:
         "INSERT INTO users (name, age) VALUES (%s, %s)",
         consistency_level=ConsistencyLevel.QUORUM)
     session.execute(query, ('John', 42))
-
-Prepared Statements
--------------------
-Prepared statements are queries that are parsed by Cassandra and then saved
-for later use.  When the driver uses a prepared statement, it only needs to
-send the values of parameters to bind.  This lowers network traffic
-and CPU utilization within Cassandra because Cassandra does not have to
-re-parse the query each time.
-
-To prepare a query, use :meth:`.Session.prepare()`:
-
-.. code-block:: python
-
-    user_lookup_stmt = session.prepare("SELECT * FROM users WHERE user_id=?")
-
-    users = []
-    for user_id in user_ids_to_query:
-        user = session.execute(user_lookup_stmt, [user_id])
-        users.append(user)
-
-:meth:`~.Session.prepare()` returns a :class:`~.PreparedStatement` instance
-which can be used in place of :class:`~.SimpleStatement` instances or literal
-string queries.  It is automatically prepared against all nodes, and the driver
-handles re-preparing against new nodes and restarted nodes when necessary.
-
-Note that the placeholders for prepared statements are ``?`` characters.  This
-is different than for simple, non-prepared statements (although future versions
-of the driver may use the same placeholders for both).
 
 Setting a Consistency Level with Prepared Statements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -403,3 +437,43 @@ level on that:
     user3_lookup = user_lookup_stmt.bind([user_id3])
     user3_lookup.consistency_level = ConsistencyLevel.ALL
     user3 = session.execute(user3_lookup)
+
+Speculative Execution
+^^^^^^^^^^^^^^^^^^^^^
+
+Speculative execution is a way to minimize latency by preemptively executing several
+instances of the same query against different nodes. For more details about this
+technique, see `Speculative Execution with DataStax Drivers <https://docs.datastax.com/en/devapp/doc/devapp/driversSpeculativeRetry.html>`_.
+
+To enable speculative execution:
+
+* Configure a :class:`~.policies.SpeculativeExecutionPolicy` with the ExecutionProfile
+* Mark your query as idempotent, which mean it can be applied multiple
+  times without changing the result of the initial application.
+  See `Query Idempotence <https://docs.datastax.com/en/devapp/doc/devapp/driversQueryIdempotence.html>`_ for more details.
+
+
+Example:
+
+.. code-block:: python
+
+    from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+    from cassandra.policies import ConstantSpeculativeExecutionPolicy
+    from cassandra.query import SimpleStatement
+
+    # Configure the speculative execution policy
+    ep = ExecutionProfile(
+        speculative_execution_policy=ConstantSpeculativeExecutionPolicy(delay=.5, max_attempts=10)
+    )
+    cluster = Cluster(..., execution_profiles={EXEC_PROFILE_DEFAULT: ep})
+    session = cluster.connect()
+
+    # Mark the query idempotent
+    query = SimpleStatement(
+        "UPDATE my_table SET list_col = [1] WHERE pk = 1",
+        is_idempotent=True
+    )
+
+    # Execute. A new query will be sent to the server every 0.5 second
+    # until we receive a response, for a max number attempts of 10.
+    session.execute(query)

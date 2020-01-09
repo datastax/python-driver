@@ -29,11 +29,11 @@ import types
 from uuid import UUID
 import six
 
+from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
+                            sortedset, Time, Date, Point, LineString, Polygon)
+
 if six.PY3:
     import ipaddress
-
-from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
-                            sortedset, Time, Date)
 
 if six.PY3:
     long = int
@@ -91,7 +91,10 @@ class Encoder(object):
             sortedset: self.cql_encode_set_collection,
             frozenset: self.cql_encode_set_collection,
             types.GeneratorType: self.cql_encode_list_collection,
-            ValueSequence: self.cql_encode_sequence
+            ValueSequence: self.cql_encode_sequence,
+            Point: self.cql_encode_str_quoted,
+            LineString: self.cql_encode_str_quoted,
+            Polygon: self.cql_encode_str_quoted
         }
 
         if six.PY2:
@@ -127,6 +130,9 @@ class Encoder(object):
         Escapes quotes in :class:`str` objects.
         """
         return cql_quote(val)
+
+    def cql_encode_str_quoted(self, val):
+        return "'%s'" % val
 
     if six.PY3:
         def cql_encode_bytes(self, val):

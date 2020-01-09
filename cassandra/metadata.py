@@ -17,7 +17,6 @@ from bisect import bisect_left
 from collections import defaultdict
 from functools import total_ordering
 from hashlib import md5
-from itertools import islice, cycle
 import json
 import logging
 import re
@@ -50,15 +49,22 @@ log = logging.getLogger(__name__)
 cql_keywords = set((
     'add', 'aggregate', 'all', 'allow', 'alter', 'and', 'apply', 'as', 'asc', 'ascii', 'authorize', 'batch', 'begin',
     'bigint', 'blob', 'boolean', 'by', 'called', 'clustering', 'columnfamily', 'compact', 'contains', 'count',
-    'counter', 'create', 'custom', 'date', 'decimal', 'delete', 'desc', 'describe', 'distinct', 'double', 'drop',
+    'counter', 'create', 'custom', 'date', 'decimal', 'delete', 'desc', 'describe', 'deterministic', 'distinct', 'double', 'drop',
     'entries', 'execute', 'exists', 'filtering', 'finalfunc', 'float', 'from', 'frozen', 'full', 'function',
     'functions', 'grant', 'if', 'in', 'index', 'inet', 'infinity', 'initcond', 'input', 'insert', 'int', 'into', 'is', 'json',
-    'key', 'keys', 'keyspace', 'keyspaces', 'language', 'limit', 'list', 'login', 'map', 'materialized', 'modify', 'nan', 'nologin',
+    'key', 'keys', 'keyspace', 'keyspaces', 'language', 'limit', 'list', 'login', 'map', 'materialized', 'modify', 'monotonic', 'nan', 'nologin',
     'norecursive', 'nosuperuser', 'not', 'null', 'of', 'on', 'options', 'or', 'order', 'password', 'permission',
     'permissions', 'primary', 'rename', 'replace', 'returns', 'revoke', 'role', 'roles', 'schema', 'select', 'set',
     'sfunc', 'smallint', 'static', 'storage', 'stype', 'superuser', 'table', 'text', 'time', 'timestamp', 'timeuuid',
     'tinyint', 'to', 'token', 'trigger', 'truncate', 'ttl', 'tuple', 'type', 'unlogged', 'update', 'use', 'user',
-    'users', 'using', 'uuid', 'values', 'varchar', 'varint', 'view', 'where', 'with', 'writetime'
+    'users', 'using', 'uuid', 'values', 'varchar', 'varint', 'view', 'where', 'with', 'writetime',
+
+    # DSE specifics
+    "node", "nodes", "plan", "active", "application", "applications", "java", "executor", "executors", "std_out", "std_err",
+    "renew", "delegation", "no", "redact", "token", "lowercasestring", "cluster", "authentication", "schemes", "scheme",
+    "internal", "ldap", "kerberos", "remote", "object", "method", "call", "calls", "search", "schema", "config", "rows",
+    "columns", "profiles", "commit", "reload", "unset", "rebuild", "field", "workpool", "any", "submission", "indices",
+    "restrict", "unrestrict"
 ))
 """
 Set of keywords in CQL.
@@ -68,9 +74,9 @@ Derived from .../cassandra/src/java/org/apache/cassandra/cql3/Cql.g
 
 cql_keywords_unreserved = set((
     'aggregate', 'all', 'as', 'ascii', 'bigint', 'blob', 'boolean', 'called', 'clustering', 'compact', 'contains',
-    'count', 'counter', 'custom', 'date', 'decimal', 'distinct', 'double', 'exists', 'filtering', 'finalfunc', 'float',
+    'count', 'counter', 'custom', 'date', 'decimal', 'deterministic', 'distinct', 'double', 'exists', 'filtering', 'finalfunc', 'float',
     'frozen', 'function', 'functions', 'inet', 'initcond', 'input', 'int', 'json', 'key', 'keys', 'keyspaces',
-    'language', 'list', 'login', 'map', 'nologin', 'nosuperuser', 'options', 'password', 'permission', 'permissions',
+    'language', 'list', 'login', 'map', 'monotonic', 'nologin', 'nosuperuser', 'options', 'password', 'permission', 'permissions',
     'returns', 'role', 'roles', 'sfunc', 'smallint', 'static', 'storage', 'stype', 'superuser', 'text', 'time',
     'timestamp', 'timeuuid', 'tinyint', 'trigger', 'ttl', 'tuple', 'type', 'user', 'users', 'uuid', 'values', 'varchar',
     'varint', 'writetime'
@@ -129,7 +135,8 @@ class Metadata(object):
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
         server_version = self.get_host(connection.endpoint).release_version
-        parser = get_schema_parser(connection, server_version, timeout)
+        dse_version = self.get_host(connection.endpoint).dse_version
+        parser = get_schema_parser(connection, server_version, dse_version, timeout)
 
         if not target_type:
             self._rebuild_all(parser)
@@ -665,7 +672,7 @@ class KeyspaceMetadata(object):
     virtual = False
     """
     A boolean indicating if this is a virtual keyspace or not. Always ``False``
-    for clusters running pre-4.0 versions of Cassandra.
+    for clusters running Cassandra pre-4.0 and DSE pre-6.7 versions.
 
     .. versionadded:: 3.15
     """
@@ -897,8 +904,15 @@ class Aggregate(object):
     Type of the aggregate state
     """
 
+    deterministic = None
+    """
+    Flag indicating if this function is guaranteed to produce the same result
+    for a particular input and state. This is available only with DSE >=6.0.
+    """
+
     def __init__(self, keyspace, name, argument_types, state_func,
-                 state_type, final_func, initial_condition, return_type):
+                 state_type, final_func, initial_condition, return_type,
+                 deterministic):
         self.keyspace = keyspace
         self.name = name
         self.argument_types = argument_types
@@ -907,6 +921,7 @@ class Aggregate(object):
         self.final_func = final_func
         self.initial_condition = initial_condition
         self.return_type = return_type
+        self.deterministic = deterministic
 
     def as_cql_query(self, formatted=False):
         """
@@ -927,6 +942,7 @@ class Aggregate(object):
 
         ret += ''.join((sep, 'FINALFUNC ', protect_name(self.final_func))) if self.final_func else ''
         ret += ''.join((sep, 'INITCOND ', self.initial_condition)) if self.initial_condition is not None else ''
+        ret += '{}DETERMINISTIC'.format(sep) if self.deterministic else ''
 
         return ret
 
@@ -988,8 +1004,27 @@ class Function(object):
     (convenience function to avoid handling nulls explicitly if the result will just be null)
     """
 
+    deterministic = None
+    """
+    Flag indicating if this function is guaranteed to produce the same result
+    for a particular input. This is available only for DSE >=6.0.
+    """
+
+    monotonic = None
+    """
+    Flag indicating if this function is guaranteed to increase or decrease
+    monotonically on any of its arguments. This is available only for DSE >=6.0.
+    """
+
+    monotonic_on = None
+    """
+    A list containing the argument or arguments over which this function is
+    monotonic. This is available only for DSE >=6.0.
+    """
+
     def __init__(self, keyspace, name, argument_types, argument_names,
-                 return_type, language, body, called_on_null_input):
+                 return_type, language, body, called_on_null_input,
+                 deterministic, monotonic, monotonic_on):
         self.keyspace = keyspace
         self.name = name
         self.argument_types = argument_types
@@ -1000,6 +1035,9 @@ class Function(object):
         self.language = language
         self.body = body
         self.called_on_null_input = called_on_null_input
+        self.deterministic = deterministic
+        self.monotonic = monotonic
+        self.monotonic_on = monotonic_on
 
     def as_cql_query(self, formatted=False):
         """
@@ -1016,10 +1054,25 @@ class Function(object):
         lang = self.language
         body = self.body
         on_null = "CALLED" if self.called_on_null_input else "RETURNS NULL"
+        deterministic_token = ('DETERMINISTIC{}'.format(sep)
+                               if self.deterministic else
+                               '')
+        monotonic_tokens = ''  # default for nonmonotonic function
+        if self.monotonic:
+            # monotonic on all arguments; ignore self.monotonic_on
+            monotonic_tokens = 'MONOTONIC{}'.format(sep)
+        elif self.monotonic_on:
+            # if monotonic == False and monotonic_on is nonempty, we know that
+            # monotonicity was specified with MONOTONIC ON <arg>, so there's
+            # exactly 1 value there
+            monotonic_tokens = 'MONOTONIC ON {}{}'.format(self.monotonic_on[0],
+                                                          sep)
 
         return "CREATE FUNCTION %(keyspace)s.%(name)s(%(arg_list)s)%(sep)s" \
                "%(on_null)s ON NULL INPUT%(sep)s" \
                "RETURNS %(typ)s%(sep)s" \
+               "%(deterministic_token)s" \
+               "%(monotonic_tokens)s" \
                "LANGUAGE %(lang)s%(sep)s" \
                "AS $$%(body)s$$" % locals()
 
@@ -1106,7 +1159,7 @@ class TableMetadata(object):
     virtual = False
     """
     A boolean indicating if this is a virtual table or not. Always ``False``
-    for clusters running pre-4.0 versions of Cassandra.
+    for clusters running Cassandra pre-4.0 and DSE pre-6.7 versions.
 
     .. versionadded:: 3.15
     """
@@ -1714,7 +1767,7 @@ class _SchemaParser(object):
         if not success and isinstance(result, expected_failures):
             return []
         elif success:
-            return dict_factory(*result.results) if result else []
+            return dict_factory(result.column_names, result.parsed_rows) if result else []
         else:
             raise result
 
@@ -1727,7 +1780,7 @@ class _SchemaParser(object):
         responses = self.connection.wait_for_responses((query), timeout=self.timeout, fail_on_error=False)
         (success, response) = responses[0]
         if success:
-            result = dict_factory(*response.results)
+            result = dict_factory(response.column_names, response.parsed_rows)
             return [build_func(row) for row in result]
         elif isinstance(response, InvalidRequest):
             log.debug("user types table not found")
@@ -1737,6 +1790,9 @@ class _SchemaParser(object):
 
 
 class SchemaParserV22(_SchemaParser):
+    """
+    For C* 2.2+
+    """
     _SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces"
     _SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies"
     _SELECT_COLUMNS = "SELECT * FROM system.schema_columns"
@@ -1888,10 +1944,14 @@ class SchemaParserV22(_SchemaParser):
     @classmethod
     def _build_function(cls, function_row):
         return_type = cls._schema_type_to_cql(function_row['return_type'])
+        deterministic = function_row.get('deterministic', False)
+        monotonic = function_row.get('monotonic', False)
+        monotonic_on = function_row.get('monotonic_on', ())
         return Function(function_row['keyspace_name'], function_row['function_name'],
                         function_row[cls._function_agg_arument_type_col], function_row['argument_names'],
                         return_type, function_row['language'], function_row['body'],
-                        function_row['called_on_null_input'])
+                        function_row['called_on_null_input'],
+                        deterministic, monotonic, monotonic_on)
 
     @classmethod
     def _build_aggregate(cls, aggregate_row):
@@ -1903,7 +1963,8 @@ class SchemaParserV22(_SchemaParser):
         return_type = cls._schema_type_to_cql(aggregate_row['return_type'])
         return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
                          aggregate_row['signature'], aggregate_row['state_func'], state_type,
-                         aggregate_row['final_func'], initial_condition, return_type)
+                         aggregate_row['final_func'], initial_condition, return_type,
+                         aggregate_row.get('deterministic', False))
 
     def _build_table_metadata(self, row, col_rows=None, trigger_rows=None):
         keyspace_name = row["keyspace_name"]
@@ -2158,7 +2219,7 @@ class SchemaParserV22(_SchemaParser):
 
         # if we're connected to Cassandra < 2.0, the triggers table will not exist
         if triggers_success:
-            self.triggers_result = dict_factory(*triggers_result.results)
+            self.triggers_result = dict_factory(triggers_result.column_names, triggers_result.parsed_rows)
         else:
             if isinstance(triggers_result, InvalidRequest):
                 log.debug("triggers table not found")
@@ -2170,7 +2231,7 @@ class SchemaParserV22(_SchemaParser):
 
         # if we're connected to Cassandra < 2.1, the usertypes table will not exist
         if types_success:
-            self.types_result = dict_factory(*types_result.results)
+            self.types_result = dict_factory(types_result.column_names, types_result.parsed_rows)
         else:
             if isinstance(types_result, InvalidRequest):
                 log.debug("user types table not found")
@@ -2180,7 +2241,7 @@ class SchemaParserV22(_SchemaParser):
 
         # functions were introduced in Cassandra 2.2
         if functions_success:
-            self.functions_result = dict_factory(*functions_result.results)
+            self.functions_result = dict_factory(functions_result.column_names, functions_result.parsed_rows)
         else:
             if isinstance(functions_result, InvalidRequest):
                 log.debug("user functions table not found")
@@ -2189,7 +2250,7 @@ class SchemaParserV22(_SchemaParser):
 
         # aggregates were introduced in Cassandra 2.2
         if aggregates_success:
-            self.aggregates_result = dict_factory(*aggregates_result.results)
+            self.aggregates_result = dict_factory(aggregates_result.column_names, aggregates_result.parsed_rows)
         else:
             if isinstance(aggregates_result, InvalidRequest):
                 log.debug("user aggregates table not found")
@@ -2234,6 +2295,9 @@ class SchemaParserV22(_SchemaParser):
 
 
 class SchemaParserV3(SchemaParserV22):
+    """
+    For C* 3.0+
+    """
     _SELECT_KEYSPACES = "SELECT * FROM system_schema.keyspaces"
     _SELECT_TABLES = "SELECT * FROM system_schema.tables"
     _SELECT_COLUMNS = "SELECT * FROM system_schema.columns"
@@ -2320,7 +2384,8 @@ class SchemaParserV3(SchemaParserV22):
     def _build_aggregate(aggregate_row):
         return Aggregate(aggregate_row['keyspace_name'], aggregate_row['aggregate_name'],
                          aggregate_row['argument_types'], aggregate_row['state_func'], aggregate_row['state_type'],
-                         aggregate_row['final_func'], aggregate_row['initcond'], aggregate_row['return_type'])
+                         aggregate_row['final_func'], aggregate_row['initcond'], aggregate_row['return_type'],
+                         aggregate_row.get('deterministic', False))
 
     def _build_table_metadata(self, row, col_rows=None, trigger_rows=None, index_rows=None, virtual=False):
         keyspace_name = row["keyspace_name"]
@@ -2502,16 +2567,32 @@ class SchemaParserV3(SchemaParserV22):
         return type_string
 
 
+class SchemaParserDSE60(SchemaParserV3):
+    """
+    For DSE 6.0+
+    """
+    recognized_table_options = (SchemaParserV3.recognized_table_options +
+                                ("nodesync",))
+
+
 class SchemaParserV4(SchemaParserV3):
 
-    recognized_table_options = tuple(
-        opt for opt in
-        SchemaParserV3.recognized_table_options
-        if opt not in (
-            # removed in V4: CASSANDRA-13910
-            'dclocal_read_repair_chance', 'read_repair_chance'
-        )
-    )
+    recognized_table_options = (
+        'additional_write_policy',
+        'bloom_filter_fp_chance',
+        'caching',
+        'cdc',
+        'comment',
+        'compaction',
+        'compression',
+        'crc_check_chance',
+        'default_time_to_live',
+        'gc_grace_seconds',
+        'max_index_interval',
+        'memtable_flush_period_in_ms',
+        'min_index_interval',
+        'read_repair',
+        'speculative_retry')
 
     _SELECT_VIRTUAL_KEYSPACES = 'SELECT * from system_virtual_schema.keyspaces'
     _SELECT_VIRTUAL_TABLES = 'SELECT * from system_virtual_schema.tables'
@@ -2633,10 +2714,25 @@ class SchemaParserV4(SchemaParserV3):
         return super(SchemaParserV4, SchemaParserV4)._build_keyspace_metadata_internal(row)
 
 
+class SchemaParserDSE67(SchemaParserV4):
+    """
+    For DSE 6.7+
+    """
+    recognized_table_options = (SchemaParserV4.recognized_table_options +
+                                ("nodesync",))
+
+
 class TableMetadataV3(TableMetadata):
+    """
+    For C* 3.0+. `option_maps` take a superset of map names, so if  nothing
+    changes structurally, new option maps can just be appended to the list.
+    """
     compaction_options = {}
 
-    option_maps = ['compaction', 'compression', 'caching']
+    option_maps = [
+        'compaction', 'compression', 'caching',
+        'nodesync'  # added DSE 6.0
+    ]
 
     @property
     def is_cql_compatible(self):
@@ -2772,11 +2868,18 @@ class MaterializedViewMetadata(object):
         return self.as_cql_query(formatted=True) + ";"
 
 
-def get_schema_parser(connection, server_version, timeout):
+def get_schema_parser(connection, server_version, dse_version, timeout):
     version = Version(server_version)
+    if dse_version:
+        v = Version(dse_version)
+        if v >= Version('6.7.0'):
+            return SchemaParserDSE67(connection, timeout)
+        elif v >= Version('6.0.0'):
+            return SchemaParserDSE60(connection, timeout)
+
     if version >= Version('4-a'):
         return SchemaParserV4(connection, timeout)
-    if version >= Version('3.0.0'):
+    elif version >= Version('3.0.0'):
         return SchemaParserV3(connection, timeout)
     else:
         # we could further specialize by version. Right now just refactoring the
@@ -2795,6 +2898,14 @@ def _cql_from_cass_type(cass_type):
         return cass_type.cql_parameterized_type()
 
 
+class RLACTableExtension(RegisteredTableExtension):
+    name = "DSE_RLACA"
+
+    @classmethod
+    def after_table_cql(cls, table_meta, ext_key, ext_blob):
+        return "RESTRICT ROWS ON %s.%s USING %s;" % (protect_name(table_meta.keyspace_name),
+                                                     protect_name(table_meta.name),
+                                                     protect_name(ext_blob.decode('utf-8')))
 NO_VALID_REPLICA = object()
 
 

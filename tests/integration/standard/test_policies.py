@@ -17,7 +17,7 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, \
     WhiteListRoundRobinPolicy
 from cassandra.pool import Host
@@ -26,6 +26,7 @@ from cassandra.connection import DefaultEndPoint
 from tests.integration import PROTOCOL_VERSION, local, use_singledc
 
 from concurrent.futures import wait as wait_futures
+
 
 def setup_module():
     use_singledc()
@@ -51,8 +52,10 @@ class HostFilterPolicyTests(unittest.TestCase):
         all_hosts = {Host(DefaultEndPoint("127.0.0.{}".format(i)), SimpleConvictionPolicy) for i in (1, 2, 3)}
 
         predicate = lambda host: host.endpoint == contact_point if external_event else True
-        cluster = Cluster((contact_point,), load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
-                                                                                 predicate=predicate),
+        hfp = ExecutionProfile(
+            load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(), predicate=predicate)
+        )
+        cluster = Cluster((contact_point,), execution_profiles={EXEC_PROFILE_DEFAULT: hfp},
                           protocol_version=PROTOCOL_VERSION, topology_event_refresh_window=0,
                           status_event_refresh_window=0)
         session = cluster.connect(wait_for_all_pools=True)

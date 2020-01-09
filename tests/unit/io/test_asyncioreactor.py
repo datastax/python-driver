@@ -1,3 +1,4 @@
+AsyncioConnection, ASYNCIO_AVAILABLE = None, False
 try:
     from cassandra.io.asyncioreactor import AsyncioConnection
     import asynctest

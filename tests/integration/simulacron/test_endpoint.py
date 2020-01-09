@@ -20,8 +20,8 @@ from functools import total_ordering
 
 from cassandra.cluster import Cluster
 from cassandra.connection import DefaultEndPoint, EndPoint, EndPointFactory
-from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
-from tests.integration.simulacron import SimulacronCluster
+from tests.integration import requiressimulacron
+from tests.integration.simulacron import SimulacronCluster, PROTOCOL_VERSION
 
 
 @total_ordering

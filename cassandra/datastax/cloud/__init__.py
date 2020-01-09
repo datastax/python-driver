@@ -137,7 +137,8 @@ def read_metadata_info(config, cloud_config):
         response = urlopen(url, context=config.ssl_context, timeout=timeout)
     except Exception as e:
         log.exception(e)
-        raise DriverException("Unable to connect to the metadata service at %s" % url)
+        raise DriverException("Unable to connect to the metadata service at %s. "
+                              "Check the cluster status in the Constellation cloud console. " % url)
 
     if response.code != 200:
         raise DriverException(("Error while fetching the metadata at: %s. "

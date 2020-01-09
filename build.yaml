@@ -8,7 +8,7 @@ schedules:
       EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_long_test:
@@ -20,7 +20,7 @@ schedules:
       EVENT_LOOP_MANAGER='libev'
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_branches:
@@ -33,7 +33,7 @@ schedules:
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_branches_dev:
@@ -46,8 +46,8 @@ schedules:
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [2.7, 3.4, 3.6, 3.7]
-        - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
+        - python: [2.7, 3.4, 3.7, 3.8]
+        - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse', dse-4.8', 'dse-5.0']
 
   release_test:
     schedule: per_commit
@@ -138,7 +138,7 @@ schedules:
       JUST_UPGRADE=True
     matrix:
       exclude:
-        - python: [3.4, 3.6, 3.7]
+        - python: [3.4, 3.6, 3.7, 3.8]
         - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
 
 python:
@@ -147,6 +147,7 @@ python:
   - 3.5
   - 3.6
   - 3.7
+  - 3.8
 
 os:
   - ubuntu/bionic64/python-driver
@@ -156,7 +157,11 @@ cassandra:
   - '2.2'
   - '3.0'
   - '3.11'
-  - 'test-dse'
+  - 'dse-4.8'
+  - 'dse-5.0'
+  - 'dse-5.1'
+  - 'dse-6.0'
+  - 'dse-6.7'
 
 env:
   CYTHON:
@@ -178,7 +183,12 @@ build:
 
       pip install git+ssh://git@github.com/riptano/ccm-private.git
 
-      pip install -r test-requirements.txt
+      if [ -n "$CCM_IS_DSE" ]; then
+        pip install -r test-datastax-requirements.txt
+      else
+        pip install -r test-requirements.txt
+      fi
+
       pip install nose-ignore-docstring
       pip install nose-exclude
       pip install service_identity
@@ -201,9 +211,9 @@ build:
         exit 0
       fi
 
-      if [[ $CCM_IS_DSE == 'true' ]]; then
-        # We only use a DSE version for unreleased DSE versions, so we only need to run the smoke tests here
-        echo "CCM_IS_DSE: $CCM_IS_DSE"
+      if [[ $JUST_SMOKE == 'true' ]]; then
+        # When we ONLY want to run the smoke tests
+        echo "JUST_SMOKE: $JUST_SMOKE"
         echo "==========RUNNING SMOKE TESTS==========="
         EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION DSE_VERSION='6.7.0' MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/test_dse.py || true
         exit 0
@@ -229,28 +239,33 @@ build:
           "tests/integration/simulacron/test_endpoint.py"
           "tests/integration/long/test_ssl.py"
         )
-        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml ${EVENT_LOOP_TESTS[@]} || true
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml ${EVENT_LOOP_TESTS[@]} || true
         exit 0
       fi
 
       echo "Running with event loop manager: $EVENT_LOOP_MANAGER"
       echo "==========RUNNING SIMULACRON TESTS=========="
       SIMULACRON_JAR="$HOME/simulacron.jar"
-      SIMULACRON_JAR=$SIMULACRON_JAR EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_DIR=$CCM_INSTALL_DIR CCM_ARGS="$CCM_ARGS" DSE_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=simulacron_results.xml tests/integration/simulacron/ || true
+      SIMULACRON_JAR=$SIMULACRON_JAR EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_DIR=$CCM_INSTALL_DIR CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=simulacron_results.xml tests/integration/simulacron/ || true
 
       echo "Running with event loop manager: $EVENT_LOOP_MANAGER"
       echo "==========RUNNING CQLENGINE TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/ || true
 
       echo "==========RUNNING INTEGRATION TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/ || true
 
-      echo "==========RUNNING ADVANCED AND CLOUD TESTS=========="
-      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CLOUD_PROXY_PATH="$HOME/proxy/" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=advanced_results.xml tests/integration/advanced/ || true
+      if [ -n "$DSE_VERSION" ] && ! [[ $DSE_VERSION == "4.8"* ]]; then
+        echo "==========RUNNING DSE INTEGRATION TESTS=========="
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CASSANDRA_DIR=$CCM_INSTALL_DIR DSE_VERSION=$DSE_VERSION ADS_HOME=$HOME/ VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=dse_results.xml tests/integration/advanced/ || true
+      fi
+
+      echo "==========RUNNING CLOUD TESTS=========="
+      EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CLOUD_PROXY_PATH="$HOME/proxy/" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=advanced_results.xml tests/integration/cloud/ || true
 
       if [ -z "$EXCLUDE_LONG" ]; then
         echo "==========RUNNING LONG INTEGRATION TESTS=========="
-        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
+        EVENT_LOOP_MANAGER=$EVENT_LOOP_MANAGER CCM_ARGS="$CCM_ARGS" DSE_VERSION=$DSE_VERSION CASSANDRA_VERSION=$CCM_CASSANDRA_VERSION MAPPED_CASSANDRA_VERSION=$MAPPED_CASSANDRA_VERSION VERIFY_CYTHON=$FORCE_CYTHON nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/ || true
       fi
 
   - xunit:

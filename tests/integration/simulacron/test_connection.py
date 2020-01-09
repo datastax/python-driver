@@ -25,13 +25,14 @@ from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
 from cassandra.policies import HostStateListener, RoundRobinPolicy
-from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.connection import DEFAULT_CQL_VERSION
+
 from tests import connection_class, thread_pool_executor_class
-from tests.unit.cython.utils import cythontest
-from tests.integration import (PROTOCOL_VERSION, requiressimulacron)
+from tests.integration import requiressimulacron, libevtest
 from tests.integration.util import assert_quiescent_pool_state, late
-from tests.integration.simulacron import SimulacronBase
+# important to import the patch PROTOCOL_VERSION from the simulacron module
+from tests.integration.simulacron import SimulacronBase, PROTOCOL_VERSION
+from cassandra.connection import DEFAULT_CQL_VERSION
+from tests.unit.cython.utils import cythontest
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
                                                 start_and_prime_cluster_defaults,
@@ -117,6 +118,7 @@ class ConnectionTests(SimulacronBase):
         cluster = Cluster(compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
+                          protocol_version=PROTOCOL_VERSION,
                           executor_threads=8,
                           execution_profiles={
                               EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())})
@@ -192,6 +194,7 @@ class ConnectionTests(SimulacronBase):
         callback.assert_not_called()
 
     @cythontest
+    @libevtest
     def test_heartbeat_defunct_deadlock(self):
         """
         Ensure that there is no deadlock when request is in-flight and heartbeat defuncts connection
@@ -288,7 +291,7 @@ class ConnectionTests(SimulacronBase):
                 "scope": "connection"
             }
 
-            prime_query(query_to_prime, then=then, rows=None, column_types=None)
+            prime_query(query_to_prime, rows=None, column_types=None, then=then)
             self.assertRaises(NoHostAvailable, session.execute, query_to_prime)
 
     def test_retry_after_defunct(self):
@@ -322,7 +325,7 @@ class ConnectionTests(SimulacronBase):
                     cluster_name="{}/{}".format(simulacron_cluster.cluster_name, last_host))
 
         roundrobin_lbp = OrderedRoundRobinPolicy()
-        cluster = Cluster(compression=False,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
                           execution_profiles={
@@ -376,7 +379,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_interval = 1
 
         listener = TrackDownListener()
-        cluster = Cluster(compression=False,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout)
         session = cluster.connect(wait_for_all_pools=True)
@@ -407,7 +410,7 @@ class ConnectionTests(SimulacronBase):
         prime_query(query_to_prime, then=NO_THEN)
 
         listener = TrackDownListener()
-        cluster = Cluster(compression=False)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         session = cluster.connect(wait_for_all_pools=True)
         cluster.register_listener(listener)
 
@@ -428,8 +431,10 @@ class ConnectionTests(SimulacronBase):
         class ExtendedConnection(connection_class):
             pass
 
-        cluster = Cluster(contact_points=["127.0.0.2"],
-                          connection_class=ExtendedConnection)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          contact_points=["127.0.0.2"],
+                          connection_class=ExtendedConnection,
+                          compression=False)
         cluster.connect()
         cluster.shutdown()
 
@@ -441,11 +446,14 @@ class ConnectionTests(SimulacronBase):
 
         listener = TrackDownListener()
 
-        cluster = Cluster(['127.0.0.1'],
-                          load_balancing_policy=RoundRobinPolicy(),
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1'],
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
                           idle_heartbeat_interval=idle_heartbeat_interval,
-                          executor_threads=16)
+                          executor_threads=16,
+                          compression=False,
+                          execution_profiles={
+                              EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+                          })
         session = cluster.connect(wait_for_all_pools=True)
 
         cluster.register_listener(listener)

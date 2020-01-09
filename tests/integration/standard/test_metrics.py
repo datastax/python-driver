@@ -26,10 +26,13 @@ from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 from cassandra.protocol import SyntaxException
 
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from tests.integration import get_cluster, get_node, use_singledc, PROTOCOL_VERSION, execute_until_pass
 from greplin import scales
 from tests.integration import BasicSharedKeyspaceUnitTestCaseRF3WM, BasicExistingKeyspaceUnitTestCase, local
+
+import pprint as pp
+
 
 def setup_module():
     use_singledc()
@@ -40,10 +43,15 @@ class MetricsTests(unittest.TestCase):
     def setUp(self):
         contact_point = ['127.0.0.2']
         self.cluster = Cluster(contact_points=contact_point, metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
-                               load_balancing_policy=HostFilterPolicy(
-                                   RoundRobinPolicy(), lambda host: host.address in contact_point
-                               ),
-                               default_retry_policy=FallthroughRetryPolicy())
+                               execution_profiles=
+                                   {EXEC_PROFILE_DEFAULT:
+                                       ExecutionProfile(
+                                           load_balancing_policy=HostFilterPolicy(
+                                                RoundRobinPolicy(), lambda host: host.address in contact_point),
+                                           retry_policy=FallthroughRetryPolicy()
+                                       )
+                                   }
+                               )
         self.session = self.cluster.connect("test3rf", wait_for_all_pools=True)
 
     def tearDown(self):
@@ -196,7 +204,7 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         """
 
         cluster2 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
-                           default_retry_policy=FallthroughRetryPolicy())
+                           execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=FallthroughRetryPolicy())})
         cluster2.connect(self.ks_name, wait_for_all_pools=True)
 
         self.assertEqual(len(cluster2.metadata.all_hosts()), 3)
@@ -248,10 +256,12 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         @test_category metrics
         """
         cluster2 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
-                           default_retry_policy=FallthroughRetryPolicy())
+                           monitor_reporting_enabled=False,
+                           execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=FallthroughRetryPolicy())})
 
         cluster3 = Cluster(metrics_enabled=True, protocol_version=PROTOCOL_VERSION,
-                           default_retry_policy=FallthroughRetryPolicy())
+                           monitor_reporting_enabled=False,
+                           execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=FallthroughRetryPolicy())})
 
         # Ensure duplicate metric names are not allowed
         cluster2.metrics.set_stats_name("appcluster")
@@ -333,6 +343,10 @@ class RequestAnalyzer(object):
 
 
 class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(1, keyspace_creation=False, monitor_reporting_enabled=False)
 
     def wait_for_count(self, ra, expected_count, error=False):
         for _ in range(10):

@@ -32,7 +32,7 @@ from mock import patch
 
 from tests.integration import requirescloudproxy
 from tests.integration.util import wait_until_not_raised
-from tests.integration.advanced.cloud import CloudProxyCluster, CLOUD_PROXY_SERVER
+from tests.integration.cloud import CloudProxyCluster, CLOUD_PROXY_SERVER
 
 DISALLOWED_CONSISTENCIES = [
     ConsistencyLevel.ANY,
@@ -69,8 +69,8 @@ class CloudTests(CloudProxyCluster):
     def test_set_auth_provider(self):
         self.connect(self.creds)
         self.assertIsInstance(self.cluster.auth_provider, PlainTextAuthProvider)
-        self.assertEqual(self.cluster.auth_provider.username, 'cassandra')
-        self.assertEqual(self.cluster.auth_provider.password, 'cassandra')
+        self.assertEqual(self.cluster.auth_provider.username, 'user1')
+        self.assertEqual(self.cluster.auth_provider.password, 'user1')
 
     def test_support_leaving_the_auth_unset(self):
         with self.assertRaises(NoHostAvailable):

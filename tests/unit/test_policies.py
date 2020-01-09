@@ -156,8 +156,10 @@ class RoundRobinPolicyTest(unittest.TestCase):
                 sys.setcheckinterval(0)
             else:
                 sys.setswitchinterval(0.0001)
-            map(lambda t: t.start(), threads)
-            map(lambda t: t.join(), threads)
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
         finally:
             if check:
                 sys.setcheckinterval(original_interval)

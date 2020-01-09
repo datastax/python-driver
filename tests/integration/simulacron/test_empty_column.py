@@ -18,7 +18,8 @@ except ImportError:
 
 from collections import namedtuple, OrderedDict
 
-from cassandra.cluster import Cluster
+from cassandra import ProtocolVersion
+from cassandra.cluster import Cluster, EXEC_PROFILE_DEFAULT
 from cassandra.query import (named_tuple_factory, tuple_factory,
                              dict_factory, ordered_dict_factory)
 
@@ -29,6 +30,10 @@ from cassandra.cqlengine.models import Model
 from tests.integration import PROTOCOL_VERSION, requiressimulacron
 from tests.integration.simulacron import SimulacronCluster
 from tests.integration.simulacron.utils import PrimeQuery, prime_request
+
+
+PROTOCOL_VERSION = 4 if PROTOCOL_VERSION in \
+    (ProtocolVersion.DSE_V1, ProtocolVersion.DSE_V2) else PROTOCOL_VERSION
 
 
 @requiressimulacron
@@ -74,29 +79,29 @@ class EmptyColumnTests(SimulacronCluster):
         query = 'SELECT "", " " FROM testks.testtable'
         self._prime_testtable_query()
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
         # Test all row factories
-        self.session.row_factory = named_tuple_factory
+        self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = named_tuple_factory
         self.assertEqual(
             list(self.session.execute(query)),
             [namedtuple('Row', ['field_0_', 'field_1_'])('testval', 'testval1')]
         )
 
-        self.session.row_factory = tuple_factory
+        self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = tuple_factory
         self.assertEqual(
             list(self.session.execute(query)),
             [('testval', 'testval1')]
         )
 
-        self.session.row_factory = dict_factory
+        self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = dict_factory
         self.assertEqual(
             list(self.session.execute(query)),
             [{'': 'testval', ' ': 'testval1'}]
         )
 
-        self.session.row_factory = ordered_dict_factory
+        self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = ordered_dict_factory
         self.assertEqual(
             list(self.session.execute(query)),
             [OrderedDict((('', 'testval'), (' ', 'testval1')))]
@@ -119,8 +124,6 @@ class EmptyColumnTests(SimulacronCluster):
                     "caching": {"keys": "ALL", "rows_per_partition": "NONE"},
                     "comment": "comment",
                     "gc_grace_seconds": 60000,
-                    "dclocal_read_repair_chance": 0.1,
-                    "read_repair_chance": 0.1,
                     "keyspace_name": "testks",
                     "table_name": "testtable",
                     "columnfamily_name": "testtable",  # C* 2.2
@@ -135,8 +138,6 @@ class EmptyColumnTests(SimulacronCluster):
                 "caching": "map<ascii, ascii>",
                 "comment": "ascii",
                 "gc_grace_seconds": "int",
-                "dclocal_read_repair_chance": "double",
-                "read_repair_chance": "double",
                 "keyspace_name": "ascii",
                 "table_name": "ascii",
                 "columnfamily_name": "ascii",
@@ -230,7 +231,7 @@ class EmptyColumnTests(SimulacronCluster):
             query = PrimeQuery(query, then=then)
             prime_request(query)
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
         table_metadata = self.cluster.metadata.keyspaces['testks'].tables['testtable']
@@ -241,7 +242,7 @@ class EmptyColumnTests(SimulacronCluster):
     def test_empty_columns_with_cqlengine(self):
         self._prime_testtable_query()
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         self.session = self.cluster.connect(wait_for_all_pools=True)
         set_session(self.session)
 

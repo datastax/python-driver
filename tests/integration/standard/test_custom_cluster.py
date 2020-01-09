@@ -31,9 +31,9 @@ def setup_module():
     # can't use wait_for_binary_proto cause ccm tries on port 9042
     ccm_cluster.start(wait_for_binary_proto=False)
     # wait until all nodes are up
-    wait_until_not_raised(lambda: Cluster(['127.0.0.1'], port=9046).connect().shutdown(), 1, 10)
-    wait_until_not_raised(lambda: Cluster(['127.0.0.2'], port=9046).connect().shutdown(), 1, 10)
-    wait_until_not_raised(lambda: Cluster(['127.0.0.3'], port=9046).connect().shutdown(), 1, 10)
+    wait_until_not_raised(lambda: Cluster(['127.0.0.1'], port=9046).connect().shutdown(), 1, 20)
+    wait_until_not_raised(lambda: Cluster(['127.0.0.2'], port=9046).connect().shutdown(), 1, 20)
+    wait_until_not_raised(lambda: Cluster(['127.0.0.3'], port=9046).connect().shutdown(), 1, 20)
 
 
 def teardown_module():

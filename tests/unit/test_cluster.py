@@ -22,13 +22,12 @@ import six
 from mock import patch, Mock
 
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
-    InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException
-from cassandra.cluster import _Scheduler, Session, Cluster, _NOT_SET, default_lbp_factory, \
-    ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT, NoHostAvailable
-from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, \
-    DowngradingConsistencyRetryPolicy, SimpleConvictionPolicy
-from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
+    InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException, ProtocolVersion
+from cassandra.cluster import _Scheduler, Session, Cluster, default_lbp_factory, \
+    ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT
 from cassandra.pool import Host
+from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy, SimpleConvictionPolicy
+from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
 from tests.unit.utils import mock_session_pools
 from tests import connection_class
 
@@ -136,14 +135,43 @@ class SessionTest(unittest.TestCase):
 
     # TODO: this suite could be expanded; for now just adding a test covering a PR
     @mock_session_pools
-    def test_default_serial_consistency_level(self, *_):
+    def test_default_serial_consistency_level_ep(self, *_):
         """
-        Make sure default_serial_consistency_level passes through to a query message.
+        Make sure default_serial_consistency_level passes through to a query message using execution profiles.
         Also make sure Statement.serial_consistency_level overrides the default.
 
         PR #510
         """
-        s = Session(Cluster(protocol_version=4), [Host("127.0.0.1", SimpleConvictionPolicy)])
+        c = Cluster(protocol_version=4)
+        s = Session(c, [Host("127.0.0.1", SimpleConvictionPolicy)])
+
+        # default is None
+        default_profile = c.profile_manager.default
+        self.assertIsNone(default_profile.serial_consistency_level)
+
+        for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
+            s.get_execution_profile(EXEC_PROFILE_DEFAULT).serial_consistency_level = cl
+
+            # default is passed through
+            f = s.execute_async(query='')
+            self.assertEqual(f.message.serial_consistency_level, cl)
+
+            # any non-None statement setting takes precedence
+            for cl_override in (ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
+                f = s.execute_async(SimpleStatement(query_string='', serial_consistency_level=cl_override))
+                self.assertEqual(default_profile.serial_consistency_level, cl)
+                self.assertEqual(f.message.serial_consistency_level, cl_override)
+
+    @mock_session_pools
+    def test_default_serial_consistency_level_legacy(self, *_):
+        """
+        Make sure default_serial_consistency_level passes through to a query message using legacy settings.
+        Also make sure Statement.serial_consistency_level overrides the default.
+
+        PR #510
+        """
+        c = Cluster(protocol_version=4)
+        s = Session(c, [Host("127.0.0.1", SimpleConvictionPolicy)])
 
         # default is None
         self.assertIsNone(s.default_serial_consistency_level)
@@ -157,15 +185,34 @@ class SessionTest(unittest.TestCase):
         for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
             s.default_serial_consistency_level = cl
 
-            # default is passed through
-            f = s.execute_async(query='')
-            self.assertEqual(f.message.serial_consistency_level, cl)
-
             # any non-None statement setting takes precedence
             for cl_override in (ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
                 f = s.execute_async(SimpleStatement(query_string='', serial_consistency_level=cl_override))
                 self.assertEqual(s.default_serial_consistency_level, cl)
                 self.assertEqual(f.message.serial_consistency_level, cl_override)
+
+
+class ProtocolVersionTests(unittest.TestCase):
+
+    def test_protocol_downgrade_test(self):
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V2)
+        self.assertEqual(ProtocolVersion.DSE_V1, lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V1)
+        self.assertEqual(ProtocolVersion.V4,lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V4)
+        self.assertEqual(ProtocolVersion.V3,lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V3)
+        self.assertEqual(ProtocolVersion.V2,lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V2)
+        self.assertEqual(ProtocolVersion.V1, lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V1)
+        self.assertEqual(0, lower)
+
+        self.assertTrue(ProtocolVersion.uses_error_code_map(ProtocolVersion.DSE_V1))
+        self.assertTrue(ProtocolVersion.uses_int_query_flags(ProtocolVersion.DSE_V1))
+
+        self.assertFalse(ProtocolVersion.uses_error_code_map(ProtocolVersion.V4))
+        self.assertFalse(ProtocolVersion.uses_int_query_flags(ProtocolVersion.V4))
 
 
 class ExecutionProfileTest(unittest.TestCase):
@@ -187,12 +234,18 @@ class ExecutionProfileTest(unittest.TestCase):
         cluster = Cluster()
         self.assertEqual(cluster._config_mode, _ConfigMode.UNCOMMITTED)
         self.assertEqual(cluster.load_balancing_policy.__class__, default_lbp_factory().__class__)
+        self.assertEqual(cluster.profile_manager.default.load_balancing_policy.__class__, default_lbp_factory().__class__)
         self.assertEqual(cluster.default_retry_policy.__class__, RetryPolicy)
+        self.assertEqual(cluster.profile_manager.default.retry_policy.__class__, RetryPolicy)
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
         self.assertEqual(session.default_timeout, 10.0)
+        self.assertEqual(cluster.profile_manager.default.request_timeout, 10.0)
         self.assertEqual(session.default_consistency_level, ConsistencyLevel.LOCAL_ONE)
+        self.assertEqual(cluster.profile_manager.default.consistency_level, ConsistencyLevel.LOCAL_ONE)
         self.assertEqual(session.default_serial_consistency_level, None)
+        self.assertEqual(cluster.profile_manager.default.serial_consistency_level, None)
         self.assertEqual(session.row_factory, named_tuple_factory)
+        self.assertEqual(cluster.profile_manager.default.row_factory, named_tuple_factory)
 
     @mock_session_pools
     def test_default_legacy(self):
@@ -216,7 +269,7 @@ class ExecutionProfileTest(unittest.TestCase):
 
         self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
 
-        default_profile = session.get_execution_profile(EXEC_PROFILE_DEFAULT)
+        default_profile = cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT]
         rf = session.execute_async("query")
         self._verify_response_future_profile(rf, default_profile)
 

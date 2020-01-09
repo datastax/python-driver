@@ -7,12 +7,89 @@ Features
 * Allow passing ssl context for Twisted (PYTHON-1161)
 * ssl context and cloud support for Eventlet (PYTHON-1162)
 * Cloud Twisted support (PYTHON-1163)
+* Add additional_write_policy and read_repair to system schema parsing (PYTHON-1048)
+* Handle prepared id mismatch when repreparing on the fly (PYTHON-1124)
+* Remove *read_repair_chance table options (PYTHON-1140)
+* Flexible version parsing (PYTHON-1174)
+* Support NULL in collection deserializer (PYTHON-1123)
+* Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
+* Add Python 3.8 support (PYTHON-1189)
+* Add new DSE CQL keywords (PYTHON-1122)
+* [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 
 Bug Fixes
 ---------
 * re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
+* asyncio message chunks can be processed discontinuously (PYTHON-1185)
+* Reconnect attempts persist after downed node removed from peers (PYTHON-1181)
 * Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set (PYTHON-1186)
 * ResponseFuture._set_result crashes on connection error when used with PrepareMessage (PYTHON-1187)
+* Insights fail to serialize the startup message when the SSL Context is from PyOpenSSL (PYTHON-1192)
+
+Others
+------
+* The driver has a new dependency: geomet. It comes from the dse-driver unification and
+  is used to support DSE geo types.
+
+Deprecations
+------------
+
+* DSELoadBalancingPolicy will be removed in the next major, consider using
+  the DefaultLoadBalancingPolicy.
+
+Merged from dse-driver:
+
+Features
+--------
+
+* Insights integration (PYTHON-1047)
+* Graph execution profiles should preserve their graph_source when graph_options is overridden (PYTHON-1021)
+* Add NodeSync metadata (PYTHON-799)
+* Add new NodeSync failure values (PYTHON-934)
+* DETERMINISTIC and MONOTONIC Clauses for Functions and Aggregates (PYTHON-955)
+* GraphOptions should show a warning for unknown parameters (PYTHON-819)
+* DSE protocol version 2 and continous paging backpressure (PYTHON-798)
+* GraphSON2 Serialization/Deserialization Support (PYTHON-775)
+* Add graph-results payload option for GraphSON format (PYTHON-773)
+* Create an AuthProvider for the DSE transitional mode (PYTHON-831)
+* Implement serializers for the Graph String API (PYTHON-778)
+* Provide deserializers for GraphSON types (PYTHON-782)
+* Add Graph DurationType support (PYTHON-607)
+* Support DSE DateRange type (PYTHON-668)
+* RLAC CQL output for materialized views (PYTHON-682)
+* Add Geom Types wkt deserializer
+* DSE Graph Client timeouts in custom payload (PYTHON-589)
+* Make DSEGSSAPIAuthProvider accept principal name (PYTHON-574)
+* Add config profiles to DSE graph execution (PYTHON-570)
+* DSE Driver version checking (PYTHON-568)
+* Distinct default timeout for graph queries (PYTHON-477)
+* Graph result parsing for known types (PYTHON-479,487)
+* Distinct read/write CL for graph execution (PYTHON-509)
+* Target graph analytics query to spark master when available (PYTHON-510)
+
+Bug Fixes
+---------
+
+* Continuous paging sessions raise RuntimeError when results are not entirely consumed (PYTHON-1054)
+* GraphSON Property deserializer should return a dict instead of a set (PYTHON-1033)
+* ResponseFuture.has_more_pages may hold the wrong value (PYTHON-946)
+* DETERMINISTIC clause in AGGREGATE misplaced in CQL generation (PYTHON-963)
+* graph module import cause a DLL issue on Windows due to its cythonizing failure (PYTHON-900)
+* Update date serialization to isoformat in graph (PYTHON-805)
+* DateRange Parse Error (PYTHON-729)
+* MontonicTimestampGenerator.__init__ ignores class defaults (PYTHON-728)
+* metadata.get_host returning None unexpectedly (PYTHON-709)
+* Sockets associated with sessions not getting cleaned up on session.shutdown() (PYTHON-673)
+* Resolve FQDN from ip address and use that as host passed to SASLClient (PYTHON-566)
+* Geospatial type implementations don't handle 'EMPTY' values. (PYTHON-481)
+* Correctly handle other types in geo type equality (PYTHON-508)
+
+Other
+-----
+* Add tests around cqlengine and continuous paging (PYTHON-872)
+* Add an abstract GraphStatement to handle different graph statements  (PYTHON-789)
+* Write documentation examples for DSE 2.0 features (PYTHON-732)
+* DSE_V1 protocol should not include all of protocol v5 (PYTHON-694)
 
 3.20.2
 ======
@@ -64,6 +141,7 @@ Bug Fixes
 * Call ConnectionException with correct kwargs (PYTHON-1117)
 * Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
 * Discovered node doesn´t honor the configured Cluster port on connection (PYTHON-1127)
+* Exception when use pk__token__gt filter In python 3.7 (PYTHON-1121)
 
 Other
 -----

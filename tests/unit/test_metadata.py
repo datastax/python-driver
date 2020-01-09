@@ -472,7 +472,10 @@ class UserTypesTest(unittest.TestCase):
 
 class UserDefinedFunctionTest(unittest.TestCase):
     def test_as_cql_query_removes_frozen(self):
-        func = Function("ks1", "myfunction", ["frozen<tuple<int, text>>"], ["a"], "int", "java", "return 0;", True)
+        func = Function(
+            "ks1", "myfunction", ["frozen<tuple<int, text>>"], ["a"],
+            "int", "java", "return 0;", True, False, False, False
+        )
         expected_result = (
             "CREATE FUNCTION ks1.myfunction(a tuple<int, text>) "
             "CALLED ON NULL INPUT "
@@ -485,7 +488,7 @@ class UserDefinedFunctionTest(unittest.TestCase):
 
 class UserDefinedAggregateTest(unittest.TestCase):
     def test_as_cql_query_removes_frozen(self):
-        aggregate = Aggregate("ks1", "myaggregate", ["frozen<tuple<int>>"], "statefunc", "frozen<tuple<int>>", "finalfunc", "(0)", "tuple<int>")
+        aggregate = Aggregate("ks1", "myaggregate", ["frozen<tuple<int>>"], "statefunc", "frozen<tuple<int>>", "finalfunc", "(0)", "tuple<int>", False)
         expected_result = (
             "CREATE AGGREGATE ks1.myaggregate(tuple<int>) "
             "SFUNC statefunc "
@@ -504,7 +507,7 @@ class IndexTest(unittest.TestCase):
         column_meta.table.name = 'table_name_here'
         column_meta.table.keyspace_name = 'keyspace_name_here'
         column_meta.table.columns = {column_meta.name: column_meta}
-        parser = get_schema_parser(Mock(), '2.1.0', 0.1)
+        parser = get_schema_parser(Mock(), '2.1.0', None, 0.1)
 
         row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
         index_meta = parser._build_index_metadata(column_meta, row)
@@ -574,16 +577,139 @@ class UnicodeIdentifiersTests(unittest.TestCase):
         log.debug(im.export_as_string())
 
     def test_function(self):
-        fm = Function(self.name, self.name, (u'int', u'int'), (u'x', u'y'), u'int', u'language', self.name, False)
+        fm = Function(keyspace=self.name, name=self.name,
+                      argument_types=(u'int', u'int'),
+                      argument_names=(u'x', u'y'),
+                      return_type=u'int', language=u'language',
+                      body=self.name, called_on_null_input=False,
+                      deterministic=True,
+                      monotonic=False, monotonic_on=(u'x',))
         fm.export_as_string()
 
     def test_aggregate(self):
-        am = Aggregate(self.name, self.name, (u'text',), self.name, u'text', self.name, self.name, u'text')
+        am = Aggregate(self.name, self.name, (u'text',), self.name, u'text', self.name, self.name, u'text', True)
         am.export_as_string()
 
     def test_user_type(self):
         um = UserType(self.name, self.name, [self.name, self.name], [u'int', u'text'])
         um.export_as_string()
+
+
+class FunctionToCQLTests(unittest.TestCase):
+
+    base_vars = {
+        'keyspace': 'ks_name',
+        'name': 'function_name',
+        'argument_types': (u'int', u'int'),
+        'argument_names': (u'x', u'y'),
+        'return_type': u'int',
+        'language': u'language',
+        'body': 'body',
+        'called_on_null_input': False,
+        'deterministic': True,
+        'monotonic': False,
+        'monotonic_on': ()
+    }
+
+    def _function_with_kwargs(self, **kwargs):
+        return Function(**dict(self.base_vars,
+                               **kwargs)
+                        )
+
+    def test_non_monotonic(self):
+        self.assertNotIn(
+            'MONOTONIC',
+            self._function_with_kwargs(
+                monotonic=False,
+                monotonic_on=()
+            ).export_as_string()
+        )
+
+    def test_monotonic_all(self):
+        mono_function = self._function_with_kwargs(
+            monotonic=True,
+            monotonic_on=()
+        )
+        self.assertIn(
+            'MONOTONIC LANG',
+            mono_function.as_cql_query(formatted=False)
+        )
+        self.assertIn(
+            'MONOTONIC\n    LANG',
+            mono_function.as_cql_query(formatted=True)
+        )
+
+    def test_monotonic_one(self):
+        mono_on_function = self._function_with_kwargs(
+            monotonic=False,
+            monotonic_on=('x',)
+        )
+        self.assertIn(
+            'MONOTONIC ON x LANG',
+            mono_on_function.as_cql_query(formatted=False)
+        )
+        self.assertIn(
+            'MONOTONIC ON x\n    LANG',
+            mono_on_function.as_cql_query(formatted=True)
+        )
+
+    def test_nondeterministic(self):
+        self.assertNotIn(
+            'DETERMINISTIC',
+            self._function_with_kwargs(
+                deterministic=False
+            ).as_cql_query(formatted=False)
+        )
+
+    def test_deterministic(self):
+        self.assertIn(
+            'DETERMINISTIC',
+            self._function_with_kwargs(
+                deterministic=True
+            ).as_cql_query(formatted=False)
+        )
+        self.assertIn(
+            'DETERMINISTIC\n',
+            self._function_with_kwargs(
+                deterministic=True
+            ).as_cql_query(formatted=True)
+        )
+
+
+class AggregateToCQLTests(unittest.TestCase):
+    base_vars = {
+        'keyspace': 'ks_name',
+        'name': 'function_name',
+        'argument_types': (u'int', u'int'),
+        'state_func': 'funcname',
+        'state_type': u'int',
+        'return_type': u'int',
+        'final_func': None,
+        'initial_condition': '0',
+        'deterministic': True
+    }
+
+    def _aggregate_with_kwargs(self, **kwargs):
+        return Aggregate(**dict(self.base_vars,
+                                **kwargs)
+                         )
+
+    def test_nondeterministic(self):
+        self.assertNotIn(
+            'DETERMINISTIC',
+            self._aggregate_with_kwargs(
+                deterministic=False
+            ).as_cql_query(formatted=True)
+        )
+
+    def test_deterministic(self):
+        for formatted in (True, False):
+            query = self._aggregate_with_kwargs(
+                deterministic=True
+            ).as_cql_query(formatted=formatted)
+            self.assertTrue(query.endswith('DETERMINISTIC'),
+                            msg="'DETERMINISTIC' not found in {}".format(query)
+                            )
 
 
 class HostsTests(unittest.TestCase):

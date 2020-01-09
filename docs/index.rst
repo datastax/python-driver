@@ -1,10 +1,10 @@
-Python Cassandra Driver
-=======================
+DataStax Python Driver for Apache Cassandra
+===========================================
 A Python client driver for `Apache Cassandra <http://cassandra.apache.org>`_.
 This driver works exclusively with the Cassandra Query Language v3 (CQL3)
-and Cassandra's native protocol.  Cassandra 2.1+ is supported.
+and Cassandra's native protocol.  Cassandra 2.1+ is supported, including DSE 4.7+.
 
-The driver supports Python 2.7, 3.4, 3.5, 3.6 and 3.7.
+The driver supports Python 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
 
 This driver is open source under the
 `Apache v2 License <http://www.apache.org/licenses/LICENSE-2.0.html>`_.
@@ -50,6 +50,18 @@ Contents
 :doc:`cloud`
     A guide to connecting to Datastax Apollo
 
+:doc:`geo_types`
+    Working with DSE geometry types
+
+:doc:`graph`
+    Graph queries with DSE Graph
+
+:doc:`graph_fluent`
+    DataStax Graph Fluent API
+
+:doc:`CHANGELOG`
+    Log of changes to the driver, organized by version.
+
 :doc:`faq`
     A collection of Frequently Asked Questions
 
@@ -70,6 +82,10 @@ Contents
    security
    user_defined_types
    object_mapper
+   geo_types
+   graph
+   graph_fluent
+   dse_auth
    dates_and_times
    cloud
    faq
@@ -80,7 +96,7 @@ Visit the :doc:`FAQ section <faq>` in this documentation.
 
 Please send questions to the `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_.
 
-Alternatively, you can use the `#datastax-drivers` channel in the DataStax Acadamy Slack to ask questions in real time.
+Alternatively, you can use the `DataStax Community <https://community.datastax.com>`_.
 
 Reporting Issues
 ----------------
