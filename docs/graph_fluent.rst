@@ -1,7 +1,7 @@
 DataStax Graph Fluent API
 =========================
 
-The fluent API adds graph features to the core driver::
+The fluent API adds graph features to the core driver:
 
 * A TinkerPop GraphTraversalSource builder to execute traversals on a DSE cluster
 * The ability to execution traversal queries explicitly using execute_graph
