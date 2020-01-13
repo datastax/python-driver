@@ -40,14 +40,35 @@ behavior in some other way, this is the place to do it:
 
 .. code-block:: python
 
-    from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
-    from cassandra.query import tuple_factory
+    from cassandra.cluster import Cluster
+    cluster = Cluster(['192.168.0.1', '192.168.0.2'], port=..., ssl_context=...)
 
-    profile = ExecutionProfile(row_factory=tuple_factory)
-    cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: profile})
+Instantiating a :class:`~.Cluster` does not actually connect us to any nodes.
+To establish connections and begin executing queries we need a
+:class:`~.Session`, which is created by calling :meth:`.Cluster.connect()`:
+
+.. code-block:: python
+
+    cluster = Cluster()
     session = cluster.connect()
 
-    print(session.execute("SELECT release_version FROM system.local").one())
+The :meth:`~.Cluster.connect()` method takes an optional ``keyspace`` argument
+which sets the default keyspace for all queries made through that :class:`~.Session`:
+
+.. code-block:: python
+
+    cluster = Cluster()
+    session = cluster.connect('mykeyspace')
+
+
+You can always change a Session's keyspace using :meth:`~.Session.set_keyspace` or
+by executing a ``USE <keyspace>`` query:
+
+.. code-block:: python
+
+    session.set_keyspace('users')
+    # or you can do this instead
+    session.execute('USE users')
 
 Profiles are passed in by ``execution_profiles`` dict.
 
@@ -82,33 +103,6 @@ Users are free to setup additional profiles to be used by name:
     session.execute(statement, execution_profile='long')
 
 Also, parameters passed to ``Session.execute`` or attached to ``Statement``\s are still honored as before.
-
-Instantiating a :class:`~.Cluster` does not actually connect us to any nodes.
-To establish connections and begin executing queries we need a
-:class:`~.Session`, which is created by calling :meth:`.Cluster.connect()`:
-
-.. code-block:: python
-
-    cluster = Cluster()
-    session = cluster.connect()
-
-The :meth:`~.Cluster.connect()` method takes an optional ``keyspace`` argument
-which sets the default keyspace for all queries made through that :class:`~.Session`:
-
-.. code-block:: python
-
-    cluster = Cluster()
-    session = cluster.connect('mykeyspace')
-
-
-You can always change a Session's keyspace using :meth:`~.Session.set_keyspace` or
-by executing a ``USE <keyspace>`` query:
-
-.. code-block:: python
-
-    session.set_keyspace('users')
-    # or you can do this instead
-    session.execute('USE users')
 
 Executing Queries
 -----------------
