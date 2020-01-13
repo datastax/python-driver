@@ -2467,22 +2467,6 @@ class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
 class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
     virtual_ks_names = ('system_virtual_schema', 'system_views')
 
-    virtual_ks_structure = {
-        # keyspaces
-        'system_virtual_schema': {
-            # tables: columns. columns are a set because we're comparing unordered
-            'keyspaces': {'keyspace_name'},
-            'tables': {'comment', 'keyspace_name', 'table_name'},
-            'columns': {'clustering_order', 'column_name', 'column_name_bytes',
-                        'keyspace_name', 'kind', 'position', 'table_name',
-                        'type'}
-        },
-        'system_views': {
-            'sstable_tasks': {'keyspace_name', 'kind', 'progress',
-                              'table_name', 'task_id', 'total', 'unit'}
-        }
-    }
-
     def test_existing_keyspaces_have_correct_virtual_tags(self):
         for name, ks in self.cluster.metadata.keyspaces.items():
             if name in self.virtual_ks_names:
@@ -2519,5 +2503,7 @@ class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
                     tab.columns.keys()
                 )
 
-        self.assertDictEqual(ingested_virtual_ks_structure,
-                             self.virtual_ks_structure)
+        # Identify a couple known values to verify we parsed the structure correctly
+        self.assertIn('table_name', ingested_virtual_ks_structure['system_virtual_schema']['tables'])
+        self.assertIn('type', ingested_virtual_ks_structure['system_virtual_schema']['columns'])
+        self.assertIn('total', ingested_virtual_ks_structure['system_views']['sstable_tasks'])
