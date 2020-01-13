@@ -27,7 +27,7 @@ import warnings
 from packaging.version import Version
 
 import cassandra
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT, ControlConnection
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
@@ -502,79 +502,70 @@ class ClusterTests(unittest.TestCase):
     @local
     @notwindows
     def test_refresh_schema_no_wait(self):
-        contact_points = [CASSANDRA_IP]
-        with Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
-                     contact_points=contact_points,
-                     execution_profiles=
-                     {EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=
-                             HostFilterPolicy(
-                                 RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
-                             ))}) as cluster:
-            session = cluster.connect()
+        original_wait_for_responses = connection.Connection.wait_for_responses
 
-            schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
-            new_schema_ver = uuid4()
-            session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (new_schema_ver,))
+        def patched_wait_for_responses(*args, **kwargs):
+            # When selecting schema version, replace the real schema UUID with an unexpected UUID
+            response = original_wait_for_responses(*args, **kwargs)
+            if len(args) > 2 and hasattr(args[2], "query") and args[2].query == "SELECT schema_version FROM system.local WHERE key='local'":
+                new_uuid = uuid4()
+                response[1].parsed_rows[0] = (new_uuid,)
+            return response
 
-            try:
-                agreement_timeout = 1
+        with patch.object(connection.Connection, "wait_for_responses", patched_wait_for_responses):
+            agreement_timeout = 1
 
-                # cluster agreement wait exceeded
-                c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=agreement_timeout)
-                c.connect()
-                self.assertTrue(c.metadata.keyspaces)
+            # cluster agreement wait exceeded
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=agreement_timeout)
+            c.connect()
+            self.assertTrue(c.metadata.keyspaces)
 
-                # cluster agreement wait used for refresh
-                original_meta = c.metadata.keyspaces
-                start_time = time.time()
-                self.assertRaisesRegexp(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
-                end_time = time.time()
-                self.assertGreaterEqual(end_time - start_time, agreement_timeout)
-                self.assertIs(original_meta, c.metadata.keyspaces)
+            # cluster agreement wait used for refresh
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            self.assertRaisesRegexp(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertIs(original_meta, c.metadata.keyspaces)
 
-                # refresh wait overrides cluster value
-                original_meta = c.metadata.keyspaces
-                start_time = time.time()
-                c.refresh_schema_metadata(max_schema_agreement_wait=0)
-                end_time = time.time()
-                self.assertLess(end_time - start_time, agreement_timeout)
-                self.assertIsNot(original_meta, c.metadata.keyspaces)
-                self.assertEqual(original_meta, c.metadata.keyspaces)
+            # refresh wait overrides cluster value
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            c.refresh_schema_metadata(max_schema_agreement_wait=0)
+            end_time = time.time()
+            self.assertLess(end_time - start_time, agreement_timeout)
+            self.assertIsNot(original_meta, c.metadata.keyspaces)
+            self.assertEqual(original_meta, c.metadata.keyspaces)
 
-                c.shutdown()
+            c.shutdown()
 
-                refresh_threshold = 0.5
-                # cluster agreement bypass
-                c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0)
-                start_time = time.time()
-                s = c.connect()
-                end_time = time.time()
-                self.assertLess(end_time - start_time, refresh_threshold)
-                self.assertTrue(c.metadata.keyspaces)
+            refresh_threshold = 0.5
+            # cluster agreement bypass
+            c = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=0)
+            start_time = time.time()
+            s = c.connect()
+            end_time = time.time()
+            self.assertLess(end_time - start_time, refresh_threshold)
+            self.assertTrue(c.metadata.keyspaces)
 
-                # cluster agreement wait used for refresh
-                original_meta = c.metadata.keyspaces
-                start_time = time.time()
-                c.refresh_schema_metadata()
-                end_time = time.time()
-                self.assertLess(end_time - start_time, refresh_threshold)
-                self.assertIsNot(original_meta, c.metadata.keyspaces)
-                self.assertEqual(original_meta, c.metadata.keyspaces)
+            # cluster agreement wait used for refresh
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            c.refresh_schema_metadata()
+            end_time = time.time()
+            self.assertLess(end_time - start_time, refresh_threshold)
+            self.assertIsNot(original_meta, c.metadata.keyspaces)
+            self.assertEqual(original_meta, c.metadata.keyspaces)
 
-                # refresh wait overrides cluster value
-                original_meta = c.metadata.keyspaces
-                start_time = time.time()
-                self.assertRaisesRegexp(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata,
-                                        max_schema_agreement_wait=agreement_timeout)
-                end_time = time.time()
-                self.assertGreaterEqual(end_time - start_time, agreement_timeout)
-                self.assertIs(original_meta, c.metadata.keyspaces)
-                c.shutdown()
-            finally:
-                # TODO once fixed this connect call
-                session = cluster.connect()
-                session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (schema_ver,))
-
+            # refresh wait overrides cluster value
+            original_meta = c.metadata.keyspaces
+            start_time = time.time()
+            self.assertRaisesRegexp(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata,
+                                    max_schema_agreement_wait=agreement_timeout)
+            end_time = time.time()
+            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            self.assertIs(original_meta, c.metadata.keyspaces)
+            c.shutdown()
 
     def test_trace(self):
         """
