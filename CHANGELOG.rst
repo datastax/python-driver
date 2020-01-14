@@ -1,24 +1,22 @@
 3.21.0
 ======
-Unreleased
+January 15, 2020
 
 Features
 --------
+* Unified driver: merge core and DSE drivers into a single package (PYTHON-1130)
+* Add Python 3.8 support (PYTHON-1189)
 * Allow passing ssl context for Twisted (PYTHON-1161)
-* ssl context and cloud support for Eventlet (PYTHON-1162)
+* Ssl context and cloud support for Eventlet (PYTHON-1162)
 * Cloud Twisted support (PYTHON-1163)
 * Add additional_write_policy and read_repair to system schema parsing (PYTHON-1048)
-* Handle prepared id mismatch when repreparing on the fly (PYTHON-1124)
-* Remove *read_repair_chance table options (PYTHON-1140)
 * Flexible version parsing (PYTHON-1174)
 * Support NULL in collection deserializer (PYTHON-1123)
-* Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
-* Add Python 3.8 support (PYTHON-1189)
-* Add new DSE CQL keywords (PYTHON-1122)
 * [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
 
 Bug Fixes
 ---------
+* Handle prepared id mismatch when repreparing on the fly (PYTHON-1124)
 * re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
 * asyncio message chunks can be processed discontinuously (PYTHON-1185)
 * Reconnect attempts persist after downed node removed from peers (PYTHON-1181)
@@ -30,6 +28,9 @@ Others
 ------
 * The driver has a new dependency: geomet. It comes from the dse-driver unification and
   is used to support DSE geo types.
+* Remove *read_repair_chance table options (PYTHON-1140)
+* Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
+* Add new DSE CQL keywords (PYTHON-1122)
 
 Deprecations
 ------------
