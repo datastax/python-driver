@@ -472,7 +472,13 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
         if CCM_CLUSTER:
             log.debug("Using external CCM cluster {0}".format(CCM_CLUSTER.name))
         else:
-            log.debug("Using unnamed external cluster")
+            ccm_path = os.getenv("CCM_PATH", None)
+            ccm_name = os.getenv("CCM_NAME", None)
+            if ccm_path and ccm_name:
+                CCM_CLUSTER = CCMClusterFactory.load(ccm_path, ccm_name)
+                log.debug("Using external CCM cluster {0}".format(CCM_CLUSTER.name))
+            else:
+                log.debug("Using unnamed external cluster")
         if set_keyspace and start:
             setup_keyspace(ipformat=ipformat, wait=False)
         return
