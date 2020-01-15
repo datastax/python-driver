@@ -23,7 +23,7 @@ sections:
       CASS_DRIVER_NO_CYTHON=1 python setup.py build_ext --inplace --force
 versions:
   - name: '3.21'
-    ref: 49482462
+    ref: 5589d96b
   - name: '3.20'
     ref: d30d166f
   - name: '3.19'
