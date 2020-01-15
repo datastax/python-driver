@@ -1,6 +1,6 @@
-DataStax Python Driver for Apache Cassandra
-===========================================
-A Python client driver for `Apache Cassandra <http://cassandra.apache.org>`_.
+DataStax Python Driver for Apache Cassandra®
+============================================
+A Python client driver for `Apache Cassandra® <http://cassandra.apache.org>`_.
 This driver works exclusively with the Cassandra Query Language v3 (CQL3)
 and Cassandra's native protocol.  Cassandra 2.1+ is supported, including DSE 4.7+.
 
