@@ -27,8 +27,9 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
 from cassandra.policies import HostStateListener, RoundRobinPolicy
 
 from tests import connection_class, thread_pool_executor_class
+from tests.util late
 from tests.integration import requiressimulacron, libevtest
-from tests.integration.util import assert_quiescent_pool_state, late
+from tests.integration.util import assert_quiescent_pool_state
 # important to import the patch PROTOCOL_VERSION from the simulacron module
 from tests.integration.simulacron import SimulacronBase, PROTOCOL_VERSION
 from cassandra.connection import DEFAULT_CQL_VERSION

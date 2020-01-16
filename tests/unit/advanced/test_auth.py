@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from puresasl import QOP
 
 try:
@@ -21,10 +22,10 @@ except ImportError:
 
 from cassandra.auth import DSEGSSAPIAuthProvider
 
-from tests.integration import requiredse
-
+# Cannot import requiredse from tests.integration
 # This auth provider requires kerberos and puresals
-@requiredse
+DSE_VERSION = os.getenv('DSE_VERSION', None)
+@unittest.skipUnless(DSE_VERSION, "DSE required")
 class TestGSSAPI(unittest.TestCase):
 
     def test_host_resolution(self):
