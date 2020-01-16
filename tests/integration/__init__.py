@@ -166,8 +166,6 @@ else:  # we are testing against Cassandra or DDAC
     cv_string = os.getenv('CASSANDRA_VERSION', None)
     mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
     try:
-        print(cv_string)
-        sasa
         cassandra_version = Version(cv_string)  # env var is set to test-dse for DDAC
     except:
         # fallback to MAPPED_CASSANDRA_VERSION
