@@ -259,10 +259,13 @@ class TestDeprecationWarning(unittest.TestCase):
             rows[-1]
             rows[-1:]
 
-            self.assertEqual(len(w), 4)
-            self.assertIn("__table_name_case_sensitive__ will be removed in 4.0.", str(w[0].message))
-            self.assertIn("__table_name_case_sensitive__ will be removed in 4.0.", str(w[1].message))
+            # Asyncio complains loudly about old syntax on python 3.7+, so get rid of all of those
+            relevant_warnings = [warn for warn in w if "with (yield from lock)" not in str(warn.message)]
+
+            self.assertEqual(len(relevant_warnings), 4)
+            self.assertIn("__table_name_case_sensitive__ will be removed in 4.0.", str(relevant_warnings[0].message))
+            self.assertIn("__table_name_case_sensitive__ will be removed in 4.0.", str(relevant_warnings[1].message))
             self.assertIn("ModelQuerySet indexing with negative indices support will be removed in 4.0.",
-                          str(w[2].message))
+                          str(relevant_warnings[2].message))
             self.assertIn("ModelQuerySet slicing with negative indices support will be removed in 4.0.",
-                          str(w[3].message))
+                          str(relevant_warnings[3].message))
