@@ -2538,6 +2538,8 @@ class Session(object):
                 msg += " using keyspace '%s'" % self.keyspace
             raise NoHostAvailable(msg, [h.address for h in hosts])
 
+        self.session_id = uuid.uuid4()
+
         cc_host = self.cluster.get_control_connection_host()
         valid_insights_version = (cc_host and version_supports_insights(cc_host.dse_version))
         if self.cluster.monitor_reporting_enabled and valid_insights_version:
@@ -2551,7 +2553,6 @@ class Session(object):
                           'not supported by server version {v} on '
                           'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
 
-        self.session_id = uuid.uuid4()
         log.debug('Started Session with client_id {} and session_id {}'.format(self.cluster.client_id,
                                                                                self.session_id))
 
