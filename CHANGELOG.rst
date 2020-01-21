@@ -1,3 +1,11 @@
+3.22.0
+======
+UNRELEASED
+
+Features
+--------
+* Add all() function to the ResultSet API (PYTHON-1203)
+
 3.21.0
 ======
 January 15, 2020
@@ -31,6 +39,7 @@ Others
 * Remove *read_repair_chance table options (PYTHON-1140)
 * Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
 * Add new DSE CQL keywords (PYTHON-1122)
+* Publish binary wheel distributions (PYTHON-1013)
 
 Deprecations
 ------------

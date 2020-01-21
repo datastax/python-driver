@@ -4934,6 +4934,15 @@ class ResultSet(object):
         """
         return self._current_rows or []
 
+    def all(self):
+        """
+        Returns all the remaining rows as a list. This is basically
+        a convenient shortcut to `list(result_set)`.
+
+        This function is not recommended for queries that return a large number of elements.
+        """
+        return list(self)
+
     def one(self):
         """
         Return a single row of the results or None if empty. This is basically
