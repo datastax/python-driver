@@ -195,6 +195,13 @@ class ResultSetTests(unittest.TestCase):
 
         self.assertEqual(rs.one(), first)
 
+    def test_all(self):
+        first, second = Mock(), Mock()
+        rs1 = ResultSet(Mock(has_more_pages=False), [first, second])
+        rs2 = ResultSet(Mock(has_more_pages=False), [first, second])
+
+        self.assertEqual(rs1.all(), list(rs2))
+
     @patch('cassandra.cluster.warn')
     def test_indexing_deprecation(self, mocked_warn):
         # normally we'd use catch_warnings to test this, but that doesn't work
