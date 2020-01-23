@@ -4,7 +4,7 @@ from cassandra.cluster import Cluster
 from cassandra.policies import HostStateListener
 from tests.integration import PROTOCOL_VERSION, get_node, use_cluster, local
 from tests.integration.long.utils import decommission
-from tests.integration.util import wait_until
+from tests.util import wait_until
 
 
 class StateListener(HostStateListener):

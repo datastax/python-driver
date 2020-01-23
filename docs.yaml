@@ -1,5 +1,5 @@
-title: DataStax Python Driver for Apache Cassandra
-summary: DataStax Python Driver for Apache Cassandra Documentation
+title: DataStax Python Driver
+summary: DataStax Python Driver for Apache Cassandra®
 output: docs/_build/
 swiftype_drivers: pythondrivers
 checks:
@@ -13,7 +13,7 @@ sections:
     directory: docs
     virtualenv_init: |
       set -x
-      CASS_DRIVER_NO_CYTHON=1 pip install -r test-requirements.txt
+      CASS_DRIVER_NO_CYTHON=1 pip install -r test-datastax-requirements.txt
       # for newer versions this is redundant, but in older versions we need to
       # install, e.g., the cassandra driver, and those versions don't specify
       # the cassandra driver version in requirements files
@@ -22,6 +22,8 @@ sections:
       # build extensions like libev
       CASS_DRIVER_NO_CYTHON=1 python setup.py build_ext --inplace --force
 versions:
+  - name: '3.21'
+    ref: 5589d96b
   - name: '3.20'
     ref: d30d166f
   - name: '3.19'

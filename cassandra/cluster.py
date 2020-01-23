@@ -2543,6 +2543,7 @@ class Session(object):
                 msg += " using keyspace '%s'" % self.keyspace
             raise NoHostAvailable(msg, [h.address for h in hosts])
 
+        self.session_id = uuid.uuid4()
         self._graph_paging_available = self._check_graph_paging_available()
 
         cc_host = self.cluster.get_control_connection_host()
@@ -2558,7 +2559,6 @@ class Session(object):
                           'not supported by server version {v} on '
                           'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
 
-        self.session_id = uuid.uuid4()
         log.debug('Started Session with client_id {} and session_id {}'.format(self.cluster.client_id,
                                                                                self.session_id))
 
@@ -5025,6 +5025,15 @@ class ResultSet(object):
         or this is the last page.
         """
         return self._current_rows or []
+
+    def all(self):
+        """
+        Returns all the remaining rows as a list. This is basically
+        a convenient shortcut to `list(result_set)`.
+
+        This function is not recommended for queries that return a large number of elements.
+        """
+        return list(self)
 
     def one(self):
         """

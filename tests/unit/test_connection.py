@@ -31,7 +31,7 @@ from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ProtocolHandler)
 
-from tests.integration.util import wait_until
+from tests.util import wait_until
 
 
 class ConnectionTest(unittest.TestCase):

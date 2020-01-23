@@ -99,7 +99,10 @@ SSL Configuration Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Here, we'll describe the server and driver configuration necessary to set up SSL to meet various goals, such as the client verifying the server and the server verifying the client. We'll also include Python code demonstrating how to use servers and drivers configured in these ways.
 
-**No identity verification**
+.. _ssl-no-identify-verification:
+
+No identity verification
+++++++++++++++++++++++++
 
 No identity verification at all. Note that this is not recommended for for production deployments.
 
@@ -123,7 +126,10 @@ The driver configuration:
     cluster = Cluster(['127.0.0.1'], ssl_context=ssl_context)
     session = cluster.connect()
 
-**Client verifies server**
+.. _ssl-client-verifies-server:
+
+Client verifies server
+++++++++++++++++++++++
 
 Ensure the python driver verifies the identity of the server.
 
@@ -166,7 +172,10 @@ Additionally, you can also force the driver to verify the `hostname` of the serv
     cluster = Cluster(['127.0.0.1'], ssl_context=ssl_context, ssl_options=ssl_options)
     session = cluster.connect()
 
-**Server verifies client**
+.. _ssl-server-verifies-client:
+
+Server verifies client
+++++++++++++++++++++++
 
 If Cassandra is configured to verify clients (``require_client_auth``), you need to generate
 SSL key and certificate files.
@@ -229,8 +238,10 @@ Finally, you can use that configuration with the following driver code:
     cluster = Cluster(['127.0.0.1'], ssl_context=ssl_context)
     session = cluster.connect()
 
+.. _ssl-server-client-verification:
 
-**Server verifies client and client verifies server**
+Server verifies client and client verifies server
++++++++++++++++++++++++++++++++++++++++++++++++++
 
 See the previous section for examples of Cassandra configuration and preparing
 the client certificates.

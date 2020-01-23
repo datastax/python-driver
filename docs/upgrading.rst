@@ -44,6 +44,9 @@ need to change only the first module of your import statements, not the submodul
     from cassandra.auth import PlainTextAuthProvider
     from cassandra.policies import WhiteListRoundRobinPolicy
 
+Also note that the cassandra.hosts module doesn't exist in cassandra-driver. This
+module is named cassandra.pool.
+
 dse-graph
 ^^^^^^^^^
 
