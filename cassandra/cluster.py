@@ -2754,6 +2754,7 @@ class Session(object):
         Determine the GraphSON protocol and row factory for a graph query. This is useful
         to configure automatically the execution profile when executing a query on a
         core graph.
+
         If `graph_protocol` is not explicitly specified, the following rules apply:
         - Default to GraphProtocol.GRAPHSON_1_0, or GRAPHSON_2_0 if the `graph_language` is not gremlin-groovy.
         - If `graph_options.graph_name` is specified and is a Core graph, set GraphSON_3_0.
