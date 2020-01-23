@@ -723,7 +723,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         try:
             self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT a, b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
                                  .format(self.keyspace_name, self.function_table_name))
             self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
@@ -745,7 +745,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster3.connect()
         try:
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT a, b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
                                  .format(self.keyspace_name, self.function_table_name))
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
             cluster3.refresh_materialized_view_metadata(self.keyspace_name, 'mv2')
@@ -2007,17 +2007,15 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
 
         # Format can very slightly between versions, strip out whitespace for consistency sake
-        try:
-            self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
-                            "s=>org.apache.cassandra.db.marshal.UTF8Type,"
-                            "i=>org.apache.cassandra.db.marshal.Int32Type)'"
-                            in dct_table.as_cql_query().replace(" ", ""))
-        except:
-            # C* 4.0
-            self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
-                            "i=>org.apache.cassandra.db.marshal.Int32Type,"
-                            "s=>org.apache.cassandra.db.marshal.UTF8Type)'"
-                            in dct_table.as_cql_query().replace(" ", ""))
+        table_text = dct_table.as_cql_query().replace(" ", "")
+        dynamic_type_text = "c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
+        self.assertIn("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(", table_text)
+        # Types within in the composite can come out in random order, so grab the type definition and find each one
+        type_definition_start = table_text.index("(", table_text.find(dynamic_type_text))
+        type_definition_end = table_text.index(")")
+        type_definition_text = table_text[type_definition_start:type_definition_end]
+        self.assertIn("s=>org.apache.cassandra.db.marshal.UTF8Type", type_definition_text)
+        self.assertIn("i=>org.apache.cassandra.db.marshal.Int32Type", type_definition_text)
 
 
 @greaterthanorequalcass30
@@ -2025,7 +2023,7 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
     def tearDown(self):
         self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
@@ -2096,7 +2094,7 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
 
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
 
 
 @greaterthanorequalcass30
@@ -2239,7 +2237,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, year ASC, month ASC, day ASC)""".format(self.keyspace_name)
 
         self.session.execute(create_mv)
 
@@ -2469,22 +2467,6 @@ class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
 class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
     virtual_ks_names = ('system_virtual_schema', 'system_views')
 
-    virtual_ks_structure = {
-        # keyspaces
-        'system_virtual_schema': {
-            # tables: columns. columns are a set because we're comparing unordered
-            'keyspaces': {'keyspace_name'},
-            'tables': {'comment', 'keyspace_name', 'table_name'},
-            'columns': {'clustering_order', 'column_name', 'column_name_bytes',
-                        'keyspace_name', 'kind', 'position', 'table_name',
-                        'type'}
-        },
-        'system_views': {
-            'sstable_tasks': {'keyspace_name', 'kind', 'progress',
-                              'table_name', 'task_id', 'total', 'unit'}
-        }
-    }
-
     def test_existing_keyspaces_have_correct_virtual_tags(self):
         for name, ks in self.cluster.metadata.keyspaces.items():
             if name in self.virtual_ks_names:
@@ -2521,5 +2503,7 @@ class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
                     tab.columns.keys()
                 )
 
-        self.assertDictEqual(ingested_virtual_ks_structure,
-                             self.virtual_ks_structure)
+        # Identify a couple known values to verify we parsed the structure correctly
+        self.assertIn('table_name', ingested_virtual_ks_structure['system_virtual_schema']['tables'])
+        self.assertIn('type', ingested_virtual_ks_structure['system_virtual_schema']['columns'])
+        self.assertIn('total', ingested_virtual_ks_structure['system_views']['sstable_tasks'])

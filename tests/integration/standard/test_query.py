@@ -1193,25 +1193,25 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, year ASC, month ASC, day ASC)""".format(self.keyspace_name)
 
         create_mv_dailyhigh = """CREATE MATERIALIZED VIEW {0}.dailyhigh AS
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL
                         PRIMARY KEY ((game, year, month, day), score, user)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC)""".format(self.keyspace_name)
 
         create_mv_monthlyhigh = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY ((game, year, month), score, user, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
 
         create_mv_filtereduserhigh = """CREATE MATERIALIZED VIEW {0}.filtereduserhigh AS
                         SELECT * FROM {0}.scores
                         WHERE user in ('jbellis', 'pcmanus') AND game IS NOT NULL AND score IS NOT NULL AND year is NOT NULL AND day is not NULL and month IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, year ASC, month ASC, day ASC)""".format(self.keyspace_name)
 
         self.session.execute(create_mv_alltime)
         self.session.execute(create_mv_dailyhigh)

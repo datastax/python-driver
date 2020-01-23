@@ -16,6 +16,8 @@ import logging
 import sys
 import traceback
 import time
+
+from ccmlib.dse_cluster import DseCluster
 from mock import Mock
 
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy
@@ -29,7 +31,7 @@ from cassandra.query import SimpleStatement
 from tests.integration import (
     use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster,
     get_node, start_cluster_wait_for_up, requiresmallclockgranularity,
-)
+    local)
 
 
 try:
@@ -40,6 +42,7 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
+@local
 def setup_module():
     """
     We need some custom setup for this module. All unit tests in this module
@@ -52,7 +55,7 @@ def setup_module():
         use_singledc(start=False)
         ccm_cluster = get_cluster()
         ccm_cluster.stop()
-        config_options = {'tombstone_failure_threshold': 2000, 'tombstone_warn_threshold': 1000}
+        config_options = {'guardrails.tombstone_failure_threshold': 2000, 'guardrails.tombstone_warn_threshold': 1000}
         ccm_cluster.set_configuration_options(config_options)
         start_cluster_wait_for_up(ccm_cluster)
         setup_keyspace()
@@ -252,7 +255,7 @@ class ClientExceptionTests(unittest.TestCase):
         parameters = [(x,) for x in range(3000)]
         self.execute_concurrent_args_helper(self.session, statement, parameters)
 
-        statement = self.session.prepare("DELETE v1 FROM test3rf.test2 WHERE k = 1 AND v0 =?")
+        statement = self.session.prepare("DELETE FROM test3rf.test2 WHERE k = 1 AND v0 =?")
         parameters = [(x,) for x in range(2001)]
         self.execute_concurrent_args_helper(self.session, statement, parameters)
 
