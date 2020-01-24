@@ -1,11 +1,11 @@
 DataStax Graph Queries
 ======================
 
-The Cassandra driver executes graph queries over the Cassandra native protocol. Use
+The driver executes graph queries over the Cassandra native protocol. Use
 :meth:`.Session.execute_graph` or :meth:`.Session.execute_graph_async` for 
-executing gremlin queries in DSE Graph.
+executing gremlin queries in DataStax Graph.
 
-Three Execution Profiles are provided suitable for graph execution:
+The driver defines three Execution Profiles suitable for graph execution:
 
 * :data:`~.cluster.EXEC_PROFILE_GRAPH_DEFAULT`
 * :data:`~.cluster.EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT`
@@ -14,8 +14,13 @@ Three Execution Profiles are provided suitable for graph execution:
 See :doc:`getting_started` and :doc:`execution_profiles`
 for more detail on working with profiles.
 
-Getting Started
-~~~~~~~~~~~~~~~
+In DSE 6.8.0, the Core graph engine has been introduced and is now the default. It
+provides a better unified multi-model, performance and scale. This guide
+is for graphs that use the core engine. If you work with previous versions of 
+DSE or existing graphs, see :doc:`classic_graph`.
+
+Getting Started with Graph and the Core Engine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 First, we need to create a graph in the system. To access the system API, we 
 use the system execution profile ::
@@ -26,129 +31,204 @@ use the system execution profile ::
     session = cluster.connect()
 
     graph_name = 'movies'
-    session.execute_graph("system.graph(name).ifNotExists().create()", {'name': graph_name},
+    session.execute_graph("system.graph(name).create()", {'name': graph_name},
                           execution_profile=EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT)
 
 
-To execute requests on our newly created graph, we need to setup an execution
-profile. Additionally, we also need to set the schema_mode to `development` 
-for the schema creation::
-
+Graphs that use the core engine only support GraphSON3. Since they are Cassandra tables under
+the hood, we can automatically configure the execution profile with the proper options
+(row_factory and graph_protocol) when executing queries. You only need to make sure that
+the `graph_name` is set and GraphSON3 will be automatically used::
 
     from cassandra.cluster import Cluster, GraphExecutionProfile, EXEC_PROFILE_GRAPH_DEFAULT
-    from cassandra.datastax.graph import GraphOptions
 
     graph_name = 'movies'
     ep = GraphExecutionProfile(graph_options=GraphOptions(graph_name=graph_name))
-
     cluster = Cluster(execution_profiles={EXEC_PROFILE_GRAPH_DEFAULT: ep})
     session = cluster.connect()
-    
-    session.execute_graph("schema.config().option('graph.schema_mode').set('development')")
+    session.execute_graph("g.addV(...)")
+
+
+Note that this graph engine detection is based on the metadata. You might experience
+some query errors if the graph has been newly created and is not yet in the metadata. This
+would result to a badly configured execution profile. If you really want to avoid that,
+configure your execution profile explicitly::
+
+    from cassandra.cluster import Cluster, GraphExecutionProfile, EXEC_PROFILE_GRAPH_DEFAULT
+    from cassandra.graph import GraphOptions, GraphProtocol, graph_graphson3_row_factory
+
+    graph_name = 'movies'
+    ep_graphson3 = GraphExecutionProfile(
+        row_factory=graph_graphson3_row_factory,
+        graph_options=GraphOptions(
+            graph_protocol=GraphProtocol.GRAPHSON_3_0,
+            graph_name=graph_name))
+
+    cluster = Cluster(execution_profiles={'core': ep_graphson3})
+    session = cluster.connect()
+    session.execute_graph("g.addV(...)", execution_profile='core')
 
 
 We are ready to configure our graph schema. We will create a simple one for movies::
 
-    # properties are used to define a vertex
-    properties = """
-    schema.propertyKey("genreId").Text().create();
-    schema.propertyKey("personId").Text().create();
-    schema.propertyKey("movieId").Text().create();
-    schema.propertyKey("name").Text().create();
-    schema.propertyKey("title").Text().create();
-    schema.propertyKey("year").Int().create();
-    schema.propertyKey("country").Text().create();
-    """
-
-    session.execute_graph(properties)  # we can execute multiple statements in a single request
-
     # A Vertex represents a "thing" in the world.
-    vertices = """
-    schema.vertexLabel("genre").properties("genreId","name").create();
-    schema.vertexLabel("person").properties("personId","name").create();
-    schema.vertexLabel("movie").properties("movieId","title","year","country").create();
+    # Create the genre vertex
+    query = """
+        schema.vertexLabel('genre')
+            .partitionBy('genreId', Int)
+            .property('name', Text)
+            .create()
     """
+    session.execute_graph(query)
 
-    session.execute_graph(vertices)
+    # Create the person vertex
+    query = """
+        schema.vertexLabel('person')
+            .partitionBy('personId', Int)
+            .property('name', Text)
+            .create()
+    """
+    session.execute_graph(query)
+
+    # Create the movie vertex
+    query = """
+        schema.vertexLabel('movie')
+            .partitionBy('movieId', Int)
+            .property('title', Text)
+            .property('year', Int)
+            .property('country', Text)
+            .create()
+    """
+    session.execute_graph(query)
 
     # An edge represents a relationship between two vertices
-    edges = """
-    schema.edgeLabel("belongsTo").single().connection("movie","genre").create();
-    schema.edgeLabel("actor").connection("movie","person").create();
+    # Create our edges
+    queries = """
+    schema.edgeLabel('belongsTo').from('movie').to('genre').create();
+    schema.edgeLabel('actor').from('movie').to('person').create();
     """
-
-    session.execute_graph(edges)
+    session.execute_graph(queries)
 
     # Indexes to execute graph requests efficiently
+
+    # If you have a node with the search workload enabled (solr), use the following:
     indexes = """
-    schema.vertexLabel("genre").index("genresById").materialized().by("genreId").add();
-    schema.vertexLabel("genre").index("genresByName").materialized().by("name").add();
-    schema.vertexLabel("person").index("personsById").materialized().by("personId").add();
-    schema.vertexLabel("person").index("personsByName").materialized().by("name").add();
-    schema.vertexLabel("movie").index("moviesById").materialized().by("movieId").add();
-    schema.vertexLabel("movie").index("moviesByTitle").materialized().by("title").add();
-    schema.vertexLabel("movie").index("moviesByYear").secondary().by("year").add();
+        schema.vertexLabel('genre').searchIndex()
+            .by("name")
+            .create();
+
+        schema.vertexLabel('person').searchIndex()
+            .by("name")
+            .create();
+
+        schema.vertexLabel('movie').searchIndex()
+            .by('title')
+            .by("year")
+            .create();
     """
+    session.execute_graph(indexes)
+
+    # Otherwise, use secondary indexes:
+    indexes = """
+        schema.vertexLabel('genre')
+            .secondaryIndex('by_genre')
+            .by('name')
+            .create()
+
+        schema.vertexLabel('person')
+            .secondaryIndex('by_name')
+            .by('name')
+            .create()
+
+        schema.vertexLabel('movie')
+            .secondaryIndex('by_title')
+            .by('title')
+            .create()
+    """
+    session.execute_graph(indexes)
+
+Add some edge indexes (materialized views)::
+
+    indexes = """
+        schema.edgeLabel('belongsTo')
+            .from('movie')
+            .to('genre')
+            .materializedView('movie__belongsTo__genre_by_in_genreId')
+            .ifNotExists()
+            .partitionBy(IN, 'genreId')
+            .clusterBy(OUT, 'movieId', Asc)
+            .create()
+
+        schema.edgeLabel('actor')
+            .from('movie')
+            .to('person')
+            .materializedView('movie__actor__person_by_in_personId')
+            .ifNotExists()
+            .partitionBy(IN, 'personId')
+            .clusterBy(OUT, 'movieId', Asc)
+            .create()
+    """
+    session.execute_graph(indexes)
 
 Next, we'll add some data::
 
     session.execute_graph("""
-    g.addV('genre').property('genreId', 1).property('name', 'Action').next();
-    g.addV('genre').property('genreId', 2).property('name', 'Drama').next();
-    g.addV('genre').property('genreId', 3).property('name', 'Comedy').next();
-    g.addV('genre').property('genreId', 4).property('name', 'Horror').next();
+        g.addV('genre').property('genreId', 1).property('name', 'Action').next();
+        g.addV('genre').property('genreId', 2).property('name', 'Drama').next();
+        g.addV('genre').property('genreId', 3).property('name', 'Comedy').next();
+        g.addV('genre').property('genreId', 4).property('name', 'Horror').next();
     """)
 
     session.execute_graph("""
-    g.addV('person').property('personId', 1).property('name', 'Mark Wahlberg').next();
-    g.addV('person').property('personId', 2).property('name', 'Leonardo DiCaprio').next();
-    g.addV('person').property('personId', 3).property('name', 'Iggy Pop').next();
+        g.addV('person').property('personId', 1).property('name', 'Mark Wahlberg').next();
+        g.addV('person').property('personId', 2).property('name', 'Leonardo DiCaprio').next();
+        g.addV('person').property('personId', 3).property('name', 'Iggy Pop').next();
     """)
 
     session.execute_graph("""
-    g.addV('movie').property('movieId', 1).property('title', 'The Happening').
-        property('year', 2008).property('country', 'United States').next();
-    g.addV('movie').property('movieId', 2).property('title', 'The Italian Job').
-        property('year', 2003).property('country', 'United States').next();
+        g.addV('movie').property('movieId', 1).property('title', 'The Happening').
+            property('year', 2008).property('country', 'United States').next();
+        g.addV('movie').property('movieId', 2).property('title', 'The Italian Job').
+            property('year', 2003).property('country', 'United States').next();
 
-    g.addV('movie').property('movieId', 3).property('title', 'Revolutionary Road').
-        property('year', 2008).property('country', 'United States').next();
-    g.addV('movie').property('movieId', 4).property('title', 'The Man in the Iron Mask').
-        property('year', 1998).property('country', 'United States').next();
+        g.addV('movie').property('movieId', 3).property('title', 'Revolutionary Road').
+            property('year', 2008).property('country', 'United States').next();
+        g.addV('movie').property('movieId', 4).property('title', 'The Man in the Iron Mask').
+            property('year', 1998).property('country', 'United States').next();
 
-    g.addV('movie').property('movieId', 5).property('title', 'Dead Man').
-        property('year', 1995).property('country', 'United States').next();
+        g.addV('movie').property('movieId', 5).property('title', 'Dead Man').
+            property('year', 1995).property('country', 'United States').next();
     """)
 
 Now that our genre, actor and movie vertices are added, we'll create the relationships (edges) between them::
 
     session.execute_graph("""
-    genre_horror = g.V().hasLabel('genre').has('name', 'Horror').next();
-    genre_drama = g.V().hasLabel('genre').has('name', 'Drama').next();
-    genre_action = g.V().hasLabel('genre').has('name', 'Action').next();
+        genre_horror = g.V().hasLabel('genre').has('name', 'Horror').id().next();
+        genre_drama = g.V().hasLabel('genre').has('name', 'Drama').id().next();
+        genre_action = g.V().hasLabel('genre').has('name', 'Action').id().next();
 
-    leo  = g.V().hasLabel('person').has('name', 'Leonardo DiCaprio').next();
-    mark = g.V().hasLabel('person').has('name', 'Mark Wahlberg').next();
-    iggy = g.V().hasLabel('person').has('name', 'Iggy Pop').next();
+        leo  = g.V().hasLabel('person').has('name', 'Leonardo DiCaprio').id().next();
+        mark = g.V().hasLabel('person').has('name', 'Mark Wahlberg').id().next();
+        iggy = g.V().hasLabel('person').has('name', 'Iggy Pop').id().next();
 
-    the_happening = g.V().hasLabel('movie').has('title', 'The Happening').next();
-    the_italian_job = g.V().hasLabel('movie').has('title', 'The Italian Job').next();
-    rev_road = g.V().hasLabel('movie').has('title', 'Revolutionary Road').next();
-    man_mask = g.V().hasLabel('movie').has('title', 'The Man in the Iron Mask').next();
-    dead_man = g.V().hasLabel('movie').has('title', 'Dead Man').next();
+        the_happening = g.V().hasLabel('movie').has('title', 'The Happening').id().next();
+        the_italian_job = g.V().hasLabel('movie').has('title', 'The Italian Job').id().next();
+        rev_road = g.V().hasLabel('movie').has('title', 'Revolutionary Road').id().next();
+        man_mask = g.V().hasLabel('movie').has('title', 'The Man in the Iron Mask').id().next();
+        dead_man = g.V().hasLabel('movie').has('title', 'Dead Man').id().next();
 
-    the_happening.addEdge('belongsTo', genre_horror);
-    the_italian_job.addEdge('belongsTo', genre_action);
-    rev_road.addEdge('belongsTo', genre_drama);
-    man_mask.addEdge('belongsTo', genre_drama);
-    man_mask.addEdge('belongsTo', genre_action);
-    dead_man.addEdge('belongsTo', genre_drama);
+        g.addE('belongsTo').from(__.V(the_happening)).to(__.V(genre_horror)).next();
+        g.addE('belongsTo').from(__.V(the_italian_job)).to(__.V(genre_action)).next();
+        g.addE('belongsTo').from(__.V(rev_road)).to(__.V(genre_drama)).next();
+        g.addE('belongsTo').from(__.V(man_mask)).to(__.V(genre_drama)).next();
+        g.addE('belongsTo').from(__.V(man_mask)).to(__.V(genre_action)).next();
+        g.addE('belongsTo').from(__.V(dead_man)).to(__.V(genre_drama)).next();
 
-    the_happening.addEdge('actor', mark);
-    the_italian_job.addEdge('actor', mark);
-    rev_road.addEdge('actor', leo);
-    man_mask.addEdge('actor', leo);
-    dead_man.addEdge('actor', iggy);
+        g.addE('actor').from(__.V(the_happening)).to(__.V(mark)).next();
+        g.addE('actor').from(__.V(the_italian_job)).to(__.V(mark)).next();
+        g.addE('actor').from(__.V(rev_road)).to(__.V(leo)).next();
+        g.addE('actor').from(__.V(man_mask)).to(__.V(leo)).next();
+        g.addE('actor').from(__.V(dead_man)).to(__.V(iggy)).next();
     """)
 
 We are all set. You can now query your graph. Here are some examples::
@@ -157,7 +237,7 @@ We are all set. You can now query your graph. Here are some examples::
     for r in session.execute_graph("""
       g.V().has('genre', 'name', 'Drama').in('belongsTo').valueMap();"""):
         print(r)
-    
+
     # Find all movies of the same genre than the movie 'Dead Man'
     for r in session.execute_graph("""
       g.V().has('movie', 'title', 'Dead Man').out('belongsTo').in('belongsTo').valueMap();"""):
@@ -170,81 +250,40 @@ We are all set. You can now query your graph. Here are some examples::
 
 To see a more graph examples, see `DataStax Graph Examples <https://github.com/datastax/graph-examples/>`_.
 
-.. _graph-types:
-
-Graph Types
-~~~~~~~~~~~
+Graph Types for the Core Engine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Here are the supported graph types with their python representations:
 
-==========   ================
-DSE Graph    Python
-==========   ================
-boolean      bool
-bigint       long, int (PY3)
-int          int
-smallint     int
-varint       int
-float        float
-double       double
-uuid         uuid.UUID
-Decimal      Decimal
-inet         str
-timestamp    datetime.datetime
-date         datetime.date
-time         datetime.time
-duration     datetime.timedelta
-point        Point
-linestring   LineString
-polygon      Polygon
-blob         bytearray, buffer (PY2), memoryview (PY3), bytes (PY3)
-==========   ================
-
-Graph Row Factory
-~~~~~~~~~~~~~~~~~
-
-By default (with :class:`.GraphExecutionProfile.row_factory` set to :func:`.datastax.graph.graph_object_row_factory`), known graph result
-types are unpacked and returned as specialized types (:class:`.Vertex`, :class:`.Edge`). If the result is not one of these
-types, a :class:`.datastax.graph.Result` is returned, containing the graph result parsed from JSON and removed from its outer dict.
-The class has some accessor convenience methods for accessing top-level properties by name (`type`, `properties` above),
-or lists by index::
-
-    # dicts with `__getattr__` or `__getitem__`
-    result = session.execute_graph("[[key_str: 'value', key_int: 3]]", execution_profile=EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT)[0]  # Using system exec just because there is no graph defined
-    result  # cassandra.datastax.graph.Result({u'key_str': u'value', u'key_int': 3})
-    result.value  # {u'key_int': 3, u'key_str': u'value'} (dict)
-    result.key_str  # u'value'
-    result.key_int  # 3
-    result['key_str']  # u'value'
-    result['key_int']  # 3
-
-    # lists with `__getitem__`
-    result = session.execute_graph('[[0, 1, 2]]', execution_profile=EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT)[0]
-    result  # cassandra.datastax.graph.Result([0, 1, 2])
-    result.value  # [0, 1, 2] (list)
-    result[1]  # 1 (list[1])
-
-You can use a different row factory by setting :attr:`.cluster.ExecutionProfile.row_factory` or passing it to
-:meth:`cluster.Session.execute_graph`. For example, :func:`.datastax.graph.single_object_row_factory` returns the JSON result string,
-unparsed. :func:`.datastax.graph.graph_result_row_factory` returns parsed, but unmodified results (such that all metadata is retained,
-unlike :func:`.datastax.graph.graph_object_row_factory`, which sheds some as attributes and properties are unpacked). These results
-also provide convenience methods for converting to known types (:meth:`.datastax.graph.Result.as_vertex`, :meth:`.datastax.graph.Result.as_edge`,
- :meth:`.datastax.graph.Result.as_path`).
-
-Vertex and Edge properties are never unpacked since their types are unknown. If you know your graph schema and want to
-deserialize properties, use the :class:`.datastax.graph.GraphSON1Deserializer`. It provides convenient methods to deserialize by types (e.g.
-deserialize_date, deserialize_uuid, deserialize_polygon etc.) Example::
-
-    # ...
-    from cassandra.datastax.graph import GraphSON1Deserializer
-
-    row = session.execute_graph("g.V().toList()")[0]
-    value = row.properties['my_property_key'][0].value  # accessing the VertexProperty value
-    value = GraphSON1Deserializer.deserialize_timestamp(value)
-
-    print value  # 2017-06-26 08:27:05
-    print type(value)  # <type 'datetime.datetime'>
-
+============   =================
+DSE Graph      Python Driver
+============   =================
+text           str
+boolean        bool
+bigint         long
+int            int
+smallint       int
+varint         long
+double         float
+float          float
+uuid           UUID
+bigdecimal     Decimal
+duration       Duration (cassandra.util)
+inet           str or IPV4Address/IPV6Address (if available)
+timestamp      datetime.datetime
+date           datetime.date
+time           datetime.time
+polygon        Polygon
+point          Point
+linestring     LineString
+blob           bytearray, buffer (PY2), memoryview (PY3), bytes (PY3)
+list           list
+map            dict
+set            set or list
+               (Can return a list due to numerical values returned by Java)
+tuple          tuple
+udt            class or namedtuple
+============   =================
 
 Named Parameters
 ~~~~~~~~~~~~~~~~
@@ -254,17 +293,17 @@ Named parameters are passed in a dict to :meth:`.cluster.Session.execute_graph`:
     result_set = session.execute_graph('[a, b]', {'a': 1, 'b': 2}, execution_profile=EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT)
     [r.value for r in result_set]  # [1, 2]
 
-All python types listed in `Graph Types`_ can be passed as named parameters and will be serialized
+All python types listed in `Graph Types for the Core Engine`_ can be passed as named parameters and will be serialized
 automatically to their graph representation:
 
 Example::
 
-    s.execute_graph("""
+    session.execute_graph("""
       g.addV('person').
       property('name', text_value).
       property('age', integer_value).
       property('birthday', timestamp_value).
-      property('house_yard', polygon_value).toList()
+      property('house_yard', polygon_value).next()
     """, {
       'text_value': 'Mike Smith',
       'integer_value': 34,
@@ -280,36 +319,116 @@ or specified per execution::
                                                 graph_options=GraphOptions(graph_name='something-else'))
     session.execute_graph(statement, execution_profile=ep)
 
-Using GraphSON2 Protocol
-~~~~~~~~~~~~~~~~~~~~~~~~
+CQL collections, Tuple and UDT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The default graph protocol used is GraphSON1. However GraphSON1 may
-cause problems of type conversion happening during the serialization
-of the query to the DSE Graph server, or the deserialization of the
-responses back from a string Gremlin query. GraphSON2 offers better
-support for the complex data types handled by DSE Graph.
+This is a very interesting feature of the core engine: we can use all CQL data types, including
+list, map, set, tuple and udt. Here is an example using all these types::
 
-DSE >=5.0.4 now offers the possibility to use the GraphSON2 protocol
-for graph queries. Enabling GraphSON2 can be done by `changing the
-graph protocol of the execution profile` and `setting the graphson2 row factory`::
+    query = """
+        schema.type('address')
+            .property('address', Text)
+            .property('city', Text)
+            .property('state', Text)
+            .create();
+    """
+    session.execute_graph(query)
 
-    from cassandra.cluster import Cluster, GraphExecutionProfile, EXEC_PROFILE_GRAPH_DEFAULT
-    from cassandra.datastax.graph import GraphOptions, GraphProtocol, graph_graphson2_row_factory
+    # It works the same way than normal CQL UDT, so we
+    # can create an udt class and register it
+    class Address(object):
+        def __init__(self, address, city, state):
+            self.address = address
+            self.city = city
+            self.state = state
 
-    # Create a GraphSON2 execution profile
-    ep = GraphExecutionProfile(graph_options=GraphOptions(graph_name='types',
-                                                          graph_protocol=GraphProtocol.GRAPHSON_2_0),
-                               row_factory=graph_graphson2_row_factory)
+    session.cluster.register_user_type(graph_name, 'address', Address)
 
+    query = """
+        schema.vertexLabel('person')
+            .partitionBy('personId', Int)
+            .property('address', typeOf('address'))
+            .property('friends', listOf(Text))
+            .property('skills', setOf(Text))
+            .property('scores', mapOf(Text, Int))
+            .property('last_workout', tupleOf(Text, Date))
+            .create()
+    """
+    session.execute_graph(query)
+
+    # insertion example
+    query = """
+         g.addV('person')
+            .property('personId', pid)
+            .property('address', address)
+            .property('friends', friends)
+            .property('skills', skills)
+            .property('scores', scores)
+            .property('last_workout', last_workout)
+            .next()
+    """
+
+    session.execute_graph(query, {
+        'pid': 3,
+        'address': Address('42 Smith St', 'Quebec', 'QC'),
+        'friends': ['Al', 'Mike', 'Cathy'],
+        'skills': {'food', 'fight', 'chess'},
+        'scores': {'math': 98, 'french': 3},
+        'last_workout': ('CrossFit', datetime.date(2018, 11, 20))
+    })
+
+Limitations
+-----------
+
+Since Python is not a strongly-typed language and the UDT/Tuple graphson representation is, you might 
+get schema errors when trying to write numerical data. Example::
+
+    session.execute_graph("""
+        schema.vertexLabel('test_tuple').partitionBy('id', Int).property('t', tupleOf(Text, Bigint)).create()
+    """)
+
+    session.execute_graph("""
+        g.addV('test_tuple').property('id', 0).property('t', t)
+          """, 
+          {'t': ('Test', 99))}
+    )
+
+    # error: [Invalid query] message="Value component 1 is of type int, not bigint"
+
+This is because the server requires the client to include a GraphSON schema definition
+with every UDT or tuple query. In the general case, the driver can't determine what Graph type
+is meant by, e.g., an int value, and so it can't serialize the value with the correct type in the schema.
+The driver provides some numerical type-wrapper factories that you can use to specify types:
+
+* :func:`~.to_int`
+* :func:`~.to_bigint`
+* :func:`~.to_smallint`
+* :func:`~.to_float`
+* :func:`~.to_double`
+
+Here's the working example of the case above::
+
+    from cassandra.graph import to_bigint
+
+     session.execute_graph("""
+        g.addV('test_tuple').property('id', 0).property('t', t)
+          """, 
+          {'t': ('Test', to_bigint(99))}
+    )
+
+Continuous Paging
+~~~~~~~~~~~~~~~~~
+
+This is another nice feature that comes with the core engine: continuous paging with
+graph queries. If all nodes of the cluster are >= DSE 6.8.0, it is automatically
+enabled under the hood to get the best performance. If you want to explicitly
+enable/disable it, you can do it through the execution profile::
+
+    # Disable it
+    ep = GraphExecutionProfile(..., continuous_paging_options=None))
     cluster = Cluster(execution_profiles={EXEC_PROFILE_GRAPH_DEFAULT: ep})
-    s = cluster.connect()
-    s.execute_graph(...)
 
-Using GraphSON2, all properties will be automatically deserialized to
-its Python representation. Note that it may bring significant
-behavioral change at runtime.
-
-It is generally recommended to switch to GraphSON2 as it brings more
-consistent support for complex data types in the Graph driver and will
-be activated by default in the next major version (Python dse-driver
-driver 3.0).
+    # Enable with a custom max_pages option
+    ep = GraphExecutionProfile(...,
+        continuous_paging_options=ContinuousPagingOptions(max_pages=10)))
+    cluster = Cluster(execution_profiles={EXEC_PROFILE_GRAPH_DEFAULT: ep})

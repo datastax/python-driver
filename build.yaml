@@ -162,6 +162,7 @@ cassandra:
   - 'dse-5.1'
   - 'dse-6.0'
   - 'dse-6.7'
+  - 'dse-6.8'
 
 env:
   CYTHON:
@@ -173,6 +174,7 @@ build:
       export JAVA_HOME=$CCM_JAVA_HOME
       export PATH=$JAVA_HOME/bin:$PATH
       export PYTHONPATH=""
+      export CCM_MAX_HEAP_SIZE=1024M
 
       # Required for unix socket tests
       sudo apt-get install socat

@@ -33,29 +33,29 @@ if HAVE_GREMLIN:
 
     from cassandra.cluster import Session, GraphExecutionProfile, EXEC_PROFILE_GRAPH_DEFAULT
     from cassandra.datastax.graph import GraphOptions, GraphProtocol
+    from cassandra.datastax.graph.query import _GraphSONContextRowFactory
 
     from cassandra.datastax.graph.fluent.serializers import (
-        GremlinGraphSONReader,
-        deserializers,
-        gremlin_deserializers
+        GremlinGraphSONReaderV2,
+        GremlinGraphSONReaderV3,
+        dse_graphson2_deserializers,
+        gremlin_graphson2_deserializers,
+        dse_graphson3_deserializers,
+        gremlin_graphson3_deserializers
     )
     from cassandra.datastax.graph.fluent.query import _DefaultTraversalBatch, _query_from_traversal
 
     log = logging.getLogger(__name__)
 
-    __all__ = ['BaseGraphRowFactory', 'dse_graphson_reader', 'graphson_reader', 'graph_traversal_row_factory',
+    __all__ = ['BaseGraphRowFactory', 'graph_traversal_row_factory',
                'graph_traversal_dse_object_row_factory', 'DSESessionRemoteGraphConnection', 'DseGraph']
-
-    # Create our custom GraphSONReader/Writer
-    dse_graphson_reader = GremlinGraphSONReader(deserializer_map=deserializers)
-    graphson_reader = GremlinGraphSONReader(deserializer_map=gremlin_deserializers)
 
     # Traversal result keys
     _bulk_key = 'bulk'
     _result_key = 'result'
 
 
-    class BaseGraphRowFactory(object):
+    class BaseGraphRowFactory(_GraphSONContextRowFactory):
         """
         Base row factory for graph traversal. This class basically wraps a
         graphson reader function to handle additional features of Gremlin/DSE
@@ -63,37 +63,51 @@ if HAVE_GREMLIN:
 
         Currently supported:
           - bulk results
-
-        :param graphson_reader: The function used to read the graphson.
-
-        Use example::
-
-            my_custom_row_factory = BaseGraphRowFactory(custom_graphson_reader.readObject)
         """
 
-        def __init__(self, graphson_reader):
-            self._graphson_reader = graphson_reader
-
         def __call__(self, column_names, rows):
-            results = []
-
             for row in rows:
-                parsed_row = self._graphson_reader(row[0])
+                parsed_row = self.graphson_reader.readObject(row[0])
+                yield parsed_row[_result_key]
                 bulk = parsed_row.get(_bulk_key, 1)
-                if bulk > 1:  # Avoid deepcopy call if bulk <= 1
-                    results.extend([copy.deepcopy(parsed_row[_result_key])
-                                    for _ in range(bulk - 1)])
-
-                results.append(parsed_row[_result_key])
-
-            return results
+                for _ in range(bulk - 1):
+                    yield copy.deepcopy(parsed_row[_result_key])
 
 
-    graph_traversal_row_factory = BaseGraphRowFactory(graphson_reader.readObject)
-    graph_traversal_row_factory.__doc__ = "Row Factory that returns the decoded graphson."
+    class _GremlinGraphSON2RowFactory(BaseGraphRowFactory):
+        """Row Factory that returns the decoded graphson2."""
+        graphson_reader_class = GremlinGraphSONReaderV2
+        graphson_reader_kwargs = {'deserializer_map': gremlin_graphson2_deserializers}
 
-    graph_traversal_dse_object_row_factory = BaseGraphRowFactory(dse_graphson_reader.readObject)
-    graph_traversal_dse_object_row_factory.__doc__ = "Row Factory that returns the decoded graphson as DSE types."
+
+    class _DseGraphSON2RowFactory(BaseGraphRowFactory):
+        """Row Factory that returns the decoded graphson2 as DSE types."""
+        graphson_reader_class = GremlinGraphSONReaderV2
+        graphson_reader_kwargs = {'deserializer_map': dse_graphson2_deserializers}
+
+    gremlin_graphson2_traversal_row_factory = _GremlinGraphSON2RowFactory
+    # TODO remove in next major
+    graph_traversal_row_factory = gremlin_graphson2_traversal_row_factory
+
+    dse_graphson2_traversal_row_factory = _DseGraphSON2RowFactory
+    # TODO remove in next major
+    graph_traversal_dse_object_row_factory = dse_graphson2_traversal_row_factory
+
+
+    class _GremlinGraphSON3RowFactory(BaseGraphRowFactory):
+        """Row Factory that returns the decoded graphson2."""
+        graphson_reader_class = GremlinGraphSONReaderV3
+        graphson_reader_kwargs = {'deserializer_map': gremlin_graphson3_deserializers}
+
+
+    class _DseGraphSON3RowFactory(BaseGraphRowFactory):
+        """Row Factory that returns the decoded graphson3 as DSE types."""
+        graphson_reader_class = GremlinGraphSONReaderV3
+        graphson_reader_kwargs = {'deserializer_map': dse_graphson3_deserializers}
+
+
+    gremlin_graphson3_traversal_row_factory = _GremlinGraphSON3RowFactory
+    dse_graphson3_traversal_row_factory = _DseGraphSON3RowFactory
 
 
     class DSESessionRemoteGraphConnection(RemoteConnection):
@@ -119,24 +133,41 @@ if HAVE_GREMLIN:
             self.graph_name = graph_name
             self.execution_profile = execution_profile
 
+        @staticmethod
+        def _traversers_generator(traversers):
+            for t in traversers:
+                yield Traverser(t)
+
         def _prepare_query(self, bytecode):
-            query = DseGraph.query_from_traversal(bytecode)
-            ep = self.session.execution_profile_clone_update(self.execution_profile,
-                                                             row_factory=graph_traversal_row_factory)
-            graph_options = ep.graph_options.copy()
+            ep = self.session.execution_profile_clone_update(self.execution_profile)
+            graph_options = ep.graph_options
+            graph_options.graph_name = self.graph_name or graph_options.graph_name
             graph_options.graph_language = DseGraph.DSE_GRAPH_QUERY_LANGUAGE
-            if self.graph_name:
-                graph_options.graph_name = self.graph_name
-            ep.graph_options = graph_options
+            # We resolve the execution profile options here , to know how what gremlin factory to set
+            self.session._resolve_execution_profile_options(ep)
+
+            context = None
+            if graph_options.graph_protocol == GraphProtocol.GRAPHSON_2_0:
+                row_factory = gremlin_graphson2_traversal_row_factory
+            elif graph_options.graph_protocol == GraphProtocol.GRAPHSON_3_0:
+                row_factory = gremlin_graphson3_traversal_row_factory
+                context = {
+                    'cluster': self.session.cluster,
+                    'graph_name': graph_options.graph_name.decode('utf-8')
+                }
+            else:
+                raise ValueError('Unknown graph protocol: {}'.format(graph_options.graph_protocol))
+
+            ep.row_factory = row_factory
+            query = DseGraph.query_from_traversal(bytecode, graph_options.graph_protocol, context)
 
             return query, ep
 
         @staticmethod
         def _handle_query_results(result_set, gremlin_future):
             try:
-                traversers = [Traverser(t) for t in result_set]
                 gremlin_future.set_result(
-                    RemoteTraversal(iter(traversers), TraversalSideEffects())
+                    RemoteTraversal(DSESessionRemoteGraphConnection._traversers_generator(result_set), TraversalSideEffects())
                 )
             except Exception as e:
                 gremlin_future.set_exception(e)
@@ -151,8 +182,7 @@ if HAVE_GREMLIN:
             query, ep = self._prepare_query(bytecode)
 
             traversers = self.session.execute_graph(query, execution_profile=ep)
-            traversers = [Traverser(t) for t in traversers]
-            return RemoteTraversal(iter(traversers), TraversalSideEffects())
+            return RemoteTraversal(self._traversers_generator(traversers), TraversalSideEffects())
 
         def submitAsync(self, bytecode):
             query, ep = self._prepare_query(bytecode)
@@ -181,12 +211,20 @@ if HAVE_GREMLIN:
         Graph query language, Default is 'bytecode-json' (GraphSON).
         """
 
+        DSE_GRAPH_QUERY_PROTOCOL = GraphProtocol.GRAPHSON_2_0
+        """
+        Graph query language, Default is GraphProtocol.GRAPHSON_2_0.
+        """
+
         @staticmethod
-        def query_from_traversal(traversal):
+        def query_from_traversal(traversal, graph_protocol=DSE_GRAPH_QUERY_PROTOCOL, context=None):
             """
             From a GraphTraversal, return a query string based on the language specified in `DseGraph.DSE_GRAPH_QUERY_LANGUAGE`.
 
             :param traversal: The GraphTraversal object
+            :param graph_protocol: The graph protocol. Default is `DseGraph.DSE_GRAPH_QUERY_PROTOCOL`.
+            :param context: The dict of the serialization context, needed for GraphSON3 (tuple, udt).
+                            e.g: {'cluster': cluster, 'graph_name': name}
             """
 
             if isinstance(traversal, GraphTraversal):
@@ -197,7 +235,7 @@ if HAVE_GREMLIN:
                         log.warning("GraphTraversal session, graph_name and execution_profile are "
                                     "only taken into account when executed with TinkerPop.")
 
-            return _query_from_traversal(traversal)
+            return _query_from_traversal(traversal, graph_protocol, context)
 
         @staticmethod
         def traversal_source(session=None, graph_name=None, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT,
@@ -233,18 +271,27 @@ if HAVE_GREMLIN:
             return traversal_source
 
         @staticmethod
-        def create_execution_profile(graph_name):
+        def create_execution_profile(graph_name, graph_protocol=DSE_GRAPH_QUERY_PROTOCOL, **kwargs):
             """
             Creates an ExecutionProfile for GraphTraversal execution. You need to register that execution profile to the
             cluster by using `cluster.add_execution_profile`.
 
             :param graph_name: The graph name
+            :param graph_protocol: (Optional) The graph protocol, default is `DSE_GRAPH_QUERY_PROTOCOL`.
             """
 
-            ep = GraphExecutionProfile(row_factory=graph_traversal_dse_object_row_factory,
+            if graph_protocol == GraphProtocol.GRAPHSON_2_0:
+                row_factory = dse_graphson2_traversal_row_factory
+            elif graph_protocol == GraphProtocol.GRAPHSON_3_0:
+                row_factory = dse_graphson3_traversal_row_factory
+            else:
+                raise ValueError('Unknown graph protocol: {}'.format(graph_protocol))
+
+            ep = GraphExecutionProfile(row_factory=row_factory,
                                        graph_options=GraphOptions(graph_name=graph_name,
                                                                   graph_language=DseGraph.DSE_GRAPH_QUERY_LANGUAGE,
-                                                                  graph_protocol=GraphProtocol.GRAPHSON_2_0))
+                                                                  graph_protocol=graph_protocol),
+                                       **kwargs)
             return ep
 
         @staticmethod

@@ -22,6 +22,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+
 from packaging.version import Version
 import logging
 import socket
@@ -128,6 +129,11 @@ def _get_cass_version_from_dse(dse_version):
     elif Version(dse_version) >= Version('6.7'):
         if dse_version == '6.7.0':
             cass_ver = "4.0.0.67"
+        else:
+            cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
+    elif dse_version.startswith('6.8'):
+        if dse_version == '6.8.0':
+            cass_ver = "4.0.0.68"
         else:
             cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
     else:
@@ -339,6 +345,7 @@ greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0
 lessthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION <= Version('4.0'), 'Cassandra version less or equal to 4.0 required')
 lessthancass40 = unittest.skipUnless(CASSANDRA_VERSION < Version('4.0'), 'Cassandra version less than 4.0 required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
+greaterthanorequaldse68 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.8'), "DSE 6.8 or greater required for this test")
 greaterthanorequaldse67 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.7'), "DSE 6.7 or greater required for this test")
 greaterthanorequaldse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.0'), "DSE 6.0 or greater required for this test")
 greaterthanorequaldse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('5.1'), "DSE 5.1 or greater required for this test")
@@ -401,12 +408,23 @@ def use_single_node(start=True, workloads=[], configuration_options={}, dse_opti
                 configuration_options=configuration_options, dse_options=dse_options)
 
 
+def check_log_error():
+    global CCM_CLUSTER
+    log.debug("Checking log error of cluster {0}".format(CCM_CLUSTER.name))
+    for node in CCM_CLUSTER.nodelist():
+            errors = node.grep_log_for_errors()
+            for error in errors:
+                for line in error:
+                    print(line)
+
+
 def remove_cluster():
     if USE_CASS_EXTERNAL or KEEP_TEST_CLUSTER:
         return
 
     global CCM_CLUSTER
     if CCM_CLUSTER:
+        check_log_error()
         log.debug("Removing cluster {0}".format(CCM_CLUSTER.name))
         tries = 0
         while tries < 100:
@@ -518,6 +536,23 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 if dse_version >= Version('5.0'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                if dse_version >= Version('5.1'):
+                    # For Inet4Address
+                    CCM_CLUSTER.set_dse_configuration_options({
+                        'graph': {
+                            'gremlin_server': {
+                                'scriptEngines': {
+                                    'gremlin-groovy': {
+                                        'config': {
+                                            'sandbox_rules': {
+                                                'whitelist_packages': ['java.net']
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    })
                 if 'spark' in workloads:
                     config_options = {"initial_spark_worker_resources": 0.1}
                     if dse_version >= Version('6.7'):

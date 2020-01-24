@@ -2019,7 +2019,7 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
 
 
 @greaterthanorequalcass30
-class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
+class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))

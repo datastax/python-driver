@@ -677,10 +677,15 @@ class KeyspaceMetadata(object):
     .. versionadded:: 3.15
     """
 
+    graph_engine = None
+    """
+    A string indicating whether a graph engine is enabled for this keyspace (Core/Classic).
+    """
+
     _exc_info = None
     """ set if metadata parsing failed """
 
-    def __init__(self, name, durable_writes, strategy_class, strategy_options):
+    def __init__(self, name, durable_writes, strategy_class, strategy_options, graph_engine=None):
         self.name = name
         self.durable_writes = durable_writes
         self.replication_strategy = ReplicationStrategy.create(strategy_class, strategy_options)
@@ -690,17 +695,28 @@ class KeyspaceMetadata(object):
         self.functions = {}
         self.aggregates = {}
         self.views = {}
+        self.graph_engine = graph_engine
+
+    @property
+    def is_graph_enabled(self):
+        return self.graph_engine is not None
 
     def export_as_string(self):
         """
         Returns a CQL query string that can be used to recreate the entire keyspace,
         including user-defined types and tables.
         """
-        cql = "\n\n".join([self.as_cql_query() + ';'] +
-                          self.user_type_strings() +
-                          [f.export_as_string() for f in self.functions.values()] +
-                          [a.export_as_string() for a in self.aggregates.values()] +
-                          [t.export_as_string() for t in self.tables.values()])
+        # Make sure tables with vertex are exported before tables with edges
+        tables_with_vertex = [t for t in self.tables.values() if hasattr(t, 'vertex') and t.vertex]
+        other_tables = [t for t in self.tables.values() if t not in tables_with_vertex]
+
+        cql = "\n\n".join(
+            [self.as_cql_query() + ';'] +
+            self.user_type_strings() +
+            [f.export_as_string() for f in self.functions.values()] +
+            [a.export_as_string() for a in self.aggregates.values()] +
+            [t.export_as_string() for t in tables_with_vertex + other_tables])
+
         if self._exc_info:
             import traceback
             ret = "/*\nWarning: Keyspace %s is incomplete because of an error processing metadata.\n" % \
@@ -726,7 +742,10 @@ class KeyspaceMetadata(object):
         ret = "CREATE KEYSPACE %s WITH replication = %s " % (
             protect_name(self.name),
             self.replication_strategy.export_for_schema())
-        return ret + (' AND durable_writes = %s' % ("true" if self.durable_writes else "false"))
+        ret = ret + (' AND durable_writes = %s' % ("true" if self.durable_writes else "false"))
+        if self.graph_engine is not None:
+            ret = ret + (" AND graph_engine = '%s'" % self.graph_engine)
+        return ret
 
     def user_type_strings(self):
         user_type_strings = []
@@ -1349,6 +1368,90 @@ class TableMetadata(object):
                 ret.append("%s = %s" % (name, protect_value(value)))
 
         return list(sorted(ret))
+
+
+class TableMetadataV3(TableMetadata):
+    """
+    For C* 3.0+. `option_maps` take a superset of map names, so if  nothing
+    changes structurally, new option maps can just be appended to the list.
+    """
+    compaction_options = {}
+
+    option_maps = [
+        'compaction', 'compression', 'caching',
+        'nodesync'  # added DSE 6.0
+    ]
+
+    @property
+    def is_cql_compatible(self):
+        return True
+
+    @classmethod
+    def _make_option_strings(cls, options_map):
+        ret = []
+        options_copy = dict(options_map.items())
+
+        for option in cls.option_maps:
+            value = options_copy.get(option)
+            if isinstance(value, Mapping):
+                del options_copy[option]
+                params = ("'%s': '%s'" % (k, v) for k, v in value.items())
+                ret.append("%s = {%s}" % (option, ', '.join(params)))
+
+        for name, value in options_copy.items():
+            if value is not None:
+                if name == "comment":
+                    value = value or ""
+                ret.append("%s = %s" % (name, protect_value(value)))
+
+        return list(sorted(ret))
+
+
+# TODO This should inherit V4 later?
+class TableMetadataDSE68(TableMetadataV3):
+
+    vertex = None
+    """A :class:`.VertexMetadata` instance, if graph enabled"""
+
+    edge = None
+    """A :class:`.EdgeMetadata` instance, if graph enabled"""
+
+    def as_cql_query(self, formatted=False):
+        ret = super(TableMetadataDSE68, self).as_cql_query(formatted)
+
+        if self.vertex:
+            ret += " AND VERTEX LABEL %s" % protect_name(self.vertex.label_name)
+
+        if self.edge:
+            ret += " AND EDGE LABEL %s" % protect_name(self.edge.label_name)
+
+            ret += self._export_edge_as_cql(
+                self.edge.from_label,
+                self.edge.from_partition_key_columns,
+                self.edge.from_clustering_columns, "FROM")
+
+            ret += self._export_edge_as_cql(
+                self.edge.to_label,
+                self.edge.to_partition_key_columns,
+                self.edge.to_clustering_columns, "TO")
+
+        return ret
+
+    @staticmethod
+    def _export_edge_as_cql(label_name, partition_keys,
+                            clustering_columns, keyword):
+        ret = " %s %s(" % (keyword, protect_name(label_name))
+
+        if len(partition_keys) == 1:
+            ret += protect_name(partition_keys[0])
+        else:
+            ret += "(%s)" % ", ".join([protect_name(k) for k in partition_keys])
+
+        if clustering_columns:
+            ret += ", %s" % ", ".join([protect_name(k) for k in clustering_columns])
+        ret += ")"
+
+        return ret
 
 
 class TableExtensionInterface(object):
@@ -2312,6 +2415,8 @@ class SchemaParserV3(SchemaParserV22):
 
     _function_agg_arument_type_col = 'argument_types'
 
+    _table_metadata_class = TableMetadataV3
+
     recognized_table_options = (
         'bloom_filter_fp_chance',
         'caching',
@@ -2395,7 +2500,7 @@ class SchemaParserV3(SchemaParserV22):
         trigger_rows = trigger_rows or self.keyspace_table_trigger_rows[keyspace_name][table_name]
         index_rows = index_rows or self.keyspace_table_index_rows[keyspace_name][table_name]
 
-        table_meta = TableMetadataV3(keyspace_name, table_name, virtual=virtual)
+        table_meta = self._table_metadata_class(keyspace_name, table_name, virtual=virtual)
         try:
             table_meta.options = self._build_table_options(row)
             flags = row.get('flags', set())
@@ -2659,15 +2764,15 @@ class SchemaParserV4(SchemaParserV3):
         # ignore them if we got an error
         self.virtual_keyspaces_result = self._handle_results(
             virtual_ks_success, virtual_ks_result,
-            expected_failures=InvalidRequest
+            expected_failures=(InvalidRequest,)
         )
         self.virtual_tables_result = self._handle_results(
             virtual_table_success, virtual_table_result,
-            expected_failures=InvalidRequest
+            expected_failures=(InvalidRequest,)
         )
         self.virtual_columns_result = self._handle_results(
             virtual_column_success, virtual_column_result,
-            expected_failures=InvalidRequest
+            expected_failures=(InvalidRequest,)
         )
 
         self._aggregate_results()
@@ -2722,41 +2827,174 @@ class SchemaParserDSE67(SchemaParserV4):
                                 ("nodesync",))
 
 
-class TableMetadataV3(TableMetadata):
+class SchemaParserDSE68(SchemaParserDSE67):
     """
-    For C* 3.0+. `option_maps` take a superset of map names, so if  nothing
-    changes structurally, new option maps can just be appended to the list.
+    For DSE 6.8+
     """
-    compaction_options = {}
 
-    option_maps = [
-        'compaction', 'compression', 'caching',
-        'nodesync'  # added DSE 6.0
-    ]
+    _SELECT_VERTICES = "SELECT * FROM system_schema.vertices"
+    _SELECT_EDGES = "SELECT * FROM system_schema.edges"
 
-    @property
-    def is_cql_compatible(self):
-        return True
+    _table_metadata_class = TableMetadataDSE68
 
-    @classmethod
-    def _make_option_strings(cls, options_map):
-        ret = []
-        options_copy = dict(options_map.items())
+    def __init__(self, connection, timeout):
+        super(SchemaParserDSE68, self).__init__(connection, timeout)
+        self.keyspace_table_vertex_rows = defaultdict(lambda: defaultdict(list))
+        self.keyspace_table_edge_rows = defaultdict(lambda: defaultdict(list))
 
-        for option in cls.option_maps:
-            value = options_copy.get(option)
-            if isinstance(value, Mapping):
-                del options_copy[option]
-                params = ("'%s': '%s'" % (k, v) for k, v in value.items())
-                ret.append("%s = {%s}" % (option, ', '.join(params)))
+    def get_all_keyspaces(self):
+        for keyspace_meta in super(SchemaParserDSE68, self).get_all_keyspaces():
 
-        for name, value in options_copy.items():
-            if value is not None:
-                if name == "comment":
-                    value = value or ""
-                ret.append("%s = %s" % (name, protect_value(value)))
+            def _build_table_graph_metadata(table_meta):
+                for row in self.keyspace_table_vertex_rows[keyspace_meta.name][table_meta.name]:
+                    vertex_meta = self._build_table_vertex_metadata(row)
+                    table_meta.vertex = vertex_meta
 
-        return list(sorted(ret))
+                for row in self.keyspace_table_edge_rows[keyspace_meta.name][table_meta.name]:
+                    edge_meta = self._build_table_edge_metadata(keyspace_meta, row)
+                    table_meta.edge = edge_meta
+
+            # Make sure we process vertices before edges
+            for t in [t for t in six.itervalues(keyspace_meta.tables)
+                      if t.name in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
+                _build_table_graph_metadata(t)
+
+            # all other tables...
+            for t in [t for t in six.itervalues(keyspace_meta.tables)
+                      if t.name not in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
+                _build_table_graph_metadata(t)
+
+            yield keyspace_meta
+
+    def get_table(self, keyspaces, keyspace, table):
+        table_meta = super(SchemaParserDSE68, self).get_table(keyspaces, keyspace, table)
+        cl = ConsistencyLevel.ONE
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
+        vertices_query = QueryMessage(query=self._SELECT_VERTICES + where_clause, consistency_level=cl)
+        edges_query = QueryMessage(query=self._SELECT_EDGES + where_clause, consistency_level=cl)
+
+        (vertices_success, vertices_result), (edges_success, edges_result) \
+            = self.connection.wait_for_responses(vertices_query, edges_query, timeout=self.timeout, fail_on_error=False)
+        vertices_result = self._handle_results(vertices_success, vertices_result)
+        edges_result = self._handle_results(edges_success, edges_result)
+
+        if vertices_result:
+            table_meta.vertex = self._build_table_vertex_metadata(vertices_result[0])
+        elif edges_result:
+            table_meta.edge = self._build_table_edge_metadata(keyspaces[keyspace], edges_result[0])
+
+        return table_meta
+
+    @staticmethod
+    def _build_keyspace_metadata_internal(row):
+        name = row["keyspace_name"]
+        durable_writes = row.get("durable_writes", None)
+        replication = dict(row.get("replication")) if 'replication' in row else {}
+        replication_class = replication.pop("class") if 'class' in replication else None
+        graph_engine = row.get("graph_engine", None)
+        return KeyspaceMetadata(name, durable_writes, replication_class, replication, graph_engine)
+
+    @staticmethod
+    def _build_table_vertex_metadata(row):
+        return VertexMetadata(row.get("keyspace_name"), row.get("table_name"),
+                              row.get("label_name"))
+
+    @staticmethod
+    def _build_table_edge_metadata(keyspace_meta, row):
+        from_table = row.get("from_table")
+        from_table_meta = keyspace_meta.tables.get(from_table)
+        from_label = from_table_meta.vertex.label_name
+        to_table = row.get("to_table")
+        to_table_meta = keyspace_meta.tables.get(to_table)
+        to_label = to_table_meta.vertex.label_name
+
+        return EdgeMetadata(
+            row.get("keyspace_name"), row.get("table_name"),
+            row.get("label_name"), from_table, from_label,
+            row.get("from_partition_key_columns"),
+            row.get("from_clustering_columns"), to_table, to_label,
+            row.get("to_partition_key_columns"),
+            row.get("to_clustering_columns"))
+
+    def _query_all(self):
+        cl = ConsistencyLevel.ONE
+        queries = [
+            # copied from v4
+            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TABLES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_INDEXES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_VIEWS, consistency_level=cl),
+            QueryMessage(query=self._SELECT_VIRTUAL_KEYSPACES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_VIRTUAL_TABLES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_VIRTUAL_COLUMNS, consistency_level=cl),
+            # dse7.0 only
+            QueryMessage(query=self._SELECT_VERTICES, consistency_level=cl),
+            QueryMessage(query=self._SELECT_EDGES, consistency_level=cl)
+        ]
+
+        responses = self.connection.wait_for_responses(
+            *queries, timeout=self.timeout, fail_on_error=False)
+        (
+            # copied from V4
+            (ks_success, ks_result),
+            (table_success, table_result),
+            (col_success, col_result),
+            (types_success, types_result),
+            (functions_success, functions_result),
+            (aggregates_success, aggregates_result),
+            (triggers_success, triggers_result),
+            (indexes_success, indexes_result),
+            (views_success, views_result),
+            (virtual_ks_success, virtual_ks_result),
+            (virtual_table_success, virtual_table_result),
+            (virtual_column_success, virtual_column_result),
+            # dse6.8 responses
+            (vertices_success, vertices_result),
+            (edges_success, edges_result)
+        ) = responses
+
+        # copied from V4
+        self.keyspaces_result = self._handle_results(ks_success, ks_result)
+        self.tables_result = self._handle_results(table_success, table_result)
+        self.columns_result = self._handle_results(col_success, col_result)
+        self.triggers_result = self._handle_results(triggers_success, triggers_result)
+        self.types_result = self._handle_results(types_success, types_result)
+        self.functions_result = self._handle_results(functions_success, functions_result)
+        self.aggregates_result = self._handle_results(aggregates_success, aggregates_result)
+        self.indexes_result = self._handle_results(indexes_success, indexes_result)
+        self.views_result = self._handle_results(views_success, views_result)
+
+        self.virtual_keyspaces_result = self._handle_results(virtual_ks_success,
+                                                             virtual_ks_result)
+        self.virtual_tables_result = self._handle_results(virtual_table_success,
+                                                          virtual_table_result)
+        self.virtual_columns_result = self._handle_results(virtual_column_success,
+                                                           virtual_column_result)
+        # dse6.8-only results
+        self.vertices_result = self._handle_results(vertices_success, vertices_result)
+        self.edges_result = self._handle_results(edges_success, edges_result)
+
+        self._aggregate_results()
+
+    def _aggregate_results(self):
+        super(SchemaParserDSE68, self)._aggregate_results()
+
+        m = self.keyspace_table_vertex_rows
+        for row in self.vertices_result:
+            ksname = row["keyspace_name"]
+            cfname = row['table_name']
+            m[ksname][cfname].append(row)
+
+        m = self.keyspace_table_edge_rows
+        for row in self.edges_result:
+            ksname = row["keyspace_name"]
+            cfname = row['table_name']
+            m[ksname][cfname].append(row)
 
 
 class MaterializedViewMetadata(object):
@@ -2765,8 +3003,7 @@ class MaterializedViewMetadata(object):
     """
 
     keyspace_name = None
-
-    """ A string name of the view."""
+    """ A string name of the keyspace of this view."""
 
     name = None
     """ A string name of the view."""
@@ -2868,11 +3105,89 @@ class MaterializedViewMetadata(object):
         return self.as_cql_query(formatted=True) + ";"
 
 
+class VertexMetadata(object):
+    """
+    A representation of a vertex on a table
+    """
+
+    keyspace_name = None
+    """ A string name of the keyspace. """
+
+    table_name = None
+    """ A string name of the table this vertex is on. """
+
+    label_name = None
+    """ A string name of the label of this vertex."""
+
+    def __init__(self, keyspace_name, table_name, label_name):
+        self.keyspace_name = keyspace_name
+        self.table_name = table_name
+        self.label_name = label_name
+
+
+class EdgeMetadata(object):
+    """
+    A representation of an edge on a table
+    """
+
+    keyspace_name = None
+    """A string name of the keyspace """
+
+    table_name = None
+    """A string name of the table this edge is on"""
+
+    label_name = None
+    """A string name of the label of this edge"""
+
+    from_table = None
+    """A string name of the from table of this edge (incoming vertex)"""
+
+    from_label = None
+    """A string name of the from table label of this edge (incoming vertex)"""
+
+    from_partition_key_columns = None
+    """The columns that match the partition key of the incoming vertex table."""
+
+    from_clustering_columns = None
+    """The columns that match the clustering columns of the incoming vertex table."""
+
+    to_table = None
+    """A string name of the to table of this edge (outgoing vertex)"""
+
+    to_label = None
+    """A string name of the to table label of this edge (outgoing vertex)"""
+
+    to_partition_key_columns = None
+    """The columns that match the partition key of the outgoing vertex table."""
+
+    to_clustering_columns = None
+    """The columns that match the clustering columns of the outgoing vertex table."""
+
+    def __init__(
+            self, keyspace_name, table_name, label_name, from_table,
+            from_label, from_partition_key_columns, from_clustering_columns,
+            to_table, to_label, to_partition_key_columns,
+            to_clustering_columns):
+        self.keyspace_name = keyspace_name
+        self.table_name = table_name
+        self.label_name = label_name
+        self.from_table = from_table
+        self.from_label = from_label
+        self.from_partition_key_columns = from_partition_key_columns
+        self.from_clustering_columns = from_clustering_columns
+        self.to_table = to_table
+        self.to_label = to_label
+        self.to_partition_key_columns = to_partition_key_columns
+        self.to_clustering_columns = to_clustering_columns
+
+
 def get_schema_parser(connection, server_version, dse_version, timeout):
     version = Version(server_version)
     if dse_version:
         v = Version(dse_version)
-        if v >= Version('6.7.0'):
+        if v >= Version('6.8.0'):
+            return SchemaParserDSE68(connection, timeout)
+        elif v >= Version('6.7.0'):
             return SchemaParserDSE67(connection, timeout)
         elif v >= Version('6.0.0'):
             return SchemaParserDSE60(connection, timeout)

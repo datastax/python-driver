@@ -3,6 +3,9 @@ getting_started
 execution_profiles
 lwt
 object_mapper
+geo_types
+graph
+classic_graph
 performance
 query_paging
 security
