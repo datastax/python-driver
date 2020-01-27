@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 16, 0)
+__version_info__ = (3, 21, 0)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -92,6 +92,11 @@ class ConsistencyLevel(object):
     one response.
     """
 
+    @staticmethod
+    def is_serial(cl):
+        return cl == ConsistencyLevel.SERIAL or cl == ConsistencyLevel.LOCAL_SERIAL
+
+
 ConsistencyLevel.value_to_name = {
     ConsistencyLevel.ANY: 'ANY',
     ConsistencyLevel.ONE: 'ONE',
@@ -159,7 +164,17 @@ class ProtocolVersion(object):
     v5, in beta from 3.x+
     """
 
-    SUPPORTED_VERSIONS = (V5, V4, V3, V2, V1)
+    DSE_V1 = 0x41
+    """
+    DSE private protocol v1, supported in DSE 5.1+
+    """
+
+    DSE_V2 = 0x42
+    """
+    DSE private protocol v2, supported in DSE 6.0+
+    """
+
+    SUPPORTED_VERSIONS = (DSE_V2, DSE_V1, V5, V4, V3, V2, V1)
     """
     A tuple of all supported protocol versions
     """
@@ -176,7 +191,7 @@ class ProtocolVersion(object):
 
     MAX_SUPPORTED = max(SUPPORTED_VERSIONS)
     """
-    Maximum protocol versioni supported by this driver.
+    Maximum protocol version supported by this driver.
     """
 
     @classmethod
@@ -198,11 +213,11 @@ class ProtocolVersion(object):
 
     @classmethod
     def uses_prepare_flags(cls, version):
-        return version >= cls.V5
+        return version >= cls.V5 and version != cls.DSE_V1
 
     @classmethod
     def uses_prepared_metadata(cls, version):
-        return version >= cls.V5
+        return version >= cls.V5 and version != cls.DSE_V1
 
     @classmethod
     def uses_error_code_map(cls, version):
@@ -210,7 +225,15 @@ class ProtocolVersion(object):
 
     @classmethod
     def uses_keyspace_flag(cls, version):
-        return version >= cls.V5
+        return version >= cls.V5 and version != cls.DSE_V1
+
+    @classmethod
+    def has_continuous_paging_support(cls, version):
+        return version >= cls.DSE_V1
+
+    @classmethod
+    def has_continuous_paging_next_pages(cls, version):
+        return version >= cls.DSE_V2
 
 
 class WriteType(object):

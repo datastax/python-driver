@@ -245,8 +245,7 @@ class Statement(object):
     keyspace = None
     """
     The string name of the keyspace this query acts on. This is used when
-    :class:`~.TokenAwarePolicy` is configured for
-    :attr:`.Cluster.load_balancing_policy`
+    :class:`~.TokenAwarePolicy` is configured in the profile load balancing policy.
 
     It is set implicitly on :class:`.BoundStatement`, and :class:`.BatchStatement`,
     but must be set explicitly on :class:`.SimpleStatement`.
@@ -328,8 +327,8 @@ class Statement(object):
         return self._serial_consistency_level
 
     def _set_serial_consistency_level(self, serial_consistency_level):
-        acceptable = (None, ConsistencyLevel.SERIAL, ConsistencyLevel.LOCAL_SERIAL)
-        if serial_consistency_level not in acceptable:
+        if (serial_consistency_level is not None and
+                not ConsistencyLevel.is_serial(serial_consistency_level)):
             raise ValueError(
                 "serial_consistency_level must be either ConsistencyLevel.SERIAL "
                 "or ConsistencyLevel.LOCAL_SERIAL")
@@ -445,7 +444,7 @@ class PreparedStatement(object):
     result_metadata_id = None
     routing_key_indexes = None
     _routing_key_index_set = None
-    serial_consistency_level = None
+    serial_consistency_level = None  # TODO never used?
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
                  keyspace, protocol_version, result_metadata, result_metadata_id):
@@ -1087,3 +1086,17 @@ class TraceEvent(object):
 
     def __str__(self):
         return "%s on %s[%s] at %s" % (self.description, self.source, self.thread_name, self.datetime)
+
+
+# TODO remove next major since we can target using the `host` attribute of session.execute
+class HostTargetingStatement(object):
+    """
+    Wraps any query statement and attaches a target host, making
+    it usable in a targeted LBP without modifying the user's statement.
+    """
+    def __init__(self, inner_statement, target_host):
+            self.__class__ = type(inner_statement.__class__.__name__,
+                                  (self.__class__, inner_statement.__class__),
+                                  {})
+            self.__dict__ = inner_statement.__dict__
+            self.target_host = target_host

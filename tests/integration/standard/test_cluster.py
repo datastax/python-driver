@@ -27,7 +27,7 @@ import warnings
 from packaging.version import Version
 
 import cassandra
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT, ControlConnection
 from cassandra.concurrent import execute_concurrent
 from cassandra.policies import (RoundRobinPolicy, ExponentialReconnectionPolicy,
                                 RetryPolicy, SimpleConvictionPolicy, HostDistance,
@@ -37,13 +37,17 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement, TraceUnavailable, tuple_factory
 from cassandra.auth import PlainTextAuthProvider, SaslAuthProvider
 from cassandra import connection
+from cassandra.connection import DefaultEndPoint
 
 from tests import notwindows
 from tests.integration import use_singledc, PROTOCOL_VERSION, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
-    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40
+    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40, \
+    DSE_VERSION
 from tests.integration.util import assert_quiescent_pool_state
 import sys
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -58,7 +62,7 @@ class IgnoredHostPolicy(RoundRobinPolicy):
         RoundRobinPolicy.__init__(self)
 
     def distance(self, host):
-        if(str(host) in self.ignored_hosts):
+        if(host.address in self.ignored_hosts):
             return HostDistance.IGNORED
         else:
             return HostDistance.LOCAL
@@ -76,11 +80,12 @@ class ClusterTests(unittest.TestCase):
 
         @test_category connection
         """
-        ingored_host_policy = IgnoredHostPolicy(["127.0.0.2", "127.0.0.3"])
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=ingored_host_policy)
-        session = cluster.connect()
+        ignored_host_policy = IgnoredHostPolicy(["127.0.0.2", "127.0.0.3"])
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=ignored_host_policy)})
+        cluster.connect()
         for host in cluster.metadata.all_hosts():
-            if str(host) == "127.0.0.1":
+            if str(host) == "127.0.0.1:9042":
                 self.assertTrue(host.is_up)
             else:
                 self.assertIsNone(host.is_up)
@@ -98,7 +103,7 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
         cluster = Cluster(contact_points=["localhost"], protocol_version=PROTOCOL_VERSION, connect_timeout=1)
-        self.assertTrue('127.0.0.1' in cluster.contact_points_resolved)
+        self.assertTrue(DefaultEndPoint('127.0.0.1') in cluster.endpoints_resolved)
 
     @local
     def test_host_duplication(self):
@@ -247,7 +252,13 @@ class ClusterTests(unittest.TestCase):
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
         # Make sure the correct protocol was selected by default
-        if CASSANDRA_VERSION >= Version('2.2'):
+        if DSE_VERSION and DSE_VERSION >= Version("6.0"):
+            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.DSE_V2)
+            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.DSE_V2)
+        elif DSE_VERSION and DSE_VERSION >= Version("5.1"):
+            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.DSE_V1)
+            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.DSE_V1)
+        elif CASSANDRA_VERSION >= Version('2.2'):
             self.assertEqual(updated_protocol_version, 4)
             self.assertEqual(updated_cluster_version, 4)
         elif CASSANDRA_VERSION >= Version('2.1'):
@@ -285,6 +296,7 @@ class ClusterTests(unittest.TestCase):
         """
 
         upper_bound = get_unsupported_upper_protocol()
+        log.debug('got upper_bound of {}'.format(upper_bound))
         if upper_bound is not None:
             cluster = Cluster(protocol_version=upper_bound)
             with self.assertRaises(NoHostAvailable):
@@ -292,6 +304,7 @@ class ClusterTests(unittest.TestCase):
             cluster.shutdown()
 
         lower_bound = get_unsupported_lower_protocol()
+        log.debug('got lower_bound of {}'.format(lower_bound))
         if lower_bound is not None:
             cluster = Cluster(protocol_version=lower_bound)
             with self.assertRaises(NoHostAvailable):
@@ -333,9 +346,7 @@ class ClusterTests(unittest.TestCase):
         """
 
         Cluster(
-            load_balancing_policy=RoundRobinPolicy(),
             reconnection_policy=ExponentialReconnectionPolicy(1.0, 600.0),
-            default_retry_policy=RetryPolicy(),
             conviction_policy_factory=SimpleConvictionPolicy,
             protocol_version=PROTOCOL_VERSION
         )
@@ -491,20 +502,17 @@ class ClusterTests(unittest.TestCase):
     @local
     @notwindows
     def test_refresh_schema_no_wait(self):
-        contact_points = [CASSANDRA_IP]
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, max_schema_agreement_wait=10,
-                          contact_points=contact_points,
-                          load_balancing_policy=HostFilterPolicy(
-                              RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
-                          ))
-        session = cluster.connect()
+        original_wait_for_responses = connection.Connection.wait_for_responses
 
-        schema_ver = session.execute("SELECT schema_version FROM system.local WHERE key='local'")[0][0]
-        new_schema_ver = uuid4()
-        session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (new_schema_ver,))
+        def patched_wait_for_responses(*args, **kwargs):
+            # When selecting schema version, replace the real schema UUID with an unexpected UUID
+            response = original_wait_for_responses(*args, **kwargs)
+            if len(args) > 2 and hasattr(args[2], "query") and args[2].query == "SELECT schema_version FROM system.local WHERE key='local'":
+                new_uuid = uuid4()
+                response[1].parsed_rows[0] = (new_uuid,)
+            return response
 
-
-        try:
+        with patch.object(connection.Connection, "wait_for_responses", patched_wait_for_responses):
             agreement_timeout = 1
 
             # cluster agreement wait exceeded
@@ -558,12 +566,6 @@ class ClusterTests(unittest.TestCase):
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
             c.shutdown()
-        finally:
-            # TODO once fixed this connect call
-            session = cluster.connect()
-            session.execute("UPDATE system.local SET schema_version=%s WHERE key='local'", (schema_ver,))
-
-        cluster.shutdown()
 
     def test_trace(self):
         """
@@ -729,12 +731,17 @@ class ClusterTests(unittest.TestCase):
                 self.assertIsNotNone(session.execute("SELECT * from system.local"))
 
             # Three conenctions to nodes plus the control connection
-            self.assertEqual(4, mock_handler.get_message_count('warning',
-                                                               "An authentication challenge was not sent"))
+            auth_warning = mock_handler.get_message_count('warning', "An authentication challenge was not sent")
+            self.assertGreaterEqual(auth_warning, 4)
+            self.assertEqual(
+                auth_warning,
+                mock_handler.get_message_count("debug", "Got ReadyMessage on new connection")
+            )
 
     def test_idle_heartbeat(self):
         interval = 2
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=interval,
+                          monitor_reporting_enabled=False)
         if PROTOCOL_VERSION < 3:
             cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         session = cluster.connect(wait_for_all_pools=True)
@@ -856,7 +863,7 @@ class ClusterTests(unittest.TestCase):
                 RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
             )
         )
-        with Cluster(execution_profiles={'node1': node1}) as cluster:
+        with Cluster(execution_profiles={'node1': node1}, monitor_reporting_enabled=False) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
 
             # default is DCA RR for all hosts
@@ -1087,6 +1094,36 @@ class ClusterTests(unittest.TestCase):
         else:
             raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
 
+    @notwindows
+    def test_execute_query_timeout(self):
+        with Cluster() as cluster:
+            session = cluster.connect(wait_for_all_pools=True)
+            query = "SELECT * FROM system.local"
+
+            # default is passed down
+            default_profile = cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT]
+            rs = session.execute(query)
+            self.assertEqual(rs.response_future.timeout, default_profile.request_timeout)
+
+            # tiny timeout times out as expected
+            tmp_profile = copy(default_profile)
+            tmp_profile.request_timeout = sys.float_info.min
+
+            max_retry_count = 10
+            for _ in range(max_retry_count):
+                start = time.time()
+                try:
+                    with self.assertRaises(cassandra.OperationTimedOut):
+                        session.execute(query, execution_profile=tmp_profile)
+                    break
+                except:
+                    import traceback
+                    traceback.print_exc()
+                    end = time.time()
+                    self.assertAlmostEqual(start, end, 1)
+            else:
+                raise Exception("session.execute didn't time out in {0} tries".format(max_retry_count))
+
     def test_replicas_are_queried(self):
         """
         Test that replicas are queried first for TokenAwarePolicy. A table with RF 1
@@ -1102,8 +1139,11 @@ class ClusterTests(unittest.TestCase):
         @test_category metadata
         """
         queried_hosts = set()
+        tap_profile = ExecutionProfile(
+            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy())
+        )
         with Cluster(protocol_version=PROTOCOL_VERSION,
-                     load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy())) as cluster:
+                     execution_profiles={EXEC_PROFILE_DEFAULT: tap_profile}) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
             session.execute('''
                     CREATE TABLE test1rf.table_with_big_key (
@@ -1120,14 +1160,17 @@ class ClusterTests(unittest.TestCase):
                 queried_hosts = self._assert_replica_queried(trace, only_replicas=True)
                 last_i = i
 
+        hfp_profile = ExecutionProfile(
+            load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
+                     predicate=lambda host: host.address != only_replica)
+        )
         only_replica = queried_hosts.pop()
         log = logging.getLogger(__name__)
         log.info("The only replica found was: {}".format(only_replica))
         available_hosts = [host for host in ["127.0.0.1", "127.0.0.2", "127.0.0.3"] if host != only_replica]
         with Cluster(contact_points=available_hosts,
                      protocol_version=PROTOCOL_VERSION,
-                     load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(),
-                     predicate=lambda host: host.address != only_replica)) as cluster:
+                     execution_profiles={EXEC_PROFILE_DEFAULT: hfp_profile}) as cluster:
 
             session = cluster.connect(wait_for_all_pools=True)
             prepared = session.prepare("""SELECT * from test1rf.table_with_big_key
@@ -1264,7 +1307,7 @@ class TestAddressTranslation(unittest.TestCase):
         c = Cluster(address_translator=lh_ad)
         c.connect()
         for host in c.metadata.all_hosts():
-            self.assertEqual(adder_map.get(str(host)), host.broadcast_address)
+            self.assertEqual(adder_map.get(host.address), host.broadcast_address)
         c.shutdown()
 
 @local
@@ -1398,7 +1441,7 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
     def test_prepare_on_ignored_hosts(self):
 
         cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                          load_balancing_policy=self.ignore_node_3_policy)
+                          execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=self.ignore_node_3_policy)})
         session = cluster.connect()
         cluster.reprepare_on_up, cluster.prepare_on_all_hosts = True, False
 
@@ -1424,47 +1467,8 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         # the length of mock_calls will vary, but all should use the unignored
         # address
         for c in cluster.connection_factory.mock_calls:
-            self.assertEqual(call(unignored_address), c)
+            self.assertEqual(call(DefaultEndPoint(unignored_address)), c)
         cluster.shutdown()
-
-
-@local
-class DuplicateRpcTest(unittest.TestCase):
-
-    load_balancing_policy = HostFilterPolicy(RoundRobinPolicy(),
-                                             lambda host: host.address == "127.0.0.1")
-
-    def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
-        self.session = self.cluster.connect()
-        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.1' WHERE peer='127.0.0.2'")
-
-    def tearDown(self):
-        self.session.execute("UPDATE system.peers SET rpc_address = '127.0.0.2' WHERE peer='127.0.0.2'")
-        self.cluster.shutdown()
-
-    def test_duplicate(self):
-        """
-        Test duplicate RPC addresses.
-
-        Modifies the system.peers table to make hosts have the same rpc address. Ensures such hosts are filtered out and a message is logged
-
-        @since 3.4
-        @jira_ticket PYTHON-366
-        @expected_result only one hosts' metadata will be populated
-
-        @test_category metadata
-        """
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cassandra.cluster.__name__)
-        logger.addHandler(mock_handler)
-        test_cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=self.load_balancing_policy)
-        test_cluster.connect()
-        warnings = mock_handler.messages.get("warning")
-        self.assertEqual(len(warnings), 1)
-        self.assertTrue('multiple' in warnings[0])
-        logger.removeHandler(mock_handler)
-        test_cluster.shutdown()
 
 
 @protocolv5

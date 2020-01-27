@@ -26,9 +26,17 @@ except ImportError:
     import unittest  # noqa
 
 
+# Previous Cassandra upgrade
 two_to_three_path = upgrade_paths([
-    UpgradePath("2.2.9-3.11", {"version": "2.2.9"}, {"version": "3.11"}, {}),
+    UpgradePath("2.2.9-3.11", {"version": "2.2.9"}, {"version": "3.11.4"}, {}),
 ])
+
+# Previous DSE upgrade
+five_upgrade_path = upgrade_paths([
+    UpgradePath("5.0.11-5.1.4", {"version": "5.0.11"}, {"version": "5.1.4"}, {}),
+])
+
+
 class UpgradeTests(UpgradeBase):
     @two_to_three_path
     def test_can_write(self):
@@ -43,16 +51,17 @@ class UpgradeTests(UpgradeBase):
         """
         self.start_upgrade(0)
 
+        self.cluster_driver.add_execution_profile("all", ExecutionProfile(consistency_level=ConsistencyLevel.ALL))
+        self.cluster_driver.add_execution_profile("one", ExecutionProfile(consistency_level=ConsistencyLevel.LOCAL_ONE))
+
         c = count()
         while not self.is_upgraded():
-            self.session.execute("INSERT INTO test3rf.test(k, v) VALUES (%s, 0)", (next(c), ))
+            self.session.execute("INSERT INTO test3rf.test(k, v) VALUES (%s, 0)", (next(c), ), execution_profile="one")
             time.sleep(0.0001)
 
-        self.session.default_consistency_level = ConsistencyLevel.ALL
-        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test")[0][0]
+        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all")[0][0]
         self.assertEqual(total_number_of_inserted, next(c))
 
-        self.session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
         self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
 
     @two_to_three_path
@@ -101,16 +110,17 @@ class UpgradeTestsMetadata(UpgradeBase):
         """
         self.start_upgrade(0)
 
+        self.cluster_driver.add_execution_profile("all", ExecutionProfile(consistency_level=ConsistencyLevel.ALL))
+        self.cluster_driver.add_execution_profile("one", ExecutionProfile(consistency_level=ConsistencyLevel.LOCAL_ONE))
+
         c = count()
         while not self.is_upgraded():
-            self.session.execute("INSERT INTO test3rf.test(k, v) VALUES (%s, 0)", (next(c),))
+            self.session.execute("INSERT INTO test3rf.test(k, v) VALUES (%s, 0)", (next(c),), execution_profile="one")
             time.sleep(0.0001)
 
-        self.session.default_consistency_level = ConsistencyLevel.ALL
-        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test")[0][0]
+        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all")[0][0]
         self.assertEqual(total_number_of_inserted, next(c))
 
-        self.session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
         self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
 
     @two_to_three_path
@@ -176,7 +186,7 @@ class UpgradeTestsMetadata(UpgradeBase):
 
 
 two_to_three_with_auth_path = upgrade_paths([
-    UpgradePath("2.2.9-3.11-auth", {"version": "2.2.9"}, {"version": "3.11"},
+    UpgradePath("2.2.9-3.11-auth", {"version": "2.2.9"}, {"version": "3.11.4"},
                 {'authenticator': 'PasswordAuthenticator',
                  'authorizer': 'CassandraAuthorizer'}),
 ])
@@ -261,7 +271,7 @@ class UpgradeTestsPolicies(UpgradeBase):
         cluster = Cluster()
         self.addCleanup(cluster.shutdown)
         cluster.add_execution_profile("spec_ep_rr", spec_ep_rr)
-
+        cluster.add_execution_profile("all", ExecutionProfile(consistency_level=ConsistencyLevel.ALL))
         session = cluster.connect()
 
         self.start_upgrade(0)
@@ -272,8 +282,7 @@ class UpgradeTestsPolicies(UpgradeBase):
                                  execution_profile='spec_ep_rr')
             time.sleep(0.0001)
 
-        session.default_consistency_level = ConsistencyLevel.ALL
-        total_number_of_inserted = session.execute("SELECT COUNT(*) from test3rf.test")[0][0]
+        total_number_of_inserted = session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all")[0][0]
         self.assertEqual(total_number_of_inserted, next(c))
 
         self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)

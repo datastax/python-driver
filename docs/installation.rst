@@ -3,7 +3,7 @@ Installation
 
 Supported Platforms
 -------------------
-Python 2.7, 3.4, 3.5 and 3.6 are supported.  Both CPython (the standard Python
+Python 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8 are supported. Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.
@@ -20,11 +20,59 @@ You can use ``pip install --pre cassandra-driver`` if you need to install a beta
 
 ***Note**: if intending to use optional extensions, install the `dependencies <#optional-non-python-dependencies>`_ first. The driver may need to be reinstalled if dependencies are added after the initial installation.
 
+Verifying your Installation
+---------------------------
+To check if the installation was successful, you can run::
+
+    python -c 'import cassandra; print cassandra.__version__'
+
+It should print something like "3.21.0".
+
+.. _installation-datastax-graph:
+
+(*Optional*) DataStax Graph
+---------------------------
+The driver provides an optional fluent graph API that depends on Apache TinkerPop (gremlinpython). It is
+not installed by default. To be able to build Gremlin traversals, you need to install
+the `graph` requirements::
+
+    pip install cassandra-driver[graph]
+
+See :doc:`graph_fluent` for more details about this API.
+
+(*Optional*) Compression Support
+--------------------------------
+Compression can optionally be used for communication between the driver and
+Cassandra.  There are currently two supported compression algorithms:
+snappy (in Cassandra 1.2+) and LZ4 (only in Cassandra 2.0+).  If either is
+available for the driver and Cassandra also supports it, it will
+be used automatically.
+
+For lz4 support::
+
+    pip install lz4
+
+For snappy support::
+
+    pip install python-snappy
+
+(If using a Debian Linux derivative such as Ubuntu, it may be easier to
+just run ``apt-get install python-snappy``.)
+
+(*Optional*) Metrics Support
+----------------------------
+The driver has built-in support for capturing :attr:`.Cluster.metrics` about
+the queries you run.  However, the ``scales`` library is required to
+support this::
+
+    pip install scales
+
+
 Speeding Up Installation
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-By default, installing the driver through ``pip`` uses Cython to compile
-certain parts of the driver.
+By default, installing the driver through ``pip`` uses a pre-compiled, platform-specific wheel when available.
+If using a source distribution rather than a wheel, Cython is used to compile certain parts of the driver.
 This makes those hot paths faster at runtime, but the Cython compilation
 process can take a long time -- as long as 10 minutes in some environments.
 
@@ -39,30 +87,6 @@ threads used to build the driver and any C extensions:
     $ CASS_DRIVER_BUILD_CONCURRENCY=8 python setup.py install
     $ # installing from pip
     $ CASS_DRIVER_BUILD_CONCURRENCY=8 pip install cassandra-driver
-
-Finally, you can `build a wheel <https://packaging.python.org/tutorials/distributing-packages/#wheels>`_ from the driver's source and distribute that to computers
-that depend on it. For example:
-
-.. code-block:: bash
-
-    $ git clone https://github.com/datastax/python-driver.git
-    $ cd python-driver
-    $ git checkout 3.14.0 # or other desired tag
-    $ pip install wheel
-    $ python setup.py bdist_wheel
-    $ # build wheel with optional concurrency settings
-    $ CASS_DRIVER_BUILD_CONCURRENCY=8 python setup.py bdist_wheel
-    $ scp ./dist/cassandra_driver-3.14.0-cp27-cp27mu-linux_x86_64.whl user@host:/remote_dir
-
-Then, on the remote machine or machines, simply
-
-.. code-block:: bash
-
-    $ pip install /remote_dir/cassandra_driver-3.14.0-cp27-cp27mu-linux_x86_64.whl
-
-Note that the wheel created this way is a `platform wheel
-<https://packaging.python.org/tutorials/distributing-packages/#platform-wheels>`_
-and as such will not work across platforms or architectures.
 
 OSX Installation Error
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -103,41 +127,6 @@ installed. You can find the list of dependencies in
 Once the dependencies are installed, simply run::
 
     python setup.py install
-
-Verifying your Installation
----------------------------
-To check if the installation was successful, you can run::
-
-    python -c 'import cassandra; print cassandra.__version__'
-
-It should print something like "2.7.0".
-
-(*Optional*) Compression Support
---------------------------------
-Compression can optionally be used for communication between the driver and
-Cassandra.  There are currently two supported compression algorithms:
-snappy (in Cassandra 1.2+) and LZ4 (only in Cassandra 2.0+).  If either is
-available for the driver and Cassandra also supports it, it will
-be used automatically.
-
-For lz4 support::
-
-    pip install lz4
-
-For snappy support::
-
-    pip install python-snappy
-
-(If using a Debian Linux derivative such as Ubuntu, it may be easier to
-just run ``apt-get install python-snappy``.)
-
-(*Optional*) Metrics Support
-----------------------------
-The driver has built-in support for capturing :attr:`.Cluster.metrics` about
-the queries you run.  However, the ``scales`` library is required to
-support this::
-
-    pip install scales
 
 
 (*Optional*) Non-python Dependencies

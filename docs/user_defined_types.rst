@@ -9,11 +9,15 @@ new type through ``CREATE TYPE`` statements in CQL::
 
 Version 2.1 of the Python driver adds support for user-defined types.
 
-Registering a Class to Map to a UDT
------------------------------------
+Registering a UDT
+-----------------
 You can tell the Python driver to return columns of a specific UDT as
-instances of a class by registering them with your :class:`~.Cluster`
+instances of a class or a dict by registering them with your :class:`~.Cluster`
 instance through :meth:`.Cluster.register_user_type`:
+
+
+Map a Class to a UDT
+++++++++++++++++++++
 
 .. code-block:: python
 
@@ -39,7 +43,29 @@ instance through :meth:`.Cluster.register_user_type`:
     # results will include Address instances
     results = session.execute("SELECT * FROM users")
     row = results[0]
-    print row.id, row.location.street, row.location.zipcode
+    print(row.id, row.location.street, row.location.zipcode)
+
+Map a dict to a UDT
++++++++++++++++++++
+
+.. code-block:: python
+
+    cluster = Cluster(protocol_version=3)
+    session = cluster.connect()
+    session.set_keyspace('mykeyspace')
+    session.execute("CREATE TYPE address (street text, zipcode int)")
+    session.execute("CREATE TABLE users (id int PRIMARY KEY, location frozen<address>)")
+
+    cluster.register_user_type('mykeyspace', 'address', dict)
+
+    # insert a row using a prepared statement and a tuple
+    insert_statement = session.prepare("INSERT INTO mykeyspace.users (id, location) VALUES (?, ?)")
+    session.execute(insert_statement, [0, ("123 Main St.", 78723)])
+
+    # results will include dict instances
+    results = session.execute("SELECT * FROM users")
+    row = results[0]
+    print(row.id, row.location['street'], row.location['zipcode'])
 
 Using UDTs Without Registering Them
 -----------------------------------
@@ -79,7 +105,7 @@ for the UDT:
     results = session.execute("SELECT * FROM users")
     first_row = results[0]
     address = first_row.location
-    print address  # prints "Address(street='123 Main St.', zipcode=78723)"
+    print(address)  # prints "Address(street='123 Main St.', zipcode=78723)"
     street = address.street
     zipcode = address.street
 

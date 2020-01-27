@@ -395,7 +395,7 @@ def run_setup(extensions):
         # 1.) build_ext eats errors at compile time, letting the install complete while producing useful feedback
         # 2.) there could be a case where the python environment has cython installed but the system doesn't have build tools
         if pre_build_check():
-            cython_dep = 'Cython>=0.20,!=0.25,<0.29'
+            cython_dep = 'Cython>=0.20,!=0.25,<0.30'
             user_specified_cython_version = os.environ.get('CASS_DRIVER_ALLOWED_CYTHON_VERSION')
             if user_specified_cython_version is not None:
                 cython_dep = 'Cython==%s' % (user_specified_cython_version,)
@@ -403,23 +403,37 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = ['six >=1.9']
+    dependencies = ['six >=1.9',
+                    'geomet>=0.1,<0.2']
 
     if not PY3:
         dependencies.append('futures')
 
+    _EXTRAS_REQUIRE = {
+        'graph': ['gremlinpython==3.3.4']
+    }
+
     setup(
         name='cassandra-driver',
         version=__version__,
-        description='Python driver for Cassandra',
+        description=' DataStax Driver for Apache Cassandra',
         long_description=long_description,
         url='http://github.com/datastax/python-driver',
-        author='Tyler Hobbs',
-        author_email='tyler@datastax.com',
-        packages=['cassandra', 'cassandra.io', 'cassandra.cqlengine'],
-        keywords='cassandra,cql,orm',
+        project_urls={
+            'Documentation': 'https://docs.datastax.com/en/developer/python-driver/latest/',
+            'Source': 'https://github.com/datastax/python-driver/',
+            'Issues': 'https://datastax-oss.atlassian.net/browse/PYTHON',
+        },
+        author='DataStax',
+        packages=[
+            'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
+            'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
+            'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud'
+        ],
+        keywords='cassandra,cql,orm,dse,graph',
         include_package_data=True,
         install_requires=dependencies,
+        extras_require=_EXTRAS_REQUIRE,
         tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
@@ -432,11 +446,14 @@ def run_setup(extensions):
             'Programming Language :: Python :: 3.4',
             'Programming Language :: Python :: 3.5',
             'Programming Language :: Python :: 3.6',
+            'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.8',
             'Programming Language :: Python :: Implementation :: CPython',
             'Programming Language :: Python :: Implementation :: PyPy',
             'Topic :: Software Development :: Libraries :: Python Modules'
         ],
         **kw)
+
 
 run_setup(None)
 

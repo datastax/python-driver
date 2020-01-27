@@ -18,7 +18,7 @@ except ImportError:
 
 from mock import patch
 import socket
-import cassandra.io.asyncorereactor
+import cassandra.io.asyncorereactor as asyncorereactor
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from tests import is_monkey_patched
 from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
@@ -77,7 +77,7 @@ class TestAsyncoreTimer(TimerTestMixin, AsyncorePatcher):
 
     @property
     def _timers(self):
-        return cassandra.io.asyncorereactor._global_loop._timers
+        return asyncorereactor._global_loop._timers
 
     def setUp(self):
         if is_monkey_patched():

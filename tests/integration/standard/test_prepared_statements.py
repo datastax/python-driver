@@ -19,19 +19,19 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
-from cassandra import InvalidRequest
+from cassandra import InvalidRequest, DriverException
 
 from cassandra import ConsistencyLevel, ProtocolVersion
 from cassandra.cluster import Cluster
-from cassandra.query import PreparedStatement, UNSET_VALUE, tuple_factory
-from tests.integration import (get_server_versions, greaterthanorequalcass40,
-                               set_default_beta_flag_true,
-                               BasicSharedKeyspaceUnitTestCase)
+from cassandra.query import PreparedStatement, UNSET_VALUE
+from tests.integration import (get_server_versions, greaterthanorequalcass40, greaterthanorequaldse50,
+    requirecassandra, BasicSharedKeyspaceUnitTestCase)
 
 import logging
 
 
 LOG = logging.getLogger(__name__)
+
 
 def setup_module():
     use_singledc()
@@ -397,6 +397,22 @@ class PreparedStatementTests(unittest.TestCase):
         with self.assertRaises(InvalidRequest):
             self.session.execute(prepared, [0])
 
+    def test_fail_if_different_query_id_on_reprepare(self):
+        """ PYTHON-1124 and CASSANDRA-15252 """
+        keyspace = "test_fail_if_different_query_id_on_reprepare"
+        self.session.execute(
+            "CREATE KEYSPACE IF NOT EXISTS {} WITH replication = "
+            "{{'class': 'SimpleStrategy', 'replication_factor': 1}}".format(keyspace)
+        )
+        self.session.execute("CREATE TABLE IF NOT EXISTS {}.foo(k int PRIMARY KEY)".format(keyspace))
+        prepared = self.session.prepare("SELECT * FROM {}.foo WHERE k=?".format(keyspace))
+        self.session.execute("DROP TABLE {}.foo".format(keyspace))
+        self.session.execute("CREATE TABLE {}.foo(k int PRIMARY KEY)".format(keyspace))
+        self.session.execute("USE {}".format(keyspace))
+        with self.assertRaises(DriverException) as e:
+            self.session.execute(prepared, [0])
+        self.assertIn("ID mismatch", str(e.exception))
+
 
 @greaterthanorequalcass40
 class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
@@ -546,16 +562,46 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 9)
 
+    @requirecassandra
     def test_id_is_not_updated_conditional_v5(self):
         """
         Test that verifies that the result_metadata and the
         result_metadata_id are udpated correctly in conditional statements
         in protocol V5
-
         @since 3.13
         @jira_ticket PYTHON-847
         """
         cluster = Cluster(protocol_version=ProtocolVersion.V5)
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+        self._test_updated_conditional(session, 10)
+
+    @greaterthanorequaldse50
+    def test_id_is_not_updated_conditional_dsev1(self):
+        """
+        Test that verifies that the result_metadata and the
+        result_metadata_id are udpated correctly in conditional statements
+        in protocol DSE V1
+
+        @since 3.13
+        @jira_ticket PYTHON-847
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.DSE_V1)
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+        self._test_updated_conditional(session, 10)
+
+    @greaterthanorequaldse50
+    def test_id_is_not_updated_conditional_dsev2(self):
+        """
+        Test that verifies that the result_metadata and the
+        result_metadata_id are udpated correctly in conditional statements
+        in protocol DSE V2
+
+        @since 3.13
+        @jira_ticket PYTHON-847
+        """
+        cluster = Cluster(protocol_version=ProtocolVersion.DSE_V2)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 10)
@@ -573,7 +619,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
                 expected
             )
             self.assertEqual(prepared_statement.result_metadata_id, first_id)
-            self.assertEqual(prepared_statement.result_metadata, [])
+            self.assertIsNone(prepared_statement.result_metadata)
 
         # Successful conditional update
         check_result_and_metadata((True,))

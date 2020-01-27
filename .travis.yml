@@ -1,12 +1,15 @@
+dist: xenial
+sudo: false
+
 language: python
 python:
   - "2.7"
-  - "3.4"
   - "3.5"
   - "3.6"
-  - "pypy-5.4.1"
+  - "3.7"
+  - "pypy2.7-6.0"
+  - "pypy3.5"
 
-sudo: false
 env:
   - CASS_DRIVER_NO_CYTHON=1
 
@@ -24,14 +27,6 @@ install:
   - pip install tox-travis lz4
 
 script:
-  - |
-    changed_code_filenames=`git diff --name-only $TRAVIS_COMMIT_RANGE`
-    changed_driver_filenames=`echo "$changed_code_filenames" | grep '^cassandra'`
-    changelog_changed=`echo "$changed_code_filenames" | grep '^CHANGELOG.rst'`
-    if [ "$changed_driver_filenames" ] && [ "$changelog_changed" = "" ] ; then
-      echo "This PR includes code changes, but no CHANGELOG changes. Please include a CHANGELOG entry."
-      exit 1
-    fi
   - tox
   - tox -e gevent_loop
   - tox -e eventlet_loop

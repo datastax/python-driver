@@ -93,6 +93,13 @@ def varint_pack(big):
     return six.binary_type(revbytes)
 
 
+point_be = struct.Struct('>dd')
+point_le = struct.Struct('<dd')
+
+circle_be = struct.Struct('>ddd')
+circle_le = struct.Struct('<ddd')
+
+
 def encode_zig_zag(n):
     return (n << 1) ^ (n >> 63)
 

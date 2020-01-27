@@ -24,22 +24,30 @@ from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile
+from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
-    USE_CASS_EXTERNAL, greaterthanorequalcass40
+    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
 import time
+import random
 import re
+
+import mock
+import six
+
+
+log = logging.getLogger(__name__)
+
 
 def setup_module():
     if not USE_CASS_EXTERNAL:
         use_singledc(start=False)
         ccm_cluster = get_cluster()
-        ccm_cluster.clear()
+        ccm_cluster.stop()
         # This is necessary because test_too_many_statements may
         # timeout otherwise
         config_options = {'write_request_timeout_in_ms': '20000'}
@@ -114,18 +122,20 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
     def test_trace_ignores_row_factory(self):
-        self.session.row_factory = dict_factory
+        with Cluster(protocol_version=PROTOCOL_VERSION,
+                    execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}) as cluster:
 
-        query = "SELECT * FROM system.local"
-        statement = SimpleStatement(query)
-        rs = self.session.execute(statement, trace=True)
+            s = cluster.connect()
+            query = "SELECT * FROM system.local"
+            statement = SimpleStatement(query)
+            rs = s.execute(statement, trace=True)
 
-        # Ensure this does not throw an exception
-        trace = rs.get_query_trace()
-        self.assertTrue(trace.events)
-        str(trace)
-        for event in trace.events:
-            str(event)
+            # Ensure this does not throw an exception
+            trace = rs.get_query_trace()
+            self.assertTrue(trace.events)
+            str(trace)
+            for event in trace.events:
+                str(event)
 
     @local
     @greaterthanprotocolv3
@@ -326,6 +336,33 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(results.column_names, ["[json]"])
         self.assertEqual(results[0][0], '{"k": 1, "v": 1}')
 
+    def test_host_targeting_query(self):
+        """
+        Test to validate the the single host targeting works.
+
+        @since 3.17.0
+        @jira_ticket PYTHON-933
+        @expected_result the coordinator host is always the one set
+        """
+
+        default_ep = self.cluster.profile_manager.default
+        # copy of default EP with checkable LBP
+        checkable_ep = self.session.execution_profile_clone_update(
+            ep=default_ep,
+            load_balancing_policy=mock.Mock(wraps=default_ep.load_balancing_policy)
+        )
+        query = SimpleStatement("INSERT INTO test3rf.test(k, v) values (1, 1)")
+
+        for i in range(10):
+            host = random.choice(self.cluster.metadata.all_hosts())
+            log.debug('targeting {}'.format(host))
+            future = self.session.execute_async(query, host=host, execution_profile=checkable_ep)
+            future.result()
+            # check we're using the selected host
+            self.assertEqual(host, future.coordinator_host)
+            # check that this bypasses the LBP
+            self.assertFalse(checkable_ep.load_balancing_policy.make_query_plan.called)
+
 
 class PreparedStatementTests(unittest.TestCase):
 
@@ -411,17 +448,26 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertEqual(bound.keyspace, 'test3rf')
 
 
-class ForcedHostSwitchPolicy(RoundRobinPolicy):
+class ForcedHostIndexPolicy(RoundRobinPolicy):
+    def __init__(self, host_index_to_use=0):
+        super(ForcedHostIndexPolicy, self).__init__()
+        self.host_index_to_use = host_index_to_use
+
+    def set_host(self, host_index):
+        """ 0-based index of which host to use """
+        self.host_index_to_use = host_index
 
     def make_query_plan(self, working_keyspace=None, query=None):
-        if hasattr(self, 'counter'):
-            self.counter += 1
-        else:
-            self.counter = 0
-        index = self.counter % 3
-        a = list(self._live_hosts)
-        value = [a[index]]
-        return value
+        live_hosts = sorted(list(self._live_hosts))
+        host = []
+        try:
+            host = [live_hosts[self.host_index_to_use]]
+        except IndexError as e:
+            six.raise_from(IndexError(
+                'You specified an index larger than the number of hosts. Total hosts: {}. Index specified: {}'.format(
+                    len(live_hosts), self.host_index_to_use
+                )), e)
+        return host
 
 
 class PreparedStatementMetdataTest(unittest.TestCase):
@@ -461,33 +507,30 @@ class PreparedStatementMetdataTest(unittest.TestCase):
 
 class PreparedStatementArgTest(unittest.TestCase):
 
+    def setUp(self):
+        self.mock_handler = MockLoggingHandler()
+        logger = logging.getLogger(cluster.__name__)
+        logger.addHandler(self.mock_handler)
+
     def test_prepare_on_all_hosts(self):
         """
         Test to validate prepare_on_all_hosts flag is honored.
 
-        Use a special ForcedHostSwitchPolicy to ensure prepared queries are cycled over nodes that should not
+        Force the host of each query to ensure prepared queries are cycled over nodes that should not
         have them prepared. Check the logs to insure they are being re-prepared on those nodes
 
         @since 3.4.0
         @jira_ticket PYTHON-556
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         """
-        white_list = ForcedHostSwitchPolicy()
-        clus = Cluster(
-            load_balancing_policy=white_list,
-            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
+        clus = Cluster(protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         session = clus.connect(wait_for_all_pools=True)
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cluster.__name__)
-        logger.addHandler(mock_handler)
-        select_statement = session.prepare("SELECT * FROM system.local")
-        session.execute(select_statement)
-        session.execute(select_statement)
-        session.execute(select_statement)
-        self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
-
+        select_statement = session.prepare("SELECT k FROM test3rf.test WHERE k = ?")
+        for host in clus.metadata.all_hosts():
+            session.execute(select_statement, (1, ), host=host)
+        self.assertEqual(2, self.mock_handler.get_message_count('debug', "Re-preparing"))
 
     def test_prepare_batch_statement(self):
         """
@@ -499,11 +542,15 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        white_list = ForcedHostSwitchPolicy()
+        policy = ForcedHostIndexPolicy()
         clus = Cluster(
-            load_balancing_policy=white_list,
-            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
-            reprepare_on_up=False)
+            execution_profiles={
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
+            },
+            protocol_version=PROTOCOL_VERSION,
+            prepare_on_all_hosts=False,
+            reprepare_on_up=False,
+        )
         self.addCleanup(clus.shutdown)
 
         table = "test3rf.%s" % self._testMethodName.lower()
@@ -517,9 +564,14 @@ class PreparedStatementArgTest(unittest.TestCase):
 
         # This is going to query a host where the query
         # is not prepared
+        policy.set_host(1)
         batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
         batch_statement.add(insert_statement, (1, 2))
         session.execute(batch_statement)
+
+        # To verify our test assumption that queries are getting re-prepared properly
+        self.assertEqual(1, self.mock_handler.get_message_count('debug', "Re-preparing"))
+
         select_results = session.execute(SimpleStatement("SELECT * FROM %s WHERE k = 1" % table,
                                                          consistency_level=ConsistencyLevel.ALL))
         first_row = select_results[0][:2]
@@ -536,11 +588,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        white_list = ForcedHostSwitchPolicy()
-        clus = Cluster(
-            load_balancing_policy=white_list,
-            protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False,
-            reprepare_on_up=False)
+        clus = Cluster(protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         table = "test3rf.%s" % self._testMethodName.lower()
@@ -556,20 +604,28 @@ class PreparedStatementArgTest(unittest.TestCase):
 
         values_to_insert = [(1, 2, 3), (2, 3, 4), (3, 4, 5), (4, 5, 6)]
 
-        # We query the three hosts in order (due to the ForcedHostSwitchPolicy)
+        # We query the three hosts in order (due to the ForcedHostIndexPolicy)
         # the first three queries will have to be repreapred and the rest should
         # work as normal batch prepared statements
+        hosts = clus.metadata.all_hosts()
         for i in range(10):
             value_to_insert = values_to_insert[i % len(values_to_insert)]
             batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
             batch_statement.add(insert_statement, value_to_insert)
-            session.execute(batch_statement)
+            session.execute(batch_statement, host=hosts[i % len(hosts)])
 
         select_results = session.execute("SELECT * FROM %s" % table)
-        expected_results = [(1, None, 2, None, 3), (2, None, 3, None, 4),
-             (3, None, 4, None, 5), (4, None, 5, None, 6)]
-        
+        expected_results = [
+            (1, None, 2, None, 3),
+            (2, None, 3, None, 4),
+            (3, None, 4, None, 5),
+            (4, None, 5, None, 6)
+        ]
+
         self.assertEqual(set(expected_results), set(select_results._current_rows))
+
+        # To verify our test assumption that queries are getting re-prepared properly
+        self.assertEqual(3, self.mock_handler.get_message_count('debug', "Re-preparing"))
 
 
 class PrintStatementTests(unittest.TestCase):
@@ -719,15 +775,19 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
             self.session.execute("DROP TABLE test3rf.testtext")
 
     def test_too_many_statements(self):
+        # The actual max # of statements is 0xFFFF, but this can occasionally cause a server write timeout.
+        large_batch = 0xFFF
         max_statements = 0xFFFF
         ss = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
         b = BatchStatement(batch_type=BatchType.UNLOGGED, consistency_level=ConsistencyLevel.ONE)
 
-        # max works
-        b.add_all([ss] * max_statements, [None] * max_statements)
-        self.session.execute(b)
+        # large number works works
+        b.add_all([ss] * large_batch, [None] * large_batch)
+        self.session.execute(b, timeout=30.0)
 
+        b = BatchStatement(batch_type=BatchType.UNLOGGED, consistency_level=ConsistencyLevel.ONE)
         # max + 1 raises
+        b.add_all([ss] * max_statements, [None] * max_statements)
         self.assertRaises(ValueError, b.add, ss)
 
         # also would have bombed trying to encode
@@ -833,7 +893,8 @@ class LightweightTransactionTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Lightweight transactions, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        serial_profile = ExecutionProfile(consistency_level=ConsistencyLevel.SERIAL)
+        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={'serial': serial_profile})
         self.session = self.cluster.connect()
 
         ddl = '''
@@ -921,7 +982,7 @@ class LightweightTransactionTests(unittest.TestCase):
         """
         for batch_type in (BatchType.UNLOGGED, BatchType.LOGGED):
             batch_statement = BatchStatement(batch_type)
-            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",
+            batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;",
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 1, 10);",
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 2, 10);"], [None] * 3)
             result = self.session.execute(batch_statement)
@@ -937,7 +998,7 @@ class LightweightTransactionTests(unittest.TestCase):
             result = self.session.execute(batch_statement)
             self.assertFalse(result.was_applied)
 
-            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             # Verify the non conditional insert hasn't been inserted
             self.assertEqual(len(all_rows.current_rows), 3)
 
@@ -963,7 +1024,7 @@ class LightweightTransactionTests(unittest.TestCase):
             result = self.session.execute(batch_statement)
             self.assertTrue(result.was_applied)
 
-            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+            all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             for i, row in enumerate(all_rows):
                 self.assertEqual((0, i, 10), (row[0], row[1], row[2]))
 
@@ -1132,25 +1193,25 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, year ASC, month ASC, day ASC)""".format(self.keyspace_name)
 
         create_mv_dailyhigh = """CREATE MATERIALIZED VIEW {0}.dailyhigh AS
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL
                         PRIMARY KEY ((game, year, month, day), score, user)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC)""".format(self.keyspace_name)
 
         create_mv_monthlyhigh = """CREATE MATERIALIZED VIEW {0}.monthlyhigh AS
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY ((game, year, month), score, user, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, day ASC)""".format(self.keyspace_name)
 
         create_mv_filtereduserhigh = """CREATE MATERIALIZED VIEW {0}.filtereduserhigh AS
                         SELECT * FROM {0}.scores
                         WHERE user in ('jbellis', 'pcmanus') AND game IS NOT NULL AND score IS NOT NULL AND year is NOT NULL AND day is not NULL and month IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, year ASC, month ASC, day ASC)""".format(self.keyspace_name)
 
         self.session.execute(create_mv_alltime)
         self.session.execute(create_mv_dailyhigh)
@@ -1337,6 +1398,7 @@ class BaseKeyspaceTests():
         cls.session.execute(ddl)
         cls.cluster.shutdown()
 
+
 class QueryKeyspaceTests(BaseKeyspaceTests):
 
     def test_setting_keyspace(self):
@@ -1380,7 +1442,8 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        pv = ProtocolVersion.DSE_V2 if DSE_VERSION else ProtocolVersion.V5
+        cluster = Cluster(protocol_version=pv, allow_beta_protocol_version=True)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
 
@@ -1398,7 +1461,8 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        pv = ProtocolVersion.DSE_V2 if DSE_VERSION else ProtocolVersion.V5
+        cluster = Cluster(protocol_version=pv, allow_beta_protocol_version=True)
         session = cluster.connect(self.ks_name)
         self.addCleanup(cluster.shutdown)
 
@@ -1421,7 +1485,7 @@ class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
         # <Host: 127.0.0.1 datacenter1>: ConnectionException('Host has been marked down or removed',)})
         with self.assertRaises(NoHostAvailable):
             session.execute(simple_stmt)
-            
+
     def _check_set_keyspace_in_statement(self, session):
         simple_stmt = SimpleStatement("SELECT * from {}".format(self.table_name), keyspace=self.ks_name)
         results = session.execute(simple_stmt)

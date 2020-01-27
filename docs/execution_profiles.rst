@@ -9,6 +9,10 @@ The legacy configuration remains intact, but legacy and Execution Profile APIs
 cannot be used simultaneously on the same client ``Cluster``. Legacy configuration
 will be removed in the next major release (4.0).
 
+An execution profile and its parameters should be unique across ``Cluster`` instances.
+For example, an execution profile and its ``LoadBalancingPolicy`` should
+not be applied to more than one ``Cluster`` instance.
+
 This document explains how Execution Profiles relate to existing settings, and shows how to use the new profiles for
 request execution.
 
@@ -117,7 +121,7 @@ New profiles can be added constructing from scratch, or deriving from default:
     locked_execution = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
     node1_profile = 'node1_whitelist'
     cluster.add_execution_profile(node1_profile, locked_execution)
-    
+
     for _ in cluster.metadata.all_hosts():
         print session.execute(local_query, execution_profile=node1_profile)[0]
 
@@ -137,7 +141,7 @@ We also have the ability to pass profile instances to be used for execution, but
 .. code:: python
 
     from cassandra.query import tuple_factory
-    
+
     tmp = session.execution_profile_clone_update('node1', request_timeout=100, row_factory=tuple_factory)
 
     print session.execute(local_query, execution_profile=tmp)[0]

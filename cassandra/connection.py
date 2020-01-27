@@ -15,7 +15,7 @@
 from __future__ import absolute_import  # to enable import io from stdlib
 from collections import defaultdict, deque
 import errno
-from functools import wraps, partial
+from functools import wraps, partial, total_ordering
 from heapq import heappush, heappop
 import io
 import logging
@@ -24,13 +24,9 @@ from six.moves import range
 import socket
 import struct
 import sys
-from threading import Thread, Event, RLock
+from threading import Thread, Event, RLock, Condition
 import time
-
-try:
-    import ssl
-except ImportError:
-    ssl = None  # NOQA
+import ssl
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
@@ -45,7 +41,7 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 InvalidRequestException, SupportedMessage,
                                 AuthResponseMessage, AuthChallengeMessage,
                                 AuthSuccessMessage, ProtocolException,
-                                RegisterMessage)
+                                RegisterMessage, ReviseRequestMessage)
 from cassandra.util import OrderedDict
 
 
@@ -67,6 +63,17 @@ else:
         from lz4 import block as lz4_block
     except ImportError:
         lz4_block = lz4
+
+    try:
+        lz4_block.compress
+        lz4_block.decompress
+    except AttributeError:
+        raise ImportError(
+            'lz4 not imported correctly. Imported object should have '
+            '.compress and and .decompress attributes but does not. '
+            'Please file a bug report on JIRA. (Imported object was '
+            '{lz4_block})'.format(lz4_block=repr(lz4_block))
+        )
 
     # Cassandra writes the uncompressed message length in big endian order,
     # but the lz4 lib requires little endian order, so we wrap these
@@ -94,6 +101,7 @@ else:
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
+DRIVER_NAME, DRIVER_VERSION = 'DataStax Python Driver', sys.modules['cassandra'].__version__
 
 PROTOCOL_VERSION_MASK = 0x7f
 
@@ -103,6 +111,245 @@ HEADER_DIRECTION_MASK = 0x80
 
 frame_header_v1_v2 = struct.Struct('>BbBi')
 frame_header_v3 = struct.Struct('>BhBi')
+
+
+class EndPoint(object):
+    """
+    Represents the information to connect to a cassandra node.
+    """
+
+    @property
+    def address(self):
+        """
+        The IP address of the node. This is the RPC address the driver uses when connecting to the node
+        """
+        raise NotImplementedError()
+
+    @property
+    def port(self):
+        """
+        The port of the node.
+        """
+        raise NotImplementedError()
+
+    @property
+    def ssl_options(self):
+        """
+        SSL options specific to this endpoint.
+        """
+        return None
+
+    @property
+    def socket_family(self):
+        """
+        The socket family of the endpoint.
+        """
+        return socket.AF_UNSPEC
+
+    def resolve(self):
+        """
+        Resolve the endpoint to an address/port. This is called
+        only on socket connection.
+        """
+        raise NotImplementedError()
+
+
+class EndPointFactory(object):
+
+    cluster = None
+
+    def configure(self, cluster):
+        """
+        This is called by the cluster during its initialization.
+        """
+        self.cluster = cluster
+        return self
+
+    def create(self, row):
+        """
+        Create an EndPoint from a system.peers row.
+        """
+        raise NotImplementedError()
+
+
+@total_ordering
+class DefaultEndPoint(EndPoint):
+    """
+    Default EndPoint implementation, basically just an address and port.
+    """
+
+    def __init__(self, address, port=9042):
+        self._address = address
+        self._port = port
+
+    @property
+    def address(self):
+        return self._address
+
+    @property
+    def port(self):
+        return self._port
+
+    def resolve(self):
+        return self._address, self._port
+
+    def __eq__(self, other):
+        return isinstance(other, DefaultEndPoint) and \
+               self.address == other.address and self.port == other.port
+
+    def __hash__(self):
+        return hash((self.address, self.port))
+
+    def __lt__(self, other):
+        return (self.address, self.port) < (other.address, other.port)
+
+    def __str__(self):
+        return str("%s:%d" % (self.address, self.port))
+
+    def __repr__(self):
+        return "<%s: %s:%d>" % (self.__class__.__name__, self.address, self.port)
+
+
+class DefaultEndPointFactory(EndPointFactory):
+
+    port = None
+    """
+    If set, force all endpoints to use this port.
+    """
+
+    def __init__(self, port=None):
+        self.port = port
+
+    def create(self, row):
+        addr = None
+        if "rpc_address" in row:
+            addr = row.get("rpc_address")
+        if "native_transport_address" in row:
+            addr = row.get("native_transport_address")
+        if not addr or addr in ["0.0.0.0", "::"]:
+            addr = row.get("peer")
+
+        # create the endpoint with the translated address
+        return DefaultEndPoint(
+            self.cluster.address_translator.translate(addr),
+            self.port if self.port is not None else 9042)
+
+
+@total_ordering
+class SniEndPoint(EndPoint):
+    """SNI Proxy EndPoint implementation."""
+
+    def __init__(self, proxy_address, server_name, port=9042):
+        self._proxy_address = proxy_address
+        self._index = 0
+        self._resolved_address = None  # resolved address
+        self._port = port
+        self._server_name = server_name
+        self._ssl_options = {'server_hostname': server_name}
+
+    @property
+    def address(self):
+        return self._proxy_address
+
+    @property
+    def port(self):
+        return self._port
+
+    @property
+    def ssl_options(self):
+        return self._ssl_options
+
+    def resolve(self):
+        try:
+            resolved_addresses = socket.getaddrinfo(self._proxy_address, self._port,
+                                                    socket.AF_UNSPEC, socket.SOCK_STREAM)
+        except socket.gaierror:
+            log.debug('Could not resolve sni proxy hostname "%s" '
+                      'with port %d' % (self._proxy_address, self._port))
+            raise
+
+        # round-robin pick
+        self._resolved_address = sorted(addr[4][0] for addr in resolved_addresses)[self._index % len(resolved_addresses)]
+        self._index += 1
+
+        return self._resolved_address, self._port
+
+    def __eq__(self, other):
+        return (isinstance(other, SniEndPoint) and
+                self.address == other.address and self.port == other.port and
+                self._server_name == other._server_name)
+
+    def __hash__(self):
+        return hash((self.address, self.port, self._server_name))
+
+    def __lt__(self, other):
+        return ((self.address, self.port, self._server_name) <
+                (other.address, other.port, self._server_name))
+
+    def __str__(self):
+        return str("%s:%d:%s" % (self.address, self.port, self._server_name))
+
+    def __repr__(self):
+        return "<%s: %s:%d:%s>" % (self.__class__.__name__,
+                                   self.address, self.port, self._server_name)
+
+
+class SniEndPointFactory(EndPointFactory):
+
+    def __init__(self, proxy_address, port):
+        self._proxy_address = proxy_address
+        self._port = port
+
+    def create(self, row):
+        host_id = row.get("host_id")
+        if host_id is None:
+            raise ValueError("No host_id to create the SniEndPoint")
+
+        return SniEndPoint(self._proxy_address, str(host_id), self._port)
+
+    def create_from_sni(self, sni):
+        return SniEndPoint(self._proxy_address, sni, self._port)
+
+
+@total_ordering
+class UnixSocketEndPoint(EndPoint):
+    """
+    Unix Socket EndPoint implementation.
+    """
+
+    def __init__(self, unix_socket_path):
+        self._unix_socket_path = unix_socket_path
+
+    @property
+    def address(self):
+        return self._unix_socket_path
+
+    @property
+    def port(self):
+        return None
+
+    @property
+    def socket_family(self):
+        return socket.AF_UNIX
+
+    def resolve(self):
+        return self.address, None
+
+    def __eq__(self, other):
+        return (isinstance(other, UnixSocketEndPoint) and
+                self._unix_socket_path == other._unix_socket_path)
+
+    def __hash__(self):
+        return hash(self._unix_socket_path)
+
+    def __lt__(self, other):
+        return self._unix_socket_path < other._unix_socket_path
+
+    def __str__(self):
+        return str("%s" % (self._unix_socket_path,))
+
+    def __repr__(self):
+        return "<%s: %s>" % (self.__class__.__name__, self._unix_socket_path)
 
 
 class _Frame(object):
@@ -128,7 +375,6 @@ class _Frame(object):
         return "ver({0}); flags({1:04b}); stream({2}); op({3}); offset({4}); len({5})".format(self.version, self.flags, self.stream, self.opcode, self.body_offset, self.end_pos - self.body_offset)
 
 
-
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
 
@@ -138,9 +384,13 @@ class ConnectionException(Exception):
     or the connection was already closed or defunct.
     """
 
-    def __init__(self, message, host=None):
+    def __init__(self, message, endpoint=None):
         Exception.__init__(self, message)
-        self.host = host
+        self.endpoint = endpoint
+
+    @property
+    def host(self):
+        return self.endpoint.address
 
 
 class ConnectionShutdown(ConnectionException):
@@ -154,9 +404,9 @@ class ProtocolVersionUnsupported(ConnectionException):
     """
     Server rejected startup message due to unsupported protocol version
     """
-    def __init__(self, host, startup_version):
-        msg = "Unsupported protocol version on %s: %d" % (host, startup_version)
-        super(ProtocolVersionUnsupported, self).__init__(msg, host)
+    def __init__(self, endpoint, startup_version):
+        msg = "Unsupported protocol version on %s: %d" % (endpoint, startup_version)
+        super(ProtocolVersionUnsupported, self).__init__(msg, endpoint)
         self.startup_version = startup_version
 
 
@@ -173,6 +423,161 @@ class ProtocolError(Exception):
     Communication did not match the protocol that this driver expects.
     """
     pass
+
+
+class ContinuousPagingState(object):
+    """
+     A class for specifying continuous paging state, only supported starting with DSE_V2.
+    """
+
+    num_pages_requested = None
+    """
+    How many pages we have already requested
+    """
+
+    num_pages_received = None
+    """
+    How many pages we have already received
+    """
+
+    max_queue_size = None
+    """
+    The max queue size chosen by the user via the options
+    """
+
+    def __init__(self, max_queue_size):
+        self.num_pages_requested = max_queue_size  # the initial query requests max_queue_size
+        self.num_pages_received = 0
+        self.max_queue_size = max_queue_size
+
+
+class ContinuousPagingSession(object):
+    def __init__(self, stream_id, decoder, row_factory, connection, state):
+        self.stream_id = stream_id
+        self.decoder = decoder
+        self.row_factory = row_factory
+        self.connection = connection
+        self._condition = Condition()
+        self._stop = False
+        self._page_queue = deque()
+        self._state = state
+        self.released = False
+
+    def on_message(self, result):
+        if isinstance(result, ResultMessage):
+            self.on_page(result)
+        elif isinstance(result, ErrorMessage):
+            self.on_error(result)
+
+    def on_page(self, result):
+        with self._condition:
+            if self._state:
+                self._state.num_pages_received += 1
+            self._page_queue.appendleft((result.column_names, result.parsed_rows, None))
+            self._stop |= result.continuous_paging_last
+            self._condition.notify()
+
+        if result.continuous_paging_last:
+            self.released = True
+
+    def on_error(self, error):
+        if isinstance(error, ErrorMessage):
+            error = error.to_exception()
+
+        log.debug("Got error %s for session %s", error, self.stream_id)
+
+        with self._condition:
+            self._page_queue.appendleft((None, None, error))
+            self._stop = True
+            self._condition.notify()
+
+        self.released = True
+
+    def results(self):
+        try:
+            self._condition.acquire()
+            while True:
+                while not self._page_queue and not self._stop:
+                    self._condition.wait(timeout=5)
+                while self._page_queue:
+                    names, rows, err = self._page_queue.pop()
+                    if err:
+                        raise err
+                    self.maybe_request_more()
+                    self._condition.release()
+                    for row in self.row_factory(names, rows):
+                        yield row
+                    self._condition.acquire()
+                if self._stop:
+                    break
+        finally:
+            try:
+                self._condition.release()
+            except RuntimeError:
+                # This exception happens if the CP results are not entirely consumed
+                # and the session is terminated by the runtime. See PYTHON-1054
+                pass
+
+    def maybe_request_more(self):
+        if not self._state:
+            return
+
+        max_queue_size = self._state.max_queue_size
+        num_in_flight = self._state.num_pages_requested - self._state.num_pages_received
+        space_in_queue = max_queue_size - len(self._page_queue) - num_in_flight
+        log.debug("Session %s from %s, space in CP queue: %s, requested: %s, received: %s, num_in_flight: %s",
+                  self.stream_id, self.connection.host, space_in_queue, self._state.num_pages_requested,
+                  self._state.num_pages_received, num_in_flight)
+
+        if space_in_queue >= max_queue_size / 2:
+            self.update_next_pages(space_in_queue)
+
+    def update_next_pages(self, num_next_pages):
+        try:
+            self._state.num_pages_requested += num_next_pages
+            log.debug("Updating backpressure for session %s from %s", self.stream_id, self.connection.host)
+            with self.connection.lock:
+                self.connection.send_msg(ReviseRequestMessage(ReviseRequestMessage.RevisionType.PAGING_BACKPRESSURE,
+                                                              self.stream_id,
+                                                              next_pages=num_next_pages),
+                                         self.connection.get_request_id(),
+                                         self._on_backpressure_response)
+        except ConnectionShutdown as ex:
+            log.debug("Failed to update backpressure for session %s from %s, connection is shutdown",
+                      self.stream_id, self.connection.host)
+            self.on_error(ex)
+
+    def _on_backpressure_response(self, response):
+        if isinstance(response, ResultMessage):
+            log.debug("Paging session %s backpressure updated.", self.stream_id)
+        else:
+            log.error("Failed updating backpressure for session %s from %s: %s", self.stream_id, self.connection.host,
+                      response.to_exception() if hasattr(response, 'to_exception') else response)
+            self.on_error(response)
+
+    def cancel(self):
+        try:
+            log.debug("Canceling paging session %s from %s", self.stream_id, self.connection.host)
+            with self.connection.lock:
+                self.connection.send_msg(ReviseRequestMessage(ReviseRequestMessage.RevisionType.PAGING_CANCEL,
+                                                              self.stream_id),
+                                         self.connection.get_request_id(),
+                                         self._on_cancel_response)
+        except ConnectionShutdown:
+            log.debug("Failed to cancel session %s from %s, connection is shutdown",
+                      self.stream_id, self.connection.host)
+
+        with self._condition:
+            self._stop = True
+            self._condition.notify()
+
+    def _on_cancel_response(self, response):
+        if isinstance(response, ResultMessage):
+            log.debug("Paging session %s canceled.", self.stream_id)
+        else:
+            log.error("Failed canceling streaming session %s from %s: %s", self.stream_id, self.connection.host,
+                      response.to_exception() if hasattr(response, 'to_exception') else response)
+        self.released = True
 
 
 def defunct_on_error(f):
@@ -208,10 +613,13 @@ class Connection(object):
 
     keyspace = None
     compression = True
+    _compression_type = None
     compressor = None
     decompressor = None
 
+    endpoint = None
     ssl_options = None
+    ssl_context = None
     last_error = None
 
     # The current number of operations that are in flight. More precisely,
@@ -256,15 +664,20 @@ class Connection(object):
     _ssl_impl = ssl
 
     _check_hostname = False
+    _product_type = None
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
-                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False):
-        self.host = host
-        self.port = port
+                 user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False,
+                 ssl_context=None):
+
+        # TODO next major rename host to endpoint and remove port kwarg.
+        self.endpoint = host if isinstance(host, EndPoint) else DefaultEndPoint(host, port)
+
         self.authenticator = authenticator
         self.ssl_options = ssl_options.copy() if ssl_options else None
+        self.ssl_context = ssl_context
         self.sockopts = sockopts
         self.compression = compression
         self.cql_version = cql_version
@@ -277,6 +690,7 @@ class Connection(object):
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
+        self._continuous_paging_sessions = {}
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -284,6 +698,10 @@ class Connection(object):
                 if not getattr(ssl, 'match_hostname', None):
                     raise RuntimeError("ssl_options specify 'check_hostname', but ssl.match_hostname is not provided. "
                                        "Patch or upgrade Python to use this option.")
+            self.ssl_options.update(self.endpoint.ssl_options or {})
+        elif self.endpoint.ssl_options:
+            self.ssl_options = self.endpoint.ssl_options
+
 
         if protocol_version >= 3:
             self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
@@ -299,6 +717,14 @@ class Connection(object):
 
         self.lock = RLock()
         self.connected_event = Event()
+
+    @property
+    def host(self):
+        return self.endpoint.address
+
+    @property
+    def port(self):
+        return self.endpoint.port
 
     @classmethod
     def initialize_reactor(cls):
@@ -321,7 +747,7 @@ class Connection(object):
         raise NotImplementedError()
 
     @classmethod
-    def factory(cls, host, timeout, *args, **kwargs):
+    def factory(cls, endpoint, timeout, *args, **kwargs):
         """
         A factory function which returns connections which have
         succeeded in connecting and are ready for service (or
@@ -329,12 +755,12 @@ class Connection(object):
         """
         start = time.time()
         kwargs['connect_timeout'] = timeout
-        conn = cls(host, *args, **kwargs)
+        conn = cls(endpoint, *args, **kwargs)
         elapsed = time.time() - start
         conn.connected_event.wait(timeout - elapsed)
         if conn.last_error:
             if conn.is_unsupported_proto_version:
-                raise ProtocolVersionUnsupported(host, conn.protocol_version)
+                raise ProtocolVersionUnsupported(endpoint, conn.protocol_version)
             raise conn.last_error
         elif not conn.connected_event.is_set():
             conn.close()
@@ -342,23 +768,51 @@ class Connection(object):
         else:
             return conn
 
+    def _wrap_socket_from_context(self):
+        ssl_options = self.ssl_options or {}
+        # PYTHON-1186: set the server_hostname only if the SSLContext has
+        # check_hostname enabled and it is not already provided by the EndPoint ssl options
+        if (self.ssl_context.check_hostname and
+                'server_hostname' not in ssl_options):
+            ssl_options = ssl_options.copy()
+            ssl_options['server_hostname'] = self.endpoint.address
+        self._socket = self.ssl_context.wrap_socket(self._socket, **ssl_options)
+
+    def _initiate_connection(self, sockaddr):
+        self._socket.connect(sockaddr)
+
+    def _match_hostname(self):
+        ssl.match_hostname(self._socket.getpeercert(), self.endpoint.address)
+
+    def _get_socket_addresses(self):
+        address, port = self.endpoint.resolve()
+
+        if hasattr(socket, 'AF_UNIX') and self.endpoint.socket_family == socket.AF_UNIX:
+            return [(socket.AF_UNIX, socket.SOCK_STREAM, 0, None, address)]
+
+        addresses = socket.getaddrinfo(address, port, self.endpoint.socket_family, socket.SOCK_STREAM)
+        if not addresses:
+            raise ConnectionException("getaddrinfo returned empty list for %s" % (self.endpoint,))
+
+        return addresses
+
     def _connect_socket(self):
         sockerr = None
-        addresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        if not addresses:
-            raise ConnectionException("getaddrinfo returned empty list for %s" % (self.host,))
-        for (af, socktype, proto, canonname, sockaddr) in addresses:
+        addresses = self._get_socket_addresses()
+        for (af, socktype, proto, _, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
-                if self.ssl_options:
+                if self.ssl_context:
+                    self._wrap_socket_from_context()
+                elif self.ssl_options:
                     if not self._ssl_impl:
                         raise RuntimeError("This version of Python was not compiled with SSL support")
                     self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
                 self._socket.settimeout(self.connect_timeout)
-                self._socket.connect(sockaddr)
+                self._initiate_connection(sockaddr)
                 self._socket.settimeout(None)
                 if self._check_hostname:
-                    ssl.match_hostname(self._socket.getpeercert(), self.host)
+                    self._match_hostname()
                 sockerr = None
                 break
             except socket.error as err:
@@ -368,7 +822,8 @@ class Connection(object):
                 sockerr = err
 
         if sockerr:
-            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" % ([a[4] for a in addresses], sockerr.strerror or sockerr))
+            raise socket.error(sockerr.errno, "Tried connecting to %s. Last error: %s" %
+                               ([a[4] for a in addresses], sockerr.strerror or sockerr))
 
         if self.sockopts:
             for args in self.sockopts:
@@ -387,16 +842,22 @@ class Connection(object):
         # if we are not handling an exception, just use the passed exception, and don't try to format exc_info with the message
         if any(exc_info):
             log.debug("Defuncting connection (%s) to %s:",
-                      id(self), self.host, exc_info=exc_info)
+                      id(self), self.endpoint, exc_info=exc_info)
         else:
             log.debug("Defuncting connection (%s) to %s: %s",
-                      id(self), self.host, exc)
+                      id(self), self.endpoint, exc)
 
         self.last_error = exc
         self.close()
+        self.error_all_cp_sessions(exc)
         self.error_all_requests(exc)
         self.connected_event.set()
         return exc
+
+    def error_all_cp_sessions(self, exc):
+        stream_ids = list(self._continuous_paging_sessions.keys())
+        for stream_id in stream_ids:
+            self._continuous_paging_sessions[stream_id].on_error(exc)
 
     def error_all_requests(self, exc):
         with self.lock:
@@ -407,13 +868,14 @@ class Connection(object):
             return
 
         new_exc = ConnectionShutdown(str(exc))
+
         def try_callback(cb):
             try:
                 cb(new_exc)
             except Exception:
                 log.warning("Ignoring unhandled exception while erroring requests for a "
                             "failed connection (%s) to host %s:",
-                            id(self), self.host, exc_info=True)
+                            id(self), self.endpoint, exc_info=True)
 
         # run first callback from this thread to ensure pool state before leaving
         cb, _, _ = requests.popitem()[1]
@@ -460,9 +922,9 @@ class Connection(object):
 
     def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=None):
         if self.is_defunct:
-            raise ConnectionShutdown("Connection to %s is defunct" % self.host)
+            raise ConnectionShutdown("Connection to %s is defunct" % self.endpoint)
         elif self.is_closed:
-            raise ConnectionShutdown("Connection to %s is closed" % self.host)
+            raise ConnectionShutdown("Connection to %s is closed" % self.endpoint)
 
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
@@ -471,8 +933,8 @@ class Connection(object):
         self.push(msg)
         return len(msg)
 
-    def wait_for_response(self, msg, timeout=None):
-        return self.wait_for_responses(msg, timeout=timeout)[0]
+    def wait_for_response(self, msg, timeout=None, **kwargs):
+        return self.wait_for_responses(msg, timeout=timeout, **kwargs)[0]
 
     def wait_for_responses(self, *msgs, **kwargs):
         """
@@ -550,7 +1012,7 @@ class Connection(object):
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
-            if version > ProtocolVersion.MAX_SUPPORTED:
+            if version not in ProtocolVersion.SUPPORTED_VERSIONS:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
             # this frame header struct is everything after the version byte
@@ -595,15 +1057,18 @@ class Connection(object):
             decoder = ProtocolHandler.decode_message
             result_metadata = None
         else:
-            try:
-                callback, decoder, result_metadata = self._requests.pop(stream_id)
-            # This can only happen if the stream_id was
-            # removed due to an OperationTimedOut
-            except KeyError:
-                return
-
-            with self.lock:
-                self.request_ids.append(stream_id)
+            if stream_id in self._continuous_paging_sessions:
+                paging_session = self._continuous_paging_sessions[stream_id]
+                callback = paging_session.on_message
+                decoder = paging_session.decoder
+                result_metadata = None
+            else:
+                try:
+                    callback, decoder, result_metadata = self._requests.pop(stream_id)
+                # This can only happen if the stream_id was
+                # removed due to an OperationTimedOut
+                except KeyError:
+                    return
 
         try:
             response = decoder(header.version, self.user_type_map, stream_id,
@@ -631,18 +1096,33 @@ class Connection(object):
         except Exception:
             log.exception("Callback handler errored, ignoring:")
 
+        # done after callback because the callback might signal this as a paging session
+        if stream_id >= 0:
+            if stream_id in self._continuous_paging_sessions:
+                if self._continuous_paging_sessions[stream_id].released:
+                    self.remove_continuous_paging_session(stream_id)
+            else:
+                with self.lock:
+                    self.request_ids.append(stream_id)
+
+    def new_continuous_paging_session(self, stream_id, decoder, row_factory, state):
+        session = ContinuousPagingSession(stream_id, decoder, row_factory, self, state)
+        self._continuous_paging_sessions[stream_id] = session
+        return session
+
+    def remove_continuous_paging_session(self, stream_id):
+        try:
+            self._continuous_paging_sessions.pop(stream_id)
+            with self.lock:
+                log.debug("Returning cp session stream id %s", stream_id)
+                self.request_ids.append(stream_id)
+        except KeyError:
+            pass
+
     @defunct_on_error
     def _send_options_message(self):
-        if self.cql_version is None and (not self.compression or not locally_supported_compressions):
-            log.debug("Not sending options message for new connection(%s) to %s "
-                      "because compression is disabled and a cql version was not "
-                      "specified", id(self), self.host)
-            self._compressor = None
-            self.cql_version = DEFAULT_CQL_VERSION
-            self._send_startup_message(no_compact=self.no_compact)
-        else:
-            log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.host)
-            self.send_msg(OptionsMessage(), self.get_request_id(), self._handle_options_response)
+        log.debug("Sending initial options message for new connection (%s) to %s", id(self), self.endpoint)
+        self.send_msg(OptionsMessage(), self.get_request_id(), self._handle_options_response)
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
@@ -660,9 +1140,10 @@ class Connection(object):
                                           % (options_response,))
 
         log.debug("Received options response on new connection (%s) from %s",
-                  id(self), self.host)
+                  id(self), self.endpoint)
         supported_cql_versions = options_response.cql_versions
         remote_supported_compressions = options_response.options['COMPRESSION']
+        self._product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
 
         if self.cql_version:
             if self.cql_version not in supported_cql_versions:
@@ -690,7 +1171,7 @@ class Connection(object):
                     if self.compression not in remote_supported_compressions:
                         raise ProtocolError(
                             "The requested compression type (%s) is not supported by the Cassandra server at %s"
-                            % (self.compression, self.host))
+                            % (self.compression, self.endpoint))
                     compression_type = self.compression
                 else:
                     # our locally supported compressions are ordered to prefer
@@ -702,6 +1183,7 @@ class Connection(object):
 
                 # set the decompressor here, but set the compressor only after
                 # a successful Ready message
+                self._compression_type = compression_type
                 self._compressor, self.decompressor = \
                     locally_supported_compressions[compression_type]
 
@@ -710,7 +1192,8 @@ class Connection(object):
     @defunct_on_error
     def _send_startup_message(self, compression=None, no_compact=False):
         log.debug("Sending StartupMessage on %s", self)
-        opts = {}
+        opts = {'DRIVER_NAME': DRIVER_NAME,
+                'DRIVER_VERSION': DRIVER_VERSION}
         if compression:
             opts['COMPRESSION'] = compression
         if no_compact:
@@ -730,16 +1213,19 @@ class Connection(object):
                             "authentication (configured authenticator = %s)",
                             self.authenticator.__class__.__name__)
 
-            log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.host)
+            log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.endpoint)
             if self._compressor:
                 self.compressor = self._compressor
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
             log.debug("Got AuthenticateMessage on new connection (%s) from %s: %s",
-                      id(self), self.host, startup_response.authenticator)
+                      id(self), self.endpoint, startup_response.authenticator)
 
             if self.authenticator is None:
-                raise AuthenticationFailed('Remote end requires authentication.')
+                log.error("Failed to authenticate to %s. If you are trying to connect to a DSE cluster, "
+                          "consider using TransitionalModePlainTextAuthProvider "
+                          "if DSE authentication is configured with transitional mode" % (self.host,))
+                raise AuthenticationFailed('Remote end requires authentication')
 
             if isinstance(self.authenticator, dict):
                 log.debug("Sending credentials-based auth response on %s", self)
@@ -751,20 +1237,21 @@ class Connection(object):
                 self.authenticator.server_authenticator_class = startup_response.authenticator
                 initial_response = self.authenticator.initial_response()
                 initial_response = "" if initial_response is None else initial_response
-                self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(), self._handle_auth_response)
+                self.send_msg(AuthResponseMessage(initial_response), self.get_request_id(),
+                              self._handle_auth_response)
         elif isinstance(startup_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
-                      id(self), self.host, startup_response.summary_msg())
+                      id(self), self.endpoint, startup_response.summary_msg())
             if did_authenticate:
                 raise AuthenticationFailed(
                     "Failed to authenticate to %s: %s" %
-                    (self.host, startup_response.summary_msg()))
+                    (self.endpoint, startup_response.summary_msg()))
             else:
                 raise ConnectionException(
                     "Failed to initialize new connection to %s: %s"
-                    % (self.host, startup_response.summary_msg()))
+                    % (self.endpoint, startup_response.summary_msg()))
         elif isinstance(startup_response, ConnectionShutdown):
-            log.debug("Connection to %s was closed during the startup handshake", (self.host))
+            log.debug("Connection to %s was closed during the startup handshake", (self.endpoint))
             raise startup_response
         else:
             msg = "Unexpected response during Connection setup: %r"
@@ -789,17 +1276,17 @@ class Connection(object):
             self.send_msg(msg, self.get_request_id(), self._handle_auth_response)
         elif isinstance(auth_response, ErrorMessage):
             log.debug("Received ErrorMessage on new connection (%s) from %s: %s",
-                      id(self), self.host, auth_response.summary_msg())
+                      id(self), self.endpoint, auth_response.summary_msg())
             raise AuthenticationFailed(
                 "Failed to authenticate to %s: %s" %
-                (self.host, auth_response.summary_msg()))
+                (self.endpoint, auth_response.summary_msg()))
         elif isinstance(auth_response, ConnectionShutdown):
-            log.debug("Connection to %s was closed during the authentication process", self.host)
+            log.debug("Connection to %s was closed during the authentication process", self.endpoint)
             raise auth_response
         else:
             msg = "Unexpected response during Connection authentication to %s: %r"
-            log.error(msg, self.host, auth_response)
-            raise ProtocolError(msg % (self.host, auth_response))
+            log.error(msg, self.endpoint, auth_response)
+            raise ProtocolError(msg % (self.endpoint, auth_response))
 
     def set_keyspace_blocking(self, keyspace):
         if not keyspace or keyspace == self.keyspace:
@@ -814,7 +1301,7 @@ class Connection(object):
             raise ire.to_exception()
         except Exception as exc:
             conn_exc = ConnectionException(
-                "Problem while setting keyspace: %r" % (exc,), self.host)
+                "Problem while setting keyspace: %r" % (exc,), self.endpoint)
             self.defunct(conn_exc)
             raise conn_exc
 
@@ -822,7 +1309,7 @@ class Connection(object):
             self.keyspace = keyspace
         else:
             conn_exc = ConnectionException(
-                "Problem while setting keyspace: %r" % (result,), self.host)
+                "Problem while setting keyspace: %r" % (result,), self.endpoint)
             self.defunct(conn_exc)
             raise conn_exc
 
@@ -870,7 +1357,7 @@ class Connection(object):
                 callback(self, result.to_exception())
             else:
                 callback(self, self.defunct(ConnectionException(
-                    "Problem while setting keyspace: %r" % (result,), self.host)))
+                    "Problem while setting keyspace: %r" % (result,), self.endpoint)))
 
         # We've incremented self.in_flight above, so we "have permission" to
         # acquire a new request id
@@ -892,7 +1379,7 @@ class Connection(object):
         elif self.is_closed:
             status = " (closed)"
 
-        return "<%s(%r) %s:%d%s>" % (self.__class__.__name__, id(self), self.host, self.port, status)
+        return "<%s(%r) %s%s>" % (self.__class__.__name__, id(self), self.endpoint, status)
     __repr__ = __str__
 
 
@@ -953,7 +1440,7 @@ class HeartbeatFuture(object):
         self.connection = connection
         self.owner = owner
         log.debug("Sending options message heartbeat on idle connection (%s) %s",
-                  id(connection), connection.host)
+                  id(connection), connection.endpoint)
         with connection.lock:
             if connection.in_flight <= connection.max_request_id:
                 connection.in_flight += 1
@@ -968,12 +1455,12 @@ class HeartbeatFuture(object):
             if self._exception:
                 raise self._exception
         else:
-            raise OperationTimedOut("Connection heartbeat timeout after %s seconds" % (timeout,), self.connection.host)
+            raise OperationTimedOut("Connection heartbeat timeout after %s seconds" % (timeout,), self.connection.endpoint)
 
     def _options_callback(self, response):
         if isinstance(response, SupportedMessage):
             log.debug("Received options response on connection (%s) from %s",
-                      id(self.connection), self.connection.host)
+                      id(self.connection), self.connection.endpoint)
         else:
             if isinstance(response, ConnectionException):
                 self._exception = response
@@ -1014,13 +1501,13 @@ class ConnectionHeartbeat(Thread):
                                     futures.append(HeartbeatFuture(connection, owner))
                                 except Exception as e:
                                     log.warning("Failed sending heartbeat message on connection (%s) to %s",
-                                                id(connection), connection.host)
+                                                id(connection), connection.endpoint)
                                     failed_connections.append((connection, owner, e))
                             else:
                                 connection.reset_idle()
                         else:
                             log.debug("Cannot send heartbeat message on connection (%s) to %s",
-                                      id(connection), connection.host)
+                                      id(connection), connection.endpoint)
                             # make sure the owner sees this defunt/closed connection
                             owner.return_connection(connection)
                     self._raise_if_stopped()
@@ -1039,7 +1526,7 @@ class ConnectionHeartbeat(Thread):
                         connection.reset_idle()
                     except Exception as e:
                         log.warning("Heartbeat failed for connection (%s) to %s",
-                                    id(connection), connection.host)
+                                    id(connection), connection.endpoint)
                         failed_connections.append((f.connection, f.owner, e))
 
                     timeout = self._timeout - (time.time() - start_time)
