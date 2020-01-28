@@ -283,10 +283,6 @@ class NodeSyncMetadataTests(BasicSharedKeyspaceUnitTestCase):
         self.assertIn('nodesync =', table_meta.export_as_string())
         self.assertIn('nodesync', table_meta.options)
 
-        table_3rf = self.cluster.metadata.keyspaces["test3rf"].tables['test']
-        self.assertNotIn('nodesync =', table_3rf.export_as_string())
-        self.assertIsNone(table_3rf.options['nodesync'])
-
 
 @greaterthanorequaldse68
 class GraphMetadataTests(BasicExistingKeyspaceUnitTestCase):

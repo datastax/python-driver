@@ -514,9 +514,15 @@ class _AbstractTraversalTest(GraphUnitTestCase):
         wait_until_not_raised(
             lambda: self.session.cluster.register_user_type(self.graph_name, 'address', Address),
             1, 10)
-        self.session.cluster.register_user_type(self.graph_name, 'addressTags', AddressWithTags)
-        self.session.cluster.register_user_type(self.graph_name, 'complexAddress', ComplexAddress)
-        self.session.cluster.register_user_type(self.graph_name, 'complexAddressWithOwners', ComplexAddressWithOwners)
+        wait_until_not_raised(
+            lambda: self.session.cluster.register_user_type(self.graph_name, 'addressTags', AddressWithTags),
+            1, 10)
+        wait_until_not_raised(
+            lambda: self.session.cluster.register_user_type(self.graph_name, 'complexAddress', ComplexAddress),
+            1, 10)
+        wait_until_not_raised(
+            lambda: self.session.cluster.register_user_type(self.graph_name, 'complexAddressWithOwners', ComplexAddressWithOwners),
+            1, 10)
 
         data = {
             "udt1": ["typeOf('address')", Address('1440 Rd Smith', 'Quebec', 'QC')],
