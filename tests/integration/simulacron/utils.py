@@ -358,7 +358,9 @@ def prime_driver_defaults():
     # prepare empty rows for NGDG
     for query in [SchemaParserDSE68._SELECT_VERTICES,
                   SchemaParserDSE68._SELECT_EDGES]:
-        PrimeQuery(query, result='success', then={'rows': [], 'column_types': {'row1': 'int'}})
+        client_simulacron.submit_request(
+            PrimeQuery(query, result='success',
+            then={'rows': [], 'column_types': {'row1': 'int'}}))
 
 
 def prime_cluster(data_centers="3", version=None, cluster_name=DEFAULT_CLUSTER, dse_version=None):

@@ -31,6 +31,7 @@ from gremlin_python.process.traversal import P
 from gremlin_python.structure.graph import Edge as TravEdge
 from gremlin_python.structure.graph import Vertex as TravVertex, VertexProperty as TravVertexProperty
 
+from tests.util import wait_until_not_raised
 from tests.integration import DSE_VERSION, greaterthanorequaldse68
 from tests.integration.advanced.graph import GraphUnitTestCase, \
     ClassicGraphSchema, CoreGraphSchema, \
@@ -509,8 +510,10 @@ class _AbstractTraversalTest(GraphUnitTestCase):
                     property('owners', frozen(listOf(tupleOf(Text, Int)))).create();
                 """, execution_profile=ep)
 
-        time.sleep(2)  # wait the UDT to be discovered
-        self.session.cluster.register_user_type(self.graph_name, 'address', Address)
+        # wait max 10 seconds to get the UDT discovered.
+        wait_until_not_raised(
+            lambda: self.session.cluster.register_user_type(self.graph_name, 'address', Address),
+            1, 10)
         self.session.cluster.register_user_type(self.graph_name, 'addressTags', AddressWithTags)
         self.session.cluster.register_user_type(self.graph_name, 'complexAddress', ComplexAddress)
         self.session.cluster.register_user_type(self.graph_name, 'complexAddressWithOwners', ComplexAddressWithOwners)

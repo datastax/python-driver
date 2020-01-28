@@ -161,6 +161,8 @@ class BasicGraphQueryTest(BasicGraphUnitTestCase):
             s.execute_graph(statement, execution_profile=ep)
         except NoHostAvailable:
             self.assertTrue(DSE_VERSION >= Version("6.0"))
+        except InvalidRequest:
+            self.assertTrue(DSE_VERSION >= Version("5.1"))
         else:
             if DSE_VERSION < Version("6.8"):  # >6.8 returns true
                 self.fail("Should have risen ServerError or InvalidRequest")

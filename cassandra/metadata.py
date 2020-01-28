@@ -1407,7 +1407,6 @@ class TableMetadataV3(TableMetadata):
         return list(sorted(ret))
 
 
-# TODO This should inherit V4 later?
 class TableMetadataDSE68(TableMetadataV3):
 
     vertex = None
@@ -2932,7 +2931,7 @@ class SchemaParserDSE68(SchemaParserDSE67):
             QueryMessage(query=self._SELECT_VIRTUAL_KEYSPACES, consistency_level=cl),
             QueryMessage(query=self._SELECT_VIRTUAL_TABLES, consistency_level=cl),
             QueryMessage(query=self._SELECT_VIRTUAL_COLUMNS, consistency_level=cl),
-            # dse7.0 only
+            # dse6.8 only
             QueryMessage(query=self._SELECT_VERTICES, consistency_level=cl),
             QueryMessage(query=self._SELECT_EDGES, consistency_level=cl)
         ]
@@ -2969,12 +2968,21 @@ class SchemaParserDSE68(SchemaParserDSE67):
         self.indexes_result = self._handle_results(indexes_success, indexes_result)
         self.views_result = self._handle_results(views_success, views_result)
 
-        self.virtual_keyspaces_result = self._handle_results(virtual_ks_success,
-                                                             virtual_ks_result)
-        self.virtual_tables_result = self._handle_results(virtual_table_success,
-                                                          virtual_table_result)
-        self.virtual_columns_result = self._handle_results(virtual_column_success,
-                                                           virtual_column_result)
+        # These tables don't exist in some DSE versions reporting 4.X so we can
+        # ignore them if we got an error
+        self.virtual_keyspaces_result = self._handle_results(
+            virtual_ks_success, virtual_ks_result,
+            expected_failures=(InvalidRequest,)
+        )
+        self.virtual_tables_result = self._handle_results(
+            virtual_table_success, virtual_table_result,
+            expected_failures=(InvalidRequest,)
+        )
+        self.virtual_columns_result = self._handle_results(
+            virtual_column_success, virtual_column_result,
+            expected_failures=(InvalidRequest,)
+        )
+
         # dse6.8-only results
         self.vertices_result = self._handle_results(vertices_success, vertices_result)
         self.edges_result = self._handle_results(edges_success, edges_result)
