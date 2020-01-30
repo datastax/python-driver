@@ -23,6 +23,7 @@ Features
 * Enable Paging Through DSE Driver for Gremlin Traversals (PYTHON-1045)
 * Expose filter predicates for cql collections (PYTHON-1019)
 * Add g:TraversalMetrics/Metrics deserializers (PYTHON-1057)
+* Make graph metadata handling more robust (PYTHON-1204)
 
 3.21.0
 ======
