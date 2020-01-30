@@ -2843,26 +2843,7 @@ class SchemaParserDSE68(SchemaParserDSE67):
 
     def get_all_keyspaces(self):
         for keyspace_meta in super(SchemaParserDSE68, self).get_all_keyspaces():
-
-            def _build_table_graph_metadata(table_meta):
-                for row in self.keyspace_table_vertex_rows[keyspace_meta.name][table_meta.name]:
-                    vertex_meta = self._build_table_vertex_metadata(row)
-                    table_meta.vertex = vertex_meta
-
-                for row in self.keyspace_table_edge_rows[keyspace_meta.name][table_meta.name]:
-                    edge_meta = self._build_table_edge_metadata(keyspace_meta, row)
-                    table_meta.edge = edge_meta
-
-            # Make sure we process vertices before edges
-            for t in [t for t in six.itervalues(keyspace_meta.tables)
-                      if t.name in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
-                _build_table_graph_metadata(t)
-
-            # all other tables...
-            for t in [t for t in six.itervalues(keyspace_meta.tables)
-                      if t.name not in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
-                _build_table_graph_metadata(t)
-
+            self._build_graph_metadata(keyspace_meta)
             yield keyspace_meta
 
     def get_table(self, keyspaces, keyspace, table):
@@ -2877,10 +2858,16 @@ class SchemaParserDSE68(SchemaParserDSE67):
         vertices_result = self._handle_results(vertices_success, vertices_result)
         edges_result = self._handle_results(edges_success, edges_result)
 
-        if vertices_result:
-            table_meta.vertex = self._build_table_vertex_metadata(vertices_result[0])
-        elif edges_result:
-            table_meta.edge = self._build_table_edge_metadata(keyspaces[keyspace], edges_result[0])
+        try:
+            if vertices_result:
+                table_meta.vertex = self._build_table_vertex_metadata(vertices_result[0])
+            elif edges_result:
+                table_meta.edge = self._build_table_edge_metadata(keyspaces[keyspace], edges_result[0])
+        except Exception:
+            table_meta.vertex = None
+            table_meta.edge = None
+            table_meta._exc_info = sys.exc_info()
+            log.exception("Error while parsing graph metadata for table %s.%s.", keyspace, table)
 
         return table_meta
 
@@ -2892,6 +2879,32 @@ class SchemaParserDSE68(SchemaParserDSE67):
         replication_class = replication.pop("class") if 'class' in replication else None
         graph_engine = row.get("graph_engine", None)
         return KeyspaceMetadata(name, durable_writes, replication_class, replication, graph_engine)
+
+    def _build_graph_metadata(self, keyspace_meta):
+
+        def _build_table_graph_metadata(table_meta):
+            for row in self.keyspace_table_vertex_rows[keyspace_meta.name][table_meta.name]:
+                table_meta.vertex = self._build_table_vertex_metadata(row)
+
+            for row in self.keyspace_table_edge_rows[keyspace_meta.name][table_meta.name]:
+                table_meta.egde = self._build_table_edge_metadata(keyspace_meta, row)
+
+        try:
+            # Make sure we process vertices before edges
+            for table_meta in [t for t in six.itervalues(keyspace_meta.tables)
+                               if t.name in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
+                _build_table_graph_metadata(table_meta)
+
+            # all other tables...
+            for table_meta in [t for t in six.itervalues(keyspace_meta.tables)
+                               if t.name not in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
+                _build_table_graph_metadata(table_meta)
+        except Exception:
+            # schema error, remove all graph metadata for this keyspace
+            for t in six.itervalues(keyspace_meta.tables):
+                t.edge = t.vertex = None
+            keyspace_meta._exc_info = sys.exc_info()
+            log.exception("Error while parsing graph metadata for keyspace %s", keyspace_meta.name)
 
     @staticmethod
     def _build_table_vertex_metadata(row):

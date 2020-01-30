@@ -14,11 +14,12 @@
 
 from packaging.version import Version
 
+from cassandra.cluster import Cluster
 from tests.integration import (BasicExistingKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicSharedKeyspaceUnitTestCaseRF1,
                                greaterthanorequaldse51, greaterthanorequaldse60,
                                greaterthanorequaldse68, use_single_node,
-                               DSE_VERSION, requiredse)
+                               DSE_VERSION, requiredse, PROTOCOL_VERSION)
 
 try:
     import unittest2 as unittest
@@ -361,3 +362,35 @@ class GraphMetadataTests(BasicExistingKeyspaceUnitTestCase):
         self.assertEqual(edge_meta.to_label, 'rocksolidsoftware')
         self.assertEqual(edge_meta.to_partition_key_columns, ['company_name', 'software_name'])
         self.assertEqual(edge_meta.to_clustering_columns, ['software_version'])
+
+
+@greaterthanorequaldse68
+class GraphMetadataSchemaErrorTests(BasicExistingKeyspaceUnitTestCase):
+    """
+    Test that we can connect when the graph schema is broken.
+    """
+
+    def test_connection_on_graph_schema_error(self):
+        self.session = self.cluster.connect()
+
+        self.session.execute("""
+        CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} and graph_engine = 'Core';
+        """ % (self.ks_name,))
+
+        self.session.execute("""
+        CREATE TABLE %s.person (name text PRIMARY KEY) WITH VERTEX LABEL;
+        """ % (self.ks_name,))
+
+        self.session.execute("""
+        CREATE TABLE %s.software(company  text, name text, version int, PRIMARY KEY((company, name), version)) WITH VERTEX LABEL rocksolidsoftware;
+        """ % (self.ks_name,))
+
+        self.session.execute("""
+        CREATE TABLE %s.contributors (contributor text, company_name text, software_name text, software_version int,
+        PRIMARY KEY (contributor, company_name, software_name, software_version) )
+        WITH CLUSTERING ORDER BY (company_name ASC, software_name ASC, software_version ASC)
+        AND EDGE LABEL contrib FROM person(contributor) TO rocksolidsoftware((company_name, software_name), software_version);
+        """ % (self.ks_name,))
+
+        self.session.execute('TRUNCATE system_schema.vertices')
+        Cluster(protocol_version=PROTOCOL_VERSION).connect().shutdown()
