@@ -2546,18 +2546,19 @@ class Session(object):
         self.session_id = uuid.uuid4()
         self._graph_paging_available = self._check_graph_paging_available()
 
-        cc_host = self.cluster.get_control_connection_host()
-        valid_insights_version = (cc_host and version_supports_insights(cc_host.dse_version))
-        if self.cluster.monitor_reporting_enabled and valid_insights_version:
-            self._monitor_reporter = MonitorReporter(
-                interval_sec=self.cluster.monitor_reporting_interval,
-                session=self,
-            )
-        else:
-            if cc_host:
-                log.debug('Not starting MonitorReporter thread for Insights; '
-                          'not supported by server version {v} on '
-                          'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
+        if self.cluster.monitor_reporting_enabled:
+            cc_host = self.cluster.get_control_connection_host()
+            valid_insights_version = (cc_host and version_supports_insights(cc_host.dse_version))
+            if valid_insights_version:
+                self._monitor_reporter = MonitorReporter(
+                    interval_sec=self.cluster.monitor_reporting_interval,
+                    session=self,
+                )
+            else:
+                if cc_host:
+                    log.debug('Not starting MonitorReporter thread for Insights; '
+                              'not supported by server version {v} on '
+                              'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
 
         log.debug('Started Session with client_id {} and session_id {}'.format(self.cluster.client_id,
                                                                                self.session_id))
