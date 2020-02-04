@@ -3418,7 +3418,7 @@ class ControlConnection(object):
     _SELECT_SCHEMA_PEERS_TEMPLATE = "SELECT peer, host_id, {nt_col_name}, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
 
-    _MINIMUM_NATIVE_ADDRESS_VERSION = "4.0"
+    _MINIMUM_NATIVE_ADDRESS_DSE_VERSION = Version("6.0.0")
 
     _is_shutdown = False
     _timeout = None
@@ -3978,14 +3978,17 @@ class ControlConnection(object):
         field named nt_col_name.
         """
         host_release_version = self._cluster.metadata.get_host(connection.endpoint).release_version
-        if host_release_version:
-            use_native_address_query = host_release_version >= self._MINIMUM_NATIVE_ADDRESS_VERSION
-            if use_native_address_query:
-                select_peers_query = peers_query_template.format(nt_col_name="native_transport_address")
-            else:
+        host_dse_version = self._cluster.metadata.get_host(connection.endpoint).dse_version
+        uses_native_address_query = (
+            host_dse_version and Version(host_dse_version) >= self._MINIMUM_NATIVE_ADDRESS_DSE_VERSION)
+
+        if uses_native_address_query:
+            select_peers_query = peers_query_template.format(nt_col_name="native_transport_address")
+        elif host_release_version:
                 select_peers_query = peers_query_template.format(nt_col_name="rpc_address")
         else:
             select_peers_query = self._SELECT_PEERS
+
         return select_peers_query
 
     def _signal_error(self):
