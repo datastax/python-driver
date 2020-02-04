@@ -46,8 +46,8 @@ schedules:
       EXCLUDE_LONG=1
     matrix:
       exclude:
-        - python: [2.7, 3.4, 3.7, 3.8]
-        - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse', dse-4.8', 'dse-5.0']
+        - python: [2.7, 3.4, 3.7, 3.6, 3.8]
+        - cassandra: ['2.0', '2.1', '2.2', '3.0', '3.11', 'test-dse', 'dse-4.8', 'dse-5.0', 'dse-6.0', 'dse-6.7', 'dse-6.8']
 
   release_test:
     schedule: per_commit
@@ -157,6 +157,7 @@ cassandra:
   - '2.2'
   - '3.0'
   - '3.11'
+  - '4.0'
   - 'dse-4.8'
   - 'dse-5.0'
   - 'dse-5.1'
