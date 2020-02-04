@@ -6,6 +6,10 @@ Features
 --------
 * Add all() function to the ResultSet API (PYTHON-1203)
 
+Bug Fixes
+---------
+* Make sure to only query the native_transport_address column with DSE (PYTHON-1205)
+
 3.21.0
 ======
 January 15, 2020

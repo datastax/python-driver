@@ -172,7 +172,7 @@ else:  # we are testing against Cassandra or DDAC
         cassandra_version = Version(mcv_string)
 
     CASSANDRA_VERSION = Version(mcv_string) if mcv_string else cassandra_version
-    CCM_VERSION = mcv_string or cv_string
+    CCM_VERSION = mcv_string if mcv_string else cv_string
 
 CASSANDRA_IP = os.getenv('CLUSTER_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
@@ -454,7 +454,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
     set_default_cass_ip()
 
     if ccm_options is None and DSE_VERSION:
-        ccm_options = {"version": DSE_VERSION}
+        ccm_options = {"version": CCM_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
 

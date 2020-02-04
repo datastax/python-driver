@@ -9,7 +9,7 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6, 3.7, 3.8]
-        - cassandra: ['2.1', '3.0', 'test-dse']
+        - cassandra: ['2.1', '3.0', '4.0', 'test-dse']
 
   commit_long_test:
     schedule: per_commit
@@ -21,7 +21,7 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6, 3.7, 3.8]
-        - cassandra: ['2.1', '3.0', 'test-dse']
+        - cassandra: ['2.1', '3.0', '4.0', 'test-dse']
 
   commit_branches:
     schedule: per_commit
@@ -34,7 +34,7 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6, 3.7, 3.8]
-        - cassandra: ['2.1', '3.0', 'test-dse']
+        - cassandra: ['2.1', '3.0', '4.0', 'test-dse']
 
   commit_branches_dev:
     schedule: per_commit
@@ -47,7 +47,7 @@ schedules:
     matrix:
       exclude:
         - python: [2.7, 3.4, 3.7, 3.6, 3.8]
-        - cassandra: ['2.0', '2.1', '2.2', '3.0', '3.11', 'test-dse', 'dse-4.8', 'dse-5.0', 'dse-6.0', 'dse-6.7', 'dse-6.8']
+        - cassandra: ['2.0', '2.1', '2.2', '3.0', '4.0', 'test-dse', 'dse-4.8', 'dse-5.0', 'dse-6.0', 'dse-6.8']
 
   release_test:
     schedule: per_commit
@@ -139,7 +139,7 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6, 3.7, 3.8]
-        - cassandra: ['2.0', '2.1', '2.2', '3.0', 'test-dse']
+        - cassandra: ['2.0', '2.1', '2.2', '3.0', '4.0', 'test-dse']
 
 python:
   - 2.7
@@ -182,7 +182,7 @@ build:
       pip install --upgrade pip
       pip install -U setuptools
 
-      pip install git+ssh://git@github.com/riptano/ccm-private.git
+      pip install $HOME/ccm
 
       if [ -n "$CCM_IS_DSE" ]; then
         pip install -r test-datastax-requirements.txt
