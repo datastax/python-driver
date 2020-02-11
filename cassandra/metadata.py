@@ -2887,7 +2887,7 @@ class SchemaParserDSE68(SchemaParserDSE67):
                 table_meta.vertex = self._build_table_vertex_metadata(row)
 
             for row in self.keyspace_table_edge_rows[keyspace_meta.name][table_meta.name]:
-                table_meta.egde = self._build_table_edge_metadata(keyspace_meta, row)
+                table_meta.edge = self._build_table_edge_metadata(keyspace_meta, row)
 
         try:
             # Make sure we process vertices before edges
