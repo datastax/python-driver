@@ -25,6 +25,10 @@ Features
 * Add g:TraversalMetrics/Metrics deserializers (PYTHON-1057)
 * Make graph metadata handling more robust (PYTHON-1204)
 
+Bug Fixes
+---------
+* Make sure to only query the native_transport_address column with DSE (PYTHON-1205)
+
 3.21.0
 ======
 January 15, 2020
