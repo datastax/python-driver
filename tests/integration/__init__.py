@@ -530,7 +530,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 if Version(dse_version) >= Version('5.0'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-                if dse_version >= Version('5.1'):
+                if Version(dse_version) >= Version('5.1'):
                     # For Inet4Address
                     CCM_CLUSTER.set_dse_configuration_options({
                         'graph': {
