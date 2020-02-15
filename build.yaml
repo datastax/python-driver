@@ -184,6 +184,8 @@ build:
       pip install --upgrade pip
       pip install -U setuptools
 
+      # Remove this pyyaml installation when removing Python 3.4 support
+      pip install PyYAML==5.2
       pip install $HOME/ccm
 
       if [ -n "$CCM_IS_DSE" ]; then
