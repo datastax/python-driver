@@ -1,32 +1,25 @@
-DataStax Driver for Apache Cassandra
-====================================
+Scylla Python Driver
+====================
 
-.. image:: https://travis-ci.org/datastax/python-driver.png?branch=master
-   :target: https://travis-ci.org/datastax/python-driver
+A modern, feature-rich and highly-tunable Python client library for Scylla Open Source (2.1+) and Apache Cassandra (2.1+) and
+Scylla Enterprise (2018.1.x+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
 
-A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (2.1+) and
-DataStax Enterprise (4.7+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
+The driver supports Python versions 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
 
-The driver supports Python 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
-
-**Note:** DataStax products do not support big-endian systems.
-
-Feedback Requested
-------------------
-**Help us focus our efforts!** Provide your input on the `Platform and Runtime Survey <https://docs.google.com/a/datastax.com/forms/d/10wkbKLqmqs91gvhFW5u43y60pg_geZDolVNrxfO5_48/viewform>`_ (we kept it short).
+.. **Note:** DataStax products do not support big-endian systems.
 
 Features
 --------
-* `Synchronous <http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute_async>`_ APIs
-* `Simple, Prepared, and Batch statements <http://datastax.github.io/python-driver/api/cassandra/query.html#cassandra.query.Statement>`_
+* Synchronous and Asynchronous APIs
+* Simple, Prepared, and Batch statements 
 * Asynchronous IO, parallel execution, request pipelining
-* `Connection pooling <http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Cluster.get_core_connections_per_host>`_
+* Connection pooling 
 * Automatic node discovery
-* `Automatic reconnection <http://datastax.github.io/python-driver/api/cassandra/policies.html#reconnecting-to-dead-hosts>`_
-* Configurable `load balancing <http://datastax.github.io/python-driver/api/cassandra/policies.html#load-balancing>`_ and `retry policies <http://datastax.github.io/python-driver/api/cassandra/policies.html#retrying-failed-operations>`_
-* `Concurrent execution utilities <http://datastax.github.io/python-driver/api/cassandra/concurrent.html>`_
-* `Object mapper <http://datastax.github.io/python-driver/object_mapper.html>`_
-* `Connecting to DataStax Apollo database (cloud) <https://docs.datastax.com/en/developer/python-driver/latest/cloud/>`_
+* Automatic reconnection 
+* Configurable load balancing
+* Concurrent execution utilities
+* Object mapper
+* Connecting to DataStax Apollo database (cloud)
 * DSE Graph execution API
 * DSE Geometric type serialization
 * DSE PlainText and GSSAPI authentication
@@ -37,19 +30,18 @@ Installation through pip is recommended::
 
     $ pip install cassandra-driver
 
-For more complete installation instructions, see the
-`installation guide <http://datastax.github.io/python-driver/installation.html>`_.
+For more complete installation instructions, see the installation guide.
 
 Documentation
 -------------
-The documentation can be found online `here <http://datastax.github.io/python-driver/index.html>`_.
+The documentation can be found within this repository.
 
-A couple of links for getting up to speed:
+Information includes: 
 
-* `Installation <http://datastax.github.io/python-driver/installation.html>`_
-* `Getting started guide <http://datastax.github.io/python-driver/getting_started.html>`_
-* `API docs <http://datastax.github.io/python-driver/api/index.html>`_
-* `Performance tips <http://datastax.github.io/python-driver/performance.html>`_
+* Installation
+* Getting started guide
+* API docs 
+* Performance tips 
 
 Training
 --------
@@ -62,25 +54,24 @@ It connects to a Scylla cluster, displays the contents of a  table, inserts and 
 Object Mapper
 -------------
 cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contributions from the
-community) is now maintained as an integral part of this package. Refer to
-`documentation here <http://datastax.github.io/python-driver/object_mapper.html>`_.
+community) is now maintained as an integral part of this package. 
 
 Contributing
 ------------
-See `CONTRIBUTING.md <https://github.com/datastax/python-driver/blob/master/CONTRIBUTING.rst>`_.
+See CONTRIBUTING.md <https://github.com/scylladb/python-driver/blob/master/CONTRIBUTING.rst>`_.
 
 Reporting Problems
 ------------------
-Please report any bugs and make any feature requests on the
-`JIRA <https://datastax-oss.atlassian.net/browse/PYTHON>`_ issue tracker.
+Please report any bugs and make any feature requests by clicking the New Issue button in 
+`Github <https://github.com/scylladb/python-driver/issues>`_.
 
-If you would like to contribute, please feel free to open a pull request.
+If you would like to contribute, please feel free to send a pull request.
 
 Getting Help
 ------------
 Your best options for getting help with the driver are the
-`mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
-and the `DataStax Community <https://community.datastax.com>`_.
+`mailing list <https://groups.google.com/forum/#!forum/scylladb-users>`_
+and the Scylla Users `Slack channel <https://scylladb-users.slack.com>`_.
 
 License
 -------
