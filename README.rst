@@ -11,10 +11,6 @@ The driver supports Python 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
 
 **Note:** DataStax products do not support big-endian systems.
 
-Feedback Requested
-------------------
-**Help us focus our efforts!** Provide your input on the `Platform and Runtime Survey <https://docs.google.com/a/datastax.com/forms/d/10wkbKLqmqs91gvhFW5u43y60pg_geZDolVNrxfO5_48/viewform>`_ (we kept it short).
-
 Features
 --------
 * `Synchronous <http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <http://datastax.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute_async>`_ APIs
