@@ -426,6 +426,8 @@ class GraphExecutionProfile(ExecutionProfile):
 
         See :class:`.ExecutionProfile` for base attributes. Note that if not explicitly set,
         the row_factory and graph_options.graph_protocol are resolved during the query execution.
+        These options will resolve to graph_graphson3_row_factory and GraphProtocol.GRAPHSON_3_0
+        for the core graph engine (DSE 6.8+), otherwise graph_object_row_factory and GraphProtocol.GRAPHSON_1_0
 
         In addition to default parameters shown in the signature, this profile also defaults ``retry_policy`` to
         :class:`cassandra.policies.NeverRetryPolicy`.

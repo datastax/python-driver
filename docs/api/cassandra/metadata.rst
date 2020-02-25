@@ -37,6 +37,9 @@ Schemas
 .. autoclass:: TableMetadataV3 ()
    :members:
 
+.. autoclass:: TableMetadataDSE68 ()
+   :members:
+
 .. autoclass:: ColumnMetadata ()
    :members:
 

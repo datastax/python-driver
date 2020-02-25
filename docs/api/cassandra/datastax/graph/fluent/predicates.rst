@@ -7,5 +7,8 @@
 .. autoclass:: Search
    :members:
 
+.. autoclass:: CqlCollection
+   :members:
+
 .. autoclass:: Geo
    :members:

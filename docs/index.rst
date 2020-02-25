@@ -89,7 +89,6 @@ Contents
    graph
    classic_graph
    graph_fluent
-   dse_auth
    dates_and_times
    cloud
    faq
