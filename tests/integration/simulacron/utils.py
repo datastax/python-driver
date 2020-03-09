@@ -338,6 +338,33 @@ class ClearLogsQuery(SimulacronRequest):
         return "DELETE"
 
 
+class _PauseOrResumeReads(SimulacronRequest):
+    def __init__(self, cluster_name=DEFAULT_CLUSTER, dc_id=None, node_id=None):
+        self.path = "pause-reads/{}".format(cluster_name)
+        if dc_id is not None:
+            self.path += "/{}".format(dc_id)
+            if node_id is not None:
+                self.path += "/{}".format(node_id)
+        elif node_id:
+            raise Exception("Can't set node_id without dc_id")
+
+    @property
+    def method(self):
+        raise NotImplementedError()
+
+
+class PauseReads(_PauseOrResumeReads):
+    @property
+    def method(self):
+        return "PUT"
+
+
+class ResumeReads(_PauseOrResumeReads):
+    @property
+    def method(self):
+        return "DELETE"
+
+
 def prime_driver_defaults():
     """
     Function to prime the necessary queries so the test harness can run
