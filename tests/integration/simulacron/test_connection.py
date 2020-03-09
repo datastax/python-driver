@@ -24,7 +24,7 @@ from mock import Mock, patch
 from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
-from cassandra.policies import HostStateListener, RoundRobinPolicy
+from cassandra.policies import HostStateListener, RoundRobinPolicy, WhiteListRoundRobinPolicy
 
 from tests import connection_class, thread_pool_executor_class
 from tests.util import late
@@ -32,14 +32,14 @@ from tests.integration import requiressimulacron, libevtest
 from tests.integration.util import assert_quiescent_pool_state
 # important to import the patch PROTOCOL_VERSION from the simulacron module
 from tests.integration.simulacron import SimulacronBase, PROTOCOL_VERSION
-from cassandra.connection import DEFAULT_CQL_VERSION
+from cassandra.connection import DEFAULT_CQL_VERSION, Connection
 from tests.unit.cython.utils import cythontest
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
                                                 start_and_prime_cluster_defaults,
                                                 start_and_prime_singledc,
                                                 clear_queries, RejectConnections,
-                                                RejectType, AcceptConnections)
+                                                RejectType, AcceptConnections, PauseReads, ResumeReads)
 
 
 class TrackDownListener(HostStateListener):
@@ -475,3 +475,40 @@ class ConnectionTests(SimulacronBase):
         time.sleep(idle_heartbeat_timeout + idle_heartbeat_interval + 2)
 
         self.assertIsNotNone(session.execute("SELECT * from system.local"))
+
+    def test_max_in_flight(self):
+        """ Verify we don't exceed max_in_flight when borrowing connections or sending heartbeats """
+        Connection.max_in_flight = 50
+        start_and_prime_singledc()
+        profile = ExecutionProfile(request_timeout=1, load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        cluster = Cluster(
+            protocol_version=PROTOCOL_VERSION,
+            compression=False,
+            execution_profiles={EXEC_PROFILE_DEFAULT: profile},
+            idle_heartbeat_interval=.1,
+            idle_heartbeat_timeout=.1,
+        )
+        session = cluster.connect(wait_for_all_pools=True)
+        self.addCleanup(cluster.shutdown)
+
+        query = session.prepare("INSERT INTO table1 (id) VALUES (?)")
+
+        prime_request(PauseReads())
+
+        futures = []
+        # + 50 because simulacron doesn't immediately block all queries
+        for i in range(Connection.max_in_flight + 50):
+            futures.append(session.execute_async(query, ['a']))
+
+        prime_request(ResumeReads())
+
+        for future in futures:
+            # We're veryfing we don't get an assertion error from Connection.get_request_id,
+            # so skip any valid errors
+            try:
+                future.result()
+            except OperationTimedOut:
+                pass
+            except NoHostAvailable:
+                pass
+

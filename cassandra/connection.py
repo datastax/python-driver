@@ -692,6 +692,7 @@ class Connection(object):
         self._requests = {}
         self._iobuf = io.BytesIO()
         self._continuous_paging_sessions = {}
+        self._socket_writable = True
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -926,6 +927,8 @@ class Connection(object):
             raise ConnectionShutdown("Connection to %s is defunct" % self.endpoint)
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.endpoint)
+        elif not self._socket_writable:
+            raise ConnectionBusy("Connection %s is overloaded" % self.endpoint)
 
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
@@ -1443,7 +1446,7 @@ class HeartbeatFuture(object):
         log.debug("Sending options message heartbeat on idle connection (%s) %s",
                   id(connection), connection.endpoint)
         with connection.lock:
-            if connection.in_flight <= connection.max_request_id:
+            if connection.in_flight < connection.max_request_id:
                 connection.in_flight += 1
                 connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
             else:

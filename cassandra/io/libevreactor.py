@@ -310,6 +310,8 @@ class LibevConnection(Connection):
                 with self._deque_lock:
                     next_msg = self.deque.popleft()
             except IndexError:
+                if not self._socket_writable:
+                    self._socket_writable = True
                 return
 
             try:
@@ -317,6 +319,8 @@ class LibevConnection(Connection):
             except socket.error as err:
                 if (err.args[0] in NONBLOCKING or
                         err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE)):
+                    if err.args[0] in NONBLOCKING:
+                        self._socket_writable = False
                     with self._deque_lock:
                         self.deque.appendleft(next_msg)
                 else:
@@ -324,8 +328,10 @@ class LibevConnection(Connection):
                 return
             else:
                 if sent < len(next_msg):
+                    self._socket_writable = False
                     with self._deque_lock:
                         self.deque.appendleft(next_msg[sent:])
+                    return
 
     def handle_read(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
