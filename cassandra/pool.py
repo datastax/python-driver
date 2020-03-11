@@ -55,21 +55,60 @@ class Host(object):
 
     broadcast_address = None
     """
-    broadcast address configured for the node, *if available* ('peer' in system.peers table).
-    This is not present in the ``system.local`` table for older versions of Cassandra. It is also not queried if
-    :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    broadcast address configured for the node, *if available*:
+
+    'system.local.broadcast_address' or 'system.peers.peer' (Cassandra 2-3)
+    'system.local.broadcast_address' or 'system.peers_v2.peer' (Cassandra 4)
+
+    This is not present in the ``system.local`` table for older versions of Cassandra. It
+    is also not queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
+    """
+
+    broadcast_port = None
+    """
+    broadcast port configured for the node, *if available*:
+
+    'system.local.broadcast_port' or 'system.peers_v2.peer_port' (Cassandra 4)
+
+    It is also not queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
     """
 
     broadcast_rpc_address = None
     """
-    The broadcast rpc address of the node (`native_address` or `rpc_address`).
+    The broadcast rpc address of the node:
+
+    'system.local.rpc_address' or 'system.peers.rpc_address' (Cassandra 3)
+    'system.local.rpc_address' or 'system.peers.native_transport_address (DSE  6+)'
+    'system.local.rpc_address' or 'system.peers_v2.native_address (Cassandra 4)'
+    """
+
+    broadcast_rpc_port = None
+    """
+    The broadcast rpc port of the node, *if available*:
+    
+    'system.local.rpc_port' or 'system.peers.native_transport_port' (DSE 6+)
+    'system.local.rpc_port' or 'system.peers_v2.native_port' (Cassandra 4)
     """
 
     listen_address = None
     """
-    listen address configured for the node, *if available*. This is only available in the ``system.local`` table for newer
-    versions of Cassandra. It is also not queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
-    Usually the same as ``broadcast_address`` unless configured differently in cassandra.yaml.
+    listen address configured for the node, *if available*:
+
+    'system.local.listen_address'
+
+    This is only available in the ``system.local`` table for newer versions of Cassandra. It is also not
+    queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``. Usually the same as ``broadcast_address``
+    unless configured differently in cassandra.yaml.
+    """
+
+    listen_port = None
+    """
+    listen port configured for the node, *if available*:
+
+    'system.local.listen_port'
+
+    This is only available in the ``system.local`` table for newer versions of Cassandra. It is also not
+    queried if :attr:`~.Cluster.token_metadata_enabled` is ``False``.
     """
 
     conviction_policy = None

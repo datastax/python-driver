@@ -19,7 +19,8 @@ except ImportError:
 from functools import total_ordering
 
 from cassandra.cluster import Cluster
-from cassandra.connection import DefaultEndPoint, EndPoint, EndPointFactory
+from cassandra.connection import DefaultEndPoint, EndPoint, DefaultEndPointFactory
+from cassandra.metadata import _NodeInfo
 from tests.integration import requiressimulacron
 from tests.integration.simulacron import SimulacronCluster, PROTOCOL_VERSION
 
@@ -59,17 +60,10 @@ class AddressEndPoint(EndPoint):
         return "<%s: %s>" % (self.__class__.__name__, self.address)
 
 
-class AddressEndPointFactory(EndPointFactory):
+class AddressEndPointFactory(DefaultEndPointFactory):
 
     def create(self, row):
-        addr = None
-        if "rpc_address" in row:
-            addr = row.get("rpc_address")
-        if "native_transport_address" in row:
-            addr = row.get("native_transport_address")
-        if not addr or addr in ["0.0.0.0", "::"]:
-            addr = row.get("peer")
-
+        addr = _NodeInfo.get_broadcast_rpc_address(row)
         return AddressEndPoint(addr)
 
 
@@ -85,6 +79,7 @@ class EndPointTests(SimulacronCluster):
 
     def test_default_endpoint(self):
         hosts = self.cluster.metadata.all_hosts()
+        self.assertEqual(len(hosts), 3)
         for host in hosts:
             self.assertIsNotNone(host.endpoint)
             self.assertIsInstance(host.endpoint, DefaultEndPoint)
@@ -106,6 +101,7 @@ class EndPointTests(SimulacronCluster):
         cluster.connect(wait_for_all_pools=True)
 
         hosts = cluster.metadata.all_hosts()
+        self.assertEqual(len(hosts), 3)
         for host in hosts:
             self.assertIsNotNone(host.endpoint)
             self.assertIsInstance(host.endpoint, AddressEndPoint)

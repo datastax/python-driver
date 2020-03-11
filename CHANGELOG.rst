@@ -4,7 +4,8 @@ Unreleased
 
 Features
 --------
-Transient Replication Support (PYTHON-1207)
+* Transient Replication Support (PYTHON-1207)
+* Support system.peers_v2 and port discovery for C* 4.0 (PYTHON-700)
 
 Bug Fixes
 ---------

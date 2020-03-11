@@ -21,7 +21,7 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6, 3.7, 3.8]
-        - cassandra: ['2.1', '3.0', '4.0', 'test-dse']
+        - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_branches:
     schedule: per_commit
@@ -34,7 +34,7 @@ schedules:
     matrix:
       exclude:
         - python: [3.4, 3.6, 3.7, 3.8]
-        - cassandra: ['2.1', '3.0', '4.0', 'test-dse']
+        - cassandra: ['2.1', '3.0', 'test-dse']
 
   commit_branches_dev:
     schedule: per_commit
@@ -184,9 +184,11 @@ build:
       pip install --upgrade pip
       pip install -U setuptools
 
+      pip install git+ssh://git@github.com/riptano/ccm-private.git@cassandra-7544-native-ports-with-dse-fix
+
       # Remove this pyyaml installation when removing Python 3.4 support
       pip install PyYAML==5.2
-      pip install $HOME/ccm
+      #pip install $HOME/ccm
 
       if [ -n "$CCM_IS_DSE" ]; then
         pip install -r test-datastax-requirements.txt
