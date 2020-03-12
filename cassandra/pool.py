@@ -492,6 +492,7 @@ class HostConnection(object):
         arguments: this pool, and a list of any errors that occurred.
         """
         remaining_callbacks = set(self._connections.values())
+        remaining_callbacks_lock = Lock()
         errors = []
 
         if not remaining_callbacks:
@@ -500,7 +501,8 @@ class HostConnection(object):
 
         def connection_finished_setting_keyspace(conn, error):
             self.return_connection(conn)
-            remaining_callbacks.remove(conn)
+            with remaining_callbacks_lock:
+                remaining_callbacks.remove(conn)
             if error:
                 errors.append(error)
 
