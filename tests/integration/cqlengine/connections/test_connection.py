@@ -22,11 +22,11 @@ from cassandra import ConsistencyLevel
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns, connection, models
 from cassandra.cqlengine.management import sync_table
-from cassandra.cluster import Cluster, ExecutionProfile, _clusters_for_shutdown, _ConfigMode, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import ExecutionProfile, _clusters_for_shutdown, _ConfigMode, EXEC_PROFILE_DEFAULT
 from cassandra.policies import RoundRobinPolicy
 from cassandra.query import dict_factory
 
-from tests.integration import CASSANDRA_IP, PROTOCOL_VERSION, execute_with_long_wait_retry, local
+from tests.integration import CASSANDRA_IP, PROTOCOL_VERSION, execute_with_long_wait_retry, local, TestCluster
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE, setup_connection
 
@@ -76,7 +76,7 @@ class SeveralConnectionsTest(BaseCassEngTestCase):
         cls.keyspace1 = 'ctest1'
         cls.keyspace2 = 'ctest2'
         super(SeveralConnectionsTest, cls).setUpClass()
-        cls.setup_cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.setup_cluster = TestCluster()
         cls.setup_session = cls.setup_cluster.connect()
         ddl = "CREATE KEYSPACE {0} WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': '{1}'}}".format(cls.keyspace1, 1)
         execute_with_long_wait_retry(cls.setup_session, ddl)
@@ -93,7 +93,7 @@ class SeveralConnectionsTest(BaseCassEngTestCase):
         models.DEFAULT_KEYSPACE
 
     def setUp(self):
-        self.c = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.c = TestCluster()
         self.session1 = self.c.connect(keyspace=self.keyspace1)
         self.session1.row_factory = dict_factory
         self.session2 = self.c.connect(keyspace=self.keyspace2)
@@ -149,7 +149,7 @@ class ConnectionInitTest(unittest.TestCase):
         self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
 
     def test_connection_from_session_with_execution_profile(self):
-        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
+        cluster = TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
         session = cluster.connect()
         connection.default()
         connection.set_session(session)
@@ -157,7 +157,7 @@ class ConnectionInitTest(unittest.TestCase):
         self.assertEqual(conn.cluster._config_mode, _ConfigMode.PROFILES)
 
     def test_connection_from_session_with_legacy_settings(self):
-        cluster = Cluster(load_balancing_policy=RoundRobinPolicy())
+        cluster = TestCluster(load_balancing_policy=RoundRobinPolicy())
         session = cluster.connect()
         session.row_factory = dict_factory
         connection.set_session(session)
@@ -165,7 +165,7 @@ class ConnectionInitTest(unittest.TestCase):
         self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
 
     def test_uncommitted_session_uses_legacy(self):
-        cluster = Cluster()
+        cluster = TestCluster()
         session = cluster.connect()
         session.row_factory = dict_factory
         connection.set_session(session)
@@ -186,7 +186,7 @@ class ConnectionInitTest(unittest.TestCase):
         self.assertEqual(ConnectionModel.objects(key=0)[0].some_data, 'text0')
 
     def test_execution_profile_insert_query(self):
-        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
+        cluster = TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
         session = cluster.connect()
         connection.default()
         connection.set_session(session)

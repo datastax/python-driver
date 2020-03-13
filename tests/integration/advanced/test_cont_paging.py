@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from tests.integration import use_singledc, greaterthanorequaldse51, BasicSharedKeyspaceUnitTestCaseRF3WM, \
-    DSE_VERSION, ProtocolVersion, greaterthanorequaldse60, requiredse
+    DSE_VERSION, ProtocolVersion, greaterthanorequaldse60, requiredse, TestCluster
 
 import logging
 log = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ from six.moves import range
 from packaging.version import Version
 import time
 
-from cassandra.cluster import Cluster, ExecutionProfile, ContinuousPagingOptions
+from cassandra.cluster import ExecutionProfile, ContinuousPagingOptions
 from cassandra.concurrent import execute_concurrent
 from cassandra.query import SimpleStatement
 
@@ -64,7 +64,7 @@ class BaseContPagingTests():
     @classmethod
     def create_cluster(cls):
 
-        cls.cluster_with_profiles = Cluster(protocol_version=cls.protocol_version, execution_profiles=cls.execution_profiles)
+        cls.cluster_with_profiles = TestCluster(protocol_version=cls.protocol_version, execution_profiles=cls.execution_profiles)
 
         cls.session_with_profiles = cls.cluster_with_profiles.connect(wait_for_all_pools=True)
         statements_and_params = zip(

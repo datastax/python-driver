@@ -28,7 +28,7 @@ import time
 from unittest import SkipTest
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import NoHostAvailable, ConnectionShutdown, ExecutionProfile, EXEC_PROFILE_DEFAULT
 import cassandra.io.asyncorereactor
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
@@ -37,8 +37,9 @@ from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateList
 from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDRA_IP, local, \
-    requiresmallclockgranularity, greaterthancass20
+from tests.integration import use_singledc, get_node, CASSANDRA_IP, local, \
+    requiresmallclockgranularity, greaterthancass20, TestCluster
+
 try:
     from cassandra.io.libevreactor import LibevConnection
     import cassandra.io.libevreactor
@@ -56,15 +57,13 @@ def setup_module():
 class ConnectionTimeoutTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                                   execution_profiles=
-                                   {EXEC_PROFILE_DEFAULT: ExecutionProfile(
-                                       load_balancing_policy=HostFilterPolicy(
-                                            RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
-                                       )
-                                   )
-                                   }
-                               )
+        self.cluster = TestCluster(execution_profiles={
+            EXEC_PROFILE_DEFAULT: ExecutionProfile(
+                load_balancing_policy=HostFilterPolicy(
+                    RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
+                )
+            )
+        })
 
         self.session = self.cluster.connect()
 
@@ -118,7 +117,7 @@ class HeartbeatTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=1)
+        self.cluster = TestCluster(idle_heartbeat_interval=1)
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
     def tearDown(self):
@@ -217,7 +216,12 @@ class ConnectionTests(object):
         for i in range(5):
             try:
                 contact_point = CASSANDRA_IP
-                conn = self.klass.factory(endpoint=contact_point, timeout=timeout, protocol_version=PROTOCOL_VERSION)
+                conn = self.klass.factory(
+                    endpoint=contact_point,
+                    timeout=timeout,
+                    protocol_version=TestCluster.DEFAULT_PROTOCOL_VERSION,
+                    allow_beta_protocol_version=TestCluster.DEFAULT_ALLOW_BETA
+                )
                 break
             except (OperationTimedOut, NoHostAvailable, ConnectionShutdown) as e:
                 continue
@@ -412,10 +416,10 @@ class ConnectionTests(object):
         class C2(self.klass):
             pass
 
-        clusterC1 = Cluster(connection_class=C1)
+        clusterC1 = TestCluster(connection_class=C1)
         clusterC1.connect(wait_for_all_pools=True)
 
-        clusterC2 = Cluster(connection_class=C2)
+        clusterC2 = TestCluster(connection_class=C2)
         clusterC2.connect(wait_for_all_pools=True)
         self.addCleanup(clusterC1.shutdown)
         self.addCleanup(clusterC2.shutdown)

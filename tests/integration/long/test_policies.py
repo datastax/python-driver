@@ -18,9 +18,9 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra import ConsistencyLevel, Unavailable
-from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 
-from tests.integration import use_cluster, get_cluster, get_node
+from tests.integration import use_cluster, get_cluster, get_node, TestCluster
 
 
 def setup_module():
@@ -47,7 +47,7 @@ class RetryPolicyTests(unittest.TestCase):
         ep = ExecutionProfile(consistency_level=ConsistencyLevel.ALL,
                               serial_consistency_level=ConsistencyLevel.SERIAL)
 
-        cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep})
+        cluster = TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         session = cluster.connect()
 
         session.execute("CREATE KEYSPACE test_retry_policy_cas WITH replication = {'class':'SimpleStrategy','replication_factor': 3};")

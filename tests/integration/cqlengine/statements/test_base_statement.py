@@ -20,7 +20,6 @@ from uuid import uuid4
 import six
 
 from cassandra.query import FETCH_SIZE_UNSET
-from cassandra.cluster import Cluster, ConsistencyLevel
 from cassandra.cqlengine.statements import BaseCQLStatement
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.statements import InsertStatement, UpdateStatement, SelectStatement, DeleteStatement, \
@@ -30,7 +29,7 @@ from cassandra.cqlengine.columns import Column
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
-from tests.integration import greaterthanorequalcass3_10
+from tests.integration import greaterthanorequalcass3_10, TestCluster
 
 from cassandra.cqlengine.connection import execute
 
@@ -116,7 +115,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
 
         @test_category data_types:object_mapper
         """
-        cluster = Cluster()
+        cluster = TestCluster()
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
 

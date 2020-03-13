@@ -17,13 +17,13 @@ try:
 except ImportError:
     import unittest  # noqa
 
-from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, \
     WhiteListRoundRobinPolicy
 from cassandra.pool import Host
 from cassandra.connection import DefaultEndPoint
 
-from tests.integration import PROTOCOL_VERSION, local, use_singledc
+from tests.integration import local, use_singledc, TestCluster
 
 from concurrent.futures import wait as wait_futures
 
@@ -55,9 +55,9 @@ class HostFilterPolicyTests(unittest.TestCase):
         hfp = ExecutionProfile(
             load_balancing_policy=HostFilterPolicy(RoundRobinPolicy(), predicate=predicate)
         )
-        cluster = Cluster((contact_point,), execution_profiles={EXEC_PROFILE_DEFAULT: hfp},
-                          protocol_version=PROTOCOL_VERSION, topology_event_refresh_window=0,
-                          status_event_refresh_window=0)
+        cluster = TestCluster(contact_points=(contact_point,), execution_profiles={EXEC_PROFILE_DEFAULT: hfp},
+                              topology_event_refresh_window=0,
+                              status_event_refresh_window=0)
         session = cluster.connect(wait_for_all_pools=True)
 
         queried_hosts = set()
@@ -84,7 +84,7 @@ class WhiteListRoundRobinPolicyTests(unittest.TestCase):
     def test_only_connects_to_subset(self):
         only_connect_hosts = {"127.0.0.1", "127.0.0.2"}
         white_list = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(only_connect_hosts))
-        cluster = Cluster(execution_profiles={"white_list": white_list})
+        cluster = TestCluster(execution_profiles={"white_list": white_list})
         #cluster = Cluster(load_balancing_policy=WhiteListRoundRobinPolicy(only_connect_hosts))
         session = cluster.connect(wait_for_all_pools=True)
         queried_hosts = set()

@@ -14,8 +14,7 @@
 
 import unittest
 
-from cassandra.cluster import Cluster
-from tests.integration import CASSANDRA_IP, USE_CASS_EXTERNAL, use_cluster, PROTOCOL_VERSION
+from tests.integration import USE_CASS_EXTERNAL, use_cluster, TestCluster
 
 
 class MisconfiguredAuthenticationTests(unittest.TestCase):
@@ -34,7 +33,7 @@ class MisconfiguredAuthenticationTests(unittest.TestCase):
             cls.ccm_cluster = ccm_cluster
 
     def test_connect_no_auth_provider(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=[CASSANDRA_IP])
+        cluster = TestCluster()
         cluster.connect()
         cluster.refresh_nodes()
         down_hosts = [host for host in cluster.metadata.all_hosts() if not host.is_up]

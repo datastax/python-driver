@@ -20,13 +20,12 @@ except ImportError:
 import os
 import time
 
-from cassandra.cluster import Cluster
 from cassandra.cqlengine import columns, connection, models
 from cassandra.cqlengine.management import (CQLENG_ALLOW_SCHEMA_MANAGEMENT,
                                       create_keyspace_simple, drop_table,
                                       sync_table)
 from cassandra.cqlengine.statements import IsNotNull
-from tests.integration import DSE_VERSION, requiredse, CASSANDRA_IP, greaterthanorequaldse60
+from tests.integration import DSE_VERSION, requiredse, CASSANDRA_IP, greaterthanorequaldse60, TestCluster
 from tests.integration.advanced import use_single_node_with_graph_and_solr
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
@@ -65,7 +64,7 @@ class IsNotNullTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if DSE_VERSION:
-            cls.cluster = Cluster()
+            cls.cluster = TestCluster()
 
     @greaterthanorequaldse60
     def test_is_not_null_execution(self):
@@ -81,7 +80,7 @@ class IsNotNullTests(unittest.TestCase):
 
         @test_category cqlengine
         """
-        cluster = Cluster()
+        cluster = TestCluster()
         self.addCleanup(cluster.shutdown)
         session = cluster.connect()
 

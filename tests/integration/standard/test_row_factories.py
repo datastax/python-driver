@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass
+from tests.integration import get_server_versions, use_singledc, \
+    BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass, TestCluster
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest # noqa
 
-from cassandra.cluster import Cluster, ResultSet, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import ResultSet, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
 from cassandra.util import OrderedDict
 
@@ -86,8 +87,9 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         cls.select = "SELECT * FROM {0}.{1}".format(cls.ks_name, cls.ks_name)
 
     def _results_from_row_factory(self, row_factory):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                          execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=row_factory)})
+        cluster = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=row_factory)}
+        )
         with cluster:
             return cluster.connect().execute(self.select)
 
@@ -174,7 +176,7 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = TestCluster()
         cls.session = cls.cluster.connect()
         cls._cass_version, cls._cql_version = get_server_versions()
         ddl = '''
@@ -211,8 +213,9 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
         """
         can SELECT numeric column  using  dict_factory
         """
-        with Cluster(protocol_version=PROTOCOL_VERSION,
-                     execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}) as cluster:
+        with TestCluster(
+                execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        ) as cluster:
             try:
                 cluster.connect().execute('SELECT * FROM test1rf.table_num_col')
             except ValueError as e:
