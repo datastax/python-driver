@@ -41,7 +41,7 @@ log = logging.getLogger(__name__)
 
 __all__ = ['get_cloud_config']
 
-PRODUCT_APOLLO = "DATASTAX_APOLLO"
+DATASTAX_CLOUD_PRODUCT_TYPE = "DATASTAX_APOLLO"
 
 
 class CloudConfig(object):

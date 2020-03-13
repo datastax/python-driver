@@ -146,7 +146,7 @@ October 28, 2019
 
 Features
 --------
-* DataStax Apollo (Astra) Support (PYTHON-1074)
+* DataStax Astra Support (PYTHON-1074)
 * Use 4.0 schema parser in 4 alpha and snapshot builds (PYTHON-1158)
 
 Bug Fixes
