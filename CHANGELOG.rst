@@ -1,3 +1,11 @@
+3.23.0
+======
+Unreleased
+
+Bug Fixes
+---------
+* Asyncore logging exception on shutdown (PYTHON-1228)
+
 3.22.0
 ======
 February 26, 2020
