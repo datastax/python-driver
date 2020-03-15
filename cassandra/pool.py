@@ -380,7 +380,8 @@ class HostConnection(object):
                     self._connections[conn.shard_id] = conn
                     if self._keyspace:
                         self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
-
+                else:
+                    conn.close()
                 if len(self._connections.keys()) == first_connection.sharding_info.shards_count:
                     break
             if not len(self._connections.keys()) == first_connection.sharding_info.shards_count:
@@ -397,7 +398,7 @@ class HostConnection(object):
         if self.host.sharding_info:
             if routing_key:
                 t = self._session.cluster.metadata.token_map.token_class.from_key(routing_key)
-                shard_id =self.host.sharding_info.shard_id(t)
+                shard_id = self.host.sharding_info.shard_id(t)
             else:
                 shard_id = random.randint(0, self.host.sharding_info.shards_count - 1)
 
@@ -446,6 +447,7 @@ class HostConnection(object):
             if is_down:
                 self.shutdown()
             else:
+                connection.close()
                 del self._connections[connection.shard_id]
                 with self._lock:
                     if self._is_replacing:
