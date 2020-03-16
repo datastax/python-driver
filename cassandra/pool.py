@@ -373,19 +373,7 @@ class HostConnection(object):
 
         if first_connection.sharding_info:
             self.host.sharding_info = weakref.proxy(first_connection.sharding_info)
-            for _ in range(first_connection.sharding_info.shards_count * 2):
-                conn = self._session.cluster.connection_factory(self.host.endpoint)
-                if conn.shard_id not in self._connections.keys():
-                    log.debug("new connection created for shard_id=%i", conn.shard_id)
-                    self._connections[conn.shard_id] = conn
-                    if self._keyspace:
-                        self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
-                else:
-                    conn.close()
-                if len(self._connections.keys()) == first_connection.sharding_info.shards_count:
-                    break
-            if not len(self._connections.keys()) == first_connection.sharding_info.shards_count:
-                raise NoConnectionsAvailable("not enough shard connection opened")
+            self._open_connections_for_all_shards()
 
         log.debug("Finished initializing connection for host %s", self.host)
 
@@ -462,10 +450,7 @@ class HostConnection(object):
 
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.endpoint)
-            if self._keyspace:
-                conn.set_keyspace_blocking(self._keyspace)
-            self._connections[connection.shard_id] = conn
+            self._open_connections_for_all_shards()
         except Exception:
             log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
             self._session.submit(self._replace, connection)
@@ -486,6 +471,21 @@ class HostConnection(object):
             for c in self._connections.values():
                 c.close()
             self._connections = dict()
+
+    def _open_connections_for_all_shards(self):
+        for _ in range(self.host.sharding_info.shards_count * 2):
+            conn = self._session.cluster.connection_factory(self.host.endpoint)
+            if conn.shard_id not in self._connections.keys():
+                log.debug("new connection created for shard_id=%i", conn.shard_id)
+                self._connections[conn.shard_id] = conn
+                if self._keyspace:
+                    self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
+            else:
+                conn.close()
+            if len(self._connections.keys()) == self.host.sharding_info.shards_count:
+                break
+        if not len(self._connections.keys()) == self.host.sharding_info.shards_count:
+            raise NoConnectionsAvailable("not enough shard connections opened")
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         """
