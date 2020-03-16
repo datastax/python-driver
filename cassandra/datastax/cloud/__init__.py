@@ -41,7 +41,7 @@ log = logging.getLogger(__name__)
 
 __all__ = ['get_cloud_config']
 
-PRODUCT_APOLLO = "DATASTAX_APOLLO"
+DATASTAX_CLOUD_PRODUCT_TYPE = "DATASTAX_APOLLO"
 
 
 class CloudConfig(object):
@@ -138,7 +138,7 @@ def read_metadata_info(config, cloud_config):
     except Exception as e:
         log.exception(e)
         raise DriverException("Unable to connect to the metadata service at %s. "
-                              "Check the cluster status in the Constellation cloud console. " % url)
+                              "Check the cluster status in the cloud console. " % url)
 
     if response.code != 200:
         raise DriverException(("Error while fetching the metadata at: %s. "
@@ -183,7 +183,7 @@ def _pyopenssl_context_from_cert(ca_cert_location, cert_location, key_location):
     except ImportError as e:
         six.reraise(
             ImportError,
-            ImportError("PyOpenSSL must be installed to connect to Apollo with the Eventlet or Twisted event loops"),
+            ImportError("PyOpenSSL must be installed to connect to Astra with the Eventlet or Twisted event loops"),
             sys.exc_info()[2]
         )
     ssl_context = SSL.Context(SSL.TLSv1_METHOD)

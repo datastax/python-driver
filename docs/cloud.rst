@@ -2,9 +2,9 @@ Cloud
 -----
 Connecting
 ==========
-To connect to a DataStax Apollo cluster:
+To connect to a DataStax Astra cluster:
 
-1. Download the secure connect bundle from your Apollo account.
+1. Download the secure connect bundle from your Astra account.
 2. Connect to your cluster with
 
 .. code-block:: python
@@ -19,9 +19,9 @@ To connect to a DataStax Apollo cluster:
     cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
     session = cluster.connect()
 
-Apollo Differences
+Astra Differences
 ==================
-In most circumstances, the client code for interacting with an Apollo cluster will be the same as interacting with any other Cassandra cluster. The exceptions being:
+In most circumstances, the client code for interacting with an Astra cluster will be the same as interacting with any other Cassandra cluster. The exceptions being:
 
 * A cloud configuration must be passed to a :class:`~.Cluster` instance via the `cloud` attribute (as demonstrated above).
 * An SSL connection will be established automatically. Manual SSL configuration is not allowed, and using `ssl_context` or `ssl_options` will result in an exception.

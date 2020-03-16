@@ -48,7 +48,7 @@ Contents
     Some discussion on the driver's approach to working with timestamp, date, time types
 
 :doc:`cloud`
-    A guide to connecting to Datastax Apollo
+    A guide to connecting to Datastax Astra
 
 :doc:`geo_types`
     Working with DSE geometry types
