@@ -2,6 +2,10 @@
 ======
 Unreleased
 
+Features
+--------
+Transient Replication Support (PYTHON-1207)
+
 Bug Fixes
 ---------
 * Asyncore logging exception on shutdown (PYTHON-1228)

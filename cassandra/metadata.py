@@ -450,18 +450,37 @@ class _UnknownStrategy(ReplicationStrategy):
         return {}
 
 
+def parse_replication_factor(input_rf):
+    """
+    Given the inputted replication factor, returns a tuple containing number of total replicas
+    and number of transient replicas
+    """
+    transient_replicas = None
+    try:
+        total_replicas = int(input_rf)
+    except ValueError:
+        try:
+            rf = input_rf.split('/')
+            total_replicas, transient_replicas = int(rf[0]), int(rf[1])
+        except Exception:
+            raise ValueError("Unable to determine replication factor from: {}".format(input_rf))
+    return total_replicas, transient_replicas
+
+
 class SimpleStrategy(ReplicationStrategy):
 
     replication_factor = None
     """
     The replication factor for this keyspace.
     """
+    transient_replicas = None
+    """
+    The number of transient replicas for this keyspace.
+    """
 
     def __init__(self, options_map):
-        try:
-            self.replication_factor = int(options_map['replication_factor'])
-        except Exception:
-            raise ValueError("SimpleStrategy requires an integer 'replication_factor' option")
+        self._raw_replication_factor = options_map['replication_factor']
+        self.replication_factor, self.transient_replicas = parse_replication_factor(self._raw_replication_factor)
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
@@ -482,14 +501,14 @@ class SimpleStrategy(ReplicationStrategy):
         Returns a string version of these replication options which are
         suitable for use in a CREATE KEYSPACE statement.
         """
-        return "{'class': 'SimpleStrategy', 'replication_factor': '%d'}" \
-               % (self.replication_factor,)
+        return "{'class': 'SimpleStrategy', 'replication_factor': '%s'}" \
+               % (self._raw_replication_factor,)
 
     def __eq__(self, other):
         if not isinstance(other, SimpleStrategy):
             return False
 
-        return self.replication_factor == other.replication_factor
+        return str(self._raw_replication_factor) == str(other._raw_replication_factor)
 
 
 class NetworkTopologyStrategy(ReplicationStrategy):
@@ -500,12 +519,19 @@ class NetworkTopologyStrategy(ReplicationStrategy):
     """
 
     def __init__(self, dc_replication_factors):
-        self.dc_replication_factors = dict(
-            (str(k), int(v)) for k, v in dc_replication_factors.items())
+        try:
+            self.dc_replication_factors = dict(
+                (str(k), int(v)) for k, v in dc_replication_factors.items())
+        except ValueError:
+            self.dc_replication_factors = dict(
+                (str(k), str(v)) for k, v in dc_replication_factors.items())
 
     def make_token_replica_map(self, token_to_host_owner, ring):
-        dc_rf_map = dict((dc, int(rf))
-                         for dc, rf in self.dc_replication_factors.items() if rf > 0)
+        dc_rf_map = {}
+        for dc, rf in self.dc_replication_factors.items():
+            total_rf = parse_replication_factor(rf)[0]
+            if total_rf > 0:
+                dc_rf_map[dc] = total_rf
 
         # build a map of DCs to lists of indexes into `ring` for tokens that
         # belong to that DC
@@ -586,7 +612,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         """
         ret = "{'class': 'NetworkTopologyStrategy'"
         for dc, repl_factor in sorted(self.dc_replication_factors.items()):
-            ret += ", '%s': '%d'" % (dc, repl_factor)
+            ret += ", '%s': '%s'" % (dc, repl_factor)
         return ret + "}"
 
     def __eq__(self, other):

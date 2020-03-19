@@ -85,6 +85,89 @@ class StrategiesTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, rs.make_token_replica_map, None, None)
         self.assertRaises(NotImplementedError, rs.export_for_schema)
 
+    def test_simple_replication_type_parsing(self):
+        """ Test equality between passing numeric and string replication factor for simple strategy """
+        rs = ReplicationStrategy()
+
+        simple_int = rs.create('SimpleStrategy', {'replication_factor': 3})
+        simple_str = rs.create('SimpleStrategy', {'replication_factor': '3'})
+
+        self.assertEqual(simple_int.export_for_schema(), simple_str.export_for_schema())
+        self.assertEqual(simple_int, simple_str)
+
+        # make token replica map
+        ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
+        hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
+        token_to_host = dict(zip(ring, hosts))
+        self.assertEqual(
+            simple_int.make_token_replica_map(token_to_host, ring),
+            simple_str.make_token_replica_map(token_to_host, ring)
+        )
+
+    def test_transient_replication_parsing(self):
+        """ Test that we can PARSE a transient replication factor for SimpleStrategy """
+        rs = ReplicationStrategy()
+
+        simple_transient = rs.create('SimpleStrategy', {'replication_factor': '3/1'})
+        self.assertEqual(simple_transient.replication_factor, 3)
+        self.assertEqual(simple_transient.transient_replicas, 1)
+        self.assertIn("'replication_factor': '3/1'", simple_transient.export_for_schema())
+
+        simple_str = rs.create('SimpleStrategy', {'replication_factor': '3'})
+        self.assertNotEqual(simple_transient, simple_str)
+
+        # make token replica map
+        ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
+        hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
+        token_to_host = dict(zip(ring, hosts))
+        self.assertEqual(
+            simple_transient.make_token_replica_map(token_to_host, ring),
+            simple_str.make_token_replica_map(token_to_host, ring)
+        )
+
+    def test_nts_replication_parsing(self):
+        """ Test equality between passing numeric and string replication factor for NTS """
+        rs = ReplicationStrategy()
+
+        nts_int = rs.create('NetworkTopologyStrategy', {'dc1': 3, 'dc2': 5})
+        nts_str = rs.create('NetworkTopologyStrategy', {'dc1': '3', 'dc2': '5'})
+
+        self.assertEqual(nts_int.dc_replication_factors['dc1'], 3)
+        self.assertEqual(nts_str.dc_replication_factors['dc1'], 3)
+
+        self.assertEqual(nts_int.export_for_schema(), nts_str.export_for_schema())
+        self.assertEqual(nts_int, nts_str)
+
+        # make token replica map
+        ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
+        hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
+        token_to_host = dict(zip(ring, hosts))
+        self.assertEqual(
+            nts_int.make_token_replica_map(token_to_host, ring),
+            nts_str.make_token_replica_map(token_to_host, ring)
+        )
+
+    def test_nts_transient_parsing(self):
+        """ Test that we can PARSE a transient replication factor for NTS """
+        rs = ReplicationStrategy()
+
+        nts_transient = rs.create('NetworkTopologyStrategy', {'dc1': '3/1', 'dc2': '5/1'})
+        self.assertEqual(nts_transient.dc_replication_factors['dc1'], '3/1')
+        self.assertEqual(nts_transient.dc_replication_factors['dc2'], '5/1')
+        self.assertIn("'dc1': '3/1', 'dc2': '5/1'", nts_transient.export_for_schema())
+
+        nts_str = rs.create('NetworkTopologyStrategy', {'dc1': '3', 'dc2': '5'})
+        self.assertNotEqual(nts_transient, nts_str)
+
+        # make token replica map
+        ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
+        hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
+        token_to_host = dict(zip(ring, hosts))
+        self.assertEqual(
+            nts_transient.make_token_replica_map(token_to_host, ring),
+            nts_str.make_token_replica_map(token_to_host, ring)
+        )
+
     def test_nts_make_token_replica_map(self):
         token_to_host_owner = {}
 
