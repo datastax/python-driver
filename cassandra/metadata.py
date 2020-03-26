@@ -386,6 +386,7 @@ class ReplicationStrategyTypeType(type):
         return cls
 
 
+
 @six.add_metaclass(ReplicationStrategyTypeType)
 class _ReplicationStrategy(object):
     options_map = None
@@ -453,37 +454,82 @@ class _UnknownStrategy(ReplicationStrategy):
         return {}
 
 
-def parse_replication_factor(input_rf):
+class ReplicationFactor(object):
     """
-    Given the inputted replication factor, returns a tuple containing number of total replicas
-    and number of transient replicas
+    Represent the replication factor of a keyspace.
     """
+
+    all_replicas = None
+    """
+    The number of total replicas.
+    """
+
+    full_replicas = None
+    """
+    The number of replicas that own a full copy of the data. This is the same
+    than `all_replicas` when transient replication is not enabled.
+    """
+
     transient_replicas = None
-    try:
-        total_replicas = int(input_rf)
-    except ValueError:
+    """
+    The number of transient replicas.
+
+    Only set if the keyspace has transient replication enabled.
+    """
+
+    def __init__(self, all_replicas, transient_replicas=None):
+        self.all_replicas = all_replicas
+        self.transient_replicas = transient_replicas
+        self.full_replicas = (all_replicas - transient_replicas) if transient_replicas else all_replicas
+
+    @staticmethod
+    def create(rf):
+        """
+        Given the inputted replication factor string, parse and return the ReplicationFactor instance.
+        """
+        transient_replicas = None
         try:
-            rf = input_rf.split('/')
-            total_replicas, transient_replicas = int(rf[0]), int(rf[1])
-        except Exception:
-            raise ValueError("Unable to determine replication factor from: {}".format(input_rf))
-    return total_replicas, transient_replicas
+            all_replicas = int(rf)
+        except ValueError:
+            try:
+                rf = rf.split('/')
+                all_replicas, transient_replicas = int(rf[0]), int(rf[1])
+            except Exception:
+                raise ValueError("Unable to determine replication factor from: {}".format(rf))
+
+        return ReplicationFactor(all_replicas, transient_replicas)
+
+    def __str__(self):
+        return ("%d/%d" % (self.all_replicas, self.transient_replicas) if self.transient_replicas
+                else "%d" % self.all_replicas)
+
+    def __eq__(self, other):
+        if not isinstance(other, ReplicationFactor):
+            return False
+
+        return self.all_replicas == other.all_replicas and self.full_replicas == other.full_replicas
 
 
 class SimpleStrategy(ReplicationStrategy):
 
-    replication_factor = None
+    replication_factor_info = None
     """
-    The replication factor for this keyspace.
-    """
-    transient_replicas = None
-    """
-    The number of transient replicas for this keyspace.
+    A :class:`cassandra.metadata.ReplicationFactor` instance.
     """
 
+    @property
+    def replication_factor(self):
+        """
+        The replication factor for this keyspace.
+
+        For backward compatibility, this returns the
+        :attr:`cassandra.metadata.ReplicationFactor.full_replicas` value of
+        :attr:`cassandra.metadata.SimpleStrategy.replication_factor_info`.
+        """
+        return self.replication_factor_info.full_replicas
+
     def __init__(self, options_map):
-        self._raw_replication_factor = options_map['replication_factor']
-        self.replication_factor, self.transient_replicas = parse_replication_factor(self._raw_replication_factor)
+        self.replication_factor_info = ReplicationFactor.create(options_map['replication_factor'])
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
@@ -505,36 +551,40 @@ class SimpleStrategy(ReplicationStrategy):
         suitable for use in a CREATE KEYSPACE statement.
         """
         return "{'class': 'SimpleStrategy', 'replication_factor': '%s'}" \
-               % (self._raw_replication_factor,)
+               % (str(self.replication_factor_info),)
 
     def __eq__(self, other):
         if not isinstance(other, SimpleStrategy):
             return False
 
-        return str(self._raw_replication_factor) == str(other._raw_replication_factor)
+        return str(self.replication_factor_info) == str(other.replication_factor_info)
 
 
 class NetworkTopologyStrategy(ReplicationStrategy):
 
+    dc_replication_factors_info = None
+    """
+    A map of datacenter names to the :class:`cassandra.metadata.ReplicationFactor` instance for that DC.
+    """
+
     dc_replication_factors = None
     """
     A map of datacenter names to the replication factor for that DC.
+
+    For backward compatibility, this maps to the :attr:`cassandra.metadata.ReplicationFactor.full_replicas`
+    value of the :attr:`cassandra.metadata.NetworkTopologyStrategy.dc_replication_factors_info` dict.
     """
 
     def __init__(self, dc_replication_factors):
-        try:
-            self.dc_replication_factors = dict(
-                (str(k), int(v)) for k, v in dc_replication_factors.items())
-        except ValueError:
-            self.dc_replication_factors = dict(
-                (str(k), str(v)) for k, v in dc_replication_factors.items())
+        self.dc_replication_factors_info = dict(
+            (str(k), ReplicationFactor.create(v)) for k, v in dc_replication_factors.items())
+        self.dc_replication_factors = dict(
+            (dc, rf.full_replicas) for dc, rf in self.dc_replication_factors_info.items())
 
     def make_token_replica_map(self, token_to_host_owner, ring):
-        dc_rf_map = {}
-        for dc, rf in self.dc_replication_factors.items():
-            total_rf = parse_replication_factor(rf)[0]
-            if total_rf > 0:
-                dc_rf_map[dc] = total_rf
+        dc_rf_map = dict(
+            (dc, full_replicas) for dc, full_replicas in self.dc_replication_factors.items()
+            if full_replicas > 0)
 
         # build a map of DCs to lists of indexes into `ring` for tokens that
         # belong to that DC
@@ -614,15 +664,15 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         suitable for use in a CREATE KEYSPACE statement.
         """
         ret = "{'class': 'NetworkTopologyStrategy'"
-        for dc, repl_factor in sorted(self.dc_replication_factors.items()):
-            ret += ", '%s': '%s'" % (dc, repl_factor)
+        for dc, rf in sorted(self.dc_replication_factors_info.items()):
+            ret += ", '%s': '%s'" % (dc, str(rf))
         return ret + "}"
 
     def __eq__(self, other):
         if not isinstance(other, NetworkTopologyStrategy):
             return False
 
-        return self.dc_replication_factors == other.dc_replication_factors
+        return self.dc_replication_factors_info == other.dc_replication_factors_info
 
 
 class LocalStrategy(ReplicationStrategy):

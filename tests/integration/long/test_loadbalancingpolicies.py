@@ -16,6 +16,7 @@ import logging
 import struct
 import sys
 import traceback
+from cassandra import cqltypes
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
@@ -29,7 +30,7 @@ from cassandra.policies import (
 )
 from cassandra.query import SimpleStatement
 
-from tests.integration import use_singledc, use_multidc, remove_cluster, TestCluster
+from tests.integration import use_singledc, use_multidc, remove_cluster, TestCluster, greaterthanorequalcass40, notdse
 from tests.integration.long.utils import (wait_for_up, create_schema,
                                           CoordinatorStats, force_stop,
                                           wait_for_down, decommission, start,
@@ -184,18 +185,19 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         """
 
         cluster = TestCluster()
+        self.addCleanup(cluster.shutdown)
 
         if murmur3 is not None:
             self.assertTrue(isinstance(cluster.profile_manager.default.load_balancing_policy, TokenAwarePolicy))
         else:
             self.assertTrue(isinstance(cluster.profile_manager.default.load_balancing_policy, DCAwareRoundRobinPolicy))
 
-        cluster.shutdown()
-
     def test_roundrobin(self):
         use_singledc()
         keyspace = 'test_roundrobin'
         cluster, session = self._cluster_session_with_lbp(RoundRobinPolicy())
+        self.addCleanup(cluster.shutdown)
+
         self._wait_for_nodes_up(range(1, 4), cluster)
         create_schema(cluster, session, keyspace, replication_factor=3)
         self._insert(session, keyspace)
@@ -226,12 +228,12 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 1, 0)
         self.coordinator_stats.assert_query_count_equals(self, 2, 6)
         self.coordinator_stats.assert_query_count_equals(self, 3, 6)
-        cluster.shutdown()
 
     def test_roundrobin_two_dcs(self):
         use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs'
         cluster, session = self._cluster_session_with_lbp(RoundRobinPolicy())
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 5), cluster)
 
         create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
@@ -260,12 +262,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 3)
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
-        cluster.shutdown()
-
     def test_roundrobin_two_dcs_2(self):
         use_multidc([2, 2])
         keyspace = 'test_roundrobin_two_dcs_2'
         cluster, session = self._cluster_session_with_lbp(RoundRobinPolicy())
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 5), cluster)
 
         create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
@@ -294,12 +295,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 3)
         self.coordinator_stats.assert_query_count_equals(self, 5, 3)
 
-        cluster.shutdown()
-
     def test_dc_aware_roundrobin_two_dcs(self):
         use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs'
         cluster, session = self._cluster_session_with_lbp(DCAwareRoundRobinPolicy('dc1'))
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 6))
 
         create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
@@ -312,12 +312,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 0)
         self.coordinator_stats.assert_query_count_equals(self, 5, 0)
 
-        cluster.shutdown()
-
     def test_dc_aware_roundrobin_two_dcs_2(self):
         use_multidc([3, 2])
         keyspace = 'test_dc_aware_roundrobin_two_dcs_2'
         cluster, session = self._cluster_session_with_lbp(DCAwareRoundRobinPolicy('dc2'))
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 6))
 
         create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
@@ -330,12 +329,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 4, 6)
         self.coordinator_stats.assert_query_count_equals(self, 5, 6)
 
-        cluster.shutdown()
-
     def test_dc_aware_roundrobin_one_remote_host(self):
         use_multidc([2, 2])
         keyspace = 'test_dc_aware_roundrobin_one_remote_host'
         cluster, session = self._cluster_session_with_lbp(DCAwareRoundRobinPolicy('dc2', used_hosts_per_remote_dc=1))
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 5))
 
         create_schema(cluster, session, keyspace, replication_strategy=[2, 2])
@@ -408,8 +406,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         except NoHostAvailable:
             pass
 
-        cluster.shutdown()
-
     def test_token_aware(self):
         keyspace = 'test_token_aware'
         self.token_aware(keyspace)
@@ -421,6 +417,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def token_aware(self, keyspace, use_prepared=False):
         use_singledc()
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=1)
@@ -485,13 +482,12 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.assertEqual(results, set([0, 12]))
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
 
-        cluster.shutdown()
-
     def test_token_aware_composite_key(self):
         use_singledc()
         keyspace = 'test_token_aware_composite_key'
         table = 'composite'
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=2)
@@ -520,12 +516,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self.assertTrue(results[0].i)
 
-        cluster.shutdown()
-
     def test_token_aware_with_rf_2(self, use_prepared=False):
         use_singledc()
         keyspace = 'test_token_aware_with_rf_2'
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 4), cluster)
 
         create_schema(cluster, session, keyspace, replication_factor=2)
@@ -546,19 +541,16 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
-        cluster.shutdown()
-
     def test_token_aware_with_local_table(self):
         use_singledc()
         cluster, session = self._cluster_session_with_lbp(TokenAwarePolicy(RoundRobinPolicy()))
+        self.addCleanup(cluster.shutdown)
         self._wait_for_nodes_up(range(1, 4), cluster)
 
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
         # this would blow up prior to 61b4fad
         r = session.execute(p, ('local',))
         self.assertEqual(r[0].key, 'local')
-
-        cluster.shutdown()
 
     def test_token_aware_with_shuffle_rf2(self):
         """
@@ -572,6 +564,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         """
         keyspace = 'test_token_aware_with_rf_2'
         cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=2)
+        self.addCleanup(cluster.shutdown)
 
         self._check_query_order_changes(session=session, keyspace=keyspace)
 
@@ -586,8 +579,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
-        cluster.shutdown()
-
     def test_token_aware_with_shuffle_rf3(self):
         """
         Test to validate the hosts are shuffled when the `shuffle_replicas` is truthy
@@ -600,6 +591,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         """
         keyspace = 'test_token_aware_with_rf_3'
         cluster, session = self._set_up_shuffle_test(keyspace, replication_factor=3)
+        self.addCleanup(cluster.shutdown)
 
         self._check_query_order_changes(session=session, keyspace=keyspace)
 
@@ -625,7 +617,47 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
-        cluster.shutdown()
+    @notdse
+    @greaterthanorequalcass40
+    def test_token_aware_with_transient_replication(self):
+        """
+        Test to validate that the token aware policy doesn't route any request to a transient node.
+
+        @since 3.23
+        @jira_ticket PYTHON-1207
+        @expected_result the requests are spread across the 2 full replicas and
+        no other nodes are queried by the coordinator.
+
+        @test_category policy
+        """
+        # We can test this with a single dc when CASSANDRA-15670 is fixed
+        use_multidc([3, 3])
+
+        cluster, session = self._cluster_session_with_lbp(
+            TokenAwarePolicy(DCAwareRoundRobinPolicy(), shuffle_replicas=True)
+        )
+        self.addCleanup(cluster.shutdown)
+
+        session.execute("CREATE KEYSPACE test_tr WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': '3/1', 'dc2': '3/1'};")
+        session.execute("CREATE TABLE test_tr.users (id int PRIMARY KEY, username text) WITH read_repair ='NONE';")
+        for i in range(100):
+            session.execute("INSERT INTO test_tr.users (id, username) VALUES (%d, 'user');" % (i,))
+
+        query = session.prepare("SELECT * FROM test_tr.users WHERE id = ?")
+        for i in range(100):
+            f = session.execute_async(query, (i,), trace=True)
+            full_dc1_replicas = [h for h in cluster.metadata.get_replicas('test_tr', cqltypes.Int32Type.serialize(i, cluster.protocol_version))
+                                 if h.datacenter == 'dc1']
+            self.assertEqual(len(full_dc1_replicas), 2)
+
+            f.result()
+            trace_hosts = [cluster.metadata.get_host(e.source) for e in f.get_query_trace().events]
+
+            for h in f.attempted_hosts:
+                self.assertIn(h, full_dc1_replicas)
+            for h in trace_hosts:
+                self.assertIn(h, full_dc1_replicas)
+
 
     def _set_up_shuffle_test(self, keyspace, replication_factor):
         use_singledc()
@@ -670,6 +702,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                 )
             }
         )
+        self.addCleanup(cluster.shutdown)
         session = cluster.connect()
         self._wait_for_nodes_up([1, 2, 3])
 
@@ -695,8 +728,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.fail()
         except NoHostAvailable:
             pass
-        finally:
-            cluster.shutdown()
 
     def test_black_list_with_host_filter_policy(self):
         """
