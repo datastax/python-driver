@@ -507,6 +507,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
                 CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
                 CCM_CLUSTER.set_configuration_options({'batch_size_warn_threshold_in_kb': 5})
+                if Version(dse_version) >= Version('5.0'):
+                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+                    CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
                 if Version(dse_version) >= Version('5.1'):
                     # For Inet4Address
                     CCM_CLUSTER.set_dse_configuration_options({

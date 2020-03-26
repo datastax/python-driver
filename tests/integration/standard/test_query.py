@@ -24,7 +24,7 @@ from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
-from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT, Cluster
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
@@ -488,7 +488,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
         base_line = None
         for proto_version in get_supported_protocol_versions():
             beta_flag = True if proto_version in ProtocolVersion.BETA_VERSIONS else False
-            cluster = TestCluster()
+            cluster = Cluster(protocol_version=proto_version, allow_beta_protocol_version=beta_flag)
 
             session = cluster.connect()
             select_statement = session.prepare("SELECT * FROM system.local")

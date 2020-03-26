@@ -65,7 +65,7 @@ class UnixSocketTest(unittest.TestCase):
         lbp = UnixSocketWhiteListRoundRobinPolicy([UNIX_SOCKET_PATH])
         ep = ExecutionProfile(load_balancing_policy=lbp)
         endpoint = UnixSocketEndPoint(UNIX_SOCKET_PATH)
-        cls.cluster = TestCluster([endpoint], execution_profiles={EXEC_PROFILE_DEFAULT: ep})
+        cls.cluster = TestCluster(contact_points=[endpoint], execution_profiles={EXEC_PROFILE_DEFAULT: ep})
 
     @classmethod
     def tearDownClass(cls):
