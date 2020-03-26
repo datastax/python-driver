@@ -75,7 +75,7 @@ def get_server_versions():
     if cass_version is not None:
         return (cass_version, cql_version)
 
-    c = Cluster()
+    c = TestCluster()
     s = c.connect()
     row = s.execute('SELECT cql_version, release_version FROM system.local')[0]
 
@@ -199,33 +199,14 @@ else:
     CCM_KWARGS['version'] = CCM_VERSION
 
 
-#This changes the default contact_point parameter in Cluster
-def set_default_cass_ip():
-    if CASSANDRA_IP.startswith("127.0.0."):
-        return
-    defaults = list(Cluster.__init__.__defaults__)
-    defaults = [[CASSANDRA_IP]] + defaults[1:]
-    try:
-        Cluster.__init__.__defaults__ = tuple(defaults)
-    except:
-        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
-
-
-def set_default_beta_flag_true():
-    defaults = list(Cluster.__init__.__defaults__)
-    defaults = (defaults[:28] + [True] + defaults[29:])
-    try:
-        Cluster.__init__.__defaults__ = tuple(defaults)
-    except:
-        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
-
-
+ALLOW_BETA_PROTOCOL = False
 def get_default_protocol():
-    if CASSANDRA_VERSION >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
             return ProtocolVersion.DSE_V2
         else:
-            set_default_beta_flag_true()
+            global ALLOW_BETA_PROTOCOL
+            ALLOW_BETA_PROTOCOL = True
             return ProtocolVersion.V5
     if CASSANDRA_VERSION >= Version('3.10'):
         if DSE_VERSION:
@@ -254,7 +235,7 @@ def get_supported_protocol_versions():
     4.0(C*) -> 5(beta),4,3
     4.0(DSE) -> DSE_v2, DSE_V1,4,3
 `   """
-    if CASSANDRA_VERSION >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
             return (3, 4, ProtocolVersion.DSE_V1, ProtocolVersion.DSE_V2)
         else:
@@ -293,7 +274,7 @@ def get_unsupported_upper_protocol():
     supported by the version of C* running
     """
 
-    if CASSANDRA_VERSION >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
             return None
         else:
@@ -341,9 +322,9 @@ greaterthanorequalcass31 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.1
 greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.6'), 'Cassandra version 3.6 or greater required')
 greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.10'), 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.11'), 'Cassandra version 3.11 or greater required')
-greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
-lessthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION <= Version('4.0'), 'Cassandra version less or equal to 4.0 required')
-lessthancass40 = unittest.skipUnless(CASSANDRA_VERSION < Version('4.0'), 'Cassandra version less than 4.0 required')
+greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0-a'), 'Cassandra version 4.0 or greater required')
+lessthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION <= Version('4.0-a'), 'Cassandra version less or equal to 4.0 required')
+lessthancass40 = unittest.skipUnless(CASSANDRA_VERSION < Version('4.0-a'), 'Cassandra version less than 4.0 required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
 greaterthanorequaldse68 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.8'), "DSE 6.8 or greater required for this test")
 greaterthanorequaldse67 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.7'), "DSE 6.7 or greater required for this test")
@@ -469,7 +450,6 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
     dse_cluster = True if DSE_VERSION else False
     if not workloads:
         workloads = []
-    set_default_cass_ip()
 
     if ccm_options is None and DSE_VERSION:
         ccm_options = {"version": CCM_VERSION}
@@ -527,9 +507,6 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
                 CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
                 CCM_CLUSTER.set_configuration_options({'batch_size_warn_threshold_in_kb': 5})
-                if Version(dse_version) >= Version('5.0'):
-                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                    CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
                 if Version(dse_version) >= Version('5.1'):
                     # For Inet4Address
                     CCM_CLUSTER.set_dse_configuration_options({
@@ -565,6 +542,12 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     if Version(cassandra_version) >= Version('3.0'):
                         CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                        if Version(cassandra_version) >= Version('4.0-a'):
+                            CCM_CLUSTER.set_configuration_options({
+                                'enable_materialized_views': True,
+                                'enable_sasi_indexes': True,
+                                'enable_transient_replication': True,
+                            })
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)
                 CCM_CLUSTER.populate(nodes, ipformat=ipformat)
@@ -699,9 +682,9 @@ def setup_keyspace(ipformat=None, wait=True, protocol_version=None):
         _protocol_version = PROTOCOL_VERSION
 
     if not ipformat:
-        cluster = Cluster(protocol_version=_protocol_version)
+        cluster = TestCluster(protocol_version=_protocol_version)
     else:
-        cluster = Cluster(contact_points=["::1"], protocol_version=_protocol_version)
+        cluster = TestCluster(contact_points=["::1"], protocol_version=_protocol_version)
     session = cluster.connect()
 
     try:
@@ -795,7 +778,7 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
 
     @classmethod
     def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, **cluster_kwargs):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, **cluster_kwargs)
+        cls.cluster = TestCluster(**cluster_kwargs)
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
@@ -981,3 +964,19 @@ def assert_startswith(s, prefix):
         raise AssertionError(
             '{} does not start with {}'.format(repr(s), repr(prefix))
         )
+
+
+class TestCluster(object):
+    DEFAULT_PROTOCOL_VERSION = default_protocol_version
+    DEFAULT_CASSANDRA_IP = CASSANDRA_IP
+    DEFAULT_ALLOW_BETA = ALLOW_BETA_PROTOCOL
+
+    def __new__(cls, **kwargs):
+        if 'protocol_version' not in kwargs:
+            kwargs['protocol_version'] = cls.DEFAULT_PROTOCOL_VERSION
+        if 'contact_points' not in kwargs:
+            kwargs['contact_points'] = [cls.DEFAULT_CASSANDRA_IP]
+        if 'allow_beta_protocol_version' not in kwargs:
+            kwargs['allow_beta_protocol_version'] = cls.DEFAULT_ALLOW_BETA
+        return Cluster(**kwargs)
+

@@ -30,7 +30,7 @@ from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy, Consta
 
 from mock import patch
 
-from tests.integration import requirescloudproxy
+from tests.integration import requirescloudproxy, TestCluster
 from tests.util import wait_until_not_raised
 from tests.integration.cloud import CloudProxyCluster, CLOUD_PROXY_SERVER
 

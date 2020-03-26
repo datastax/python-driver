@@ -19,7 +19,7 @@ import traceback
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
     WriteTimeout, WriteFailure
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.metadata import murmur3
 from cassandra.policies import (
@@ -29,7 +29,7 @@ from cassandra.policies import (
 )
 from cassandra.query import SimpleStatement
 
-from tests.integration import use_singledc, use_multidc, remove_cluster, PROTOCOL_VERSION
+from tests.integration import use_singledc, use_multidc, remove_cluster, TestCluster
 from tests.integration.long.utils import (wait_for_up, create_schema,
                                           CoordinatorStats, force_stop,
                                           wait_for_down, decommission, start,
@@ -62,8 +62,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def _connect_probe_cluster(self):
         if not self.probe_cluster:
             # distinct cluster so we can see the status of nodes ignored by the LBP being tested
-            self.probe_cluster = Cluster(schema_metadata_enabled=False, token_metadata_enabled=False,
-                                         execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())})
+            self.probe_cluster = TestCluster(
+                schema_metadata_enabled=False,
+                token_metadata_enabled=False,
+                execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())}
+            )
             self.probe_session = self.probe_cluster.connect()
 
     def _wait_for_nodes_up(self, nodes, cluster=None):
@@ -90,8 +93,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
     def _cluster_session_with_lbp(self, lbp):
         # create a cluster with no delay on events
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, topology_event_refresh_window=0, status_event_refresh_window=0,
-                          execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=lbp)})
+        cluster = TestCluster(topology_event_refresh_window=0, status_event_refresh_window=0,
+                              execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=lbp)})
         session = cluster.connect()
         return cluster, session
 
@@ -180,7 +183,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         @test_category load_balancing:token_aware
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
 
         if murmur3 is not None:
             self.assertTrue(isinstance(cluster.profile_manager.default.load_balancing_policy, TokenAwarePolicy))
@@ -659,11 +662,14 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         use_singledc()
         keyspace = 'test_white_list'
 
-        cluster = Cluster(('127.0.0.2',), protocol_version=PROTOCOL_VERSION,
-                          topology_event_refresh_window=0, status_event_refresh_window=0,
-                          execution_profiles={EXEC_PROFILE_DEFAULT:
-                                                  ExecutionProfile(load_balancing_policy=
-                                                                   WhiteListRoundRobinPolicy((IP_FORMAT % 2,)))})
+        cluster = TestCluster(
+            contact_points=('127.0.0.2',), topology_event_refresh_window=0, status_event_refresh_window=0,
+            execution_profiles={
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(
+                    load_balancing_policy=WhiteListRoundRobinPolicy((IP_FORMAT % 2,))
+                )
+            }
+        )
         session = cluster.connect()
         self._wait_for_nodes_up([1, 2, 3])
 
@@ -709,9 +715,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             child_policy=RoundRobinPolicy(),
             predicate=lambda host: host.address != ignored_address
         )
-        cluster = Cluster(
-            (IP_FORMAT % 1,),
-            protocol_version=PROTOCOL_VERSION,
+        cluster = TestCluster(
+            contact_points=(IP_FORMAT % 1,),
             topology_event_refresh_window=0,
             status_event_refresh_window=0,
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=hfp)}

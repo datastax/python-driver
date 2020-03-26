@@ -19,12 +19,13 @@ from cassandra import OperationTimedOut, InvalidRequest
 from cassandra.protocol import SyntaxException
 from cassandra.policies import WhiteListRoundRobinPolicy
 from cassandra.cluster import NoHostAvailable
-from cassandra.cluster import EXEC_PROFILE_GRAPH_DEFAULT, GraphExecutionProfile, Cluster
+from cassandra.cluster import EXEC_PROFILE_GRAPH_DEFAULT, GraphExecutionProfile,
 from cassandra.graph import single_object_row_factory, Vertex, graph_object_row_factory, \
     graph_graphson2_row_factory, graph_graphson3_row_factory
 from cassandra.util import SortedSet
 
-from tests.integration import PROTOCOL_VERSION, DSE_VERSION, greaterthanorequaldse51, greaterthanorequaldse68, requiredse
+from tests.integration import DSE_VERSION, greaterthanorequaldse51, greaterthanorequaldse68, \
+    requiredse, TestCluster
 from tests.integration.advanced.graph import BasicGraphUnitTestCase, GraphUnitTestCase, \
     GraphProtocol, ClassicGraphSchema, CoreGraphSchema, use_single_node_with_graph
 
@@ -149,8 +150,7 @@ class GraphProfileTests(BasicGraphUnitTestCase):
         exec_short_timeout.graph_options.graph_name = self.graph_name
 
         # Add a single execution policy on cluster creation
-        local_cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                                execution_profiles={"exec_dif_factory": exec_dif_factory})
+        local_cluster = TestCluster(execution_profiles={"exec_dif_factory": exec_dif_factory})
         local_session = local_cluster.connect()
         self.addCleanup(local_cluster.shutdown)
 

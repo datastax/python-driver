@@ -22,9 +22,8 @@ except ImportError:
     import unittest  # noqa
 
 
-from cassandra.cluster import Cluster
 from cassandra.protocol import ConfigurationException
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 from tests.integration.datatype_utils import update_datatypes
 
 
@@ -39,7 +38,7 @@ class ControlConnectionTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Native protocol 3,0+ is required for UDTs using %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = TestCluster()
 
     def tearDown(self):
         try:

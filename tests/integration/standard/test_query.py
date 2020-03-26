@@ -24,11 +24,11 @@ from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
                              BatchStatement, BatchType, dict_factory, TraceUnavailable)
-from cassandra.cluster import Cluster, NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
-    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION
+    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, TestCluster
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
@@ -122,9 +122,9 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
     def test_trace_ignores_row_factory(self):
-        with Cluster(protocol_version=PROTOCOL_VERSION,
-                    execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}) as cluster:
-
+        with TestCluster(
+                execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        ) as cluster:
             s = cluster.connect()
             query = "SELECT * FROM system.local"
             statement = SimpleStatement(query)
@@ -367,7 +367,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 class PreparedStatementTests(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = TestCluster()
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -488,7 +488,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
         base_line = None
         for proto_version in get_supported_protocol_versions():
             beta_flag = True if proto_version in ProtocolVersion.BETA_VERSIONS else False
-            cluster = Cluster(protocol_version=proto_version, allow_beta_protocol_version=beta_flag)
+            cluster = TestCluster()
 
             session = cluster.connect()
             select_statement = session.prepare("SELECT * FROM system.local")
@@ -523,7 +523,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         @jira_ticket PYTHON-556
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         """
-        clus = Cluster(protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
+        clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         session = clus.connect(wait_for_all_pools=True)
@@ -543,11 +543,10 @@ class PreparedStatementArgTest(unittest.TestCase):
         and the batch statement will be sent.
         """
         policy = ForcedHostIndexPolicy()
-        clus = Cluster(
+        clus = TestCluster(
             execution_profiles={
                 EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
             },
-            protocol_version=PROTOCOL_VERSION,
             prepare_on_all_hosts=False,
             reprepare_on_up=False,
         )
@@ -588,7 +587,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        clus = Cluster(protocol_version=PROTOCOL_VERSION, prepare_on_all_hosts=False, reprepare_on_up=False)
+        clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         table = "test3rf.%s" % self._testMethodName.lower()
@@ -647,7 +646,7 @@ class PrintStatementTests(unittest.TestCase):
         Highlight the difference between Prepared and Bound statements
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         session = cluster.connect()
 
         prepared = session.prepare('INSERT INTO test3rf.test (k, v) VALUES (?, ?)')
@@ -671,7 +670,7 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
                 "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = TestCluster()
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect(wait_for_all_pools=True)
@@ -802,7 +801,7 @@ class SerialConsistencyTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Serial Consistency, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = TestCluster()
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
@@ -894,7 +893,7 @@ class LightweightTransactionTests(unittest.TestCase):
                 % (PROTOCOL_VERSION,))
 
         serial_profile = ExecutionProfile(consistency_level=ConsistencyLevel.SERIAL)
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, execution_profiles={'serial': serial_profile})
+        self.cluster = TestCluster(execution_profiles={'serial': serial_profile})
         self.session = self.cluster.connect()
 
         ddl = '''
@@ -944,20 +943,15 @@ class LightweightTransactionTests(unittest.TestCase):
                 continue
             else:
                 # In this case result is an exception
-                if type(result).__name__ == "NoHostAvailable":
+                exception_type = type(result).__name__
+                if exception_type == "NoHostAvailable":
                     self.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
-                if type(result).__name__ == "WriteTimeout":
-                    received_timeout = True
-                    continue
-                if type(result).__name__ == "WriteFailure":
-                    received_timeout = True
-                    continue
-                if type(result).__name__ == "ReadTimeout":
-                    continue
-                if type(result).__name__ == "ReadFailure":
+                if exception_type in ["WriteTimeout", "WriteFailure", "ReadTimeout", "ReadFailure", "ErrorMessageSub"]:
+                    if type(result).__name__ in ["WriteTimeout", "WriteFailure"]:
+                        received_timeout = True
                     continue
 
-                self.fail("Unexpected exception %s: %s" % (type(result).__name__, result.message))
+                self.fail("Unexpected exception %s: %s" % (exception_type, result.message))
 
         # Make sure test passed
         self.assertTrue(received_timeout)
@@ -1084,7 +1078,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = TestCluster()
         self.session = self.cluster.connect()
         query = """
                 INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
@@ -1359,7 +1353,7 @@ class UnicodeQueryTest(BasicSharedKeyspaceUnitTestCase):
 class BaseKeyspaceTests():
     @classmethod
     def setUpClass(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = TestCluster()
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
 
@@ -1425,7 +1419,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = Cluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        cluster = TestCluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
         session = cluster.connect(self.alternative_ks)
         self.addCleanup(cluster.shutdown)
 
@@ -1442,8 +1436,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        pv = ProtocolVersion.DSE_V2 if DSE_VERSION else ProtocolVersion.V5
-        cluster = Cluster(protocol_version=pv, allow_beta_protocol_version=True)
+        cluster = TestCluster()
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
 
@@ -1461,8 +1454,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        pv = ProtocolVersion.DSE_V2 if DSE_VERSION else ProtocolVersion.V5
-        cluster = Cluster(protocol_version=pv, allow_beta_protocol_version=True)
+        cluster = TestCluster()
         session = cluster.connect(self.ks_name)
         self.addCleanup(cluster.shutdown)
 
@@ -1473,7 +1465,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
     @unittest.skip
     def test_lower_protocol(self):
-        cluster = Cluster(protocol_version=ProtocolVersion.V4)
+        cluster = TestCluster(protocol_version=ProtocolVersion.V4)
         session = cluster.connect(self.ks_name)
         self.addCleanup(cluster.shutdown)
 
@@ -1527,7 +1519,7 @@ class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
 class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_beta_protocol_version=True)
+        self.cluster = TestCluster()
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -1603,7 +1595,7 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
         @test_category query
         """
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_beta_protocol_version=True)
+        cluster = TestCluster()
         session = self.cluster.connect("system")
         self.addCleanup(cluster.shutdown)
 
@@ -1625,7 +1617,7 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
         @test_category query
         """
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, allow_beta_protocol_version=True)
+        cluster = TestCluster()
         session = self.cluster.connect()
         self.addCleanup(cluster.shutdown)
 
