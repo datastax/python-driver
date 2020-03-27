@@ -19,7 +19,7 @@ from cassandra import OperationTimedOut, InvalidRequest
 from cassandra.protocol import SyntaxException
 from cassandra.policies import WhiteListRoundRobinPolicy
 from cassandra.cluster import NoHostAvailable
-from cassandra.cluster import EXEC_PROFILE_GRAPH_DEFAULT, GraphExecutionProfile,
+from cassandra.cluster import EXEC_PROFILE_GRAPH_DEFAULT, GraphExecutionProfile
 from cassandra.graph import single_object_row_factory, Vertex, graph_object_row_factory, \
     graph_graphson2_row_factory, graph_graphson3_row_factory
 from cassandra.util import SortedSet
