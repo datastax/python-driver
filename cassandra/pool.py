@@ -473,6 +473,12 @@ class HostConnection(object):
             self._connections = {}
 
     def _open_connections_for_all_shards(self):
+        """
+        Loop over all the shards and make sure we have open connection to each one of them.
+
+        since there's no guarantee we'll get shards opened in a nicely sequence, and on each iteration we might get
+        a shared we already got. hence we need to continue this loop at least twice to get the shards we need opened.
+        """
         for _ in range(self.host.sharding_info.shards_count * 2):
             conn = self._session.cluster.connection_factory(self.host.endpoint)
             if conn.shard_id not in self._connections.keys():
