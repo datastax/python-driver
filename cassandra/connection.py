@@ -622,7 +622,10 @@ class ShardingInfo(object):
 
         return int(shard_id), ShardingInfo(shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb)
 
-    def shard_id(self, t):
+    def shard_id_from_token(self, t):
+        """
+        Convert a Murmur3 token to shard_id based on the number of shards on the host
+        """
         token = t.value
         token += MIN_LONG
         token <<= self.sharding_ignore_msb
@@ -633,6 +636,7 @@ class ShardingInfo(object):
         _sum = (mul1 >> 32) + mul2
         output = _sum >> 32
         return output
+
 
 class Connection(object):
 

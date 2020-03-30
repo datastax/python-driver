@@ -386,7 +386,7 @@ class HostConnection(object):
         if self.host.sharding_info:
             if routing_key:
                 t = self._session.cluster.metadata.token_map.token_class.from_key(routing_key)
-                shard_id = self.host.sharding_info.shard_id(t)
+                shard_id = self.host.sharding_info.shard_id_from_token(t)
             else:
                 shard_id = random.randint(0, self.host.sharding_info.shards_count - 1)
 

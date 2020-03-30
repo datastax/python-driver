@@ -20,13 +20,14 @@ except ImportError:
 from cassandra.connection import ShardingInfo
 from cassandra.metadata import Murmur3Token
 
+
 class TestShardAware(unittest.TestCase):
     def test_parsing_and_calculating_shard_id(self):
-        '''
+        """
         Testing the parsing of the options command
         and the calculation getting a shard id from a Murmur3 token
-        '''
-        class OptionsHolder():
+        """
+        class OptionsHolder(object):
             options = {
                 'SCYLLA_SHARD': ['1'], 
                 'SCYLLA_NR_SHARDS': ['12'],
@@ -37,8 +38,8 @@ class TestShardAware(unittest.TestCase):
         shard_id, shard_info = ShardingInfo.parse_sharding_info(OptionsHolder())
 
         self.assertEqual(shard_id, 1)
-        self.assertEqual(shard_info.shard_id(Murmur3Token.from_key(b"a")), 4)
-        self.assertEqual(shard_info.shard_id(Murmur3Token.from_key(b"b")), 6)
-        self.assertEqual(shard_info.shard_id(Murmur3Token.from_key(b"c")), 6)
-        self.assertEqual(shard_info.shard_id(Murmur3Token.from_key(b"e")), 4)
-        self.assertEqual(shard_info.shard_id(Murmur3Token.from_key(b"100000")), 2)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"a")), 4)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"b")), 6)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"c")), 6)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"e")), 4)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"100000")), 2)
