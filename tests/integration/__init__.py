@@ -200,6 +200,8 @@ else:
 
 
 ALLOW_BETA_PROTOCOL = False
+
+
 def get_default_protocol():
     if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
@@ -340,6 +342,7 @@ requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or
                                                "This test is not suitible for environments with large clock granularity")
 requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
 requirecassandra = unittest.skipIf(DSE_VERSION, "Cassandra required")
+notdse = unittest.skipIf(DSE_VERSION, "DSE not supported")
 requiredse = unittest.skipUnless(DSE_VERSION, "DSE required")
 requirescloudproxy = unittest.skipIf(CLOUD_PROXY_PATH is None, "Cloud Proxy path hasn't been specified")
 
@@ -368,6 +371,9 @@ def check_socket_listening(itf, timeout=60):
     return False
 
 
+USE_SINGLE_INTERFACE = os.getenv('USE_SINGLE_INTERFACE', False)
+
+
 def get_cluster():
     return CCM_CLUSTER
 
@@ -380,8 +386,8 @@ def use_multidc(dc_list, workloads=[]):
     use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True, workloads=workloads)
 
 
-def use_singledc(start=True, workloads=[]):
-    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads)
+def use_singledc(start=True, workloads=[], use_single_interface=USE_SINGLE_INTERFACE):
+    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads, use_single_interface=use_single_interface)
 
 
 def use_single_node(start=True, workloads=[], configuration_options={}, dse_options={}):
@@ -446,7 +452,7 @@ def start_cluster_wait_for_up(cluster):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, set_keyspace=True, ccm_options=None,
-                configuration_options={}, dse_options={}):
+                configuration_options={}, dse_options={}, use_single_interface=USE_SINGLE_INTERFACE):
     dse_cluster = True if DSE_VERSION else False
     if not workloads:
         workloads = []
@@ -553,7 +559,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                             })
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)
-                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat, use_single_interface=use_single_interface)
 
     try:
         jvm_args = []

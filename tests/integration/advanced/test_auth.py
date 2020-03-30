@@ -50,16 +50,17 @@ def teardown_module():
 
 def wait_role_manager_setup_then_execute(session, statements):
     for s in statements:
-        e = None
+        exc = None
         for attempt in range(3):
             try:
                 session.execute(s)
                 break
             except Exception as e:
+                exc = e
                 time.sleep(5)
         else:  # if we didn't reach `break`
-            if e is not None:
-                raise e
+            if exc is not None:
+                raise exc
 
 
 @attr('long')

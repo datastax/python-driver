@@ -90,6 +90,17 @@ class ExceptionTypeTest(unittest.TestCase):
 
 class ClusterTest(unittest.TestCase):
 
+    def test_tuple_for_contact_points(self):
+        cluster = Cluster(contact_points=[('localhost', 9045), ('127.0.0.2', 9046), '127.0.0.3'], port=9999)
+        for cp in cluster.endpoints_resolved:
+            if cp.address in ('::1', '127.0.0.1'):
+                self.assertEqual(cp.port, 9045)
+            elif cp.address == '127.0.0.2':
+                self.assertEqual(cp.port, 9046)
+            else:
+                self.assertEqual(cp.address, '127.0.0.3')
+                self.assertEqual(cp.port, 9999)
+
     def test_invalid_contact_point_types(self):
         with self.assertRaises(ValueError):
             Cluster(contact_points=[None], protocol_version=4, connect_timeout=1)

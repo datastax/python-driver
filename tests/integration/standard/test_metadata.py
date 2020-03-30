@@ -42,7 +42,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                get_supported_protocol_versions, greaterthancass20,
                                greaterthancass21, assert_startswith, greaterthanorequalcass40,
                                greaterthanorequaldse67, lessthancass40,
-                               TestCluster)
+                               TestCluster, DSE_VERSION)
 
 
 log = logging.getLogger(__name__)
@@ -52,11 +52,12 @@ def setup_module():
     use_singledc()
 
 
-class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
+class HostMetaDataTests(BasicExistingKeyspaceUnitTestCase):
     @local
-    def test_broadcast_listen_address(self):
+    def test_host_addresses(self):
         """
-        Check to ensure that the broadcast, rpc_address, listen adresss and host are is populated correctly
+        Check to ensure that the broadcast_address, broadcast_rpc_address,
+        listen adresss, ports and host are is populated correctly.
 
         @since 3.3
         @jira_ticket PYTHON-332
@@ -69,6 +70,11 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
             self.assertIsNotNone(host.broadcast_address)
             self.assertIsNotNone(host.broadcast_rpc_address)
             self.assertIsNotNone(host.host_id)
+
+            if not DSE_VERSION and CASSANDRA_VERSION >= Version('4-a'):
+                self.assertIsNotNone(host.broadcast_port)
+                self.assertIsNotNone(host.broadcast_rpc_port)
+
         con = self.cluster.control_connection.get_connections()[0]
         local_host = con.host
 

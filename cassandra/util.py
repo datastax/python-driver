@@ -189,17 +189,17 @@ def _addrinfo_to_ip_strings(addrinfo):
     extracts the IP address from the sockaddr portion of the result.
 
     Since this is meant to be used in conjunction with _addrinfo_or_none,
-    this will pass None and EndPont instances through unaffected.
+    this will pass None and EndPoint instances through unaffected.
     """
     if addrinfo is None:
         return None
-    return [entry[4][0] for entry in addrinfo]
+    return [(entry[4][0], entry[4][1]) for entry in addrinfo]
 
 
-def _resolve_contact_points_to_string_map(contact_points, port):
+def _resolve_contact_points_to_string_map(contact_points):
     return OrderedDict(
-        (cp, _addrinfo_to_ip_strings(_addrinfo_or_none(cp, port)))
-        for cp in contact_points
+        ('{cp}:{port}'.format(cp=cp, port=port), _addrinfo_to_ip_strings(_addrinfo_or_none(cp, port)))
+        for cp, port in contact_points
     )
 
 

@@ -338,20 +338,23 @@ class Metadata(object):
         with self._hosts_lock:
             return bool(self._hosts.pop(host.endpoint, False))
 
-    def get_host(self, endpoint_or_address):
+    def get_host(self, endpoint_or_address, port=None):
         """
-        Find a host in the metadata for a specific endpoint. If a string inet address is passed,
-        iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` attribute.
+        Find a host in the metadata for a specific endpoint. If a string inet address and port are passed,
+        iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` and
+        :attr:`~.pool.Host.broadcast_rpc_port`attributes.
         """
         if not isinstance(endpoint_or_address, EndPoint):
-            return self._get_host_by_address(endpoint_or_address)
+            return self._get_host_by_address(endpoint_or_address, port)
 
         return self._hosts.get(endpoint_or_address)
 
-    def _get_host_by_address(self, address):
+    def _get_host_by_address(self, address, port=None):
         for host in six.itervalues(self._hosts):
-            if host.broadcast_rpc_address == address:
+            if (host.broadcast_rpc_address == address and
+                    (port is None or host.broadcast_rpc_port is None or host.broadcast_rpc_port == port)):
                 return host
+
         return None
 
     def all_hosts(self):
@@ -3316,3 +3319,48 @@ def group_keys_by_replica(session, keyspace, table, keys):
 
     return dict(keys_per_host)
 
+
+# TODO next major reorg
+class _NodeInfo(object):
+    """
+    Internal utility functions to determine the different host addresses/ports
+    from a local or peers row.
+    """
+
+    @staticmethod
+    def get_broadcast_rpc_address(row):
+        # TODO next major, change the parsing logic to avoid any
+        #  overriding of a non-null value
+        addr = row.get("rpc_address")
+        if "native_address" in row:
+            addr = row.get("native_address")
+        if "native_transport_address" in row:
+            addr = row.get("native_transport_address")
+        if not addr or addr in ["0.0.0.0", "::"]:
+            addr = row.get("peer")
+
+        return addr
+
+    @staticmethod
+    def get_broadcast_rpc_port(row):
+        port = row.get("rpc_port")
+        if port is None or port == 0:
+            port = row.get("native_port")
+
+        return port if port and port > 0 else None
+
+    @staticmethod
+    def get_broadcast_address(row):
+        addr = row.get("broadcast_address")
+        if addr is None:
+            addr = row.get("peer")
+
+        return addr
+
+    @staticmethod
+    def get_broadcast_port(row):
+        port = row.get("broadcast_port")
+        if port is None or port == 0:
+            port = row.get("peer_port")
+
+        return port if port and port > 0 else None

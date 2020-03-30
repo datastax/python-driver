@@ -23,7 +23,7 @@ except ImportError:
 
 
 from cassandra.protocol import ConfigurationException
-from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster, greaterthanorequalcass40, notdse
 from tests.integration.datatype_utils import update_datatypes
 
 
@@ -103,3 +103,29 @@ class ControlConnectionTests(unittest.TestCase):
         new_host = self.cluster.get_control_connection_host()
         self.assertNotEqual(host, new_host)
 
+    @notdse
+    @greaterthanorequalcass40
+    def test_control_connection_port_discovery(self):
+        """
+        Test to validate that the correct port is discovered when peersV2 is used (C* 4.0+).
+
+        Unit tests already validate that the port can be picked up (or not) from the query. This validates
+        it picks up the correct port from a real server and is able to connect.
+        """
+        self.cluster = TestCluster()
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host, None)
+
+        self.session = self.cluster.connect()
+        cc_endpoint = self.cluster.control_connection._connection.endpoint
+
+        host = self.cluster.get_control_connection_host()
+        self.assertEqual(host.endpoint, cc_endpoint)
+        self.assertEqual(host.is_up, True)
+        hosts = self.cluster.metadata.all_hosts()
+        self.assertEqual(3, len(hosts))
+
+        for host in hosts:
+            self.assertEqual(9042, host.broadcast_rpc_port)
+            self.assertEqual(7000, host.broadcast_port)

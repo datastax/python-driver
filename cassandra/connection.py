@@ -214,25 +214,26 @@ class DefaultEndPointFactory(EndPointFactory):
 
     port = None
     """
-    If set, force all endpoints to use this port.
+    If no port is discovered in the row, this is the default port
+    used for endpoint creation. 
     """
 
     def __init__(self, port=None):
         self.port = port
 
     def create(self, row):
-        addr = None
-        if "rpc_address" in row:
-            addr = row.get("rpc_address")
-        if "native_transport_address" in row:
-            addr = row.get("native_transport_address")
-        if not addr or addr in ["0.0.0.0", "::"]:
-            addr = row.get("peer")
+        # TODO next major... move this class so we don't need this kind of hack
+        from cassandra.metadata import _NodeInfo
+        addr = _NodeInfo.get_broadcast_rpc_address(row)
+        port = _NodeInfo.get_broadcast_rpc_port(row)
+        if port is None:
+            port = self.port if self.port else 9042
 
         # create the endpoint with the translated address
+        # TODO next major, create a TranslatedEndPoint type
         return DefaultEndPoint(
             self.cluster.address_translator.translate(addr),
-            self.port if self.port is not None else 9042)
+            port)
 
 
 @total_ordering
