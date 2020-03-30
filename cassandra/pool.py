@@ -353,7 +353,7 @@ class HostConnection(object):
         # this is used in conjunction with the connection streams. Not using the connection lock because the connection can be replaced in the lifetime of the pool.
         self._stream_available_condition = Condition(self._lock)
         self._is_replacing = False
-        self._connections = dict()
+        self._connections = {}
 
         if host_distance == HostDistance.IGNORED:
             log.debug("Not opening connection to ignored host %s", self.host)
@@ -470,7 +470,7 @@ class HostConnection(object):
         if self._connections:
             for c in self._connections.values():
                 c.close()
-            self._connections = dict()
+            self._connections = {}
 
     def _open_connections_for_all_shards(self):
         for _ in range(self.host.sharding_info.shards_count * 2):
