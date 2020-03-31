@@ -54,7 +54,10 @@ Contents
     Working with DSE geometry types
 
 :doc:`graph`
-    Graph queries
+    Graph queries with the Core engine
+
+:doc:`classic_graph`
+    Graph queries with the Classic engine
 
 :doc:`graph_fluent`
     DataStax Graph Fluent API
