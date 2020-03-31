@@ -5,6 +5,7 @@ lwt
 object_mapper
 geo_types
 graph
+graph_fluent
 classic_graph
 performance
 query_paging
