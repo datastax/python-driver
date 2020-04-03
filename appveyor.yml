@@ -16,7 +16,6 @@ build_script:
   - cmd: |
       "%VS140COMNTOOLS%\..\..\VC\vcvarsall.bat" x86_amd64
       python setup.py install --no-cython
-      pip install git+ssh://git@github.com/riptano/ccm-private.git@cassandra-7544-native-ports-with-dse-fix
 test_script:
   -  ps: .\appveyor\run_test.ps1
 cache:
