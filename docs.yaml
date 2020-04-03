@@ -22,6 +22,8 @@ sections:
       # build extensions like libev
       CASS_DRIVER_NO_CYTHON=1 python setup.py build_ext --inplace --force
 versions:
+  - name: '3.23'
+    ref: a40a2af7
   - name: '3.22'
     ref: 1ccd5b99
   - name: '3.21'
