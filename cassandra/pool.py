@@ -382,17 +382,40 @@ class HostConnection(object):
             raise ConnectionException(
                 "Pool for %s is shutdown" % (self.host,), self.host)
 
-        shard_id = 0
-        if self.host.sharding_info:
-            if routing_key:
-                t = self._session.cluster.metadata.token_map.token_class.from_key(routing_key)
-                shard_id = self.host.sharding_info.shard_id_from_token(t)
-            else:
-                shard_id = random.randint(0, self.host.sharding_info.shards_count - 1)
+        if not self._connections:
+            raise NoConnectionsAvailable()
+
+        shard_id = None
+        if self.host.sharding_info and routing_key:
+            t = self._session.cluster.metadata.token_map.token_class.from_key(routing_key)
+            shard_id = self.host.sharding_info.shard_id_from_token(t)
 
         conn = self._connections.get(shard_id)
+
+        # missing shard aware connection to shard_id, let's schedule an
+        # optimistic try to connect to it
+        if shard_id is not None:
+            if conn:
+                log.debug(
+                    "Using connection to shard_id=%i on host %s for routing_key=%s",
+                    shard_id,
+                    self.host,
+                    routing_key
+                )
+            else:
+                self._session.submit(self._open_connection_to_missing_shards)
+                log.debug(
+                    "Trying to connect to missing shard_id=%i on host %s (%s/%i)",
+                    shard_id,
+                    self.host,
+                    len(self._connections.keys()),
+                    self.host.sharding_info.shards_count
+                )
+
+        # we couldn't find a shard aware connection, let's pick a random one
+        # from our pool
         if not conn:
-            raise NoConnectionsAvailable()
+            conn = self._connections.get(random.choice(list(self._connections.keys())))
 
         start = time.time()
         remaining = timeout
@@ -450,7 +473,12 @@ class HostConnection(object):
 
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
-            self._open_connections_for_all_shards()
+            if self.host.sharding_info:
+                if connection.shard_id in self._connections.keys():
+                    del self._connections[connection.shard_id]
+            else:
+                self._connections.clear()
+            self._open_connection_to_missing_shards()
         except Exception:
             log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
             self._session.submit(self._replace, connection)
@@ -472,27 +500,41 @@ class HostConnection(object):
                 c.close()
             self._connections = {}
 
+    def _open_connection_to_missing_shards(self):
+        """
+        Creates a new connection, checks its shard_id and populates our shard
+        aware connections if the current shard_id is missing a connection.
+
+        NOTE: This is an optimistic implementation since we cannot control
+        which shard we want to connect to from the client side and depend on
+        the round-robin of the system.clients shard_id attribution.
+        """
+        conn = self._session.cluster.connection_factory(self.host.endpoint)
+        if conn.shard_id not in self._connections.keys():
+            log.debug(
+                "New connection created to %s for shard_id=%i",
+                self.host,
+                conn.shard_id
+            )
+            self._connections[conn.shard_id] = conn
+            if self._keyspace:
+                self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
+        else:
+            conn.close()
+
     def _open_connections_for_all_shards(self):
         """
-        Loop over all the shards and make sure we have open connection to each one of them.
-
-        since there's no guarantee we'll get shards opened in a nicely sequence, and on each iteration we might get
-        a shared we already got. hence we need to continue this loop at least twice to get the shards we need opened.
+        Loop over all the shards and try to open a connection to each one.
         """
-        for _ in range(self.host.sharding_info.shards_count * 2):
-            conn = self._session.cluster.connection_factory(self.host.endpoint)
-            if conn.shard_id not in self._connections.keys():
-                log.debug("New connection created to %s for shard_id=%i", self.host, conn.shard_id)
-                self._connections[conn.shard_id] = conn
-                if self._keyspace:
-                    self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
-            else:
-                conn.close()
-            if len(self._connections.keys()) == self.host.sharding_info.shards_count:
-                break
-        if not len(self._connections.keys()) == self.host.sharding_info.shards_count:
-            missing_shards = self.host.sharding_info.shards_count - len(self._connections.keys())
-            raise NoConnectionsAvailable("Missing open connections to %i shards on host %s", missing_shards, self.host)
+        for shard_id in range(self.host.sharding_info.shards_count):
+            self._open_connection_to_missing_shards()
+        log.debug(
+            "Connected to %s/%i shards on host %s (%i missing)",
+            len(self._connections.keys()),
+            self.host.sharding_info.shards_count,
+            self.host,
+            self.host.sharding_info.shards_count - len(self._connections.keys())
+        )
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         """
