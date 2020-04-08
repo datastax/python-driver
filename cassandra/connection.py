@@ -615,6 +615,7 @@ class ShardingInfo(object):
         partitioner = message.options.get('SCYLLA_PARTITIONER', [''])[0] or None
         sharding_algorithm = message.options.get('SCYLLA_SHARDING_ALGORITHM', [''])[0] or None
         sharding_ignore_msb = message.options.get('SCYLLA_SHARDING_IGNORE_MSB', [''])[0] or None
+        log.debug("Parsing sharding info from message options %s", message.options)
 
         if not (shard_id or shards_count or partitioner == "org.apache.cassandra.dht.Murmur3Partitioner" or
             sharding_algorithm ==  "biased-token-round-robin" or sharding_ignore_msb):
