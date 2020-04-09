@@ -512,13 +512,20 @@ class HostConnection(object):
         conn = self._session.cluster.connection_factory(self.host.endpoint)
         if conn.shard_id not in self._connections.keys():
             log.debug(
-                "New connection created to %s for shard_id=%i",
-                self.host,
-                conn.shard_id
+                "New connection created to shard_id=%i on host %s",
+                conn.shard_id,
+                self.host
             )
             self._connections[conn.shard_id] = conn
             if self._keyspace:
                 self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
+            log.debug(
+                "Connected to %s/%i shards on host %s (%i missing)",
+                len(self._connections.keys()),
+                self.host.sharding_info.shards_count,
+                self.host,
+                self.host.sharding_info.shards_count - len(self._connections.keys())
+            )
         else:
             conn.close()
 
@@ -527,14 +534,7 @@ class HostConnection(object):
         Loop over all the shards and try to open a connection to each one.
         """
         for shard_id in range(self.host.sharding_info.shards_count):
-            self._open_connection_to_missing_shards()
-        log.debug(
-            "Connected to %s/%i shards on host %s (%i missing)",
-            len(self._connections.keys()),
-            self.host.sharding_info.shards_count,
-            self.host,
-            self.host.sharding_info.shards_count - len(self._connections.keys())
-        )
+            self._session.submit(self._open_connection_to_missing_shards)
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         """
