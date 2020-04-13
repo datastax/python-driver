@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import time
+import random
+from subprocess import run
+
+try:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+except ImportError:
+    from futures import ThreadPoolExecutor, as_completed  # noqa
 
 try:
     import unittest2 as unittest
@@ -19,20 +27,22 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra.cluster import Cluster
-from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy
+from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, ConstantReconnectionPolicy
+from cassandra import OperationTimedOut
 
-from tests.integration import use_cluster
+from tests.integration import use_cluster, get_node
 
 
 def setup_module():
     os.environ['SCYLLA_EXT_OPTS'] = "--smp 4 --memory 2048M"
-    use_cluster('shared_aware', [1], start=True)
+    use_cluster('shared_aware', [3], start=True)
 
 
 class TestShardAwareIntegration(unittest.TestCase):
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=4, load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
+        cls.cluster = Cluster(protocol_version=4, load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+                              reconnection_policy=ConstantReconnectionPolicy(1))
         cls.session = cls.cluster.connect()
 
     @classmethod
@@ -49,7 +59,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         self.assertIn('querying locally', "\n".join([event.description for event in events]))
 
         trace_id = results.response_future.get_query_trace_ids()[0]
-        traces = self.session.execute("SELECT * FROM system_traces.events WHERE session_id = %s", (trace_id, ))
+        traces = self.session.execute("SELECT * FROM system_traces.events WHERE session_id = %s", (trace_id,))
         events = [event for event in traces]
         for event in events:
             print(event.thread, event.activity)
@@ -57,14 +67,7 @@ class TestShardAwareIntegration(unittest.TestCase):
             self.assertEqual(event.thread, shard_name)
         self.assertIn('querying locally', "\n".join([event.activity for event in events]))
 
-    def test_all_tracing_coming_one_shard(self):
-        """
-        Testing that shard aware driver is sending the requests to the correct shards
-
-        using the traces to validate that all the action been executed on the the same shard.
-        this test is using prepared SELECT statements for this validation
-        """
-
+    def create_ks_and_cf(self):
         self.session.execute(
             """
             DROP KEYSPACE IF EXISTS preparedtests
@@ -73,7 +76,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         self.session.execute(
             """
             CREATE KEYSPACE preparedtests
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}
             """)
 
         self.session.execute("USE preparedtests")
@@ -87,41 +90,132 @@ class TestShardAwareIntegration(unittest.TestCase):
             )
             """)
 
-        prepared = self.session.prepare(
+    @staticmethod
+    def create_data(session):
+        session.execute("USE preparedtests")
+        prepared = session.prepare(
             """
             INSERT INTO cf0 (a, b, c) VALUES  (?, ?, ?)
             """)
 
         bound = prepared.bind(('a', 'b', 'c'))
-
-        self.session.execute(bound)
-
+        session.execute(bound)
         bound = prepared.bind(('e', 'f', 'g'))
-
-        self.session.execute(bound)
-
+        session.execute(bound)
         bound = prepared.bind(('100000', 'f', 'g'))
+        session.execute(bound)
 
-        self.session.execute(bound)
-
-        prepared = self.session.prepare(
+    def query_data(self, session, verify_in_tracing=True):
+        prepared = session.prepare(
             """
             SELECT * FROM cf0 WHERE a=? AND b=?
             """)
 
         bound = prepared.bind(('a', 'b'))
-        results = self.session.execute(bound, trace=True)
+        results = session.execute(bound, trace=True)
         self.assertEqual(results, [('a', 'b', 'c')])
-
-        self.verify_same_shard_in_tracing(results, "shard 1")
+        if verify_in_tracing:
+            self.verify_same_shard_in_tracing(results, "shard 1")
 
         bound = prepared.bind(('100000', 'f'))
-        results = self.session.execute(bound, trace=True)
+        results = session.execute(bound, trace=True)
         self.assertEqual(results, [('100000', 'f', 'g')])
 
-        self.verify_same_shard_in_tracing(results, "shard 0")
+        if verify_in_tracing:
+            self.verify_same_shard_in_tracing(results, "shard 0")
 
         bound = prepared.bind(('e', 'f'))
-        results = self.session.execute(bound, trace=True)
+        results = session.execute(bound, trace=True)
 
-        self.verify_same_shard_in_tracing(results, "shard 1")
+        if verify_in_tracing:
+            self.verify_same_shard_in_tracing(results, "shard 1")
+
+    def test_all_tracing_coming_one_shard(self):
+        """
+        Testing that shard aware driver is sending the requests to the correct shards
+
+        using the traces to validate that all the action been executed on the the same shard.
+        this test is using prepared SELECT statements for this validation
+        """
+
+        self.create_ks_and_cf()
+        self.create_data(self.session)
+        self.query_data(self.session)
+
+    def test_connect_from_multiple_clients(self):
+        """
+        verify that connection from multiple clients at the same time, are handled gracefully even
+        if shard are randomly(round-robin) acquired
+        """
+        self.create_ks_and_cf()
+
+        number_of_clients = 15
+        session_list = [self.session] + [self.cluster.connect() for _ in range(number_of_clients)]
+
+        with ThreadPoolExecutor(number_of_clients) as pool:
+            futures = [pool.submit(self.create_data, session) for session in session_list]
+            for result in as_completed(futures):
+                print(result)
+
+            futures = [pool.submit(self.query_data, session) for session in session_list]
+            for result in as_completed(futures):
+                print(result)
+
+    def test_closing_connections(self):
+        """
+        Verify that reconnection is working as expected, when connection are being closed.
+        """
+        self.create_ks_and_cf()
+        self.create_data(self.session)
+        self.query_data(self.session)
+
+        for i in range(6):
+            assert self.session._pools
+            pool = list(self.session._pools.values())[0]
+            if not pool._connections:
+                continue
+            shard_id = random.choice(list(pool._connections.keys()))
+            pool._connections.get(shard_id).close()
+            time.sleep(5)
+            self.query_data(self.session, verify_in_tracing=False)
+
+        time.sleep(10)
+        self.query_data(self.session)
+
+    def test_blocking_connections(self):
+        """
+        Verify that reconnection is working as expected, when connection are being blocked.
+        """
+        res = run('which iptables'.split(' '))
+        if not res.returncode == 0:
+            self.skipTest("iptables isn't installed")
+
+        self.create_ks_and_cf()
+        self.create_data(self.session)
+        self.query_data(self.session)
+
+        node1_ip_address, node1_port = get_node(1).network_interfaces['binary']
+
+        def remove_iptables():
+            run(('sudo iptables -t filter -D INPUT -p tcp --dport {node1_port} '
+                 '--destination {node1_ip_address}/32 -j REJECT --reject-with icmp-port-unreachable'
+                 ).format(node1_ip_address=node1_ip_address, node1_port=node1_port).split(' ')
+                )
+
+        self.addCleanup(remove_iptables)
+
+        for i in range(3):
+            run(('sudo iptables -t filter -A INPUT -p tcp --dport {node1_port} '
+                 '--destination {node1_ip_address}/32 -j REJECT --reject-with icmp-port-unreachable'
+                 ).format(node1_ip_address=node1_ip_address, node1_port=node1_port).split(' ')
+                )
+            time.sleep(5)
+            try:
+                self.query_data(self.session, verify_in_tracing=False)
+            except OperationTimedOut:
+                pass
+            remove_iptables()
+            time.sleep(5)
+            self.query_data(self.session, verify_in_tracing=False)
+
+        self.query_data(self.session)
