@@ -1,32 +1,147 @@
-dist: xenial
-sudo: false
-
 language: python
-python:
-  - "2.7"
-  - "3.5"
-  - "3.6"
-  - "3.7"
-  - "pypy2.7-6.0"
-  - "pypy3.5"
 
 env:
-  - CASS_DRIVER_NO_CYTHON=1
+  global:
+    - CIBW_TEST_COMMAND_LINUX="pytest --import-mode append {project}/tests/unit -k 'not test_connection_initialization' && EVENT_LOOP_MANAGER=gevent pytest --import-mode append {project}/tests/unit/io/test_geventreactor.py && EVENT_LOOP_MANAGER=eventlet pytest --import-mode append {project}/tests/unit/io/test_eventletreactor.py "
+    - CIBW_TEST_COMMAND_MACOS="pytest --import-mode append {project}/tests/unit -k 'not (test_multi_timer_validation or test_empty_connections or test_connection_initialization or test_timer_cancellation)' "
+    - CIBW_TEST_COMMAND_WINDOWS="pytest --import-mode append {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor or test_connection_initialization)\" "
+    - CIBW_BEFORE_TEST="pip install -r {project}/test-requirements.txt pytest"
+    - CIBW_BEFORE_BUILD_LINUX="rm -rf ~/.pyxbld && yum install -y redhat-rpm-config gcc libffi-devel python-devel libev libev-devel openssl openssl-devel"
+    - CASS_DRIVER_BUILD_CONCURRENCY=2
 
-addons:
-  apt:
-    packages:
-    - build-essential
-    - python-dev
-    - pypy-dev
-    - libc-ares-dev
-    - libev4
-    - libev-dev
+jobs:
+  allow_failures:
+    - arch: s390x
+    - arch: ppc64le
+    - arch: arm64
+
+  include:
+    # Integration tests with scylla
+    #- name: Integration Test
+    #  os: linux
+    #  dist: xenial
+    #  python: 3.7
+    #  script:
+    #    - ./ci/run_integration_test.sh
+    #  if: type = pull_request
+
+    # perform a linux builds
+    - name: CPython Linux 64
+      services: docker
+      env:
+        - CIBW_BUILD="cp*_x86_64"
+
+    - name: CPython Linux 32
+      services: docker
+      env:
+        - CIBW_BUILD="cp*_i686"
+        - CIBW_TEST_COMMAND_LINUX="" # TODO: enable tests
+      if: type != pull_request
+
+    - name: PyPy Linux
+      services: docker
+      env:
+        - CIBW_BUILD="pp*"
+        - CIBW_TEST_COMMAND_LINUX="" # TODO: enable tests
+      if: type != pull_request AND branch = master
+
+    # perform a linux S390X build
+    - name: IBM-Z (s390x)
+      services: docker
+      arch: s390x
+      env:
+        - CIBW_TEST_COMMAND_LINUX="" # TODO: enable tests
+        - CIBW_BUILD="cp37* cp38*"
+      if: type != pull_request AND branch = master
+
+    # perform a linux arm64 build
+    - name: ARM64 (aarch64)
+      services: docker
+      arch: arm64
+      env:
+        - CIBW_TEST_COMMAND_LINUX="" # TODO: enable tests
+        - CIBW_BUILD="cp37* cp38*"
+      if: type != pull_request AND branch = master
+
+    # perform a linux PPC64LE build
+    - name: PowerPC (ppc64le)
+      services: docker
+      arch: ppc64le
+      env:
+        - CIBW_TEST_COMMAND_LINUX="" # TODO: enable tests
+        - CIBW_BUILD="cp37* cp38*"
+      if: type != pull_request AND branch = master
+
+    # and a mac build
+    - name: CPython MacOS
+      os: osx
+      env:
+        - CIBW_BEFORE_TEST_MACOS="pip install -r {project}/test-requirements.txt pytest"
+        - CIBW_BUILD="cp37* cp38*"
+      before_install:
+        - brew install libev
+      language: shell
+
+    - name: PyPy MacOS
+      os: osx
+      env:
+        - CIBW_BEFORE_TEST_MACOS="pip install -r {project}/test-requirements.txt pytest"
+        - CIBW_BUILD="pp*"
+        - CIBW_TEST_COMMAND_MACOS="" # TODO: enable tests
+      before_install:
+        - brew install libev
+      language: shell
+      if: type != pull_request AND branch = master
+
+    # and a windows build
+    - name: CPython Windows 64
+      os: windows
+      language: shell
+      env: CIBW_BUILD="cp*win_amd64"
+      before_install:
+        - choco install python --version 3.8.0
+        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+        # make sure it's on PATH as 'python3'
+        - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+
+    - name: CPython Windows 32
+      os: windows
+      language: shell
+      env: CIBW_BUILD="cp*win32"
+      before_install:
+        - choco install python --version 3.8.0
+        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+        # make sure it's on PATH as 'python3'
+        - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+      if: type != pull_request AND branch = master
+
+    - name: PyPy Windows
+      os: windows
+      language: shell
+      env:
+        - CIBW_BUILD="pp*"
+        - CIBW_TEST_COMMAND_WINDOWS="" # TODO: enable tests
+      before_install:
+        - choco install python --version 3.8.0
+        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+        # make sure it's on PATH as 'python3'
+        - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+        - choco install openssl
+        - cmd.exe //c "RefreshEnv.cmd"
+      if: type != pull_request AND branch = master
 
 install:
-  - pip install tox-travis lz4
+  - python3 -m pip install cibuildwheel==1.3.0
 
 script:
-  - tox
-  - tox -e gevent_loop
-  - tox -e eventlet_loop
+  # build the wheels, put them into './wheelhouse'
+  - python3 -m cibuildwheel --output-dir wheelhouse
+
+
+after_success:
+  # if the release was tagged, upload them to PyPI
+  - |
+    if [[ $TRAVIS_TAG ]] && [[ "$TRAVIS_BRANCH" == "master" ]]; then
+      python3 -m pip install twine
+      python3 -m twine upload wheelhouse/*.whl
+    fi
