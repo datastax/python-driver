@@ -353,6 +353,7 @@ class HostConnection(object):
         # this is used in conjunction with the connection streams. Not using the connection lock because the connection can be replaced in the lifetime of the pool.
         self._stream_available_condition = Condition(self._lock)
         self._is_replacing = False
+        self._connecting = []
         self._connections = {}
 
         if host_distance == HostDistance.IGNORED:
@@ -402,8 +403,10 @@ class HostConnection(object):
                     self.host,
                     routing_key
                 )
-            else:
-                self._session.submit(self._open_connection_to_missing_shards)
+            elif shard_id not in self._connecting:
+                # rate controlled optimistic attempt to connect to a missing shard
+                self._connecting.append(shard_id)
+                self._session.submit(self._open_connection_to_missing_shard, shard_id)
                 log.debug(
                     "Trying to connect to missing shard_id=%i on host %s (%s/%i)",
                     shard_id,
@@ -476,9 +479,14 @@ class HostConnection(object):
             if self.host.sharding_info:
                 if connection.shard_id in self._connections.keys():
                     del self._connections[connection.shard_id]
+                self._connecting.append(connection.shard_id)
+                self._open_connection_to_missing_shard(connection.shard_id)
             else:
                 self._connections.clear()
-            self._open_connection_to_missing_shards()
+                connection = self._session.cluster.connection_factory(self.host.endpoint)
+                self._connections[connection.shard_id] = connection
+                if self._keyspace:
+                    connection.set_keyspace_blocking(self._keyspace)
         except Exception:
             log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
             self._session.submit(self._replace, connection)
@@ -488,6 +496,7 @@ class HostConnection(object):
                 self._stream_available_condition.notify()
 
     def shutdown(self):
+        log.debug("Shutting down connections to %s", self.host)
         with self._lock:
             if self.is_shutdown:
                 return
@@ -497,18 +506,27 @@ class HostConnection(object):
 
         if self._connections:
             for c in self._connections.values():
+                log.debug("Closing connection (%s) to %s", id(c), self.host)
                 c.close()
             self._connections = {}
 
-    def _open_connection_to_missing_shards(self):
+    def _open_connection_to_missing_shard(self, shard_id):
         """
         Creates a new connection, checks its shard_id and populates our shard
         aware connections if the current shard_id is missing a connection.
+
+        The `shard_id` parameter is only here to control parallelism on
+        attempts to connect. This means that if this attempt finds another
+        missing shard_id, we will keep it anyway.
 
         NOTE: This is an optimistic implementation since we cannot control
         which shard we want to connect to from the client side and depend on
         the round-robin of the system.clients shard_id attribution.
         """
+        with self._lock:
+            if self.is_shutdown:
+                return
+
         conn = self._session.cluster.connection_factory(self.host.endpoint)
         if conn.shard_id not in self._connections.keys():
             log.debug(
@@ -528,13 +546,20 @@ class HostConnection(object):
             )
         else:
             conn.close()
+        if shard_id in self._connecting:
+            self._connecting.remove(shard_id)
 
     def _open_connections_for_all_shards(self):
         """
         Loop over all the shards and try to open a connection to each one.
         """
+        with self._lock:
+            if self.is_shutdown:
+                return
+
         for shard_id in range(self.host.sharding_info.shards_count):
-            self._session.submit(self._open_connection_to_missing_shards)
+            self._connecting.append(shard_id)
+            self._session.submit(self._open_connection_to_missing_shard, shard_id)
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         """
@@ -575,6 +600,7 @@ class HostConnection(object):
     @property
     def open_count(self):
         return sum([1 if c and not (c.is_closed or c.is_defunct) else 0 for c in self._connections.values()])
+
 
 _MAX_SIMULTANEOUS_CREATION = 1
 _MIN_TRASH_INTERVAL = 10
