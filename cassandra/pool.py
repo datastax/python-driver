@@ -546,8 +546,7 @@ class HostConnection(object):
             )
         else:
             conn.close()
-        if shard_id in self._connecting:
-            self._connecting.discard(shard_id)
+        self._connecting.discard(shard_id)
 
     def _open_connections_for_all_shards(self):
         """
