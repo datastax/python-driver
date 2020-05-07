@@ -353,7 +353,7 @@ class HostConnection(object):
         # this is used in conjunction with the connection streams. Not using the connection lock because the connection can be replaced in the lifetime of the pool.
         self._stream_available_condition = Condition(self._lock)
         self._is_replacing = False
-        self._connecting = []
+        self._connecting = set()
         self._connections = {}
 
         if host_distance == HostDistance.IGNORED:
@@ -405,7 +405,7 @@ class HostConnection(object):
                 )
             elif shard_id not in self._connecting:
                 # rate controlled optimistic attempt to connect to a missing shard
-                self._connecting.append(shard_id)
+                self._connecting.add(shard_id)
                 self._session.submit(self._open_connection_to_missing_shard, shard_id)
                 log.debug(
                     "Trying to connect to missing shard_id=%i on host %s (%s/%i)",
@@ -479,7 +479,7 @@ class HostConnection(object):
             if self.host.sharding_info:
                 if connection.shard_id in self._connections.keys():
                     del self._connections[connection.shard_id]
-                self._connecting.append(connection.shard_id)
+                self._connecting.add(connection.shard_id)
                 self._open_connection_to_missing_shard(connection.shard_id)
             else:
                 self._connections.clear()
@@ -547,7 +547,7 @@ class HostConnection(object):
         else:
             conn.close()
         if shard_id in self._connecting:
-            self._connecting.remove(shard_id)
+            self._connecting.discard(shard_id)
 
     def _open_connections_for_all_shards(self):
         """
@@ -558,7 +558,7 @@ class HostConnection(object):
                 return
 
         for shard_id in range(self.host.sharding_info.shards_count):
-            self._connecting.append(shard_id)
+            self._connecting.add(shard_id)
             self._session.submit(self._open_connection_to_missing_shard, shard_id)
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
