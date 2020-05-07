@@ -476,17 +476,16 @@ class HostConnection(object):
 
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
+            if connection.shard_id in self._connections.keys():
+                del self._connections[connection.shard_id]
             if self.host.sharding_info:
-                if connection.shard_id in self._connections.keys():
-                    del self._connections[connection.shard_id]
                 self._connecting.add(connection.shard_id)
                 self._open_connection_to_missing_shard(connection.shard_id)
             else:
-                self._connections.clear()
                 connection = self._session.cluster.connection_factory(self.host.endpoint)
-                self._connections[connection.shard_id] = connection
                 if self._keyspace:
                     connection.set_keyspace_blocking(self._keyspace)
+                self._connections[connection.shard_id] = connection
         except Exception:
             log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
             self._session.submit(self._replace, connection)
