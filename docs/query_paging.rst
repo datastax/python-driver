@@ -86,7 +86,7 @@ You can resume the pagination when executing a new query by using the :attr:`.Re
     results = session.execute(statement)
 
     # save the paging_state somewhere and return current results
-    web_session['paging_stage'] = results.paging_state
+    web_session['paging_state'] = results.paging_state
 
 
     # resume the pagination sometime later...
