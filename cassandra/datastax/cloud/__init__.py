@@ -23,7 +23,7 @@ from six.moves.urllib.request import urlopen
 
 _HAS_SSL = True
 try:
-    from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+    from ssl import SSLContext, PROTOCOL_TLS, CERT_REQUIRED
 except:
     _HAS_SSL = False
 
@@ -169,7 +169,7 @@ def parse_metadata_info(config, http_data):
 
 
 def _ssl_context_from_cert(ca_cert_location, cert_location, key_location):
-    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context = SSLContext(PROTOCOL_TLS)
     ssl_context.load_verify_locations(ca_cert_location)
     ssl_context.verify_mode = CERT_REQUIRED
     ssl_context.load_cert_chain(certfile=cert_location, keyfile=key_location)
