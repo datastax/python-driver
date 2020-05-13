@@ -48,7 +48,7 @@ def initializeEnvironment() {
     pip install nose-ignore-docstring nose-exclude service_identity
   '''
 
-  if (params.CYTHON) {
+  if (env.CYTHON_ENABLED  == 'True') {
     sh label: 'Install cython modules', script: '''#!/bin/bash -lex
       pip install cython numpy
     '''
@@ -71,7 +71,7 @@ def initializeEnvironment() {
 }
 
 def installDriverAndCompileExtensions() {
-  if (params.CYTHON) {
+  if (env.CYTHON_ENABLED  == 'True') {
     sh label: 'Install the driver and compile with C extensions with Cython', script: '''#!/bin/bash -lex
       python setup.py build_ext --inplace
     '''
@@ -87,7 +87,7 @@ def executeStandardTests() {
    * Run the cython unit tests, this is not done in travis because it takes too much time for the
    * whole matrix to build with cython
    */
-  if (params.CYTHON) {
+  if (env.CYTHON_ENABLED  == 'True') {
     sh label: 'Execute Cython unit tests', script: '''#!/bin/bash -lex
       # Load CCM environment variables
       set -o allexport
@@ -291,7 +291,7 @@ def describeScheduledTestingStage() {
   script {
     def type = params.CI_SCHEDULE.toLowerCase().capitalize()
     def displayName = "${type} schedule (${env.EVENT_LOOP_MANAGER}"
-    if (params.CYTHON) {
+    if (env.CYTHON_ENABLED  == 'True') {
       displayName += " | Cython"
     }
     if (params.PROFILE != 'NONE') {
@@ -303,7 +303,7 @@ def describeScheduledTestingStage() {
     def serverVersionDescription = "${params.CI_SCHEDULE_SERVER_VERSION.replaceAll(' ', ', ')} server version(s) in the matrix"
     def pythonVersionDescription = "${params.CI_SCHEDULE_PYTHON_VERSION.replaceAll(' ', ', ')} Python version(s) in the matrix"
     def description = "${type} scheduled testing using ${env.EVENT_LOOP_MANAGER} event loop manager"
-    if (params.CYTHON) {
+    if (env.CYTHON_ENABLED  == 'True') {
       description += ", with Cython enabled"
     }
     if (params.PROFILE != 'NONE') {
@@ -333,7 +333,7 @@ def describeAdhocTestingStage() {
       }
     }
     def displayName = "${params.ADHOC_BUILD_AND_EXECUTE_TESTS_SERVER_VERSION} for v${params.ADHOC_BUILD_AND_EXECUTE_TESTS_PYTHON_VERSION} (${env.EVENT_LOOP_MANAGER}"
-    if (params.CYTHON) {
+    if (env.CYTHON_ENABLED  == 'True') {
       displayName += " | Cython"
     }
     if (params.PROFILE != 'NONE') {
@@ -343,7 +343,7 @@ def describeAdhocTestingStage() {
     currentBuild.displayName = displayName
 
     def description = "Testing ${serverDisplayName} ${serverVersion} using ${env.EVENT_LOOP_MANAGER} against Python ${params.ADHOC_BUILD_AND_EXECUTE_TESTS_PYTHON_VERSION}"
-    if (params.CYTHON) {
+    if (env.CYTHON_ENABLED  == 'True') {
       description += ", with Cython"
     }
     if (params.PROFILE == 'NONE') {
@@ -409,8 +409,7 @@ pipeline {
                 'dse-5.1',   // Legacy DataStax Enterprise
                 'dse-6.0',   // Previous DataStax Enterprise
                 'dse-6.7',   // Previous DataStax Enterprise
-                'dse-6.8.0', // Current DataStax Enterprise
-                'dse-6.8',   // Development DataStax Enterprise
+                'dse-6.8',   // Current DataStax Enterprise
                 'ALL'],
       description: '''Apache CassandraⓇ and DataStax Enterprise server version to use for adhoc <b>BUILD-AND-EXECUTE-TESTS</b> <strong>ONLY!</strong>
                       <table style="width:100%">
@@ -455,10 +454,6 @@ pipeline {
                         <tr>
                           <td><strong>dse-6.7</strong></td>
                           <td>DataStax Enterprise v6.7.x</td>
-                        </tr>
-                        <tr>
-                          <td><strong>dse-6.8.0</strong></td>
-                          <td>DataStax Enterprise v6.8.0</td>
                         </tr>
                         <tr>
                           <td><strong>dse-6.8</strong></td>
@@ -600,6 +595,7 @@ pipeline {
     EVENT_LOOP_MANAGER = "${params.EVENT_LOOP_MANAGER.toLowerCase()}"
     EXECUTE_LONG_TESTS = "${params.EXECUTE_LONG_TESTS ? 'True' : 'False'}"
     CCM_ENVIRONMENT_SHELL = '/usr/local/bin/ccm_environment.sh'
+    CCM_MAX_HEAP_SIZE = '1024M'
   }
 
   stages {
