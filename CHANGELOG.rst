@@ -1,3 +1,11 @@
+3.24.0
+======
+Not released
+
+Bug Fixes
+---------
+* Unable to connect to a cloud cluster using Ubuntu 20.04 (PYTHON-1238)
+
 3.23.0
 ======
 April 6, 2020
