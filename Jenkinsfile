@@ -547,7 +547,7 @@ pipeline {
   }
 
   triggers {
-    parameterizedCron(branchPatternCron.matcher(env.BRANCH_NAME).matches() && !riptanoPatternCron.matcher(env.GIT_URL).find() ? """
+    parameterizedCron((branchPatternCron.matcher(env.BRANCH_NAME).matches() && !riptanoPatternCron.matcher(env.GIT_URL).find()) ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python v2.7.14 and v3.5.6
       H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.14;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
