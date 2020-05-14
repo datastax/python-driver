@@ -42,6 +42,11 @@ def initializeEnvironment() {
     sh label: 'Install Apache CassandraⓇ requirements', script: '''#!/bin/bash -lex
       pip install -r test-requirements.txt
     '''
+
+    sh label: 'Uninstall the geomet dependency since it is not required for Cassandra', script: '''#!/bin/bash -lex
+      pip uninstall -y geomet
+    '''
+
   }
 
   sh label: 'Install unit test modules', script: '''#!/bin/bash -lex
