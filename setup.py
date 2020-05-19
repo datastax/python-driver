@@ -404,7 +404,7 @@ def run_setup(extensions):
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
     dependencies = ['six >=1.9',
-                    'geomet>=0.1,<0.2']
+                    'geomet>=0.1,<0.3']
 
     if not PY3:
         dependencies.append('futures')

@@ -17,13 +17,21 @@ import calendar
 import datetime
 from functools import total_ordering
 import logging
-from geomet import wkt
 from itertools import chain
 import random
 import re
 import six
 import uuid
 import sys
+
+_HAS_GEOMET = True
+try:
+    from geomet import wkt
+except:
+    _HAS_GEOMET = False
+
+
+from cassandra import DriverException
 
 DATETIME_EPOC = datetime.datetime(1970, 1, 1)
 UTC_DATETIME_EPOC = datetime.datetime.utcfromtimestamp(0)
@@ -34,6 +42,7 @@ log = logging.getLogger(__name__)
 
 assert sys.byteorder in ('little', 'big')
 is_little_endian = sys.byteorder == 'little'
+
 
 def datetime_from_timestamp(timestamp):
     """
@@ -1308,6 +1317,9 @@ class Point(object):
         """
         Parse a Point geometry from a wkt string and return a new Point object.
         """
+        if not _HAS_GEOMET:
+            raise DriverException("Geomet is required to deserialize a wkt geometry.")
+
         try:
             geom = wkt.loads(s)
         except ValueError:
@@ -1363,6 +1375,9 @@ class LineString(object):
         """
         Parse a LineString geometry from a wkt string and return a new LineString object.
         """
+        if not _HAS_GEOMET:
+            raise DriverException("Geomet is required to deserialize a wkt geometry.")
+
         try:
             geom = wkt.loads(s)
         except ValueError:
@@ -1444,6 +1459,9 @@ class Polygon(object):
         """
         Parse a Polygon geometry from a wkt string and return a new Polygon object.
         """
+        if not _HAS_GEOMET:
+            raise DriverException("Geomet is required to deserialize a wkt geometry.")
+
         try:
             geom = wkt.loads(s)
         except ValueError:

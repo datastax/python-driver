@@ -2,9 +2,17 @@
 ======
 Not released
 
+Features
+--------
+* Make geomet an optional dependency at runtime (PYTHON-1237)
+
 Bug Fixes
 ---------
 * Unable to connect to a cloud cluster using Ubuntu 20.04 (PYTHON-1238)
+
+Others
+------
+* Bump geomet dependency version to 0.2 (PYTHON-1243)
 
 3.23.0
 ======
