@@ -418,6 +418,8 @@ class ClassicGraphFixtures(GraphFixtures):
     @staticmethod
     def datatypes():
         data = {
+            "boolean1": ["Boolean()", True, None],
+            "boolean2": ["Boolean()", False, None],
             "point1": ["Point()", Point(.5, .13), GraphSON1Deserializer.deserialize_point],
              "point2": ["Point()", Point(-5, .0), GraphSON1Deserializer.deserialize_point],
 

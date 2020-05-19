@@ -52,7 +52,7 @@ Supported types:
 DSE Graph      GraphSON 2.0     GraphSON 3.0   |  Python Driver
 ------------ | -------------- | -------------- | ------------
 text         | string         | string         | str
-boolean      | g:Boolean      | g:Boolean      | bool
+boolean      |                |                | bool
 bigint       | g:Int64        | g:Int64        | long
 int          | g:Int32        | g:Int32        | int
 double       | g:Double       | g:Double       | float
@@ -125,7 +125,7 @@ class TextTypeIO(GraphSONTypeIO):
 
 
 class BooleanTypeIO(GraphSONTypeIO):
-    graphson_base_type = 'Boolean'
+    graphson_base_type = None
     cql_type = 'boolean'
 
     @classmethod
