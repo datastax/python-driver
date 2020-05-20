@@ -623,7 +623,11 @@ pipeline {
           axis {
             name 'CASSANDRA_VERSION'
             values '3.11',    // Current Apache Cassandra
-                   'dse-6.8.0'  // Current DataStax Enterprise
+                   'dse-5.0',   // Long Term Support DataStax Enterprise
+                   'dse-5.1',   // Legacy DataStax Enterprise
+                   'dse-6.0',   // Previous DataStax Enterprise
+                   'dse-6.7',   // Previous DataStax Enterprise
+                   'dse-6.8'   // Current DataStax Enterprise
           }
           axis {
             name 'PYTHON_VERSION'
@@ -631,7 +635,7 @@ pipeline {
           }
           axis {
             name 'CYTHON_ENABLED'
-            values 'False', 'True'
+            values 'False'
           }
         }
 
