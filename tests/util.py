@@ -15,6 +15,7 @@
 import time
 from functools import wraps
 
+
 def wait_until(condition, delay, max_attempts):
     """
     Executes a function at regular intervals while the condition
@@ -44,22 +45,23 @@ def wait_until_not_raised(condition, delay, max_attempts):
     """
     def wrapped_condition():
         try:
-            condition()
+            result = condition()
         except:
-            return False
+            return False, None
 
-        return True
+        return True, result
 
     attempt = 0
     while attempt < (max_attempts-1):
         attempt += 1
-        if wrapped_condition():
-            return
+        success, result = wrapped_condition()
+        if success:
+            return result
 
         time.sleep(delay)
 
     # last attempt, let the exception raise
-    condition()
+    return condition()
 
 
 def late(seconds=1):

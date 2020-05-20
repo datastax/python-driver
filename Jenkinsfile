@@ -290,6 +290,11 @@ def describePerCommitStage() {
     currentBuild.displayName = "Per-Commit (${env.EVENT_LOOP_MANAGER} | ${type.capitalize()})"
     currentBuild.description = "Per-Commit build and ${type} testing of ${serverDescription} against Python v2.7.14 and v3.5.6 using ${env.EVENT_LOOP_MANAGER} event loop manager"
   }
+
+  sh label: 'Describe the python environment', script: '''#!/bin/bash -lex
+    python -V
+    pip freeze
+  '''
 }
 
 def describeScheduledTestingStage() {
@@ -623,10 +628,6 @@ pipeline {
           axis {
             name 'CASSANDRA_VERSION'
             values '3.11',    // Current Apache Cassandra
-                   'dse-5.0',   // Long Term Support DataStax Enterprise
-                   'dse-5.1',   // Legacy DataStax Enterprise
-                   'dse-6.0',   // Previous DataStax Enterprise
-                   'dse-6.7',   // Previous DataStax Enterprise
                    'dse-6.8'   // Current DataStax Enterprise
           }
           axis {

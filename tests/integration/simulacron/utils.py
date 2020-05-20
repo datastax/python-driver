@@ -19,6 +19,7 @@ from six.moves.urllib.request import build_opener, Request, HTTPHandler
 
 from cassandra.metadata import SchemaParserV4, SchemaParserDSE68
 
+from tests.util import wait_until_not_raised
 from tests.integration import CASSANDRA_VERSION, SIMULACRON_JAR, DSE_VERSION
 
 DEFAULT_CLUSTER = "python_simulacron_cluster"
@@ -110,7 +111,8 @@ class SimulacronClient(object):
         request.add_header("Content-Type", 'application/json')
         request.add_header("Content-Length", len(data))
 
-        connection = opener.open(request)
+        # wait that simulacron is ready and listening
+        connection = wait_until_not_raised(lambda: opener.open(request), 1, 10)
         return connection.read().decode('utf-8')
 
     def prime_server_versions(self):
