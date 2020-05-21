@@ -410,7 +410,7 @@ def run_setup(extensions):
         dependencies.append('futures')
 
     _EXTRAS_REQUIRE = {
-        'graph': ['gremlinpython==3.3.4']
+        'graph': ['gremlinpython==3.4.6']
     }
 
     setup(

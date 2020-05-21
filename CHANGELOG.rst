@@ -14,6 +14,7 @@ Bug Fixes
 Others
 ------
 * Bump geomet dependency version to 0.2 (PYTHON-1243)
+* Bump gremlinpython dependency version to 3.4.6 (PYTHON-1212)
 
 3.23.0
 ======
