@@ -5,6 +5,7 @@ Not released
 Features
 --------
 * Make geomet an optional dependency at runtime (PYTHON-1237)
+* Add use_default_tempdir cloud config options (PYTHON-1245)
 
 Bug Fixes
 ---------

@@ -97,8 +97,9 @@ def get_cloud_config(cloud_config, create_pyopenssl_context=False):
 
 def read_cloud_config_from_zip(cloud_config, create_pyopenssl_context):
     secure_bundle = cloud_config['secure_connect_bundle']
+    use_default_tempdir = cloud_config.get('use_default_tempdir', None)
     with ZipFile(secure_bundle) as zipfile:
-        base_dir = os.path.dirname(secure_bundle)
+        base_dir = tempfile.gettempdir() if use_default_tempdir else os.path.dirname(secure_bundle)
         tmp_dir = tempfile.mkdtemp(dir=base_dir)
         try:
             zipfile.extractall(path=tmp_dir)
