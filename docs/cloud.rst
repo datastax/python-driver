@@ -19,6 +19,25 @@ To connect to a DataStax Astra cluster:
     cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
     session = cluster.connect()
 
+Cloud Config Options
+====================
+
+use_default_tempdir
++++++++++++++++++++
+
+The secure connect bundle needs to be extracted to load the certificates into the SSLContext.
+By default, the zip location is used as the base dir for the extraction. In some environments,
+the zip location file system is read-only (e.g Azure Function). With *use_default_tempdir* set to *True*,
+the default temporary directory of the system will be used as base dir.
+
+.. code:: python
+
+  cloud_config = {
+        'secure_connect_bundle': '/path/to/secure-connect-dbname.zip',
+        'use_default_tempdir': True
+  }
+  ...
+
 Astra Differences
 ==================
 In most circumstances, the client code for interacting with an Astra cluster will be the same as interacting with any other Cassandra cluster. The exceptions being:
