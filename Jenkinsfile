@@ -88,22 +88,17 @@ def installDriverAndCompileExtensions() {
 }
 
 def executeStandardTests() {
-  /*
-   * Run the cython unit tests, this is not done in travis because it takes too much time for the
-   * whole matrix to build with cython
-   */
-  if (env.CYTHON_ENABLED  == 'True') {
-    sh label: 'Execute Cython unit tests', script: '''#!/bin/bash -lex
-      # Load CCM environment variables
-      set -o allexport
-      . ${HOME}/environment.txt
-      set +o allexport
 
-      EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} VERIFY_CYTHON=True nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml tests/unit/ || true
-      EVENT_LOOP_MANAGER=eventlet VERIFY_CYTHON=True nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
-      EVENT_LOOP_MANAGER=gevent VERIFY_CYTHON=True nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
-    '''
-  }
+  sh label: 'Execute unit tests', script: '''#!/bin/bash -lex
+    # Load CCM environment variables
+    set -o allexport
+    . ${HOME}/environment.txt
+    set +o allexport
+
+    EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml tests/unit/ || true
+    EVENT_LOOP_MANAGER=eventlet VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_eventlet_results.xml tests/unit/io/test_eventletreactor.py || true
+    EVENT_LOOP_MANAGER=gevent VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=unit_gevent_results.xml tests/unit/io/test_geventreactor.py || true
+  '''
 
   sh label: 'Execute Simulacron integration tests', script: '''#!/bin/bash -lex
     # Load CCM environment variables

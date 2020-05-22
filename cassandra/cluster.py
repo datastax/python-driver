@@ -993,7 +993,10 @@ class Cluster(object):
         
         {
             # path to the secure connect bundle
-            'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
+            'secure_connect_bundle': '/path/to/secure-connect-dbname.zip',
+
+            # optional config options
+            'use_default_tempdir': True  # use the system temp dir for the zip extraction
         }
 
     The zip file will be temporarily extracted in the same directory to
