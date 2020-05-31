@@ -1,0 +1,34 @@
+name: "CI Docs"
+
+on:
+  push:
+    branches:
+    - master
+
+jobs:
+  release:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        persist-credentials: false
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Setup dependencies
+      run: | 
+        sudo apt-get install libev4 libev-dev
+        sudo apt-get install build-essential python-dev
+        cd docs
+        ./_utils/setup.sh
+    - name: Build docs
+      run: |
+        cd docs
+        make dirhtml
+    - name: Deploy
+      run : ./docs/_utils/deploy.sh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
