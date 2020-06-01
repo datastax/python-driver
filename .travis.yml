@@ -24,7 +24,8 @@ addons:
     - libev-dev
 
 install:
-  - pip install tox-travis lz4
+  - pip install tox-travis
+  - if [[ $TRAVIS_PYTHON_VERSION != pypy3.5 ]]; then pip install lz4; fi
 
 script:
   - tox
