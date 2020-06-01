@@ -2378,7 +2378,7 @@ class SchemaParserV3(SchemaParserV22):
         ((cf_success, cf_result), (col_success, col_result),
          (indexes_sucess, indexes_result), (triggers_success, triggers_result),
          (view_success, view_result),
-         (scylla_sucess, scylla_result)) = (
+         (scylla_success, scylla_result)) = (
              self.connection.wait_for_responses(
                  cf_query, col_query, indexes_query, triggers_query,
                  view_query, scylla_query, timeout=self.timeout, fail_on_error=False)
