@@ -6,23 +6,19 @@ Scylla Enterprise (2018.1.x+) using exclusively Cassandra's binary protocol and 
 
 The driver supports Python versions 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
 
-.. **Note:** DataStax products do not support big-endian systems.
+.. **Note:** This driver does not support big-endian systems.
 
 Features
 --------
-* Synchronous and Asynchronous APIs
-* Simple, Prepared, and Batch statements 
+* `Synchronous <http://scylladb.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <http://scylladb.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute_async>`_ APIs
+* `Simple, Prepared, and Batch statements <http://scylladb.github.io/python-driver/api/cassandra/query.html#cassandra.query.Statement>`_
 * Asynchronous IO, parallel execution, request pipelining
-* Connection pooling 
+* `Connection pooling <http://scylladb.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Cluster.get_core_connections_per_host>`_
 * Automatic node discovery
-* Automatic reconnection 
-* Configurable load balancing
-* Concurrent execution utilities
-* Object mapper
-* Connecting to DataStax Apollo database (cloud)
-* DSE Graph execution API
-* DSE Geometric type serialization
-* DSE PlainText and GSSAPI authentication
+* `Automatic reconnection <http://scylladb.github.io/python-driver/api/cassandra/policies.html#reconnecting-to-dead-hosts>`_
+* Configurable `load balancing <http://scylladb.github.io/python-driver/api/cassandra/policies.html#load-balancing>`_ and `retry policies <http://scylladb.github.io/python-driver/api/cassandra/policies.html#retrying-failed-operations>`_
+* `Concurrent execution utilities <http://scylladb.github.io/python-driver/api/cassandra/concurrent.html>`_
+* `Object mapper <http://scylladb.github.io/python-driver/object_mapper.html>`_
 
 Installation
 ------------
@@ -30,18 +26,19 @@ Installation through pip is recommended::
 
     $ pip install cassandra-driver
 
-For more complete installation instructions, see the installation guide.
+For more complete installation instructions, see the
+`installation guide <http://scylladb.github.io/python-driver/installation.html>`_.
 
 Documentation
 -------------
-The documentation can be found within this repository.
+The documentation can be found online `here <http://scylladb.github.io/python-driver/index.html>`_.
 
 Information includes: 
 
-* Installation
-* Getting started guide
-* API docs 
-* Performance tips 
+* `Installation <http://scylladb.github.io/python-driver/installation.html>`_
+* `Getting started guide <http://scylladb.github.io/python-driver/getting_started.html>`_
+* `API docs <http://scylladb.github.io/python-driver/api/index.html>`_
+* `Performance tips <http://scylladb.github.io/python-driver/performance.html>`_
 
 Training
 --------
@@ -54,7 +51,8 @@ It connects to a Scylla cluster, displays the contents of a  table, inserts and 
 Object Mapper
 -------------
 cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contributions from the
-community) is now maintained as an integral part of this package. 
+community) is now maintained as an integral part of this package. Refer to
+`documentation here <http://scylladb.github.io/python-driver/object_mapper.html>`_.
 
 Contributing
 ------------
