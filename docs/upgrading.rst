@@ -7,22 +7,22 @@ Upgrading
 Upgrading from dse-driver
 -------------------------
 
-Since 3.21.0, cassandra-driver fully supports DataStax products. dse-driver and
-dse-graph users should now migrate to cassandra-driver to benefit from latest bug fixes
+Since 3.21.0, scylla-driver fully supports DataStax products. dse-driver and
+dse-graph users should now migrate to scylla-driver to benefit from latest bug fixes
 and new features. The upgrade to this new unified driver version is straightforward
 with no major API changes.
 
 Installation
 ^^^^^^^^^^^^
 
-Only the `cassandra-driver` package should be installed. `dse-driver` and `dse-graph`
+Only the `scylla-driver` package should be installed. `dse-driver` and `dse-graph`
 are not required anymore::
 
-    pip install cassandra-driver
+    pip install scylla-driver
 
 If you need the Graph *Fluent* API (features provided by dse-graph)::
 
-    pip install cassandra-driver[graph]
+    pip install scylla-driver[graph]
 
 See :doc:`installation` for more details.
 
@@ -44,13 +44,13 @@ need to change only the first module of your import statements, not the submodul
     from cassandra.auth import PlainTextAuthProvider
     from cassandra.policies import WhiteListRoundRobinPolicy
 
-Also note that the cassandra.hosts module doesn't exist in cassandra-driver. This
+Also note that the cassandra.hosts module doesn't exist in scylla-driver. This
 module is named cassandra.pool.
 
 dse-graph
 ^^^^^^^^^
 
-dse-graph features are now built-in in cassandra-driver. The only change you need
+dse-graph features are now built into scylla-driver. The only change you need
 to do is your import statements:
 
 .. code-block:: python

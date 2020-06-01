@@ -369,7 +369,7 @@ Setting the timeout on the model is meaningless and will raise an AssertionError
 Default TTL and Per Query TTL
 =============================
 
-Model default TTL now relies on the *default_time_to_live* feature, introduced in Cassandra 2.0. It is not handled anymore in the CQLEngine Model (cassandra-driver >=3.6). You can set the default TTL of a table like this:
+Model default TTL now relies on the *default_time_to_live* feature, introduced in Cassandra 2.0. It is not handled anymore in the CQLEngine Model (scylla-driver >=3.6). You can set the default TTL of a table like this:
 
 Example:
 

@@ -3,7 +3,7 @@ Upgrade Guide
 ========================
 
 This is an overview of things that changed as the cqlengine project was merged into
-cassandra-driver. While efforts were taken to preserve the API and most functionality exactly,
+scylla-driver. While efforts were taken to preserve the API and most functionality exactly,
 conversion to this package will still require certain minimal updates (namely, imports).
 
 **THERE IS ONE FUNCTIONAL CHANGE**, described in the first section below.

@@ -414,17 +414,17 @@ def run_setup(extensions):
     }
 
     setup(
-        name='cassandra-driver',
+        name='scylla-driver',
         version=__version__,
-        description=' DataStax Driver for Apache Cassandra',
+        description='Scylla Driver for Apache Cassandra',
         long_description=long_description,
-        url='http://github.com/datastax/python-driver',
+        url='https://github.com/scylladb/python-driver',
         project_urls={
-            'Documentation': 'https://docs.datastax.com/en/developer/python-driver/latest/',
-            'Source': 'https://github.com/datastax/python-driver/',
-            'Issues': 'https://datastax-oss.atlassian.net/browse/PYTHON',
+            'Documentation': 'https://scylladb.github.io/python-driver/',
+            'Source': 'https://github.com/scylladb/python-driver/',
+            'Issues': 'https://github.com/scylladb/python-driver/issues',
         },
-        author='DataStax',
+        author='ScyllaDB',
         packages=[
             'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
             'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',

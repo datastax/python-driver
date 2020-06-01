@@ -209,7 +209,7 @@ name to specify the built version::
 
     python setup.py egg_info -b-`git rev-parse --short HEAD` sdist --formats=zip
 
-The file (``dist/cassandra-driver-<version spec>.zip``) is packaged with Cassandra in ``cassandra/lib/cassandra-driver-internal-only*zip``.
+The file (``dist/scylla-driver-<version spec>.zip``) is packaged with Cassandra in ``cassandra/lib/scylla-driver-internal-only*zip``.
 
 Releasing an EAP
 ================
@@ -226,7 +226,7 @@ An EAP release is only uploaded on a private server and it is not published on p
 
 * Test the source distribution::
 
-    pip install dist/cassandra-driver-<version>.tar.gz
+    pip install dist/scylla-driver-<version>.tar.gz
 
 * Upload the package on the EAP download server.
 * Build the documentation::

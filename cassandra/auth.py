@@ -150,14 +150,14 @@ class TransitionalModePlainTextAuthProvider(object):
         auth_provider = TransitionalModePlainTextAuthProvider()
         cluster = Cluster(auth_provider=auth_provider)
 
-    .. warning:: TransitionalModePlainTextAuthProvider will be removed in cassandra-driver
+    .. warning:: TransitionalModePlainTextAuthProvider will be removed in scylla-driver
                  4.0. The transitional mode will be handled internally without the need
                  of any auth provider.
     """
 
     def __init__(self):
         # TODO remove next major
-        log.warning("TransitionalModePlainTextAuthProvider will be removed in cassandra-driver "
+        log.warning("TransitionalModePlainTextAuthProvider will be removed in scylla-driver "
                     "4.0. The transitional mode will be handled internally without the need "
                     "of any auth provider.")
 
