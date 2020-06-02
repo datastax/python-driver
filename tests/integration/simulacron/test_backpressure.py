@@ -45,7 +45,7 @@ class TCPBackpressureTests(SimulacronBase):
             for pool in session.get_pools():
                 if not pool._connection._socket_writable:
                     total_blocked += 1
-            if total_blocked == expected_blocked:
+            if total_blocked >= expected_blocked:
                 break
         else:
             raise Exception("Unable to fill TCP send buffer on expected number of nodes")

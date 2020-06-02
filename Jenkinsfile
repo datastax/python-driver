@@ -601,7 +601,7 @@ pipeline {
     EVENT_LOOP_MANAGER = "${params.EVENT_LOOP_MANAGER.toLowerCase()}"
     EXECUTE_LONG_TESTS = "${params.EXECUTE_LONG_TESTS ? 'True' : 'False'}"
     CCM_ENVIRONMENT_SHELL = '/usr/local/bin/ccm_environment.sh'
-    CCM_MAX_HEAP_SIZE = '1536M'
+    CCM_MAX_HEAP_SIZE = '1280M'
   }
 
   stages {
