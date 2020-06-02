@@ -184,6 +184,7 @@ def executeEventLoopTests() {
       "tests/integration/standard/test_connection.py"
       "tests/integration/standard/test_control_connection.py"
       "tests/integration/standard/test_metrics.py"
+      "tests/integration/simulacron/test_backpressure.py"
       "tests/integration/standard/test_query.py"
       "tests/integration/simulacron/test_endpoint.py"
       "tests/integration/long/test_ssl.py"

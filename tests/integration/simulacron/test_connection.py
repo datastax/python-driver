@@ -39,7 +39,7 @@ from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 start_and_prime_cluster_defaults,
                                                 start_and_prime_singledc,
                                                 clear_queries, RejectConnections,
-                                                RejectType, AcceptConnections)
+                                                RejectType, AcceptConnections, PauseReads, ResumeReads)
 
 
 class TrackDownListener(HostStateListener):
