@@ -1443,7 +1443,7 @@ class HeartbeatFuture(object):
         log.debug("Sending options message heartbeat on idle connection (%s) %s",
                   id(connection), connection.endpoint)
         with connection.lock:
-            if connection.in_flight <= connection.max_request_id:
+            if connection.in_flight < connection.max_request_id:
                 connection.in_flight += 1
                 connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
             else:
