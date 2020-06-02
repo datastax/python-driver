@@ -43,8 +43,8 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 AuthSuccessMessage, ProtocolException,
                                 RegisterMessage, ReviseRequestMessage)
 from cassandra.util import OrderedDict
+from cassandra.murmur3 import INT64_MIN
 
-MIN_LONG = -(2 ** 63)
 
 log = logging.getLogger(__name__)
 
@@ -628,7 +628,7 @@ class ShardingInfo(object):
         Convert a Murmur3 token to shard_id based on the number of shards on the host
         """
         token = t.value
-        token += MIN_LONG
+        token += INT64_MIN
         token <<= self.sharding_ignore_msb
         tokLo = token & 0xffffffff
         tokHi = (token >> 32) & 0xffffffff
