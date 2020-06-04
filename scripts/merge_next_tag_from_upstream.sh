@@ -39,8 +39,6 @@ read -p "Continue with merge (y/n)?" choice
 case "$choice" in
   y|Y )
       echo "Merging..."
-      git pull https://github.com/datastax/python-driver ${first_new_tag} --log=20 --no-ff
-
       new_scyla_tag=$(echo ${first_new_tag} | sed 's|refs/tags/||')-scylla
 
       tag_msg="
@@ -48,16 +46,21 @@ case "$choice" in
 
       git merge --continue
       git tag ${new_scyla_tag}
-      git push --tags ${scylla_repo} master
+      git push --tags ${scylla_repo} ${new_scyla_tag}
 
    re-triggering a build of a tag in Travis:
 
       git push --delete ${scylla_repo} ${new_scyla_tag}
       # then push it again
-      git push --tags ${scylla_repo} master
+      git push ${scylla_repo} ${new_scyla_tag}
 
       "
-      echo "$tag_msg" ;;
+      echo "$tag_msg"
+      git pull https://github.com/datastax/python-driver ${first_new_tag} --log=20 --no-ff
+      ;;
 
-  * ) echo "Aborted...";;
+
+  * )
+      echo "Aborted..."
+      ;;
 esac
