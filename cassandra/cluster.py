@@ -48,7 +48,7 @@ from cassandra.auth import _proxy_execute_key, PlainTextAuthProvider
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported,
                                   EndPoint, DefaultEndPoint, DefaultEndPointFactory,
-                                  ContinuousPagingState, SniEndPointFactory)
+                                  ContinuousPagingState, SniEndPointFactory, ConnectionBusy)
 from cassandra.cqltypes import UserType
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -4445,7 +4445,9 @@ class ResponseFuture(object):
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
             self._errors[host] = exc
-            return None
+        except ConnectionBusy as exc:
+            log.debug("Connection for host %s is busy, moving to the next host", host)
+            self._errors[host] = exc
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
@@ -4453,7 +4455,8 @@ class ResponseFuture(object):
                 self._metrics.on_connection_error()
             if connection:
                 pool.return_connection(connection)
-            return None
+
+        return None
 
     @property
     def has_more_pages(self):

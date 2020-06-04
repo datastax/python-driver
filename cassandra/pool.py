@@ -418,7 +418,7 @@ class HostConnection(object):
         remaining = timeout
         while True:
             with conn.lock:
-                if conn.in_flight <= conn.max_request_id:
+                if conn.in_flight < conn.max_request_id:
                     conn.in_flight += 1
                     return conn, conn.get_request_id()
             if timeout is not None:

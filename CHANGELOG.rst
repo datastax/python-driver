@@ -6,6 +6,7 @@ Features
 --------
 * Make geomet an optional dependency at runtime (PYTHON-1237)
 * Add use_default_tempdir cloud config options (PYTHON-1245)
+* Tcp flow control for libevreactor (PYTHON-1248)
 
 Bug Fixes
 ---------

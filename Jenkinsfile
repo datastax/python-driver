@@ -107,7 +107,13 @@ def executeStandardTests() {
     set +o allexport
 
     SIMULACRON_JAR="${HOME}/simulacron.jar"
-    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=simulacron_results.xml tests/integration/simulacron/ || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --exclude test_backpressure.py --xunit-file=simulacron_results.xml tests/integration/simulacron/ || true
+
+    # Run backpressure tests separately to avoid memory issue
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --exclude test_backpressure.py --xunit-file=simulacron_backpressure_1_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_paused_connections || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --exclude test_backpressure.py --xunit-file=simulacron_backpressure_2_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_queued_requests_timeout || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --exclude test_backpressure.py --xunit-file=simulacron_backpressure_3_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_cluster_busy || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP_MANAGER=${EVENT_LOOP_MANAGER} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --exclude test_backpressure.py --xunit-file=simulacron_backpressure_4_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_node_busy || true
   '''
 
   sh label: 'Execute CQL engine integration tests', script: '''#!/bin/bash -lex
@@ -283,7 +289,7 @@ def describePerCommitStage() {
     }
 
     currentBuild.displayName = "Per-Commit (${env.EVENT_LOOP_MANAGER} | ${type.capitalize()})"
-    currentBuild.description = "Per-Commit build and ${type} testing of ${serverDescription} against Python v2.7.14 and v3.5.6 using ${env.EVENT_LOOP_MANAGER} event loop manager"
+    currentBuild.description = "Per-Commit build and ${type} testing of ${serverDescription} against Python v2.7.18 and v3.5.9 using ${env.EVENT_LOOP_MANAGER} event loop manager"
   }
 
   sh label: 'Describe the python environment', script: '''#!/bin/bash -lex
@@ -401,7 +407,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'ADHOC_BUILD_AND_EXECUTE_TESTS_PYTHON_VERSION',
-      choices: ['2.7.14', '3.4.9', '3.5.6', '3.6.6', '3.7.4', '3.8.0'],
+      choices: ['2.7.18', '3.4.10', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
       description: 'Python version to use for adhoc <b>BUILD-AND-EXECUTE-TESTS</b> <strong>ONLY!</strong>')
     choice(
       name: 'ADHOC_BUILD_AND_EXECUTE_TESTS_SERVER_VERSION',
@@ -554,43 +560,43 @@ pipeline {
   triggers {
     parameterizedCron((branchPatternCron.matcher(env.BRANCH_NAME).matches() && !riptanoPatternCron.matcher(GIT_URL).find()) ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
-      # These schedules will run with and without Cython enabled for Python v2.7.14 and v3.5.6
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.14;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.5.6;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
+      # These schedules will run with and without Cython enabled for Python v2.7.18 and v3.5.9
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
 
       # Every Saturday around 12:00, 4:00 and 8:00 PM
-      # These schedules are for weekly libev event manager runs with and without Cython for most of the Python versions (excludes v3.5.6.x)
-      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.14;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
-      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.4.9;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
-      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.6.6;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
-      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.7.4;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
-      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.0;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
-      # These schedules are for weekly gevent event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.9.x)
-      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.14;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.4;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.0;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      # These schedules are for weekly eventlet event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.9.x)
-      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.14;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.4;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.0;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      # These schedules are for weekly libev event manager runs with and without Cython for most of the Python versions (excludes v3.5.9.x)
+      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
+      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.4.10;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
+      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.6.10;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
+      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.7.7;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
+      H 12 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.3;CI_SCHEDULE_SERVER_VERSION=2.1 3.0 dse-5.1 dse-6.0 dse-6.7
+      # These schedules are for weekly gevent event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.10.x)
+      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.18;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.9;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.10;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.7;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 16 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=GEVENT;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.3;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      # These schedules are for weekly eventlet event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.10.x)
+      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.18;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.9;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.10;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.7;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 20 * * 6 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=EVENTLET;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.3;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
 
       # Every Sunday around 12:00 and 4:00 AM
-      # These schedules are for weekly asyncore event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.9.x)
-      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.14;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.4;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.0;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      # These schedules are for weekly twisted event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.9.x)
-      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.14;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.6;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.4;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
-      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.0;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      # These schedules are for weekly asyncore event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.10.x)
+      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.18;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.9;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.10;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.7;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 0 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=ASYNCORE;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.3;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      # These schedules are for weekly twisted event manager event loop only runs with and without Cython for most of the Python versions (excludes v3.4.10.x)
+      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=2.7.18;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.5.9;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.6.10;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.7.7;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 4 * * 7 %CI_SCHEDULE=WEEKENDS;EVENT_LOOP_MANAGER=TWISTED;PROFILE=EVENT-LOOP;CI_SCHEDULE_PYTHON_VERSION=3.8.3;CI_SCHEDULE_SERVER_VERSION=2.1 2.2 3.0 3.11 dse-5.1 dse-6.0 dse-6.7
     """ : "")
   }
 
@@ -600,7 +606,7 @@ pipeline {
     EVENT_LOOP_MANAGER = "${params.EVENT_LOOP_MANAGER.toLowerCase()}"
     EXECUTE_LONG_TESTS = "${params.EXECUTE_LONG_TESTS ? 'True' : 'False'}"
     CCM_ENVIRONMENT_SHELL = '/usr/local/bin/ccm_environment.sh'
-    CCM_MAX_HEAP_SIZE = '1536M'
+    CCM_MAX_HEAP_SIZE = '1280M'
   }
 
   stages {
@@ -627,7 +633,7 @@ pipeline {
           }
           axis {
             name 'PYTHON_VERSION'
-            values '2.7.14', '3.5.6'
+            values '2.7.18', '3.5.9'
           }
           axis {
             name 'CYTHON_ENABLED'
