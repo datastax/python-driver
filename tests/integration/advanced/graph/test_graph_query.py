@@ -35,8 +35,9 @@ from cassandra.util import Point
 from cassandra.graph import (SimpleGraphStatement, single_object_row_factory,
                        Result, GraphOptions, GraphProtocol, to_bigint)
 from cassandra.datastax.graph.query import _graph_options
+from cassandra.datastax.graph.types import T
 
-from tests.integration import DSE_VERSION, requiredse
+from tests.integration import DSE_VERSION, requiredse, greaterthanorequaldse68
 from tests.integration.advanced.graph import BasicGraphUnitTestCase, GraphTestConfiguration, \
     validate_classic_vertex, GraphUnitTestCase, validate_classic_edge, validate_path_result_type, \
     validate_line_edge, validate_generic_vertex_result_type, \
@@ -541,6 +542,26 @@ class GenericGraphQueryTest(GraphUnitTestCase):
         else:
             self.assertEqual(len(results), 5)
         self.assertEqual(results.count(35), 2)
+
+    @greaterthanorequaldse68
+    def _test_elementMap_query(self, schema, graphson):
+        """
+        Test to validate that an elementMap can be serialized properly.
+        """
+        self.execute_graph(schema.fixtures.classic(), graphson)
+        rs = self.execute_graph('''g.V().has('name','marko').elementMap()''', graphson)
+        results_list = self.resultset_to_list(rs)
+        self.assertEqual(len(results_list), 1)
+        row = results_list[0]
+        if graphson == GraphProtocol.GRAPHSON_3_0:
+            self.assertIn(T.id, row)
+            self.assertIn(T.label, row)
+            if schema is CoreGraphSchema:
+                self.assertEqual(row[T.id], 'dseg:/person/marko')
+                self.assertEqual(row[T.label], 'person')
+        else:
+            self.assertIn('id', row)
+            self.assertIn('label', row)
 
 
 @GraphTestConfiguration.generate_tests(schema=ClassicGraphSchema)

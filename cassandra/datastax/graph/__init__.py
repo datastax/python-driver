@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from cassandra.datastax.graph.types import Element, Vertex, VertexProperty, Edge, Path
+from cassandra.datastax.graph.types import Element, Vertex, VertexProperty, Edge, Path, T
 from cassandra.datastax.graph.query import (
     GraphOptions, GraphProtocol, GraphStatement, SimpleGraphStatement, Result,
     graph_object_row_factory, single_object_row_factory,
