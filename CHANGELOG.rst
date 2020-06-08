@@ -12,6 +12,7 @@ Bug Fixes
 ---------
 * Unable to connect to a cloud cluster using Ubuntu 20.04 (PYTHON-1238)
 * [GRAPH] Can't write data in a Boolean field using the Fluent API (PYTHON-1239)
+* [GRAPH] Fix elementMap() result deserialization (PYTHON-1233)
 
 Others
 ------

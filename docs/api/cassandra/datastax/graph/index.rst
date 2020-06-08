@@ -81,6 +81,9 @@
 .. autoclass:: Path
    :members:
 
+.. autoclass:: T
+   :members:
+
 .. autoclass:: GraphSON1Serializer
    :members:
 
