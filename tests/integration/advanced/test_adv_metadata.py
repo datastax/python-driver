@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import (BasicSharedKeyspaceUnitTestCase,
+from packaging.version import Version
+
+from cassandra.cluster import Cluster
+from tests.integration import (BasicExistingKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicSharedKeyspaceUnitTestCaseRF1,
-                               greaterthanorequaldse51,
-                               greaterthanorequaldse60, use_single_node,
-                               DSE_VERSION, requiredse)
+                               greaterthanorequaldse51, greaterthanorequaldse60,
+                               greaterthanorequaldse68, use_single_node,
+                               DSE_VERSION, requiredse, PROTOCOL_VERSION)
 
 try:
     import unittest2 as unittest
@@ -211,7 +214,7 @@ class RLACMetadataTests(BasicSharedKeyspaceUnitTestCase):
         table_meta = self.cluster.metadata.keyspaces[self.keyspace_name].tables['reports']
         self.assertTrue(restrict_cql in table_meta.export_as_string())
 
-    @unittest.skip("Dse 5.1 doesn't current MV and RLAC remove after update")
+    @unittest.skip("Dse 5.1 doesn't support MV and RLAC remove after update")
     @greaterthanorequaldse51
     def test_rlac_on_mv(self):
         """
@@ -281,6 +284,113 @@ class NodeSyncMetadataTests(BasicSharedKeyspaceUnitTestCase):
         self.assertIn('nodesync =', table_meta.export_as_string())
         self.assertIn('nodesync', table_meta.options)
 
-        table_3rf = self.cluster.metadata.keyspaces["test3rf"].tables['test']
-        self.assertNotIn('nodesync =', table_3rf.export_as_string())
-        self.assertIsNone(table_3rf.options['nodesync'])
+
+@greaterthanorequaldse68
+class GraphMetadataTests(BasicExistingKeyspaceUnitTestCase):
+    """
+    Various tests to ensure that graph metadata are visible through driver metadata
+    @since DSE6.8
+    @jira_ticket PYTHON-996
+    @expected_result graph metadata are fetched
+    @test_category metadata
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if DSE_VERSION and DSE_VERSION >= Version('6.8'):
+            super(GraphMetadataTests, cls).setUpClass()
+            cls.session.execute("""
+            CREATE KEYSPACE ks_no_graph_engine WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            """)
+            cls.session.execute("""
+            CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} and graph_engine = 'Core';
+            """ % (cls.ks_name,))
+
+            cls.session.execute("""
+            CREATE TABLE %s.person (name text PRIMARY KEY) WITH VERTEX LABEL;
+            """ % (cls.ks_name,))
+
+            cls.session.execute("""
+            CREATE TABLE %s.software(company  text, name text, version int, PRIMARY KEY((company, name), version)) WITH VERTEX LABEL rocksolidsoftware;
+            """ % (cls.ks_name,))
+
+            cls.session.execute("""
+              CREATE TABLE %s.contributors (contributor text, company_name text, software_name text, software_version int, 
+              PRIMARY KEY (contributor, company_name, software_name, software_version) ) 
+              WITH CLUSTERING ORDER BY (company_name ASC, software_name ASC, software_version ASC)
+              AND EDGE LABEL contrib FROM person(contributor) TO rocksolidsoftware((company_name, software_name), software_version);
+            """ % (cls.ks_name,))
+
+    @classmethod
+    def tearDownClass(cls):
+        if DSE_VERSION and DSE_VERSION >= Version('6.8'):
+            cls.session.execute('DROP KEYSPACE {0}'.format('ks_no_graph_engine'))
+            cls.session.execute('DROP KEYSPACE {0}'.format(cls.ks_name))
+            cls.cluster.shutdown()
+
+    def test_keyspace_metadata(self):
+        self.assertIsNone(self.cluster.metadata.keyspaces['ks_no_graph_engine'].graph_engine, None)
+        self.assertEqual(self.cluster.metadata.keyspaces[self.ks_name].graph_engine, 'Core')
+
+    def test_keyspace_metadata_alter_graph_engine(self):
+        self.session.execute("ALTER KEYSPACE %s WITH graph_engine = 'Tinker'" % (self.ks_name,))
+        self.assertEqual(self.cluster.metadata.keyspaces[self.ks_name].graph_engine, 'Tinker')
+        self.session.execute("ALTER KEYSPACE %s WITH graph_engine = 'Core'" % (self.ks_name,))
+        self.assertEqual(self.cluster.metadata.keyspaces[self.ks_name].graph_engine, 'Core')
+
+    def test_vertex_metadata(self):
+        vertex_meta = self.cluster.metadata.keyspaces[self.ks_name].tables['person'].vertex
+        self.assertEqual(vertex_meta.keyspace_name, self.ks_name)
+        self.assertEqual(vertex_meta.table_name, 'person')
+        self.assertEqual(vertex_meta.label_name, 'person')
+
+        vertex_meta = self.cluster.metadata.keyspaces[self.ks_name].tables['software'].vertex
+        self.assertEqual(vertex_meta.keyspace_name, self.ks_name)
+        self.assertEqual(vertex_meta.table_name, 'software')
+        self.assertEqual(vertex_meta.label_name, 'rocksolidsoftware')
+
+    def test_edge_metadata(self):
+        edge_meta = self.cluster.metadata.keyspaces[self.ks_name].tables['contributors'].edge
+        self.assertEqual(edge_meta.keyspace_name, self.ks_name)
+        self.assertEqual(edge_meta.table_name, 'contributors')
+        self.assertEqual(edge_meta.label_name, 'contrib')
+        self.assertEqual(edge_meta.from_table, 'person')
+        self.assertEqual(edge_meta.from_label, 'person')
+        self.assertEqual(edge_meta.from_partition_key_columns, ['contributor'])
+        self.assertEqual(edge_meta.from_clustering_columns, [])
+        self.assertEqual(edge_meta.to_table, 'software')
+        self.assertEqual(edge_meta.to_label, 'rocksolidsoftware')
+        self.assertEqual(edge_meta.to_partition_key_columns, ['company_name', 'software_name'])
+        self.assertEqual(edge_meta.to_clustering_columns, ['software_version'])
+
+
+@greaterthanorequaldse68
+class GraphMetadataSchemaErrorTests(BasicExistingKeyspaceUnitTestCase):
+    """
+    Test that we can connect when the graph schema is broken.
+    """
+
+    def test_connection_on_graph_schema_error(self):
+        self.session = self.cluster.connect()
+
+        self.session.execute("""
+        CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} and graph_engine = 'Core';
+        """ % (self.ks_name,))
+
+        self.session.execute("""
+        CREATE TABLE %s.person (name text PRIMARY KEY) WITH VERTEX LABEL;
+        """ % (self.ks_name,))
+
+        self.session.execute("""
+        CREATE TABLE %s.software(company  text, name text, version int, PRIMARY KEY((company, name), version)) WITH VERTEX LABEL rocksolidsoftware;
+        """ % (self.ks_name,))
+
+        self.session.execute("""
+        CREATE TABLE %s.contributors (contributor text, company_name text, software_name text, software_version int,
+        PRIMARY KEY (contributor, company_name, software_name, software_version) )
+        WITH CLUSTERING ORDER BY (company_name ASC, software_name ASC, software_version ASC)
+        AND EDGE LABEL contrib FROM person(contributor) TO rocksolidsoftware((company_name, software_name), software_version);
+        """ % (self.ks_name,))
+
+        self.session.execute('TRUNCATE system_schema.vertices')
+        Cluster(protocol_version=PROTOCOL_VERSION).connect().shutdown()

@@ -1,19 +1,6 @@
 DataStax Graph Queries
 ======================
 
-The Cassandra driver executes graph queries over the Cassandra native protocol. Use
-:meth:`.Session.execute_graph` or :meth:`.Session.execute_graph_async` for 
-executing gremlin queries in DSE Graph.
-
-Three Execution Profiles are provided suitable for graph execution:
-
-* :data:`~.cluster.EXEC_PROFILE_GRAPH_DEFAULT`
-* :data:`~.cluster.EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT`
-* :data:`~.cluster.EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT`
-
-See :doc:`getting_started` and :doc:`execution_profiles`
-for more detail on working with profiles.
-
 Getting Started
 ~~~~~~~~~~~~~~~
 
@@ -36,7 +23,7 @@ for the schema creation::
 
 
     from cassandra.cluster import Cluster, GraphExecutionProfile, EXEC_PROFILE_GRAPH_DEFAULT
-    from cassandra.datastax.graph import GraphOptions
+    from cassandra.graph import GraphOptions
 
     graph_name = 'movies'
     ep = GraphExecutionProfile(graph_options=GraphOptions(graph_name=graph_name))
@@ -170,8 +157,6 @@ We are all set. You can now query your graph. Here are some examples::
 
 To see a more graph examples, see `DataStax Graph Examples <https://github.com/datastax/graph-examples/>`_.
 
-.. _graph-types:
-
 Graph Types
 ~~~~~~~~~~~
 
@@ -203,15 +188,15 @@ blob         bytearray, buffer (PY2), memoryview (PY3), bytes (PY3)
 Graph Row Factory
 ~~~~~~~~~~~~~~~~~
 
-By default (with :class:`.GraphExecutionProfile.row_factory` set to :func:`.datastax.graph.graph_object_row_factory`), known graph result
+By default (with :class:`.GraphExecutionProfile.row_factory` set to :func:`.graph.graph_object_row_factory`), known graph result
 types are unpacked and returned as specialized types (:class:`.Vertex`, :class:`.Edge`). If the result is not one of these
-types, a :class:`.datastax.graph.Result` is returned, containing the graph result parsed from JSON and removed from its outer dict.
+types, a :class:`.graph.Result` is returned, containing the graph result parsed from JSON and removed from its outer dict.
 The class has some accessor convenience methods for accessing top-level properties by name (`type`, `properties` above),
 or lists by index::
 
     # dicts with `__getattr__` or `__getitem__`
     result = session.execute_graph("[[key_str: 'value', key_int: 3]]", execution_profile=EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT)[0]  # Using system exec just because there is no graph defined
-    result  # cassandra.datastax.graph.Result({u'key_str': u'value', u'key_int': 3})
+    result  # dse.graph.Result({u'key_str': u'value', u'key_int': 3})
     result.value  # {u'key_int': 3, u'key_str': u'value'} (dict)
     result.key_str  # u'value'
     result.key_int  # 3
@@ -220,30 +205,29 @@ or lists by index::
 
     # lists with `__getitem__`
     result = session.execute_graph('[[0, 1, 2]]', execution_profile=EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT)[0]
-    result  # cassandra.datastax.graph.Result([0, 1, 2])
+    result  # dse.graph.Result([0, 1, 2])
     result.value  # [0, 1, 2] (list)
     result[1]  # 1 (list[1])
 
-You can use a different row factory by setting :attr:`.cluster.ExecutionProfile.row_factory` or passing it to
-:meth:`cluster.Session.execute_graph`. For example, :func:`.datastax.graph.single_object_row_factory` returns the JSON result string,
-unparsed. :func:`.datastax.graph.graph_result_row_factory` returns parsed, but unmodified results (such that all metadata is retained,
-unlike :func:`.datastax.graph.graph_object_row_factory`, which sheds some as attributes and properties are unpacked). These results
-also provide convenience methods for converting to known types (:meth:`.datastax.graph.Result.as_vertex`, :meth:`.datastax.graph.Result.as_edge`,
- :meth:`.datastax.graph.Result.as_path`).
+You can use a different row factory by setting :attr:`.Session.default_graph_row_factory` or passing it to
+:meth:`.Session.execute_graph`. For example, :func:`.graph.single_object_row_factory` returns the JSON result string`,
+unparsed. :func:`.graph.graph_result_row_factory` returns parsed, but unmodified results (such that all metadata is retained,
+unlike :func:`.graph.graph_object_row_factory`, which sheds some as attributes and properties are unpacked). These results
+also provide convenience methods for converting to known types (:meth:`~.Result.as_vertex`, :meth:`~.Result.as_edge`, :meth:`~.Result.as_path`).
 
 Vertex and Edge properties are never unpacked since their types are unknown. If you know your graph schema and want to
-deserialize properties, use the :class:`.datastax.graph.GraphSON1Deserializer`. It provides convenient methods to deserialize by types (e.g.
+deserialize properties, use the :class:`.GraphSON1Deserializer`. It provides convenient methods to deserialize by types (e.g.
 deserialize_date, deserialize_uuid, deserialize_polygon etc.) Example::
 
     # ...
-    from cassandra.datastax.graph import GraphSON1Deserializer
+    from cassandra.graph import GraphSON1Deserializer
 
     row = session.execute_graph("g.V().toList()")[0]
     value = row.properties['my_property_key'][0].value  # accessing the VertexProperty value
     value = GraphSON1Deserializer.deserialize_timestamp(value)
 
-    print value  # 2017-06-26 08:27:05
-    print type(value)  # <type 'datetime.datetime'>
+    print(value)  # 2017-06-26 08:27:05
+    print(type(value))  # <type 'datetime.datetime'>
 
 
 Named Parameters
@@ -259,7 +243,7 @@ automatically to their graph representation:
 
 Example::
 
-    s.execute_graph("""
+    session.execute_graph("""
       g.addV('person').
       property('name', text_value).
       property('age', integer_value).
@@ -294,7 +278,7 @@ for graph queries. Enabling GraphSON2 can be done by `changing the
 graph protocol of the execution profile` and `setting the graphson2 row factory`::
 
     from cassandra.cluster import Cluster, GraphExecutionProfile, EXEC_PROFILE_GRAPH_DEFAULT
-    from cassandra.datastax.graph import GraphOptions, GraphProtocol, graph_graphson2_row_factory
+    from cassandra.graph import GraphOptions, GraphProtocol, graph_graphson2_row_factory
 
     # Create a GraphSON2 execution profile
     ep = GraphExecutionProfile(graph_options=GraphOptions(graph_name='types',
@@ -302,8 +286,8 @@ graph protocol of the execution profile` and `setting the graphson2 row factory`
                                row_factory=graph_graphson2_row_factory)
 
     cluster = Cluster(execution_profiles={EXEC_PROFILE_GRAPH_DEFAULT: ep})
-    s = cluster.connect()
-    s.execute_graph(...)
+    session = cluster.connect()
+    session.execute_graph(...)
 
 Using GraphSON2, all properties will be automatically deserialized to
 its Python representation. Note that it may bring significant

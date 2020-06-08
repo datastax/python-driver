@@ -17,6 +17,7 @@ from cassandra.datastax.graph.types import Element, Vertex, VertexProperty, Edge
 from cassandra.datastax.graph.query import (
     GraphOptions, GraphProtocol, GraphStatement, SimpleGraphStatement, Result,
     graph_object_row_factory, single_object_row_factory,
-    graph_result_row_factory, graph_graphson2_row_factory
+    graph_result_row_factory, graph_graphson2_row_factory,
+    graph_graphson3_row_factory
 )
 from cassandra.datastax.graph.graphson import *

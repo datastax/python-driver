@@ -18,7 +18,7 @@ from gremlin_python.process.traversal import P
 
 from cassandra.util import Distance
 
-__all__ = ['GeoP', 'TextDistanceP', 'Search', 'GeoUnit', 'Geo']
+__all__ = ['GeoP', 'TextDistanceP', 'Search', 'GeoUnit', 'Geo', 'CqlCollection']
 
 
 class GeoP(object):
@@ -136,6 +136,41 @@ class Search(object):
         :param proximity: The proximity for the phrase search. ie. phrase('David Felcey', 2).. to find 'David Felcey' with up to two middle names.
         """
         return TextDistanceP.phrase(value, proximity)
+
+
+class CqlCollection(object):
+
+    @staticmethod
+    def contains(value):
+        """
+        Search for a value inside a cql list/set column.
+        :param value: the value to look for.
+        """
+        return P('contains', value)
+
+    @staticmethod
+    def contains_value(value):
+        """
+        Search for a map value.
+        :param value: the value to look for.
+        """
+        return P('containsValue', value)
+
+    @staticmethod
+    def contains_key(value):
+        """
+        Search for a map key.
+        :param value: the value to look for.
+        """
+        return P('containsKey', value)
+
+    @staticmethod
+    def entry_eq(value):
+        """
+        Search for a map entry.
+        :param value: the value to look for.
+        """
+        return P('entryEq', value)
 
 
 class GeoUnit(object):

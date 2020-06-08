@@ -22,6 +22,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+
 from packaging.version import Version
 import logging
 import socket
@@ -130,6 +131,11 @@ def _get_cass_version_from_dse(dse_version):
             cass_ver = "4.0.0.67"
         else:
             cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
+    elif dse_version.startswith('6.8'):
+        if dse_version == '6.8.0':
+            cass_ver = "4.0.0.68"
+        else:
+            cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
     else:
         log.error("Unknown dse version found {0}, defaulting to 2.1".format(dse_version))
         cass_ver = "2.1"
@@ -172,7 +178,7 @@ else:  # we are testing against Cassandra or DDAC
         cassandra_version = Version(mcv_string)
 
     CASSANDRA_VERSION = Version(mcv_string) if mcv_string else cassandra_version
-    CCM_VERSION = cassandra_version if mcv_string else CASSANDRA_VERSION
+    CCM_VERSION = mcv_string if mcv_string else cv_string
 
 CASSANDRA_IP = os.getenv('CLUSTER_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
@@ -339,6 +345,7 @@ greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0
 lessthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION <= Version('4.0'), 'Cassandra version less or equal to 4.0 required')
 lessthancass40 = unittest.skipUnless(CASSANDRA_VERSION < Version('4.0'), 'Cassandra version less than 4.0 required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
+greaterthanorequaldse68 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.8'), "DSE 6.8 or greater required for this test")
 greaterthanorequaldse67 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.7'), "DSE 6.7 or greater required for this test")
 greaterthanorequaldse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.0'), "DSE 6.0 or greater required for this test")
 greaterthanorequaldse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('5.1'), "DSE 5.1 or greater required for this test")
@@ -401,12 +408,23 @@ def use_single_node(start=True, workloads=[], configuration_options={}, dse_opti
                 configuration_options=configuration_options, dse_options=dse_options)
 
 
+def check_log_error():
+    global CCM_CLUSTER
+    log.debug("Checking log error of cluster {0}".format(CCM_CLUSTER.name))
+    for node in CCM_CLUSTER.nodelist():
+            errors = node.grep_log_for_errors()
+            for error in errors:
+                for line in error:
+                    print(line)
+
+
 def remove_cluster():
     if USE_CASS_EXTERNAL or KEEP_TEST_CLUSTER:
         return
 
     global CCM_CLUSTER
     if CCM_CLUSTER:
+        check_log_error()
         log.debug("Removing cluster {0}".format(CCM_CLUSTER.name))
         tries = 0
         while tries < 100:
@@ -454,18 +472,12 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
     set_default_cass_ip()
 
     if ccm_options is None and DSE_VERSION:
-        ccm_options = {"version": DSE_VERSION}
+        ccm_options = {"version": CCM_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
 
-    if 'version' in ccm_options and not isinstance(ccm_options['version'], Version):
-        ccm_options['version'] = Version(ccm_options['version'])
-
     cassandra_version = ccm_options.get('version', CCM_VERSION)
     dse_version = ccm_options.get('version', DSE_VERSION)
-
-    if 'version' in ccm_options:
-        ccm_options['version'] = ccm_options['version'].base_version
 
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
@@ -515,12 +527,29 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
                 CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
                 CCM_CLUSTER.set_configuration_options({'batch_size_warn_threshold_in_kb': 5})
-                if dse_version >= Version('5.0'):
+                if Version(dse_version) >= Version('5.0'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                if Version(dse_version) >= Version('5.1'):
+                    # For Inet4Address
+                    CCM_CLUSTER.set_dse_configuration_options({
+                        'graph': {
+                            'gremlin_server': {
+                                'scriptEngines': {
+                                    'gremlin-groovy': {
+                                        'config': {
+                                            'sandbox_rules': {
+                                                'whitelist_packages': ['java.net']
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    })
                 if 'spark' in workloads:
                     config_options = {"initial_spark_worker_resources": 0.1}
-                    if dse_version >= Version('6.7'):
+                    if Version(dse_version) >= Version('6.7'):
                         log.debug("Disabling AlwaysON SQL for a DSE 6.7 Cluster")
                         config_options['alwayson_sql_options'] = {'enabled': False}
                     CCM_CLUSTER.set_dse_configuration_options(config_options)
@@ -532,9 +561,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
             else:
                 CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
                 CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-                if cassandra_version >= Version('2.2'):
+                if Version(cassandra_version) >= Version('2.2'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                    if cassandra_version >= Version('3.0'):
+                    if Version(cassandra_version) >= Version('3.0'):
                         CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)

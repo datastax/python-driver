@@ -19,14 +19,14 @@ import six
 
 from cassandra import ConsistencyLevel
 from cassandra.query import Statement, SimpleStatement
-from cassandra.datastax.graph.types import Vertex, Edge, Path
-from cassandra.datastax.graph.graphson import GraphSON2Reader
+from cassandra.datastax.graph.types import Vertex, Edge, Path, VertexProperty
+from cassandra.datastax.graph.graphson import GraphSON2Reader, GraphSON3Reader
 
 
 __all__ = [
     'GraphProtocol', 'GraphOptions', 'GraphStatement', 'SimpleGraphStatement',
     'single_object_row_factory', 'graph_result_row_factory', 'graph_object_row_factory',
-    'graph_graphson2_row_factory', 'Result'
+    'graph_graphson2_row_factory', 'Result', 'graph_graphson3_row_factory'
 ]
 
 # (attr, description, server option)
@@ -45,19 +45,22 @@ _graph_option_names = tuple(option[0] for option in _graph_options)
 # this is defined by the execution profile attribute, not in graph options
 _request_timeout_key = 'request-timeout'
 
-_graphson2_reader = GraphSON2Reader()
-
 
 class GraphProtocol(object):
 
-    GRAPHSON_1_0 = 'graphson-1.0'
+    GRAPHSON_1_0 = b'graphson-1.0'
     """
     GraphSON1
     """
 
-    GRAPHSON_2_0 = 'graphson-2.0'
+    GRAPHSON_2_0 = b'graphson-2.0'
     """
     GraphSON2
+    """
+
+    GRAPHSON_3_0 = b'graphson-3.0'
+    """
+    GraphSON3
     """
 
 
@@ -67,11 +70,13 @@ class GraphOptions(object):
     """
     # See _graph_options map above for notes on valid options
 
+    DEFAULT_GRAPH_PROTOCOL = GraphProtocol.GRAPHSON_1_0
+    DEFAULT_GRAPH_LANGUAGE = b'gremlin-groovy'
+
     def __init__(self, **kwargs):
         self._graph_options = {}
         kwargs.setdefault('graph_source', 'g')
-        kwargs.setdefault('graph_language', 'gremlin-groovy')
-        kwargs.setdefault('graph_protocol', GraphProtocol.GRAPHSON_1_0)
+        kwargs.setdefault('graph_language', GraphOptions.DEFAULT_GRAPH_LANGUAGE)
         for attr, value in six.iteritems(kwargs):
             if attr not in _graph_option_names:
                 warn("Unknown keyword argument received for GraphOptions: {0}".format(attr))
@@ -222,11 +227,31 @@ def _graph_object_sequence(objects):
         yield res
 
 
-def graph_graphson2_row_factory(column_names, rows):
-    """
-    Row Factory that returns the decoded graphson as DSE types.
-    """
-    return [_graphson2_reader.read(row[0])['result'] for row in rows]
+class _GraphSONContextRowFactory(object):
+    graphson_reader_class = None
+    graphson_reader_kwargs = None
+
+    def __init__(self, cluster):
+        context = {'cluster': cluster}
+        kwargs = self.graphson_reader_kwargs or {}
+        self.graphson_reader = self.graphson_reader_class(context, **kwargs)
+
+    def __call__(self, column_names, rows):
+        return [self.graphson_reader.read(row[0])['result'] for row in rows]
+
+
+class _GraphSON2RowFactory(_GraphSONContextRowFactory):
+    """Row factory to deserialize GraphSON2 results."""
+    graphson_reader_class = GraphSON2Reader
+
+
+class _GraphSON3RowFactory(_GraphSONContextRowFactory):
+    """Row factory to deserialize GraphSON3 results."""
+    graphson_reader_class = GraphSON3Reader
+
+
+graph_graphson2_row_factory = _GraphSON2RowFactory
+graph_graphson3_row_factory = _GraphSON3RowFactory
 
 
 class Result(object):
@@ -302,3 +327,6 @@ class Result(object):
             return Path(self.labels, self.objects)
         except (AttributeError, ValueError, TypeError):
             raise TypeError("Could not create Path from %r" % (self,))
+
+    def as_vertex_property(self):
+        return VertexProperty(self.value.get('label'), self.value.get('value'), self.value.get('properties', {}))

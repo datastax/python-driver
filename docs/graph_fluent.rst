@@ -11,7 +11,7 @@ The fluent API adds graph features to the core driver:
 The Graph fluent API depends on Apache TinkerPop and is not installed by default. Make sure
 you have the Graph requirements are properly :ref:`installed <installation-datastax-graph>`.
 
-You might be interested in reading the :doc:`DSE Graph Getting Started documentation <graph>` to
+You might be interested in reading the :doc:`DataStax Graph Getting Started documentation <graph>` to
 understand the basics of creating a graph and its schema.
 
 Graph Traversal Queries
@@ -31,7 +31,7 @@ a `Session` object, or implicitly::
     g.addV('genre').property('genreId', 1).property('name', 'Action').next()
 
     # implicit execution caused by iterating over results
-    for v in g.V().has('genre', 'name', 'Drama').in('belongsTo').valueMap():
+    for v in g.V().has('genre', 'name', 'Drama').in_('belongsTo').valueMap():
         print(v)
 
 These :ref:`Python types <graph-types>` are also supported transparently::
@@ -70,7 +70,6 @@ be used for any groovy string queries.
 If you want to change execution property defaults, please see the :doc:`Execution Profile documentation <execution_profiles>`
 for a more generalized discussion of the API. Graph traversal queries use the same execution profile defined for DSE graph. If you
 need to change the default properties, please refer to the :doc:`DSE Graph query documentation page <graph>`
-
 
 Explicit Graph Traversal Execution with a DSE Session
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

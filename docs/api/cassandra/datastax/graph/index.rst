@@ -11,6 +11,30 @@
 
 .. autofunction:: graph_object_row_factory
 
+.. autofunction:: graph_graphson2_row_factory
+
+.. autofunction:: graph_graphson3_row_factory
+
+.. function:: to_int(value)
+
+    Wraps a value to be explicitly serialized as a graphson Int.
+
+.. function:: to_bigint(value)
+
+    Wraps a value to be explicitly serialized as a graphson Bigint.
+
+.. function:: to_smallint(value)
+
+    Wraps a value to be explicitly serialized as a graphson Smallint.
+
+.. function:: to_float(value)
+
+    Wraps a value to be explicitly serialized as a graphson Float.
+
+.. function:: to_double(value)
+
+   Wraps a value to be explicitly serialized as a graphson Double.
+
 .. autoclass:: GraphProtocol
    :members:
 

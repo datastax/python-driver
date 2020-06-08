@@ -1,10 +1,33 @@
 3.22.0
 ======
-UNRELEASED
+February 26, 2020
 
 Features
 --------
+
 * Add all() function to the ResultSet API (PYTHON-1203)
+* Parse new schema metadata in NGDG and generate table edges CQL syntax (PYTHON-996)
+* Add GraphSON3 support (PYTHON-788)
+* Use GraphSON3 as default for Native graphs (PYTHON-1004)
+* Add Tuple and UDT types for native graph (PYTHON-1005)
+* Add Duration type for native graph (PYTHON-1000)
+* Add gx:ByteBuffer graphson type support for Blob field (PYTHON-1027)
+* Enable Paging Through DSE Driver for Gremlin Traversals (PYTHON-1045)
+* Provide numerical wrappers to ensure proper graphson schema definition (PYTHON-1051)
+* Resolve the row_factory automatically for native graphs (PYTHON-1056)
+* Add g:TraversalMetrics/g:Metrics graph deserializers (PYTHON-1057)
+* Add g:BulkSet graph deserializers (PYTHON-1060)
+* Update Graph Engine names and the way to create a Classic/Native Graph (PYTHON-1090)
+* Update Native to Core Graph Engine
+* Add graphson3 and native graph support (PYTHON-1039)
+* Enable Paging Through DSE Driver for Gremlin Traversals (PYTHON-1045)
+* Expose filter predicates for cql collections (PYTHON-1019)
+* Add g:TraversalMetrics/Metrics deserializers (PYTHON-1057)
+* Make graph metadata handling more robust (PYTHON-1204)
+
+Bug Fixes
+---------
+* Make sure to only query the native_transport_address column with DSE (PYTHON-1205)
 
 3.21.0
 ======
