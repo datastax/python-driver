@@ -277,7 +277,8 @@ class PlainTextAuthenticator(BaseDSEAuthenticator):
 
     def evaluate_challenge(self, challenge):
         if challenge == six.b('PLAIN-START'):
-            return six.b("\x00%s\x00%s" % (self.username, self.password))
+            data = "\x00%s\x00%s" % (self.username, self.password)
+            return data if six.PY2 else data.encode()
         raise Exception('Did not receive a valid challenge response from server')
 
 
