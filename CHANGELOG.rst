@@ -11,6 +11,7 @@ Features
 Bug Fixes
 ---------
 * Unable to connect to a cloud cluster using Ubuntu 20.04 (PYTHON-1238)
+* PlainTextAuthProvider fails with unicode chars and Python3 (PYTHON-1241)
 * [GRAPH] Can't write data in a Boolean field using the Fluent API (PYTHON-1239)
 * [GRAPH] Fix elementMap() result deserialization (PYTHON-1233)
 
