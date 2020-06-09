@@ -23,7 +23,7 @@ import six
 from ssl import SSLContext, PROTOCOL_TLSv1
 
 from cassandra import DriverException, ConsistencyLevel, InvalidRequest
-from cassandra.cluster import NoHostAvailable, ExecutionProfile, Cluster
+from cassandra.cluster import NoHostAvailable, ExecutionProfile, Cluster, _execution_profile_to_string
 from cassandra.connection import SniEndPoint
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy, ConstantReconnectionPolicy
@@ -160,7 +160,16 @@ class CloudTests(CloudProxyCluster):
     def test_default_consistency(self):
         self.connect(self.creds)
         self.assertEqual(self.session.default_consistency_level, ConsistencyLevel.LOCAL_QUORUM)
-        self.assertEqual(self.cluster.profile_manager.default.consistency_level, ConsistencyLevel.LOCAL_QUORUM)
+        # Verify EXEC_PROFILE_DEFAULT, EXEC_PROFILE_GRAPH_DEFAULT,
+        # EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT, EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT
+        for ep_key in six.iterkeys(self.cluster.profile_manager.profiles):
+            ep = self.cluster.profile_manager.profiles[ep_key]
+            self.assertEqual(
+                ep.consistency_level,
+                ConsistencyLevel.LOCAL_QUORUM,
+                "Expecting LOCAL QUORUM for profile {}, but got {} instead".format(
+                _execution_profile_to_string(ep_key), ConsistencyLevel.value_to_name[ep.consistency_level]
+                ))
 
     def test_default_consistency_of_execution_profiles(self):
         cloud_config = {'secure_connect_bundle': self.creds}
