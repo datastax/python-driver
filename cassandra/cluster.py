@@ -418,7 +418,7 @@ class GraphExecutionProfile(ExecutionProfile):
     """
 
     def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
-                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 consistency_level=_NOT_SET, serial_consistency_level=None,
                  request_timeout=30.0, row_factory=None,
                  graph_options=None, continuous_paging_options=_NOT_SET):
         """
@@ -443,7 +443,7 @@ class GraphExecutionProfile(ExecutionProfile):
 class GraphAnalyticsExecutionProfile(GraphExecutionProfile):
 
     def __init__(self, load_balancing_policy=None, retry_policy=None,
-                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 consistency_level=_NOT_SET, serial_consistency_level=None,
                  request_timeout=3600. * 24. * 7., row_factory=None,
                  graph_options=None):
         """
