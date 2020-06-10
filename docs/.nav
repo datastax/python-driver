@@ -1,5 +1,6 @@
 installation
 getting_started
+scylla_specific
 execution_profiles
 lwt
 object_mapper

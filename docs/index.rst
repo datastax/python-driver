@@ -20,6 +20,9 @@ Contents
 :doc:`getting_started`
     A guide through the first steps of connecting to Scylla and executing queries
 
+:doc:`scylla_specific`
+    A list of feature available only on ``scylla-driver``
+
 :doc:`execution_profiles`
     An introduction to a more flexible way of configuring request execution
 
@@ -62,6 +65,7 @@ Contents
    api/index
    installation
    getting_started
+   scylla_specific
    upgrading
    execution_profiles
    performance

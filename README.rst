@@ -19,6 +19,7 @@ Features
 * Configurable `load balancing <http://scylladb.github.io/python-driver/api/cassandra/policies.html#load-balancing>`_ and `retry policies <http://scylladb.github.io/python-driver/api/cassandra/policies.html#retrying-failed-operations>`_
 * `Concurrent execution utilities <http://scylladb.github.io/python-driver/api/cassandra/concurrent.html>`_
 * `Object mapper <http://scylladb.github.io/python-driver/object_mapper.html>`_
+* `Shard awareness <http://scylladb.github.io/python-driver/scylla_specific.html#shard-awareness>`_
 
 Installation
 ------------
