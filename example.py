@@ -18,7 +18,7 @@ def main():
     cluster = Cluster(contact_points = ['127.0.0.1'], load_balancing_policy = None, protocol_version = 66)
     session = cluster.connect()
 
-    rows = session.execute("SELECT keyspace_name FROM system.schema_keyspaces")
+    rows = session.execute("SELECT keyspace_name FROM system_schema.keyspaces")
     if KEYSPACE in [row[0] for row in rows]:
         log.info("dropping existing keyspace...")
         session.execute("DROP KEYSPACE " + KEYSPACE)
