@@ -10,16 +10,16 @@ The driver supports Python versions 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
 
 Features
 --------
-* `Synchronous <http://scylladb.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <http://scylladb.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Session.execute_async>`_ APIs
-* `Simple, Prepared, and Batch statements <http://scylladb.github.io/python-driver/api/cassandra/query.html#cassandra.query.Statement>`_
+* `Synchronous <http://scylladb.github.io/python-driver/api/cassandra/cluster/#cassandra.cluster.Session.execute>`_ and `Asynchronous <http://scylladb.github.io/python-driver/api/cassandra/cluster/#cassandra.cluster.Session.execute_async>`_ APIs
+* `Simple, Prepared, and Batch statements <http://scylladb.github.io/python-driver/api/cassandra/query/#cassandra.query.Statement>`_
 * Asynchronous IO, parallel execution, request pipelining
-* `Connection pooling <http://scylladb.github.io/python-driver/api/cassandra/cluster.html#cassandra.cluster.Cluster.get_core_connections_per_host>`_
+* `Connection pooling <http://scylladb.github.io/python-driver/api/cassandra/cluster/#cassandra.cluster.Cluster.get_core_connections_per_host>`_
 * Automatic node discovery
-* `Automatic reconnection <http://scylladb.github.io/python-driver/api/cassandra/policies.html#reconnecting-to-dead-hosts>`_
-* Configurable `load balancing <http://scylladb.github.io/python-driver/api/cassandra/policies.html#load-balancing>`_ and `retry policies <http://scylladb.github.io/python-driver/api/cassandra/policies.html#retrying-failed-operations>`_
-* `Concurrent execution utilities <http://scylladb.github.io/python-driver/api/cassandra/concurrent.html>`_
-* `Object mapper <http://scylladb.github.io/python-driver/object_mapper.html>`_
-* `Shard awareness <http://scylladb.github.io/python-driver/scylla_specific.html#shard-awareness>`_
+* `Automatic reconnection <http://scylladb.github.io/python-driver/api/cassandra/policies/#reconnecting-to-dead-hosts>`_
+* Configurable `load balancing <http://scylladb.github.io/python-driver/api/cassandra/policies/#load-balancing>`_ and `retry policies <http://scylladb.github.io/python-driver/api/cassandra/policies/#retrying-failed-operations>`_
+* `Concurrent execution utilities <http://scylladb.github.io/python-driver/api/cassandra/concurrent/>`_
+* `Object mapper <http://scylladb.github.io/python-driver/object_mapper/>`_
+* `Shard awareness <http://scylladb.github.io/python-driver/scylla_specific/#shard-awareness>`_
 
 Installation
 ------------
@@ -28,18 +28,18 @@ Installation through pip is recommended::
     $ pip install scylla-driver
 
 For more complete installation instructions, see the
-`installation guide <http://scylladb.github.io/python-driver/installation.html>`_.
+`installation guide <http://scylladb.github.io/python-driver/installation/>`_.
 
 Documentation
 -------------
-The documentation can be found online `here <http://scylladb.github.io/python-driver/index.html>`_.
+The documentation can be found online `here <http://scylladb.github.io/python-driver/index/>`_.
 
 Information includes: 
 
-* `Installation <http://scylladb.github.io/python-driver/installation.html>`_
-* `Getting started guide <http://scylladb.github.io/python-driver/getting_started.html>`_
-* `API docs <http://scylladb.github.io/python-driver/api/index.html>`_
-* `Performance tips <http://scylladb.github.io/python-driver/performance.html>`_
+* `Installation <http://scylladb.github.io/python-driver/installation/>`_
+* `Getting started guide <http://scylladb.github.io/python-driver/getting_started/>`_
+* `API docs <http://scylladb.github.io/python-driver/api/index/>`_
+* `Performance tips <http://scylladb.github.io/python-driver/performance/>`_
 
 Training
 --------
@@ -53,7 +53,7 @@ Object Mapper
 -------------
 cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contributions from the
 community) is now maintained as an integral part of this package. Refer to
-`documentation here <http://scylladb.github.io/python-driver/object_mapper.html>`_.
+`documentation here <http://scylladb.github.io/python-driver/object_mapper/>`_.
 
 Contributing
 ------------
