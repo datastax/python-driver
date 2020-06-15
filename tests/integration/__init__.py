@@ -534,7 +534,17 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                         }
                     })
                 if 'spark' in workloads:
-                    config_options = {"initial_spark_worker_resources": 0.1}
+                    if Version(dse_version) >= Version('6.8'):
+                        config_options = {
+                            "resource_manager_options": {
+                                "worker_options": {
+                                    "cores_total": 0.1
+                                }
+                            }
+                        }
+                    else:
+                        config_options = {"initial_spark_worker_resources": 0.1}
+
                     if Version(dse_version) >= Version('6.7'):
                         log.debug("Disabling AlwaysON SQL for a DSE 6.7 Cluster")
                         config_options['alwayson_sql_options'] = {'enabled': False}
