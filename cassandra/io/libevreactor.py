@@ -330,6 +330,11 @@ class LibevConnection(Connection):
                 if sent < len(next_msg):
                     with self._deque_lock:
                         self.deque.appendleft(next_msg[sent:])
+                    # we've seen some cases that 0 is returned instead of NONBLOCKING. But usually,
+                    # we don't expect this to happen. https://bugs.python.org/issue20951
+                    if sent == 0:
+                        self._socket_writable = False
+                        return
 
     def handle_read(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
