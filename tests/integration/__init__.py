@@ -538,7 +538,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                         config_options = {
                             "resource_manager_options": {
                                 "worker_options": {
-                                    "cores_total": 0.1
+                                    "cores_total": 0.1,
+                                    "memory_total": "64M"
                                 }
                             }
                         }
