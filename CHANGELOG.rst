@@ -1,6 +1,6 @@
 3.24.0
 ======
-Not released
+June 18, 2020
 
 Features
 --------
@@ -12,7 +12,7 @@ Bug Fixes
 ---------
 * Unable to connect to a cloud cluster using Ubuntu 20.04 (PYTHON-1238)
 * PlainTextAuthProvider fails with unicode chars and Python3 (PYTHON-1241)
-* Graph execution profiles consistency level are not set to LOCAL_QUORUM with a cloud cluster (PYTHON-1240)
+* [GRAPH] Graph execution profiles consistency level are not set to LOCAL_QUORUM with a cloud cluster (PYTHON-1240)
 * [GRAPH] Can't write data in a Boolean field using the Fluent API (PYTHON-1239)
 * [GRAPH] Fix elementMap() result deserialization (PYTHON-1233)
 
@@ -20,6 +20,7 @@ Others
 ------
 * Bump geomet dependency version to 0.2 (PYTHON-1243)
 * Bump gremlinpython dependency version to 3.4.6 (PYTHON-1212)
+* Improve fluent graph documentation for core graphs (PYTHON-1244)
 
 3.23.0
 ======
