@@ -1,5 +1,5 @@
 ``cassandra.timestamps`` - Timestamp Generation
-=============================================
+===============================================
 
 .. module:: cassandra.timestamps
 
