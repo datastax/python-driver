@@ -59,7 +59,7 @@ Others
 ------
 * The driver has a new dependency: geomet. It comes from the dse-driver unification and
   is used to support DSE geo types.
-* Remove *read_repair_chance table options (PYTHON-1140)
+* Remove ``*read_repair_chance`` table options (PYTHON-1140)
 * Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
 * Add new DSE CQL keywords (PYTHON-1122)
 * Publish binary wheel distributions (PYTHON-1013)
@@ -439,7 +439,7 @@ Other
 -----
 * Update README (PYTHON-746)
 * Test python versions 3.5 and 3.6 (PYTHON-737)
-* Docs Warning About Prepare "select *" (PYTHON-626)
+* Docs Warning About Prepare ``select *`` (PYTHON-626)
 * Increase Coverage in CqlEngine Test Suite (PYTHON-505)
 * Example SSL connection code does not verify server certificates (PYTHON-469)
 
