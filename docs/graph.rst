@@ -1,3 +1,5 @@
+:orphan:
+
 DataStax Graph Queries
 ======================
 

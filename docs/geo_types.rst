@@ -1,3 +1,5 @@
+:orphan:
+
 DSE Geometry Types
 ==================
 This section shows how to query and work with the geometric types provided by DSE.
