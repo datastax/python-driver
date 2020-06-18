@@ -1,6 +1,5 @@
--r ../requirements.txt
+-r ../test-requirements.txt
 sphinx==1.8.0
 sphinx_scylladb_theme
 sphinx-autobuild==0.7.1
-gevent>=1.0
-eventlet
+jinja2==2.8.1
