@@ -402,11 +402,11 @@ with every UDT or tuple query. In the general case, the driver can't determine w
 is meant by, e.g., an int value, and so it can't serialize the value with the correct type in the schema.
 The driver provides some numerical type-wrapper factories that you can use to specify types:
 
-* :func:`~.to_int`
-* :func:`~.to_bigint`
-* :func:`~.to_smallint`
-* :func:`~.to_float`
-* :func:`~.to_double`
+* :func:`~cassandra.datastax.graph.to_int`
+* :func:`~cassandra.datastax.graph.to_bigint`
+* :func:`~cassandra.datastax.graph.to_smallint`
+* :func:`~cassandra.datastax.graph.to_float`
+* :func:`~cassandra.datastax.graph.to_double`
 
 Here's the working example of the case above::
 

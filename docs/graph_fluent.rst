@@ -36,7 +36,7 @@ a `Session` object, or implicitly::
     for v in g.V().has('genre', 'name', 'Drama').in_('belongsTo').valueMap():
         print(v)
 
-These :ref:`Python types <graph-types>` are also supported transparently::
+These Python types are also supported transparently::
 
     g.addV('person').property('name', 'Mike').property('birthday', datetime(1984, 3, 11)). \
         property('house_yard', Polygon(((30, 10), (40, 40), (20, 40), (10, 20), (30, 10)))

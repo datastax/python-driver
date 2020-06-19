@@ -190,9 +190,9 @@ blob         bytearray, buffer (PY2), memoryview (PY3), bytes (PY3)
 Graph Row Factory
 ~~~~~~~~~~~~~~~~~
 
-By default (with :class:`.GraphExecutionProfile.row_factory` set to :func:`.graph.graph_object_row_factory`), known graph result
-types are unpacked and returned as specialized types (:class:`.Vertex`, :class:`.Edge`). If the result is not one of these
-types, a :class:`.graph.Result` is returned, containing the graph result parsed from JSON and removed from its outer dict.
+By default (with :class:`.GraphExecutionProfile.row_factory` set to :func:`~cassandra.graph.graph_object_row_factory`), known graph result
+types are unpacked and returned as specialized types (:class:`~cassandra.graph.Vertex`, :class:`~cassandra.graph.Edge`). If the result is not one of these
+types, a :class:`~cassandra.graph.Result` is returned, containing the graph result parsed from JSON and removed from its outer dict.
 The class has some accessor convenience methods for accessing top-level properties by name (`type`, `properties` above),
 or lists by index::
 
@@ -212,13 +212,13 @@ or lists by index::
     result[1]  # 1 (list[1])
 
 You can use a different row factory by setting :attr:`.Session.default_graph_row_factory` or passing it to
-:meth:`.Session.execute_graph`. For example, :func:`.graph.single_object_row_factory` returns the JSON result string`,
-unparsed. :func:`.graph.graph_result_row_factory` returns parsed, but unmodified results (such that all metadata is retained,
-unlike :func:`.graph.graph_object_row_factory`, which sheds some as attributes and properties are unpacked). These results
-also provide convenience methods for converting to known types (:meth:`~.Result.as_vertex`, :meth:`~.Result.as_edge`, :meth:`~.Result.as_path`).
+:meth:`.Session.execute_graph`. For example, :func:`~cassandra.graph.single_object_row_factory` returns the JSON result string`,
+unparsed. :func:`~cassandra.graph.graph_result_row_factory` returns parsed, but unmodified results (such that all metadata is retained,
+unlike :func:`~cassandra.graph.graph_object_row_factory`, which sheds some as attributes and properties are unpacked). These results
+also provide convenience methods for converting to known types (:meth:`~cassandra.graph.Result.as_vertex`, :meth:`~cassandra.graph.Result.as_edge`, :meth:`~cassandra.Result.as_path`).
 
 Vertex and Edge properties are never unpacked since their types are unknown. If you know your graph schema and want to
-deserialize properties, use the :class:`.GraphSON1Deserializer`. It provides convenient methods to deserialize by types (e.g.
+deserialize properties, use the :class:`~cassandra.graph.GraphSON1Deserializer`. It provides convenient methods to deserialize by types (e.g.
 deserialize_date, deserialize_uuid, deserialize_polygon etc.) Example::
 
     # ...
