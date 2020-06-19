@@ -264,7 +264,7 @@ The following driver code specifies that the connection should use two-way verif
     session = cluster.connect()
 
 
-The driver uses ``SSLContext`` directly to give you many other options in configuring SSL. Consider reading the `Python SSL documentation <https://docs.python.org/library/ssl.html#ssl.SSLContext>`_
+The driver uses ``SSLContext`` directly to give you many other options in configuring SSL. Consider reading the `Python SSL documentation <https://docs.python.org/library/ssl.html#ssl.SSLContext>`__
 for more details about ``SSLContext`` configuration.
 
 **Server verifies client and client verifies server using Twisted and pyOpenSSL**
@@ -321,7 +321,7 @@ For example:
     cluster = Cluster(ssl_options=ssl_opts)
 
 This is only an example to show how to pass the ssl parameters. Consider reading
-the `python ssl documentation <https://docs.python.org/2/library/ssl.html#ssl.wrap_socket>`_ for
+the `python ssl documentation <https://docs.python.org/2/library/ssl.html#ssl.wrap_socket>`__ for
 your configuration. For further reading, Andrew Mussey has published a thorough guide on
 `Using SSL with the DataStax Python driver <http://blog.amussey.com/post/64036730812/cassandra-2-0-client-server-ssl-with-datastax-python>`_.
 
