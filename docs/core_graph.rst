@@ -19,7 +19,7 @@ for more detail on working with profiles.
 In DSE 6.8.0, the Core graph engine has been introduced and is now the default. It
 provides a better unified multi-model, performance and scale. This guide
 is for graphs that use the core engine. If you work with previous versions of 
-DSE or existing graphs, see :doc:`classic_graph`.
+DSE or existing graphs, see ``classic_graph``.
 
 Getting Started with Graph and the Core Engine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
