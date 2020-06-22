@@ -50,6 +50,9 @@ Contents
 :doc:`dates_and_times`
     Some discussion on the driver's approach to working with timestamp, date, time types
 
+:doc:`scylla_cloud`	
+    Connect to Scylla Cloud
+
 :doc:`CHANGELOG`
     Log of changes to the driver, organized by version.
 
@@ -75,6 +78,7 @@ Contents
    user_defined_types
    object_mapper
    dates_and_times
+   scylla_cloud
    faq
 
 Getting Help
