@@ -18,13 +18,37 @@ jobs:
 
   include:
     # Integration tests with scylla
-    #- name: Integration Test
-    #  os: linux
-    #  dist: xenial
-    #  python: 3.7
-    #  script:
-    #    - ./ci/run_integration_test.sh
-    #  if: type = pull_request
+    - name: "Integration Test #1"
+      os: linux
+      dist: xenial
+      python: 3.7
+      script:
+        - ./ci/run_integration_test.sh tests/integration/standard/test_authentication.py tests/integration/standard/test_cluster.py tests/integration/standard/test_concurrent.py
+      if: type = pull_request
+
+    - name: "Integration Test #2"
+      os: linux
+      dist: xenial
+      python: 3.7
+      script:
+        - ./ci/run_integration_test.sh tests/integration/standard/test_connection.py tests/integration/standard/test_control_connection.py tests/integration/standard/test_custom_payload.py
+      if: type = pull_request
+
+    - name: "Integration Test #3"
+      os: linux
+      dist: xenial
+      python: 3.7
+      script:
+        - ./ci/run_integration_test.sh tests/integration/standard/test_custom_protocol_handler.py tests/integration/standard/test_cython_protocol_handlers.py
+      if: type = pull_request
+
+#    - name: "Integration Test #5"
+#      os: linux
+#      dist: xenial
+#      python: 3.7
+#      script:
+#        - ./ci/run_integration_test.sh tests/integration/standard/test_shard_aware.py
+#      if: type = pull_request
 
     # perform a linux builds
     - name: CPython Linux 64

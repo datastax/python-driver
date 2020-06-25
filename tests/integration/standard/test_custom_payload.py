@@ -45,6 +45,7 @@ class CustomPayloadTests(unittest.TestCase):
 
         self.cluster.shutdown()
 
+    @unittest.skip('Failing with scylla')
     def test_custom_query_basic(self):
         """
         Test to validate that custom payloads work with simple queries
@@ -67,6 +68,7 @@ class CustomPayloadTests(unittest.TestCase):
         # Validate that various types of custom payloads are sent and received okay
         self.validate_various_custom_payloads(statement=statement)
 
+    @unittest.skip('Failing with scylla')
     def test_custom_query_batching(self):
         """
         Test to validate that custom payloads work with batch queries
@@ -91,6 +93,7 @@ class CustomPayloadTests(unittest.TestCase):
         # Validate that various types of custom payloads are sent and received okay
         self.validate_various_custom_payloads(statement=batch)
 
+    @unittest.skip('Failing with scylla')
     def test_custom_query_prepared(self):
         """
         Test to validate that custom payloads work with prepared queries

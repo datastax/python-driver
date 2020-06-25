@@ -36,6 +36,7 @@ from itertools import groupby
 import six
 import shutil
 
+
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists,\
     InvalidRequest
 from cassandra.protocol import ConfigurationException
@@ -44,6 +45,7 @@ from cassandra import ProtocolVersion
 try:
     from ccmlib.dse_cluster import DseCluster
     from ccmlib.cluster import Cluster as CCMCluster
+    from ccmlib.scylla_cluster import ScyllaCluster as CCMScyllaCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
 except ImportError as e:
@@ -161,16 +163,21 @@ KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
 SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 CLOUD_PROXY_PATH = os.getenv('CLOUD_PROXY_PATH', None)
 
-# Supported Clusters: Cassandra, DDAC, DSE
+# Supported Clusters: Cassandra, DDAC, DSE, Scylla
 DSE_VERSION = None
+SCYLLA_VERSION = os.getenv('SCYLLA_VERSION', None)
 if os.getenv('DSE_VERSION', None):  # we are testing against DSE
     DSE_VERSION = Version(os.getenv('DSE_VERSION', None))
     DSE_CRED = os.getenv('DSE_CREDS', None)
     CASSANDRA_VERSION = _get_cass_version_from_dse(DSE_VERSION.base_version)
     CCM_VERSION = DSE_VERSION.base_version
 else:  # we are testing against Cassandra or DDAC
-    cv_string = os.getenv('CASSANDRA_VERSION', None)
-    mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
+    if SCYLLA_VERSION:
+        cv_string = SCYLLA_VERSION
+        mcv_string = os.getenv('MAPPED_SCYLLA_VERSION', None)
+    else:
+        cv_string = os.getenv('CASSANDRA_VERSION', None)
+        mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
     try:
         cassandra_version = Version(cv_string)  # env var is set to test-dse for DDAC
     except:
@@ -448,7 +455,7 @@ def is_current_cluster(cluster_name, node_counts, workloads):
         if [len(list(nodes)) for dc, nodes in
                 groupby(CCM_CLUSTER.nodelist(), lambda n: n.data_center)] == node_counts:
             for node in CCM_CLUSTER.nodelist():
-                if set(node.workloads) != set(workloads):
+                if set(getattr(node, 'workloads', [])) != set(workloads):
                     print("node workloads don't match creating new cluster")
                     return False
             return True
@@ -559,15 +566,16 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
 
                 CCM_CLUSTER.set_dse_configuration_options(dse_options)
             else:
-                CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
-                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-                if IS_SCYLLA:
+                if SCYLLA_VERSION:
                     # `experimental: True` enable all experimental features.
                     # CDC is causing an issue (can't start cluster with multiple seeds)
                     # Selecting only features we need for tests, i.e. anything but CDC.
-                    CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf']})
-
-                if cassandra_version >= Version('2.2'):
+                    CCM_CLUSTER = CCMScyllaCluster(path, cluster_name, **ccm_options)
+                    CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf'], 'start_native_transport': True})
+                else:
+                    CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
+                    CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+                if Version(cassandra_version) >= Version('2.2'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     if Version(cassandra_version) >= Version('3.0'):
                         CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
@@ -581,7 +589,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
 
         if 'graph' not in workloads:
-            if PROTOCOL_VERSION >= 4:
+            if PROTOCOL_VERSION >= 4 and not SCYLLA_VERSION:
                 jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
         if len(workloads) > 0:
             for node in CCM_CLUSTER.nodes.values():

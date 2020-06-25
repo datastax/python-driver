@@ -185,6 +185,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         time.sleep(10)
         self.query_data(self.session)
 
+    @unittest.skip('For manual test only')
     def test_blocking_connections(self):
         """
         Verify that reconnection is working as expected, when connection are being blocked.

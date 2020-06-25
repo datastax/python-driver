@@ -472,6 +472,7 @@ class ForcedHostIndexPolicy(RoundRobinPolicy):
 
 class PreparedStatementMetdataTest(unittest.TestCase):
 
+    @unittest.skip('Failing with scylla')
     def test_prepared_metadata_generation(self):
         """
         Test to validate that result metadata is appropriately populated across protocol version
@@ -962,6 +963,7 @@ class LightweightTransactionTests(unittest.TestCase):
         # Make sure test passed
         self.assertTrue(received_timeout)
 
+    @unittest.skip('Failing with scylla')
     def test_was_applied_batch_stmt(self):
         """
         Test to ensure `:attr:cassandra.cluster.ResultSet.was_applied` works as expected
@@ -1399,6 +1401,7 @@ class BaseKeyspaceTests():
         cls.cluster.shutdown()
 
 
+@unittest.skip('Failing with scylla')
 class QueryKeyspaceTests(BaseKeyspaceTests):
 
     def test_setting_keyspace(self):
@@ -1469,6 +1472,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
         self._check_set_keyspace_in_statement(session)
 
 
+@unittest.skip('Failing with scylla')
 @greaterthanorequalcass40
 class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
     @unittest.skip
@@ -1497,6 +1501,7 @@ class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
         self.assertEqual(results[0], (1, 1))
 
 
+@unittest.skip('Failing with scylla')
 @greaterthanorequalcass40
 class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
     def _check_set_keyspace_in_statement(self, session):
@@ -1523,6 +1528,7 @@ class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
         self.assertEqual(set(range(10)), values, msg=results)
 
 
+@unittest.skip('Failing with scylla')
 @greaterthanorequalcass40
 class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 

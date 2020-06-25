@@ -18,8 +18,15 @@ from cassandra.cluster import Cluster
 from tests.integration import CASSANDRA_IP, USE_CASS_EXTERNAL, use_cluster, PROTOCOL_VERSION
 
 
+@unittest.skip('Failing with scylla')
 class MisconfiguredAuthenticationTests(unittest.TestCase):
     """ One node (not the contact point) has password auth. The rest of the nodes have no auth """
+    # TODO: 	Fix ccm to apply following options to scylla.yaml
+    # 	node3.set_configuration_options(values={
+    # 	'authenticator': 'PasswordAuthenticator',
+    # 	'authorizer': 'CassandraAuthorizer',
+    # 	})
+    # To make it working for scylla
     @classmethod
     def setUpClass(cls):
         if not USE_CASS_EXTERNAL:

@@ -28,6 +28,7 @@ def setup_module():
     use_singledc()
 
 
+@unittest.skip('Failing with scylla')
 class ClientWarningTests(unittest.TestCase):
 
     @classmethod

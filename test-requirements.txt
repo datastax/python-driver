@@ -2,7 +2,7 @@
 scales
 nose
 mock>1.1
-ccm>=2.1.2
+#ccm>=2.1.2
 unittest2
 pytz
 sure
