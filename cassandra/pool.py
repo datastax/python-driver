@@ -389,7 +389,7 @@ class HostConnection(object):
         shard_id = None
         if self.host.sharding_info and routing_key:
             t = self._session.cluster.metadata.token_map.token_class.from_key(routing_key)
-            shard_id = self.host.sharding_info.shard_id_from_token(t)
+            shard_id = self.host.sharding_info.shard_id_from_token(t.value)
 
         conn = self._connections.get(shard_id)
 

@@ -38,8 +38,8 @@ class TestShardAware(unittest.TestCase):
         shard_id, shard_info = ShardingInfo.parse_sharding_info(OptionsHolder())
 
         self.assertEqual(shard_id, 1)
-        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"a")), 4)
-        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"b")), 6)
-        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"c")), 6)
-        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"e")), 4)
-        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"100000")), 2)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"a").value), 4)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"b").value), 6)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"c").value), 6)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"e").value), 4)
+        self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"100000").value), 2)
