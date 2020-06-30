@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cimport libc.stdlib
 from libc.stdint cimport INT64_MIN, UINT32_MAX, uint64_t, int64_t
 
 cdef extern from *:
@@ -42,7 +41,7 @@ cdef class ShardingInfo():
         sharding_ignore_msb = message.options.get('SCYLLA_SHARDING_IGNORE_MSB', [''])[0] or None
 
         if not (shard_id or shards_count or partitioner == "org.apache.cassandra.dht.Murmur3Partitioner" or
-            sharding_algorithm ==  "biased-token-round-robin" or sharding_ignore_msb):
+            sharding_algorithm == "biased-token-round-robin" or sharding_ignore_msb):
             return 0, None
 
         return int(shard_id), ShardingInfo(shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb)
@@ -53,12 +52,3 @@ cdef class ShardingInfo():
         biased_token <<= self.sharding_ignore_msb;
         cdef int shardId = (<__uint128_t>biased_token * self.shards_count) >> 64;
         return shardId
-
-        # cdef long token = token_input + INT64_MIN
-        # token = token << self.sharding_ignore_msb
-        # cdef long tokLo = token & UINT32_MAX
-        # cdef long tokHi = (token >> 32) & UINT32_MAX
-        # cdef long mul1 = tokLo * self.shards_count
-        # cdef long mul2 = tokHi * self.shards_count
-        # cdef long sum = (mul1 >> 32) + mul2
-        # return libc.stdlib.abs(<int>(sum >> 32))
