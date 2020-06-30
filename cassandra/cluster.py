@@ -1727,6 +1727,15 @@ class Cluster(object):
         holders.append(self.control_connection)
         return holders
 
+    def is_shard_aware(self):
+        return bool(self.get_connection_holders()[:-1][0].host.sharding_info)
+
+    def shard_aware_stats(self):
+        if self.is_shard_aware():
+            return {str(pool.host.endpoint): {'shards_count': pool.host.sharding_info.shards_count,
+                                              'connected': len(pool._connections.keys())}
+                    for pool in self.get_connection_holders()[:-1]}
+
     def shutdown(self):
         """
         Closes all sessions and connection associated with this Cluster.

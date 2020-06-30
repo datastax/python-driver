@@ -45,6 +45,9 @@ class TestShardAwareIntegration(unittest.TestCase):
                               reconnection_policy=ConstantReconnectionPolicy(1))
         cls.session = cls.cluster.connect()
 
+        print(cls.cluster.is_shard_aware())
+        print(cls.cluster.shard_aware_stats())
+
     @classmethod
     def teardown_class(cls):
         cls.cluster.shutdown()
