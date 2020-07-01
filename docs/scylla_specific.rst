@@ -20,6 +20,39 @@ For using it you only need to enable ``TokenAwarePolicy`` on the ``Cluster``
     cluster = Cluster(load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()))
 
 
+New Cluster Helpers
+-------------------
+
+* ``cluster.is_shard_aware()``
+
+  New method available on ``Cluster`` allowing to check whether the remote cluster supports shard awareness (bool)
+
+.. code:: python
+
+    from cassandra.cluster import Cluster
+
+    cluster = Cluster()
+    session = cluster.connect()
+
+    if cluster.is_shard_aware():
+        print("connected to a scylla cluster")
+
+* ``cluster.shard_aware_stats()``
+
+  New method available on ``Cluster`` allowing to check the status of shard aware connections to all available hosts (dict)
+
+.. code:: python
+
+    from cassandra.cluster import Cluster
+
+    cluster = Cluster()
+    session = cluster.connect()
+
+    stats = cluster.shard_aware_stats()
+    if all([v["shards_count"] == v["connected"] for v in stats.values()]):
+        print("successfully connected to all shards of all scylla nodes")
+
+
 New Table Attributes
 --------------------
 
