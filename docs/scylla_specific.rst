@@ -25,9 +25,9 @@ New Table Attributes
 
 * ``in_memory`` flag
 
-  New flag available on ``TableMetadata.options`` to indicate it's is `In Memory <https://docs.scylladb.com/using-scylla/in-memory/>`_ table
+  New flag available on ``TableMetadata.options`` to indicate that it is an `In Memory <https://docs.scylladb.com/using-scylla/in-memory/>`_ table
 
-.. note::  in memory tables is a feature exist only in Scylla Enterprise
+.. note::  in memory tables is a feature existing only in Scylla Enterprise
 
 .. code:: python
 
