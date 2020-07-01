@@ -14,20 +14,19 @@ jobs:
       uses: actions/checkout@v2
       with:
         persist-credentials: false
+        fetch-depth: 0
     - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: 3.7
     - name: Setup dependencies
-      run: | 
+      run: |
         sudo apt-get install libev4 libev-dev
         sudo apt-get install build-essential python-dev
-        cd docs
-        ./_utils/setup.sh
     - name: Build docs
       run: |
         cd docs
-        make dirhtml
+        make multiversion
     - name: Deploy
       run : ./docs/_utils/deploy.sh
       env:

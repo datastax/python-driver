@@ -13,7 +13,6 @@
 
 import os
 import sys
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -27,7 +26,7 @@ import cassandra
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx_scylladb_theme']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx_scylladb_theme', 'sphinx_multiversion']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -107,7 +106,8 @@ html_theme_options = {
     ('Scylla Cloud', 'https://docs.scylladb.com/scylla-cloud/'),
     ('Scylla University', 'https://university.scylladb.com/'),
     ('ScyllaDB Home', 'https://www.scylladb.com/')],
-    'github_issues_repository': 'scylladb/python-driver'
+    'github_issues_repository': 'scylladb/python-driver',
+    'show_sidebar_index': True,
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -225,3 +225,16 @@ man_pages = [
     ('index', 'scylla-driver', u'Cassandra Driver Documentation',
      [u'DataStax'], 1)
 ]
+
+
+# -- Options for multiversion --------------------------------------------
+# Whitelist pattern for tags (set to None to ignore all tags)
+smv_tag_whitelist = r'\b(3.22.0-scylla|3.21.0-scylla)\b'
+# Whitelist pattern for branches (set to None to ignore all branches)
+smv_branch_whitelist = r"^master$"
+# Whitelist pattern for remotes (set to None to use local branches only)
+smv_remote_whitelist = r"^origin$"
+# Pattern for released versions
+smv_released_pattern = r'^tags/.*$'
+# Format for versioned output directories inside the build directory
+smv_outputdir_format = '{ref.name}'
