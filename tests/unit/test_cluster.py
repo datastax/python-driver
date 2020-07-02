@@ -155,6 +155,7 @@ class SessionTest(unittest.TestCase):
         """
         c = Cluster(protocol_version=4)
         s = Session(c, [Host("127.0.0.1", SimpleConvictionPolicy)])
+        c.connection_class.initialize_reactor()
 
         # default is None
         default_profile = c.profile_manager.default
@@ -183,7 +184,7 @@ class SessionTest(unittest.TestCase):
         """
         c = Cluster(protocol_version=4)
         s = Session(c, [Host("127.0.0.1", SimpleConvictionPolicy)])
-
+        c.connection_class.initialize_reactor()
         # default is None
         self.assertIsNone(s.default_serial_consistency_level)
 

@@ -84,6 +84,7 @@ class MockCluster(object):
         self.executor = Mock(spec=ThreadPoolExecutor)
         self.profile_manager.profiles[EXEC_PROFILE_DEFAULT] = ExecutionProfile(RoundRobinPolicy())
         self.endpoint_factory = DefaultEndPointFactory().configure(self)
+        self.ssl_options = None
 
     def add_host(self, endpoint, datacenter, rack, signal=False, refresh_nodes=True):
         host = Host(endpoint, SimpleConvictionPolicy, datacenter, rack)
@@ -98,6 +99,9 @@ class MockCluster(object):
 
     def on_down(self, host, is_host_addition):
         self.down_host = host
+
+    def get_control_connection_host(self):
+        return self.added_hosts[0] if  self.added_hosts else None
 
 
 def _node_meta_results(local_results, peer_results):
@@ -121,6 +125,7 @@ class MockConnection(object):
 
     def __init__(self):
         self.endpoint = DefaultEndPoint("192.168.1.0")
+        self.original_endpoint = self.endpoint
         self.local_results = [
             ["schema_version", "cluster_name", "data_center", "rack", "partitioner", "release_version", "tokens"],
             [["a", "foocluster", "dc1", "rack1", "Murmur3Partitioner", "2.2.0", ["0", "100", "200"]]]

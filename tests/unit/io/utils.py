@@ -28,7 +28,7 @@ from functools import wraps
 from itertools import cycle
 import six
 from six import binary_type, BytesIO
-from mock import Mock
+from mock import Mock, MagicMock
 
 import errno
 import logging
@@ -214,7 +214,7 @@ class ReactorTestMixin(object):
 
     def make_connection(self):
         c = self.connection_class(DefaultEndPoint('1.2.3.4'), cql_version='3.0.1', connect_timeout=5)
-        mocket = Mock()
+        mocket = MagicMock()
         mocket.send.side_effect = lambda x: len(x)
         self.set_socket(c, mocket)
         return c

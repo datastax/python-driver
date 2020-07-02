@@ -28,7 +28,8 @@ from threading import Thread, Event, RLock, Condition
 import time
 import ssl
 import weakref
-
+import random
+import itertools
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
@@ -115,6 +116,10 @@ PROTOCOL_VERSION_MASK = 0x7f
 HEADER_DIRECTION_FROM_CLIENT = 0x00
 HEADER_DIRECTION_TO_CLIENT = 0x80
 HEADER_DIRECTION_MASK = 0x80
+
+# shard aware default for opening per shard connection
+DEFAULT_LOCAL_PORT_LOW = 49152
+DEFAULT_LOCAL_PORT_HIGH = 65535
 
 frame_header_v1_v2 = struct.Struct('>BbBi')
 frame_header_v3 = struct.Struct('>BhBi')
@@ -666,6 +671,17 @@ class _ConnectionIOBuffer(object):
             self.reset_io_buffer()
 
 
+class ShardawarePortGenerator:
+    @classmethod
+    def generate(cls, shard_id, total_shards):
+        start = random.randrange(DEFAULT_LOCAL_PORT_LOW, DEFAULT_LOCAL_PORT_HIGH)
+        available_ports = itertools.chain(range(start, DEFAULT_LOCAL_PORT_HIGH), range(DEFAULT_LOCAL_PORT_LOW, start))
+
+        for port in available_ports:
+            if port % total_shards == shard_id:
+                yield port
+
+
 class Connection(object):
 
     CALLBACK_ERR_THREAD_THRESHOLD = 100
@@ -762,7 +778,7 @@ class Connection(object):
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
                  user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False,
-                 ssl_context=None, owning_pool=None):
+                 ssl_context=None, owning_pool=None, shard_id=None, total_shards=None):
 
         # TODO next major rename host to endpoint and remove port kwarg.
         self.endpoint = host if isinstance(host, EndPoint) else DefaultEndPoint(host, port)
@@ -812,6 +828,9 @@ class Connection(object):
 
         self.lock = RLock()
         self.connected_event = Event()
+        self.shard_id = shard_id
+        self.total_shards = total_shards
+        self.original_endpoint = self.endpoint
 
     @property
     def host(self):
@@ -874,6 +893,15 @@ class Connection(object):
         self._socket = self.ssl_context.wrap_socket(self._socket, **ssl_options)
 
     def _initiate_connection(self, sockaddr):
+        if self.shard_id is not None:
+            for port in ShardawarePortGenerator.generate(self.shard_id, self.total_shards):
+                try:
+                    self._socket.bind(('', port))
+                    break
+                except Exception as ex:
+                    log.debug("port=%d couldn't bind cause: %s", port, str(ex))
+            log.debug(f'connection (%r) port=%d should be shard_id=%d', id(self), port, port % self.total_shards)
+
         self._socket.connect(sockaddr)
 
     def _match_hostname(self):
@@ -894,6 +922,7 @@ class Connection(object):
     def _connect_socket(self):
         sockerr = None
         addresses = self._get_socket_addresses()
+        port = None
         for (af, socktype, proto, _, sockaddr) in addresses:
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)

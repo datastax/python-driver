@@ -22,15 +22,19 @@ cdef class ShardingInfo():
     cdef readonly str partitioner
     cdef readonly str sharding_algorithm
     cdef readonly int sharding_ignore_msb
+    cdef readonly int shard_aware_port
+    cdef readonly int shard_aware_port_ssl
 
     cdef object __weakref__
 
-    def __init__(self, shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb):
+    def __init__(self, shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb, shard_aware_port,
+                 shard_aware_port_ssl):
         self.shards_count = int(shards_count)
         self.partitioner = partitioner
         self.sharding_algorithm = sharding_algorithm
         self.sharding_ignore_msb = int(sharding_ignore_msb)
-
+        self.shard_aware_port = int(shard_aware_port) if shard_aware_port else 0
+        self.shard_aware_port_ssl = int(shard_aware_port_ssl) if shard_aware_port_ssl else 0
 
     @staticmethod
     def parse_sharding_info(message):
@@ -39,12 +43,15 @@ cdef class ShardingInfo():
         partitioner = message.options.get('SCYLLA_PARTITIONER', [''])[0] or None
         sharding_algorithm = message.options.get('SCYLLA_SHARDING_ALGORITHM', [''])[0] or None
         sharding_ignore_msb = message.options.get('SCYLLA_SHARDING_IGNORE_MSB', [''])[0] or None
+        shard_aware_port = message.options.get('SCYLLA_SHARD_AWARE_PORT', [''])[0] or None
+        shard_aware_port_ssl = message.options.get('SCYLLA_SHARD_AWARE_PORT_SSL', [''])[0] or None
 
         if not (shard_id or shards_count or partitioner == "org.apache.cassandra.dht.Murmur3Partitioner" or
             sharding_algorithm == "biased-token-round-robin" or sharding_ignore_msb):
             return 0, None
 
-        return int(shard_id), ShardingInfo(shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb)
+        return int(shard_id), ShardingInfo(shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb,
+                                           shard_aware_port, shard_aware_port_ssl)
 
     
     def shard_id_from_token(self, int64_t token_input):

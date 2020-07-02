@@ -20,11 +20,13 @@ log = logging.getLogger(__name__)
 
 class _ShardingInfo(object):
 
-    def __init__(self, shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb):
+    def __init__(self, shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb, shard_aware_port, shard_aware_port_ssl):
         self.shards_count = int(shards_count)
         self.partitioner = partitioner
         self.sharding_algorithm = sharding_algorithm
         self.sharding_ignore_msb = int(sharding_ignore_msb)
+        self.shard_aware_port = int(shard_aware_port) if shard_aware_port else None
+        self.shard_aware_port_ssl = int(shard_aware_port_ssl) if shard_aware_port_ssl else None
 
     @staticmethod
     def parse_sharding_info(message):
@@ -33,13 +35,16 @@ class _ShardingInfo(object):
         partitioner = message.options.get('SCYLLA_PARTITIONER', [''])[0] or None
         sharding_algorithm = message.options.get('SCYLLA_SHARDING_ALGORITHM', [''])[0] or None
         sharding_ignore_msb = message.options.get('SCYLLA_SHARDING_IGNORE_MSB', [''])[0] or None
+        shard_aware_port = message.options.get('SCYLLA_SHARD_AWARE_PORT', [''])[0] or None
+        shard_aware_port_ssl = message.options.get('SCYLLA_SHARD_AWARE_PORT_SSL', [''])[0] or None
         log.debug("Parsing sharding info from message options %s", message.options)
 
         if not (shard_id or shards_count or partitioner == "org.apache.cassandra.dht.Murmur3Partitioner" or
             sharding_algorithm == "biased-token-round-robin" or sharding_ignore_msb):
             return 0, None
 
-        return int(shard_id), _ShardingInfo(shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb)
+        return int(shard_id), _ShardingInfo(shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb,
+                                            shard_aware_port, shard_aware_port_ssl)
 
     def shard_id_from_token(self, token):
         """

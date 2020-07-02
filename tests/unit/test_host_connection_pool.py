@@ -301,7 +301,8 @@ class HostConnectionTests(_PoolTests):
                 connection.shard_id = self.connection_counter
                 self.connection_counter += 1
                 connection.sharding_info = _ShardingInfo(shard_id=1, shards_count=14,
-                                                         partitioner="", sharding_algorithm="", sharding_ignore_msb=0)
+                                                         partitioner="", sharding_algorithm="", sharding_ignore_msb=0,
+                                                         shard_aware_port="", shard_aware_port_ssl="")
 
                 return connection
 

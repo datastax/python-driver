@@ -134,8 +134,8 @@ class Metadata(object):
 
     def refresh(self, connection, timeout, target_type=None, change_type=None, **kwargs):
 
-        server_version = self.get_host(connection.endpoint).release_version
-        dse_version = self.get_host(connection.endpoint).dse_version
+        server_version = self.get_host(connection.original_endpoint).release_version
+        dse_version = self.get_host(connection.original_endpoint).dse_version
         parser = get_schema_parser(connection, server_version, dse_version, timeout)
 
         if not target_type:

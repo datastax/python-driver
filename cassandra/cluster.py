@@ -1734,14 +1734,20 @@ class Cluster(object):
         holders.append(self.control_connection)
         return holders
 
+    def get_all_pools(self):
+        pools = []
+        for s in tuple(self.sessions):
+            pools.extend(s.get_pools())
+        return pools
+
     def is_shard_aware(self):
-        return bool(self.get_connection_holders()[:-1][0].host.sharding_info)
+        return bool(self.get_all_pools()[0].host.sharding_info)
 
     def shard_aware_stats(self):
         if self.is_shard_aware():
             return {str(pool.host.endpoint): {'shards_count': pool.host.sharding_info.shards_count,
                                               'connected': len(pool._connections.keys())}
-                    for pool in self.get_connection_holders()[:-1]}
+                    for pool in self.get_all_pools()}
 
     def shutdown(self):
         """
@@ -3756,7 +3762,7 @@ class ControlConnection(object):
             partitioner = local_row.get("partitioner")
             tokens = local_row.get("tokens")
 
-            host = self._cluster.metadata.get_host(connection.endpoint)
+            host = self._cluster.metadata.get_host(connection.original_endpoint)
             if host:
                 datacenter = local_row.get("data_center")
                 rack = local_row.get("rack")
@@ -4049,9 +4055,8 @@ class ControlConnection(object):
                 query_template = (self._SELECT_SCHEMA_PEERS_TEMPLATE
                                   if peers_query_type == self.PeersQueryType.PEERS_SCHEMA
                                   else self._SELECT_PEERS_NO_TOKENS_TEMPLATE)
-
-                host_release_version = self._cluster.metadata.get_host(connection.endpoint).release_version
-                host_dse_version = self._cluster.metadata.get_host(connection.endpoint).dse_version
+                host_release_version = self._cluster.metadata.get_host(connection.original_endpoint).release_version
+                host_dse_version = self._cluster.metadata.get_host(connection.original_endpoint).dse_version
                 uses_native_address_query = (
                     host_dse_version and Version(host_dse_version) >= self._MINIMUM_NATIVE_ADDRESS_DSE_VERSION)
 

@@ -1514,7 +1514,7 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         # the length of mock_calls will vary, but all should use the unignored
         # address
         for c in cluster.connection_factory.mock_calls:
-            self.assertEqual(call(DefaultEndPoint(unignored_address)), c)
+            self.assertEqual(unignored_address, c.args[0].address)
         cluster.shutdown()
 
 

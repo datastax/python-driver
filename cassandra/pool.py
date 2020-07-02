@@ -21,6 +21,7 @@ import logging
 import socket
 import time
 import random
+import copy
 from threading import Lock, RLock, Condition
 import weakref
 try:
@@ -412,6 +413,7 @@ class HostConnection(object):
         # so that we can dispose of them.
         self._trash = set()
         self._shard_connections_futures = []
+        self.advanced_shardaware_block_until = 0
 
         if host_distance == HostDistance.IGNORED:
             log.debug("Not opening connection to ignored host %s", self.host)
@@ -431,7 +433,7 @@ class HostConnection(object):
 
         if first_connection.sharding_info:
             self.host.sharding_info = first_connection.sharding_info
-            self._open_connections_for_all_shards()
+            self._open_connections_for_all_shards(first_connection.shard_id)
 
         log.debug("Finished initializing connection for host %s", self.host)
 
@@ -645,6 +647,24 @@ class HostConnection(object):
             log.debug("Closing excess connection (%s) to %s", id(c), self.host)
             c.close()
 
+    def disable_advanced_shard_aware(self, secs):
+        log.warning("disabling advanced_shard_aware for %i seconds, could be that this client is behind NAT?", secs)
+        self.advanced_shardaware_block_until = max(time.time() + secs, self.advanced_shardaware_block_until)
+
+    def _get_shard_aware_endpoint(self):
+        if self.advanced_shardaware_block_until and self.advanced_shardaware_block_until < time.time():
+            return None
+
+        endpoint = None
+        if self._session.cluster.ssl_options and self.host.sharding_info.shard_aware_port_ssl:
+            endpoint = copy.copy(self.host.endpoint)
+            endpoint._port = self.host.sharding_info.shard_aware_port_ssl
+        elif self.host.sharding_info.shard_aware_port:
+            endpoint = copy.copy(self.host.endpoint)
+            endpoint._port = self.host.sharding_info.shard_aware_port
+
+        return endpoint
+
     def _open_connection_to_missing_shard(self, shard_id):
         """
         Creates a new connection, checks its shard_id and populates our shard
@@ -666,13 +686,28 @@ class HostConnection(object):
         with self._lock:
             if self.is_shutdown:
                 return
+        shard_aware_endpoint = self._get_shard_aware_endpoint()
+        log.debug("shard_aware_endpoint=%r", shard_aware_endpoint)
 
-        conn = self._session.cluster.connection_factory(self.host.endpoint)
+        if shard_aware_endpoint:
+            conn = self._session.cluster.connection_factory(shard_aware_endpoint, owning_pool=self,
+                                                            shard_id=shard_id,
+                                                            total_shards=self.host.sharding_info.shards_count)
+            conn.original_endpoint = self.host.endpoint
+        else:
+            conn = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+
         log.debug("Received a connection %s for shard_id=%i on host %s", id(conn), conn.shard_id, self.host)
         if self.is_shutdown:
             log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", self.host, id(conn))
             conn.close()
             return
+
+        if shard_aware_endpoint and shard_id != conn.shard_id:
+            # connection didn't land on expected shared
+            # assuming behind a NAT, disabling advanced shard aware for a while
+            self.disable_advanced_shard_aware(10 * 60)
+
         old_conn = self._connections.get(conn.shard_id)
         if old_conn is None or old_conn.orphaned_threshold_reached:
             log.debug(
@@ -776,7 +811,7 @@ class HostConnection(object):
                 conn.close()
         self._connecting.discard(shard_id)
 
-    def _open_connections_for_all_shards(self):
+    def _open_connections_for_all_shards(self, skip_shard_id=None):
         """
         Loop over all the shards and try to open a connection to each one.
         """
@@ -785,6 +820,8 @@ class HostConnection(object):
                 return
 
             for shard_id in range(self.host.sharding_info.shards_count):
+                if skip_shard_id and skip_shard_id == shard_id:
+                    continue
                 future = self._session.submit(self._open_connection_to_missing_shard, shard_id)
                 if isinstance(future, Future):
                     self._connecting.add(shard_id)
