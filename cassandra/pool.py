@@ -527,7 +527,7 @@ class HostConnection(object):
                 return
 
         conn = self._session.cluster.connection_factory(self.host.endpoint)
-        if conn.shard_id not in self._connections.keys():
+        if not self.is_shutdown and conn.shard_id not in self._connections.keys():
             log.debug(
                 "New connection created to shard_id=%i on host %s",
                 conn.shard_id,
