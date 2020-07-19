@@ -2494,7 +2494,7 @@ class SchemaParserV3(SchemaParserV22):
             triggers_result = self._handle_results(triggers_success, triggers_result)
             # in_memory property is stored in scylla private table
             # add it to table properties if enabled
-            scylla_result = self._handle_results(scylla_success, scylla_result)
+            scylla_result = self._handle_results(scylla_success, scylla_result, expected_failures=(InvalidRequest,))
             try:
                 if scylla_result[0]["in_memory"] == True:
                     table_result[0]["in_memory"] = True
@@ -2682,7 +2682,7 @@ class SchemaParserV3(SchemaParserV22):
         self.aggregates_result = self._handle_results(aggregates_success, aggregates_result)
         self.indexes_result = self._handle_results(indexes_success, indexes_result)
         self.views_result = self._handle_results(views_success, views_result)
-        self.scylla_result = self._handle_results(scylla_success, scylla_result)
+        self.scylla_result = self._handle_results(scylla_success, scylla_result, expected_failures=(InvalidRequest,))
 
         self._aggregate_results()
 
