@@ -57,76 +57,36 @@ Releasing
 
 Building the Docs
 =================
-Sphinx is required to build the docs. You probably want to install through apt,
-if possible::
 
-    sudo apt-get install python-sphinx
+*Note*: The docs build instructions have been tested with Sphinx 2.4.4 and Fedora 32.
 
-pip may also work::
+To build and preview the theme locally, you will need to install the following software:
 
-    sudo pip install -U Sphinx
+- `Git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
+- `Python 3.7 <https://www.python.org/downloads/>`_
+- `pip <https://pip.pypa.io/en/stable/installing/>`_
 
-To build the docs, run::
+Run the following command to build the docs.
 
-    python setup.py doc
+.. code:: console
 
-Upload the Docs
-=================
+    cd docs
+    make preview
 
-This is deprecated. The docs is now only published on https://docs.datastax.com.
+Once the command completes processing, open http://127.0.0.1:5500/ with your preferred browser.
 
-To upload the docs, checkout the ``gh-pages`` branch and copy the entire
-contents all of ``docs/_build/X.Y.Z/*`` into the root of the ``gh-pages`` branch
-and then push that branch to github.
+Building multiple documentation versions
+========================================
 
-For example::
+Build docs for all the versions.
 
-    git checkout 1.0.0
-    python setup.py doc
-    git checkout gh-pages
-    cp -R docs/_build/1.0.0/* .
-    git add --update  # add modified files
-    # Also make sure to add any new documentation files!
-    git commit -m 'Update docs (version 1.0.0)'
-    git push origin gh-pages
+```
+cd docs
+make multiversion
+```
+ Then, open ``docs/_build/dirhtml/<version>/index.html`` with your preferred browser.
 
-If docs build includes errors, those errors may not show up in the next build unless
-you have changed the files with errors.  It's good to occassionally clear the build
-directory and build from scratch::
-
-    rm -rf docs/_build/*
-
-Documentor
-==========
-We now also use another tool called Documentor with Sphinx source to build docs.
-This gives us versioned docs with nice integrated search. This is a private tool
-of DataStax.
-
-Dependencies
-------------
-Sphinx
-~~~~~~
-Installed as described above
-
-Documentor
-~~~~~~~~~~
-Clone and setup Documentor as specified in `the project <https://github.com/riptano/documentor#installation-and-quick-start>`_.
-This tool assumes Ruby, bundler, and npm are present.
-
-Building
---------
-The setup script expects documentor to be in the system path. You can either add it permanently or run with something
-like this::
-
-    PATH=$PATH:<documentor repo>/bin python setup.py doc
-
-The docs will not display properly just browsing the filesystem in a browser. To view the docs as they would be in most
-web servers, use the SimpleHTTPServer module::
-
-    cd docs/_build/
-    python -m SimpleHTTPServer
-
-Then, browse to `localhost:8000 <http://localhost:8000>`_.
+**NOTE:** If you only can see docs generated for the master branch, try to run ``git fetch --tags`` to download the latest tags from remote.
 
 Tests
 =====
