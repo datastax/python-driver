@@ -387,7 +387,7 @@ def describeBuild(buildContext) {
   }
 }
 
-def scheduleTriggerJobName = "drivers/python/oss/master"
+def scheduleTriggerJobName = "drivers/python/oss/master/disabled"
 
 pipeline {
   agent none
@@ -641,11 +641,11 @@ pipeline {
 
   stages {
     stage ('Build and Test') {
-      agent {
-        // If I removed this agent block, GIT_URL and GIT_COMMIT aren't set.
-        // However, this trigger an additional checkout
-        label "master"
-      }
+      agent none
+      //   // If I removed this agent block, GIT_URL and GIT_COMMIT aren't set.
+      //   // However, this trigger an additional checkout
+      //   label none
+      // }
       when {
         beforeAgent true
         allOf {
