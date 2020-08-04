@@ -1541,8 +1541,11 @@ class Duration(object):
     """
 
     months = 0
+    ""
     days = 0
+    ""
     nanoseconds = 0
+    ""
 
     def __init__(self, months=0, days=0, nanoseconds=0):
         self.months = months
