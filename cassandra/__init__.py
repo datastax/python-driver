@@ -235,6 +235,14 @@ class ProtocolVersion(object):
     def has_continuous_paging_next_pages(cls, version):
         return version >= cls.DSE_V2
 
+    @classmethod
+    def has_checksumming_support(cls, version):
+        return cls.V5 <= version < cls.DSE_V1
+
+    @classmethod
+    def has_cql_frame_compression_support(cls, version):
+        return version != cls.V5
+
 
 class WriteType(object):
     """

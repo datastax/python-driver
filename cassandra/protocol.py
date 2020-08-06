@@ -31,7 +31,7 @@ from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
                        UserAggregateDescriptor, SchemaTargetType)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
                                uint8_pack, int8_unpack, uint64_pack, header_pack,
-                               v3_header_pack, uint32_pack)
+                               v3_header_pack, uint32_pack, uint32_le_unpack, uint32_le_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
                                 DoubleType, FloatType, Int32Type,
@@ -1115,7 +1115,8 @@ class _ProtocolHandler(object):
         msg.send_body(body, protocol_version)
         body = body.getvalue()
 
-        if compressor and len(body) > 0:
+        if (ProtocolVersion.has_cql_frame_compression_support(protocol_version)
+                and compressor and len(body) > 0):
             body = compressor(body)
             flags |= COMPRESSED_FLAG
 
@@ -1155,7 +1156,8 @@ class _ProtocolHandler(object):
         :param decompressor: optional decompression function to inflate the body
         :return: a message decoded from the body and frame attributes
         """
-        if flags & COMPRESSED_FLAG:
+        if (ProtocolVersion.has_cql_frame_compression_support(protocol_version) and
+                flags & COMPRESSED_FLAG):
             if decompressor is None:
                 raise RuntimeError("No de-compressor available for compressed frame!")
             body = decompressor(body)
@@ -1269,6 +1271,33 @@ def write_byte(f, b):
 
 def read_int(f):
     return int32_unpack(f.read(4))
+
+
+def read_uint_le(f, size=4):
+    """
+    Read a sequence of little endian bytes and return an unsigned integer.
+    """
+
+    if size == 4:
+        value = uint32_le_unpack(f.read(4))
+    else:
+        value = 0
+        for i in range(size):
+            value |= (read_byte(f) & 0xFF) << 8 * i
+
+    return value
+
+
+def write_uint_le(f, i, size=4):
+    """
+    Write an unsigned integer on a sequence of little endian bytes.
+    """
+    if size == 4:
+        f.write(uint32_le_pack(i))
+    else:
+        for j in range(size):
+            shift = j * 8
+            write_byte(f, i >> shift & 0xFF)
 
 
 def write_int(f, i):

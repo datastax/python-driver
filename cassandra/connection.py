@@ -42,10 +42,14 @@ from cassandra.protocol import (ReadyMessage, AuthenticateMessage, OptionsMessag
                                 AuthResponseMessage, AuthChallengeMessage,
                                 AuthSuccessMessage, ProtocolException,
                                 RegisterMessage, ReviseRequestMessage)
+from cassandra.segment import SegmentCodec, CrcException
 from cassandra.util import OrderedDict
 
 
 log = logging.getLogger(__name__)
+
+segment_codec_no_compression = SegmentCodec()
+segment_codec_lz4 = None
 
 # We use an ordered dictionary and specifically add lz4 before
 # snappy so that lz4 will be preferred. Changing the order of this
@@ -88,6 +92,7 @@ else:
         return lz4_block.decompress(byts[3::-1] + byts[4:])
 
     locally_supported_compressions['lz4'] = (lz4_compress, lz4_decompress)
+    segment_codec_lz4 = SegmentCodec(lz4_compress, lz4_decompress)
 
 try:
     import snappy
@@ -426,6 +431,10 @@ class ProtocolError(Exception):
     pass
 
 
+class CrcMismatchException(ConnectionException):
+    pass
+
+
 class ContinuousPagingState(object):
     """
      A class for specifying continuous paging state, only supported starting with DSE_V2.
@@ -657,6 +666,7 @@ class Connection(object):
     allow_beta_protocol_version = False
 
     _iobuf = None
+    _frame_iobuf = None
     _current_frame = None
 
     _socket = None
@@ -666,6 +676,8 @@ class Connection(object):
 
     _check_hostname = False
     _product_type = None
+
+    _is_checksumming_enabled = False
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
@@ -691,6 +703,7 @@ class Connection(object):
         self._push_watchers = defaultdict(set)
         self._requests = {}
         self._iobuf = io.BytesIO()
+        self._frame_iobuf = io.BytesIO()
         self._continuous_paging_sessions = {}
         self._socket_writable = True
 
@@ -933,7 +946,14 @@ class Connection(object):
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
         self._requests[request_id] = (cb, decoder, result_metadata)
-        msg = encoder(msg, request_id, self.protocol_version, compressor=self.compressor, allow_beta_protocol_version=self.allow_beta_protocol_version)
+        msg = encoder(msg, request_id, self.protocol_version, compressor=self.compressor,
+                      allow_beta_protocol_version=self.allow_beta_protocol_version)
+
+        if self._is_checksumming_enabled:
+            buffer = io.BytesIO()
+            self._segment_codec.encode(buffer, msg)
+            msg = buffer.getvalue()
+
         self.push(msg)
         return len(msg)
 
@@ -1012,7 +1032,7 @@ class Connection(object):
 
     @defunct_on_error
     def _read_frame_header(self):
-        buf = self._iobuf.getvalue()
+        buf = self._frame_iobuf.getvalue()
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
@@ -1029,26 +1049,57 @@ class Connection(object):
         return pos
 
     def _reset_frame(self):
-        self._iobuf = io.BytesIO(self._iobuf.read())
-        self._iobuf.seek(0, 2)  # io.SEEK_END == 2 (constant not present in 2.6)
+        self._frame_iobuf = io.BytesIO(self._frame_iobuf.read())
+        self._frame_iobuf.seek(0, 2)  # 2 == SEEK_END
         self._current_frame = None
+
+    def _reset_io_buffer(self):
+        self._iobuf = io.BytesIO(self._iobuf.read())
+        self._iobuf.seek(0, 2)  # 2 == SEEK_END
+
+    @defunct_on_error
+    def _process_segment_buffer(self):
+        if self._iobuf.tell():
+            try:
+                segment_header = self._segment_codec.decode_header(self._iobuf)
+                if segment_header:
+                    segment = self._segment_codec.decode(self._iobuf, segment_header)
+                    if segment:
+                        self._frame_iobuf.write(segment.payload)
+            except CrcException as exc:
+                # re-raise an exception that inherits from ConnectionException
+                raise CrcMismatchException(str(exc), self.endpoint)
 
     def process_io_buffer(self):
         while True:
+            if self._is_checksumming_enabled:
+                self._process_segment_buffer()
+            else:
+                # TODO, try to avoid having 2 io buffers when protocol != V5
+                self._frame_iobuf.write(self._iobuf.getvalue())
+
+            self._reset_io_buffer()
+
             if not self._current_frame:
                 pos = self._read_frame_header()
             else:
-                pos = self._iobuf.tell()
+                pos = self._frame_iobuf.tell()
 
             if not self._current_frame or pos < self._current_frame.end_pos:
+                if self._is_checksumming_enabled and self._iobuf.tell():
+                    # TODO keep the current segment frame?
+                    # We have a multi-segments message and we need to read more data to complete
+                    # the current cql frame
+                    continue
+
                 # we don't have a complete header yet or we
                 # already saw a header, but we don't have a
                 # complete message yet
                 return
             else:
                 frame = self._current_frame
-                self._iobuf.seek(frame.body_offset)
-                msg = self._iobuf.read(frame.end_pos - frame.body_offset)
+                self._frame_iobuf.seek(frame.body_offset)
+                msg = self._frame_iobuf.read(frame.end_pos - frame.body_offset)
                 self.process_msg(frame, msg)
                 self._reset_frame()
 
@@ -1185,11 +1236,17 @@ class Connection(object):
                             compression_type = k
                             break
 
-                # set the decompressor here, but set the compressor only after
-                # a successful Ready message
-                self._compression_type = compression_type
-                self._compressor, self.decompressor = \
-                    locally_supported_compressions[compression_type]
+                if (compression_type == 'snappy' and
+                        ProtocolVersion.has_checksumming_support(self.protocol_version)):
+                    log.debug("Snappy compression is not supported with protocol version %s and checksumming.",
+                             self.protocol_version)
+                    compression_type = None
+                else:
+                    # set the decompressor here, but set the compressor only after
+                    # a successful Ready message
+                    self._compression_type = compression_type
+                    self._compressor, self.decompressor = \
+                        locally_supported_compressions[compression_type]
 
         self._send_startup_message(compression_type, no_compact=self.no_compact)
 
@@ -1210,6 +1267,7 @@ class Connection(object):
     def _handle_startup_response(self, startup_response, did_authenticate=False):
         if self.is_defunct:
             return
+
         if isinstance(startup_response, ReadyMessage):
             if self.authenticator:
                 log.warning("An authentication challenge was not sent, "
@@ -1220,6 +1278,15 @@ class Connection(object):
             log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.endpoint)
             if self._compressor:
                 self.compressor = self._compressor
+
+            if ProtocolVersion.has_checksumming_support(self.protocol_version):
+                self._is_checksumming_enabled = True
+                if self.compressor:
+                    self._segment_codec = segment_codec_lz4
+                else:
+                    self._segment_codec = segment_codec_no_compression
+                log.debug("Enabling protocol checksumming on connection (%s).", id(self))
+
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):
             log.debug("Got AuthenticateMessage on new connection (%s) from %s: %s",
