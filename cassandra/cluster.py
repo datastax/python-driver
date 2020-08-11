@@ -3789,6 +3789,8 @@ class ControlConnection(object):
         should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
         for row in peers_result:
             endpoint = self._cluster.endpoint_factory.create(row)
+            if endpoint is None:
+                continue
 
             tokens = row.get("tokens", None)
             if 'tokens' in row and not tokens:  # it was selected, but empty
@@ -3983,6 +3985,8 @@ class ControlConnection(object):
             if not schema_ver:
                 continue
             endpoint = self._cluster.endpoint_factory.create(row)
+            if endpoint is None:
+                continue
             peer = self._cluster.metadata.get_host(endpoint)
             if peer and peer.is_up is not False:
                 versions[schema_ver].add(endpoint)

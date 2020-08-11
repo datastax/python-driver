@@ -304,7 +304,8 @@ class SniEndPointFactory(EndPointFactory):
     def create(self, row):
         host_id = row.get("host_id")
         if host_id is None:
-            raise ValueError("No host_id to create the SniEndPoint")
+            log.debug("Received null host_id entry, ignoring.")
+            return None
 
         return SniEndPoint(self._proxy_address, str(host_id), self._port)
 
