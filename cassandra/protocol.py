@@ -1115,7 +1115,8 @@ class _ProtocolHandler(object):
         msg.send_body(body, protocol_version)
         body = body.getvalue()
 
-        if (ProtocolVersion.has_cql_frame_compression_support(protocol_version)
+        # With checksumming, the compression is done at the segment frame encoding
+        if (not ProtocolVersion.has_checksumming_support(protocol_version)
                 and compressor and len(body) > 0):
             body = compressor(body)
             flags |= COMPRESSED_FLAG
@@ -1156,7 +1157,7 @@ class _ProtocolHandler(object):
         :param decompressor: optional decompression function to inflate the body
         :return: a message decoded from the body and frame attributes
         """
-        if (ProtocolVersion.has_cql_frame_compression_support(protocol_version) and
+        if (not ProtocolVersion.has_checksumming_support(protocol_version) and
                 flags & COMPRESSED_FLAG):
             if decompressor is None:
                 raise RuntimeError("No de-compressor available for compressed frame!")

@@ -1059,13 +1059,17 @@ class Connection(object):
 
     @defunct_on_error
     def _process_segment_buffer(self):
-        if self._iobuf.tell():
+        readable_bytes = self._iobuf.tell()
+        if readable_bytes >= self._segment_codec.header_length_with_crc:
             try:
+                self._iobuf.seek(0)
                 segment_header = self._segment_codec.decode_header(self._iobuf)
-                if segment_header:
+                if readable_bytes >= segment_header.segment_length:
                     segment = self._segment_codec.decode(self._iobuf, segment_header)
-                    if segment:
-                        self._frame_iobuf.write(segment.payload)
+                    self._frame_iobuf.write(segment.payload)
+                else:
+                    # not enough data to read the segment
+                    self._iobuf.seek(0, 2)
             except CrcException as exc:
                 # re-raise an exception that inherits from ConnectionException
                 raise CrcMismatchException(str(exc), self.endpoint)
@@ -1075,7 +1079,9 @@ class Connection(object):
             if self._is_checksumming_enabled:
                 self._process_segment_buffer()
             else:
-                # TODO, try to avoid having 2 io buffers when protocol != V5
+                # We should probably refactor the IO buffering stuff out of the Connection
+                # class to handle this in a better way. That would make the segment and frame
+                # decoding code clearer.
                 self._frame_iobuf.write(self._iobuf.getvalue())
 
             self._reset_io_buffer()
@@ -1087,9 +1093,8 @@ class Connection(object):
 
             if not self._current_frame or pos < self._current_frame.end_pos:
                 if self._is_checksumming_enabled and self._iobuf.tell():
-                    # TODO keep the current segment frame?
-                    # We have a multi-segments message and we need to read more data to complete
-                    # the current cql frame
+                    # We have a multi-segments message and we need to read more
+                    # data to complete the current cql frame
                     continue
 
                 # we don't have a complete header yet or we
@@ -1236,10 +1241,12 @@ class Connection(object):
                             compression_type = k
                             break
 
+                # If snappy compression is selected with v5+checksumming, the connection
+                # will fail with OTO. Only lz4 is supported
                 if (compression_type == 'snappy' and
                         ProtocolVersion.has_checksumming_support(self.protocol_version)):
-                    log.debug("Snappy compression is not supported with protocol version %s and checksumming.",
-                             self.protocol_version)
+                    log.debug("Snappy compression is not supported with protocol version %s and "
+                              "checksumming. Consider installing lz4. Disabling compression.", self.protocol_version)
                     compression_type = None
                 else:
                     # set the decompressor here, but set the compressor only after
@@ -1281,10 +1288,7 @@ class Connection(object):
 
             if ProtocolVersion.has_checksumming_support(self.protocol_version):
                 self._is_checksumming_enabled = True
-                if self.compressor:
-                    self._segment_codec = segment_codec_lz4
-                else:
-                    self._segment_codec = segment_codec_no_compression
+                self._segment_codec = segment_codec_lz4 if self.compressor else segment_codec_no_compression
                 log.debug("Enabling protocol checksumming on connection (%s).", id(self))
 
             self.connected_event.set()
