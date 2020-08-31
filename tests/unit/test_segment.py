@@ -17,12 +17,17 @@ try:
 except ImportError:
     import unittest  # noqa
 
-import io
+import six
 
 from cassandra import DriverException
 from cassandra.segment import Segment, CrcException
 from cassandra.connection import segment_codec_no_compression, segment_codec_lz4
 
+
+def to_bits(b):
+    if six.PY2:
+        b = six.byte2int(b)
+    return '{:08b}'.format(b)
 
 class SegmentCodecTest(unittest.TestCase):
 
@@ -36,19 +41,19 @@ class SegmentCodecTest(unittest.TestCase):
         # data should be the little endian bytes sequence
         if len(data) > 6:  # compressed
             data = data[:5]
-            bits = ''.join(['{:08b}'.format(b) for b in reversed(data)])
+            bits = ''.join([to_bits(b) for b in reversed(data)])
             # return the compressed payload length, the uncompressed payload length,
             # the self contained flag and the padding as bits
             return bits[23:40] + bits[6:23] + bits[5:6] + bits[:5]
         else:  # uncompressed
             data = data[:3]
-            bits = ''.join(['{:08b}'.format(b) for b in reversed(data)])
+            bits = ''.join([to_bits(b) for b in reversed(data)])
             # return the payload length, the self contained flag and
             # the padding as bits
             return bits[7:24] + bits[6:7] + bits[:6]
 
     def test_encode_uncompressed_header(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_no_compression.encode_header(buffer, len(self.small_msg), -1, True)
         self.assertEqual(buffer.tell(), 6)
         self.assertEqual(
@@ -56,7 +61,7 @@ class SegmentCodecTest(unittest.TestCase):
             "00000000000110010" + "1" + "000000")
 
     def test_encode_compressed_header(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         compressed_length = len(segment_codec_lz4.compress(self.small_msg))
         segment_codec_lz4.encode_header(buffer, compressed_length, len(self.small_msg), True)
 
@@ -66,7 +71,7 @@ class SegmentCodecTest(unittest.TestCase):
             "{:017b}".format(compressed_length) + "00000000000110010" + "1" + "00000")
 
     def test_encode_uncompressed_header_with_max_payload(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_no_compression.encode_header(buffer, len(self.max_msg), -1, True)
         self.assertEqual(buffer.tell(), 6)
         self.assertEqual(
@@ -74,13 +79,13 @@ class SegmentCodecTest(unittest.TestCase):
             "11111111111111111" + "1" + "000000")
 
     def test_encode_header_fails_if_payload_too_big(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         for codec in [segment_codec_no_compression, segment_codec_lz4]:
             with self.assertRaises(DriverException):
                 codec.encode_header(buffer, len(self.large_msg), -1, False)
 
     def test_encode_uncompressed_header_not_self_contained_msg(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         # simulate the first chunk with the max size
         segment_codec_no_compression.encode_header(buffer, len(self.max_msg), -1, False)
         self.assertEqual(buffer.tell(), 6)
@@ -91,7 +96,7 @@ class SegmentCodecTest(unittest.TestCase):
              "000000"))
 
     def test_encode_compressed_header_with_max_payload(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         compressed_length = len(segment_codec_lz4.compress(self.max_msg))
         segment_codec_lz4.encode_header(buffer, compressed_length, len(self.max_msg), True)
         self.assertEqual(buffer.tell(), 8)
@@ -100,7 +105,7 @@ class SegmentCodecTest(unittest.TestCase):
             "{:017b}".format(compressed_length) + "11111111111111111" + "1" + "00000")
 
     def test_encode_compressed_header_not_self_contained_msg(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         # simulate the first chunk with the max size
         compressed_length = len(segment_codec_lz4.compress(self.max_msg))
         segment_codec_lz4.encode_header(buffer, compressed_length, len(self.max_msg), False)
@@ -113,7 +118,7 @@ class SegmentCodecTest(unittest.TestCase):
              "00000"))
 
     def test_decode_uncompressed_header(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_no_compression.encode_header(buffer, len(self.small_msg), -1, True)
         buffer.seek(0)
         header = segment_codec_no_compression.decode_header(buffer)
@@ -122,7 +127,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(header.is_self_contained, True)
 
     def test_decode_compressed_header(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         compressed_length = len(segment_codec_lz4.compress(self.small_msg))
         segment_codec_lz4.encode_header(buffer, compressed_length, len(self.small_msg), True)
         buffer.seek(0)
@@ -132,7 +137,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(header.is_self_contained, True)
 
     def test_decode_header_fails_if_corrupted(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_no_compression.encode_header(buffer, len(self.small_msg), -1, True)
         # corrupt one byte
         buffer.seek(buffer.tell()-1)
@@ -143,7 +148,7 @@ class SegmentCodecTest(unittest.TestCase):
             segment_codec_no_compression.decode_header(buffer)
 
     def test_decode_uncompressed_self_contained_segment(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_no_compression.encode(buffer, self.small_msg)
 
         buffer.seek(0)
@@ -156,7 +161,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(segment.payload, self.small_msg)
 
     def test_decode_compressed_self_contained_segment(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_lz4.encode(buffer, self.small_msg)
 
         buffer.seek(0)
@@ -169,7 +174,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(segment.payload, self.small_msg)
 
     def test_decode_multi_segments(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_no_compression.encode(buffer, self.large_msg)
 
         buffer.seek(0)
@@ -186,7 +191,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(decoded_msg, self.large_msg)
 
     def test_decode_fails_if_corrupted(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_lz4.encode(buffer, self.small_msg)
         buffer.seek(buffer.tell()-1)
         buffer.write(b'0')
@@ -196,7 +201,7 @@ class SegmentCodecTest(unittest.TestCase):
             segment_codec_lz4.decode(buffer, header)
 
     def test_decode_tiny_msg_not_compressed(self):
-        buffer = io.BytesIO()
+        buffer = six.BytesIO()
         segment_codec_lz4.encode(buffer, b'b')
         buffer.seek(0)
         header = segment_codec_lz4.decode_header(buffer)
