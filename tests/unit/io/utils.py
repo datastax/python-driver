@@ -435,7 +435,7 @@ class ReactorTestMixin(object):
 
         self.get_socket(c).recv.return_value = message[0:1]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._iobuf.getvalue(), message[0:1])
+        self.assertEqual(c._frame_iobuf.getvalue(), message[0:1])
 
         self.get_socket(c).recv.return_value = message[1:]
         c.handle_read(*self.null_handle_function_args)
@@ -461,7 +461,7 @@ class ReactorTestMixin(object):
         # read in the first nine bytes
         self.get_socket(c).recv.return_value = message[:9]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._iobuf.getvalue(), message[:9])
+        self.assertEqual(c._frame_iobuf.getvalue(), message[:9])
 
         # ... then read in the rest
         self.get_socket(c).recv.return_value = message[9:]

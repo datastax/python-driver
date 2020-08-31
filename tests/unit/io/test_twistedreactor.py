@@ -148,12 +148,12 @@ class TestTwistedConnection(unittest.TestCase):
         # incomplete header
         self.obj_ut._iobuf.write(b'\x84\x00\x00\x00\x00')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), b'\x84\x00\x00\x00\x00')
+        self.assertEqual(self.obj_ut._frame_iobuf.getvalue(), b'\x84\x00\x00\x00\x00')
 
         # full header, but incomplete body
         self.obj_ut._iobuf.write(b'\x00\x00\x00\x15')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(),
+        self.assertEqual(self.obj_ut._frame_iobuf.getvalue(),
                          b'\x84\x00\x00\x00\x00\x00\x00\x00\x15')
         self.assertEqual(self.obj_ut._current_frame.end_pos, 30)
 
@@ -174,7 +174,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut._iobuf.write(
             b'\x84\x01\x00\x02\x03\x00\x00\x00\x15' + body + extra)
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), extra)
+        self.assertEqual(self.obj_ut._frame_iobuf.getvalue(), extra)
         self.obj_ut.process_msg.assert_called_with(
             _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos=9 + len(body)), body)
 
