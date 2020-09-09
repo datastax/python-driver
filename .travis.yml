@@ -166,8 +166,8 @@ jobs:
       if: type != pull_request AND (branch = master OR (tag =~ /^.*-scylla$/))
 
 install:
-  # - python3 -m pip install cibuildwheel==1.3.0
-  - python3 -m pip install git+https://github.com/joerick/cibuildwheel.git@python3.9
+  - python3 -m pip install cibuildwheel==1.6.0
+
 
 script:
   # build the wheels, put them into './wheelhouse'
