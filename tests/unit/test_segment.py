@@ -60,6 +60,7 @@ class SegmentCodecTest(unittest.TestCase):
             self._header_to_bits(buffer.getvalue()),
             "00000000000110010" + "1" + "000000")
 
+    @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
     def test_encode_compressed_header(self):
         buffer = six.BytesIO()
         compressed_length = len(segment_codec_lz4.compress(self.small_msg))
@@ -80,7 +81,7 @@ class SegmentCodecTest(unittest.TestCase):
 
     def test_encode_header_fails_if_payload_too_big(self):
         buffer = six.BytesIO()
-        for codec in [segment_codec_no_compression, segment_codec_lz4]:
+        for codec in [c for c in [segment_codec_no_compression, segment_codec_lz4] if c is not None]:
             with self.assertRaises(DriverException):
                 codec.encode_header(buffer, len(self.large_msg), -1, False)
 
@@ -95,6 +96,7 @@ class SegmentCodecTest(unittest.TestCase):
              "0"  # not self contained
              "000000"))
 
+    @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
     def test_encode_compressed_header_with_max_payload(self):
         buffer = six.BytesIO()
         compressed_length = len(segment_codec_lz4.compress(self.max_msg))
@@ -104,6 +106,7 @@ class SegmentCodecTest(unittest.TestCase):
             self._header_to_bits(buffer.getvalue()),
             "{:017b}".format(compressed_length) + "11111111111111111" + "1" + "00000")
 
+    @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
     def test_encode_compressed_header_not_self_contained_msg(self):
         buffer = six.BytesIO()
         # simulate the first chunk with the max size
@@ -126,6 +129,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(header.payload_length, len(self.small_msg))
         self.assertEqual(header.is_self_contained, True)
 
+    @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
     def test_decode_compressed_header(self):
         buffer = six.BytesIO()
         compressed_length = len(segment_codec_lz4.compress(self.small_msg))
@@ -160,6 +164,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(header.payload_length, len(self.small_msg))
         self.assertEqual(segment.payload, self.small_msg)
 
+    @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
     def test_decode_compressed_self_contained_segment(self):
         buffer = six.BytesIO()
         segment_codec_lz4.encode(buffer, self.small_msg)
@@ -190,6 +195,7 @@ class SegmentCodecTest(unittest.TestCase):
         decoded_msg = segments[0].payload + segments[1].payload
         self.assertEqual(decoded_msg, self.large_msg)
 
+    @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
     def test_decode_fails_if_corrupted(self):
         buffer = six.BytesIO()
         segment_codec_lz4.encode(buffer, self.small_msg)
@@ -200,6 +206,7 @@ class SegmentCodecTest(unittest.TestCase):
         with self.assertRaises(CrcException):
             segment_codec_lz4.decode(buffer, header)
 
+    @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
     def test_decode_tiny_msg_not_compressed(self):
         buffer = six.BytesIO()
         segment_codec_lz4.encode(buffer, b'b')

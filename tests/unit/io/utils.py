@@ -309,14 +309,14 @@ class ReactorTestMixin(object):
 
         for message, expected_size in messages:
             message_chunks = message
-            c._iobuf = io.BytesIO()
+            c._io_buffer._io_buffer = io.BytesIO()
             c.process_io_buffer.reset_mock()
             c.handle_read(*self.null_handle_function_args)
-            c._iobuf.seek(0, os.SEEK_END)
+            c._io_buffer.io_buffer.seek(0, os.SEEK_END)
 
             # Ensure the message size is the good one and that the
             # message has been processed if it is non-empty
-            self.assertEqual(c._iobuf.tell(), expected_size)
+            self.assertEqual(c._io_buffer.io_buffer.tell(), expected_size)
             if expected_size == 0:
                 c.process_io_buffer.assert_not_called()
             else:
@@ -435,11 +435,11 @@ class ReactorTestMixin(object):
 
         self.get_socket(c).recv.return_value = message[0:1]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._frame_iobuf.getvalue(), message[0:1])
+        self.assertEqual(c._io_buffer.cql_frame_buffer.getvalue(), message[0:1])
 
         self.get_socket(c).recv.return_value = message[1:]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._io_buffer.io_buffer.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(*self.null_handle_function_args)
@@ -461,12 +461,12 @@ class ReactorTestMixin(object):
         # read in the first nine bytes
         self.get_socket(c).recv.return_value = message[:9]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._frame_iobuf.getvalue(), message[:9])
+        self.assertEqual(c._io_buffer.cql_frame_buffer.getvalue(), message[:9])
 
         # ... then read in the rest
         self.get_socket(c).recv.return_value = message[9:]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._io_buffer.io_buffer.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(*self.null_handle_function_args)
@@ -501,7 +501,7 @@ class ReactorTestMixin(object):
 
             for i in range(1, 15):
                 c.process_io_buffer.reset_mock()
-                c._iobuf = io.BytesIO()
+                c._io_buffer._io_buffer = io.BytesIO()
                 message = io.BytesIO(six.b('a') * (2**i))
 
                 def recv_side_effect(*args):
@@ -511,7 +511,7 @@ class ReactorTestMixin(object):
 
                 self.get_socket(c).recv.side_effect = recv_side_effect
                 c.handle_read(*self.null_handle_function_args)
-                if c._iobuf.tell():
+                if c._io_buffer.io_buffer.tell():
                     c.process_io_buffer.assert_called_once()
                 else:
                     c.process_io_buffer.assert_not_called()

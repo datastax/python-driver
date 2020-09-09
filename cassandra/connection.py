@@ -27,6 +27,8 @@ import sys
 from threading import Thread, Event, RLock, Condition
 import time
 import ssl
+import weakref
+
 
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
@@ -610,6 +612,55 @@ else:
     int_from_buf_item = ord
 
 
+class _ConnectionIOBuffer(object):
+    """
+    Abstraction class to ease the use of the different connection io buffers. With
+    protocol V5 and checksumming, the data is read, validated and copied to another
+    cql frame buffer.
+    """
+    _io_buffer = None
+    _cql_frame_buffer = None
+    _connection = None
+
+    def __init__(self, connection):
+        self._io_buffer = io.BytesIO()
+        self._connection = weakref.proxy(connection)
+
+    @property
+    def io_buffer(self):
+        return self._io_buffer
+
+    @property
+    def cql_frame_buffer(self):
+        return self._cql_frame_buffer if self.is_checksumming_enabled else \
+            self._io_buffer
+
+    def set_checksumming_buffer(self):
+        self.reset_io_buffer()
+        self._cql_frame_buffer = io.BytesIO()
+
+    @property
+    def is_checksumming_enabled(self):
+        return self._connection._is_checksumming_enabled
+
+    def readable_io_bytes(self):
+        return self.io_buffer.tell()
+
+    def readable_cql_frame_bytes(self):
+        return self.cql_frame_buffer.tell()
+
+    def reset_io_buffer(self):
+        self._io_buffer = io.BytesIO(self._io_buffer.read())
+        self._io_buffer.seek(0, 2)  # 2 == SEEK_END
+
+    def reset_cql_frame_buffer(self):
+        if self.is_checksumming_enabled:
+            self._cql_frame_buffer = io.BytesIO(self._cql_frame_buffer.read())
+            self._cql_frame_buffer.seek(0, 2)  # 2 == SEEK_END
+        else:
+            self.reset_io_buffer()
+
+
 class Connection(object):
 
     CALLBACK_ERR_THREAD_THRESHOLD = 100
@@ -665,8 +716,6 @@ class Connection(object):
 
     allow_beta_protocol_version = False
 
-    _iobuf = None
-    _frame_iobuf = None
     _current_frame = None
 
     _socket = None
@@ -678,6 +727,11 @@ class Connection(object):
     _product_type = None
 
     _is_checksumming_enabled = False
+
+    @property
+    def _iobuf(self):
+        # backward compatibility, to avoid any change in the reactors
+        return self._io_buffer.io_buffer
 
     def __init__(self, host='127.0.0.1', port=9042, authenticator=None,
                  ssl_options=None, sockopts=None, compression=True,
@@ -702,8 +756,7 @@ class Connection(object):
         self.no_compact = no_compact
         self._push_watchers = defaultdict(set)
         self._requests = {}
-        self._iobuf = io.BytesIO()
-        self._frame_iobuf = io.BytesIO()
+        self._io_buffer = _ConnectionIOBuffer(self)
         self._continuous_paging_sessions = {}
         self._socket_writable = True
 
@@ -843,6 +896,12 @@ class Connection(object):
         if self.sockopts:
             for args in self.sockopts:
                 self._socket.setsockopt(*args)
+
+    def _enable_checksumming(self):
+        self._io_buffer.set_checksumming_buffer()
+        self._is_checksumming_enabled = True
+        self._segment_codec = segment_codec_lz4 if self.compressor else segment_codec_no_compression
+        log.debug("Enabling protocol checksumming on connection (%s).", id(self))
 
     def close(self):
         raise NotImplementedError()
@@ -1032,7 +1091,7 @@ class Connection(object):
 
     @defunct_on_error
     def _read_frame_header(self):
-        buf = self._frame_iobuf.getvalue()
+        buf = self._io_buffer.cql_frame_buffer.getvalue()
         pos = len(buf)
         if pos:
             version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
@@ -1048,28 +1107,19 @@ class Connection(object):
                 self._current_frame = _Frame(version, flags, stream, op, header_size, body_len + header_size)
         return pos
 
-    def _reset_frame(self):
-        self._frame_iobuf = io.BytesIO(self._frame_iobuf.read())
-        self._frame_iobuf.seek(0, 2)  # 2 == SEEK_END
-        self._current_frame = None
-
-    def _reset_io_buffer(self):
-        self._iobuf = io.BytesIO(self._iobuf.read())
-        self._iobuf.seek(0, 2)  # 2 == SEEK_END
-
     @defunct_on_error
     def _process_segment_buffer(self):
-        readable_bytes = self._iobuf.tell()
+        readable_bytes = self._io_buffer.readable_io_bytes()
         if readable_bytes >= self._segment_codec.header_length_with_crc:
             try:
-                self._iobuf.seek(0)
-                segment_header = self._segment_codec.decode_header(self._iobuf)
+                self._io_buffer.io_buffer.seek(0)
+                segment_header = self._segment_codec.decode_header(self._io_buffer.io_buffer)
                 if readable_bytes >= segment_header.segment_length:
                     segment = self._segment_codec.decode(self._iobuf, segment_header)
-                    self._frame_iobuf.write(segment.payload)
+                    self._io_buffer.cql_frame_buffer.write(segment.payload)
                 else:
                     # not enough data to read the segment
-                    self._iobuf.seek(0, 2)
+                    self._io_buffer.io_buffer.seek(0, 2)
             except CrcException as exc:
                 # re-raise an exception that inherits from ConnectionException
                 raise CrcMismatchException(str(exc), self.endpoint)
@@ -1078,21 +1128,15 @@ class Connection(object):
         while True:
             if self._is_checksumming_enabled:
                 self._process_segment_buffer()
-            else:
-                # We should probably refactor the IO buffering stuff out of the Connection
-                # class to handle this in a better way. That would make the segment and frame
-                # decoding code clearer.
-                self._frame_iobuf.write(self._iobuf.getvalue())
-
-            self._reset_io_buffer()
+                self._io_buffer.reset_io_buffer()
 
             if not self._current_frame:
                 pos = self._read_frame_header()
             else:
-                pos = self._frame_iobuf.tell()
+                pos = self._io_buffer.readable_cql_frame_bytes()
 
             if not self._current_frame or pos < self._current_frame.end_pos:
-                if self._is_checksumming_enabled and self._iobuf.tell():
+                if self._is_checksumming_enabled and self._io_buffer.readable_io_bytes():
                     # We have a multi-segments message and we need to read more
                     # data to complete the current cql frame
                     continue
@@ -1103,10 +1147,11 @@ class Connection(object):
                 return
             else:
                 frame = self._current_frame
-                self._frame_iobuf.seek(frame.body_offset)
-                msg = self._frame_iobuf.read(frame.end_pos - frame.body_offset)
+                self._io_buffer.cql_frame_buffer.seek(frame.body_offset)
+                msg = self._io_buffer.cql_frame_buffer.read(frame.end_pos - frame.body_offset)
                 self.process_msg(frame, msg)
-                self._reset_frame()
+                self._io_buffer.reset_cql_frame_buffer()
+                self._current_frame = None
 
     @defunct_on_error
     def process_msg(self, header, body):
@@ -1287,9 +1332,7 @@ class Connection(object):
                 self.compressor = self._compressor
 
             if ProtocolVersion.has_checksumming_support(self.protocol_version):
-                self._is_checksumming_enabled = True
-                self._segment_codec = segment_codec_lz4 if self.compressor else segment_codec_no_compression
-                log.debug("Enabling protocol checksumming on connection (%s).", id(self))
+                self._enable_checksumming()
 
             self.connected_event.set()
         elif isinstance(startup_response, AuthenticateMessage):

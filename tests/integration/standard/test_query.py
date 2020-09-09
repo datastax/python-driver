@@ -28,7 +28,7 @@ from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DE
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
-    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, TestCluster
+    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, TestCluster, requirecassandra
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
@@ -1408,6 +1408,8 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
         """
         self._check_set_keyspace_in_statement(self.session)
 
+    @requirecassandra
+    @greaterthanorequalcass40
     def test_setting_keyspace_and_session(self):
         """
         Test we can still send the keyspace independently even the session
