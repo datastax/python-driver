@@ -3788,12 +3788,14 @@ class ControlConnection(object):
         # any new nodes, so we need this additional check.  (See PYTHON-90)
         should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
         for row in peers_result:
+            if not self._is_valid_peer(row):
+                log.warning(
+                    "Found an invalid row for peer (%s). Ignoring host." %
+                    _NodeInfo.get_broadcast_rpc_address(row))
+                continue
+
             endpoint = self._cluster.endpoint_factory.create(row)
 
-            tokens = row.get("tokens", None)
-            if 'tokens' in row and not tokens:  # it was selected, but empty
-                log.warning("Excluding host (%s) with no tokens in system.peers table of %s." % (endpoint, connection.endpoint))
-                continue
             if endpoint in found_hosts:
                 log.warning("Found multiple hosts with the same endpoint (%s). Excluding peer %s", endpoint, row.get("peer"))
                 continue
@@ -3820,6 +3822,7 @@ class ControlConnection(object):
             host.dse_workload = row.get("workload")
             host.dse_workloads = row.get("workloads")
 
+            tokens = row.get("tokens", None)
             if partitioner and tokens and self._token_meta_enabled:
                 token_map[host] = tokens
 
@@ -3833,6 +3836,12 @@ class ControlConnection(object):
         if partitioner and should_rebuild_token_map:
             log.debug("[control connection] Rebuilding token map due to topology changes")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
+
+    @staticmethod
+    def _is_valid_peer(row):
+        return bool(_NodeInfo.get_broadcast_rpc_address(row) and row.get("host_id") and
+                    row.get("data_center") and row.get("rack") and
+                    ('tokens' not in row or row.get('tokens')))
 
     def _update_location_info(self, host, datacenter, rack):
         if host.datacenter == datacenter and host.rack == rack:
