@@ -33,7 +33,7 @@ slack = new Slack()
 matrices = [
   "FULL": [
     "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0', 'dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
-    "RUNTIME": ['2.7.18', '3.4.10', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
+    "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
   ],
   "DEVELOP": [
@@ -43,12 +43,12 @@ matrices = [
   ],
   "CASSANDRA": [
     "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0'],
-    "RUNTIME": ['2.7.18', '3.4.10', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
+    "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
   ],
   "DSE": [
     "SERVER": ['dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
-    "RUNTIME": ['2.7.18', '3.4.10', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
+    "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
   ]
 ]
@@ -482,7 +482,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'PYTHON_VERSION',
-      choices: ['DEFAULT', '2.7.18', '3.4.10', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
+      choices: ['DEFAULT', '2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
       description: 'Python runtime version. Default to the build context.')
     choice(
       name: 'SERVER_VERSION',
@@ -641,11 +641,11 @@ pipeline {
 
   stages {
     stage ('Build and Test') {
-      agent none
+      agent {
       //   // If I removed this agent block, GIT_URL and GIT_COMMIT aren't set.
       //   // However, this trigger an additional checkout
-      //   label none
-      // }
+        label "master"
+      }
       when {
         beforeAgent true
         allOf {

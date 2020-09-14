@@ -15,5 +15,5 @@ cython>=0.20,<0.30
 packaging
 backports.ssl_match_hostname; python_version < '2.7.9'
 futurist; python_version >= '3.7'
-asynctest; python_version > '3.4'
+asynctest; python_version >= '3.5'
 ipaddress; python_version < '3.3.0'

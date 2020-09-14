@@ -176,7 +176,7 @@ Use tee to capture logs and see them on your terminal::
 
 Testing Multiple Python Versions
 --------------------------------
-If you want to test all of python 2.7, 3.4, 3.5, 3.6, 3.7, and pypy, use tox (this is what
+If you want to test all of python 2.7, 3.5, 3.6, 3.7, and pypy, use tox (this is what
 TravisCI runs)::
 
     tox
