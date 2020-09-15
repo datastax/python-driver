@@ -1,3 +1,11 @@
+3.25.0
+======
+Not released
+
+Others
+------
+* Drop Python 3.4 support (PYTHON-1220)
+
 3.24.0
 ======
 June 18, 2020
