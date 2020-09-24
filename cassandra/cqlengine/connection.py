@@ -98,7 +98,11 @@ class Connection(object):
         if self.lazy_connect:
             return
 
-        self.cluster = Cluster(self.hosts, **self.cluster_options)
+        if 'cloud' in self.cluster_options:
+            self.cluster = Cluster(**self.cluster_options)
+        else:
+            self.cluster = Cluster(self.hosts, **self.cluster_options)
+
         try:
             self.session = self.cluster.connect()
             log.debug(format_log_context("connection initialized with internally created session", connection=self.name))
