@@ -1,7 +1,5 @@
 #!/bin/bash
 
-latest=${LATEST_VERSION:='master'}
-
 cat <<- _EOF_
 <!DOCTYPE html>
 <html>
