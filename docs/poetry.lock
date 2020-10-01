@@ -476,7 +476,7 @@ description = "A Sphinx Theme for ScyllaDB projects documentation"
 name = "sphinx-scylladb-theme"
 optional = false
 python-versions = ">=3.7,<4.0"
-version = "0.1.11"
+version = "0.1.12"
 
 [package.dependencies]
 Sphinx = ">=2.4.4,<3.0.0"
@@ -925,8 +925,8 @@ sphinx-notfound-page = [
     {file = "sphinx_notfound_page-0.5-py3-none-any.whl", hash = "sha256:557ad998d7a2897a5da7ba9ed0762a8f535c4250c49325db7b105e69c386f690"},
 ]
 sphinx-scylladb-theme = [
-    {file = "sphinx-scylladb-theme-0.1.11.tar.gz", hash = "sha256:48106cf200b407625a0f3fffaab0ffc4a9ff9129bfecf813e8440e7dc6e57c9b"},
-    {file = "sphinx_scylladb_theme-0.1.11-py3-none-any.whl", hash = "sha256:3da8832117013c183954f5e6d37efc7dad27dc43932909247d9f4450a492fbd0"},
+    {file = "sphinx-scylladb-theme-0.1.12.tar.gz", hash = "sha256:9cc0a675a065aeef4a77e0b7d56ebfaab760d2b1078d3362e4d5c32ada530d98"},
+    {file = "sphinx_scylladb_theme-0.1.12-py3-none-any.whl", hash = "sha256:41386beb0c36d463f8191dfa20bb40e036aedeaab88af7cd9ed616ac785ab3d7"},
 ]
 sphinx-tabs = [
     {file = "sphinx-tabs-1.3.0.tar.gz", hash = "sha256:54132c8a57aa19bba6e17fe26eb94ea9df531708ff3f509b119313b32d0d5aff"},
