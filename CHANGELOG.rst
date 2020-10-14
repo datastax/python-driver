@@ -2,6 +2,10 @@
 ======
 Not released
 
+Features
+--------
+* Ensure the driver can connect when invalid peer hosts are in system.peers (PYTHON-1260)
+
 Others
 ------
 * Drop Python 3.4 support (PYTHON-1220)
