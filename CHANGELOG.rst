@@ -6,6 +6,10 @@ Features
 --------
 * Ensure the driver can connect when invalid peer hosts are in system.peers (PYTHON-1260)
 
+Bug Fixes
+---------
+* Asyncore race condition cause logging exception on shutdown (PYTHON-1266)
+
 Others
 ------
 * Drop Python 3.4 support (PYTHON-1220)

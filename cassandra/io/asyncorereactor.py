@@ -36,20 +36,7 @@ import asyncore
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING, Timer, TimerManager
 
 
-# TODO: Remove when Python 2 is removed
-class LogWrapper(object):
-    """ PYTHON-1228. If our logger has disappeared, there's nothing we can do, so just execute nothing """
-    def __init__(self):
-        self._log = logging.getLogger(__name__)
-
-    def __getattr__(self, name):
-        try:
-            return getattr(self._log, name)
-        except:
-            return lambda *args, **kwargs: None
-
-
-log = LogWrapper()
+log = logging.getLogger(__name__)
 
 _dispatcher_map = {}
 
@@ -262,7 +249,13 @@ class AsyncoreLoop(object):
                     self._loop_dispatcher.loop(self.timer_resolution)
                     self._timers.service_timeouts()
                 except Exception:
-                    log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
+                    try:
+                        log.debug("Asyncore event loop stopped unexpectedly", exc_info=True)
+                    except Exception:
+                        # TODO: Remove when Python 2 support is removed
+                        # PYTHON-1266. If our logger has disappeared, there's nothing we
+                        # can do, so just log nothing.
+                        pass
                     break
             self._started = False
 
