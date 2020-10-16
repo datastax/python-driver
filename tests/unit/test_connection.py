@@ -100,7 +100,7 @@ class ConnectionTest(unittest.TestCase):
         header = self.make_header_prefix(SupportedMessage, version=0x7f)
         options = self.make_options_body()
         message = self.make_msg(header, options)
-        c._iobuf = BytesIO()
+        c._iobuf._io_buffer = BytesIO()
         c._iobuf.write(message)
         c.process_io_buffer()
 
@@ -117,7 +117,7 @@ class ConnectionTest(unittest.TestCase):
         # read in a SupportedMessage response
         header = self.make_header_prefix(SupportedMessage)
         message = header + int32_pack(-13)
-        c._iobuf = BytesIO()
+        c._iobuf._io_buffer = BytesIO()
         c._iobuf.write(message)
         c.process_io_buffer()
 
