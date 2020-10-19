@@ -6,11 +6,5 @@ if pwd | egrep -q '\s'; then
 fi
 
 which python3 || { echo "Failed to find python3. Try installing Python for your operative system: https://www.python.org/downloads/" && exit 1; }
-# install pipx
-which pipx || python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-
-# install poetry
-which poetry || pipx install poetry
-poetry --version || { echo "Failed to find or install poetry. Try installing it manually: https://python-poetry.org/docs/#installation" && exit 1; }
+which poetry || curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/1.1.3/get-poetry.py | python3 - && source ${HOME}/.poetry/env
 poetry install
