@@ -99,6 +99,8 @@ class Connection(object):
             return
 
         if 'cloud' in self.cluster_options:
+            if self.hosts:
+                log.warning("Ignoring hosts %s because a cloud config was provided.", self.hosts)
             self.cluster = Cluster(**self.cluster_options)
         else:
             self.cluster = Cluster(self.hosts, **self.cluster_options)
@@ -305,6 +307,8 @@ def set_session(s):
     log.debug("cqlengine default connection initialized with %s", s)
 
 
+# TODO next major: if a cloud config is specified in kwargs, hosts will be ignored.
+# This function should be refactored to reflect this change. PYTHON-1265
 def setup(
         hosts,
         default_keyspace,

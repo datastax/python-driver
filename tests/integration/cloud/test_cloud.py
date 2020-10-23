@@ -13,6 +13,10 @@
 # limitations under the License
 from cassandra.datastax.cloud import parse_metadata_info
 from cassandra.query import SimpleStatement
+from cassandra.cqlengine import connection
+from cassandra.cqlengine.management import sync_table, create_keyspace_simple
+from cassandra.cqlengine.models import Model
+from cassandra.cqlengine import columns
 
 try:
     import unittest2 as unittest
@@ -30,7 +34,7 @@ from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy, Consta
 
 from mock import patch
 
-from tests.integration import requirescloudproxy, TestCluster
+from tests.integration import requirescloudproxy
 from tests.util import wait_until_not_raised
 from tests.integration.cloud import CloudProxyCluster, CLOUD_PROXY_SERVER
 
@@ -143,7 +147,7 @@ class CloudTests(CloudProxyCluster):
             wait_until_not_raised(
                 lambda: self.assertEqual(len(self.hosts_up()), 3),
                 0.02, 250)
-            mocked_resolve.assert_called_once()
+            mocked_resolve.assert_called()
 
     def test_metadata_unreachable(self):
         with self.assertRaises(DriverException) as cm:
@@ -234,3 +238,14 @@ class CloudTests(CloudProxyCluster):
             self.session.execute(statement)
         except InvalidRequest:
             self.fail("InvalidRequest was incorrectly raised for write query at LOCAL QUORUM!")
+
+    def test_cqlengine_can_connect(self):
+        class TestModel(Model):
+            id = columns.Integer(primary_key=True)
+            val = columns.Text()
+
+        connection.setup(None, "test", cloud={'secure_connect_bundle': self.creds})
+        create_keyspace_simple('test', 1)
+        sync_table(TestModel)
+        TestModel.objects.create(id=42, value='test')
+        self.assertEqual(len(TestModel.objects.all()), 1)
