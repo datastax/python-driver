@@ -6,6 +6,7 @@ Features
 --------
 * Ensure the driver can connect when invalid peer hosts are in system.peers (PYTHON-1260)
 * Implement protocol v5 checksumming (PYTHON-1258)
+* Fix the default cqlengine connection mechanism to work with Astra (PYTHON-1265)
 
 Bug Fixes
 ---------
