@@ -15,6 +15,7 @@ Bug Fixes
 Others
 ------
 * Drop Python 3.4 support (PYTHON-1220)
+* Update security documentation and examples to use PROTOCOL_TLS (PYTHON-1264)
 
 3.24.0
 ======

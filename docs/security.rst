@@ -119,9 +119,9 @@ The driver configuration:
 .. code-block:: python
 
     from cassandra.cluster import Cluster, Session
-    from ssl import SSLContext, PROTOCOL_TLSv1
+    from ssl import SSLContext, PROTOCOL_TLS
 
-    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context = SSLContext(PROTOCOL_TLS)
 
     cluster = Cluster(['127.0.0.1'], ssl_context=ssl_context)
     session = cluster.connect()
@@ -147,9 +147,9 @@ to `CERT_REQUIRED`. Otherwise, the loaded verify certificate will have no effect
 .. code-block:: python
 
     from cassandra.cluster import Cluster, Session
-    from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+    from ssl import SSLContext, PROTOCOL_TLS, CERT_REQUIRED
 
-    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context = SSLContext(PROTOCOL_TLS)
     ssl_context.load_verify_locations('/path/to/rootca.crt')
     ssl_context.verify_mode = CERT_REQUIRED
 
@@ -161,9 +161,9 @@ Additionally, you can also force the driver to verify the `hostname` of the serv
 .. code-block:: python
 
     from cassandra.cluster import Cluster, Session
-    from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+    from ssl import SSLContext, PROTOCOL_TLS, CERT_REQUIRED
 
-    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context = SSLContext(PROTOCOL_TLS)
     ssl_context.load_verify_locations('/path/to/rootca.crt')
     ssl_context.verify_mode = CERT_REQUIRED
     ssl_context.check_hostname = True
@@ -228,9 +228,9 @@ Finally, you can use that configuration with the following driver code:
 .. code-block:: python
 
     from cassandra.cluster import Cluster, Session
-    from ssl import SSLContext, PROTOCOL_TLSv1
+    from ssl import SSLContext, PROTOCOL_TLS
 
-    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context = SSLContext(PROTOCOL_TLS)
     ssl_context.load_cert_chain(
         certfile='/path/to/client.crt_signed',
         keyfile='/path/to/client.key')
@@ -251,9 +251,9 @@ The following driver code specifies that the connection should use two-way verif
 .. code-block:: python
 
     from cassandra.cluster import Cluster, Session
-    from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+    from ssl import SSLContext, PROTOCOL_TLS, CERT_REQUIRED
 
-    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context = SSLContext(PROTOCOL_TLS)
     ssl_context.load_verify_locations('/path/to/rootca.crt')
     ssl_context.verify_mode = CERT_REQUIRED
     ssl_context.load_cert_chain(
@@ -275,7 +275,7 @@ for more details about ``SSLContext`` configuration.
     from cassandra.cluster import Cluster
     from cassandra.io.twistedreactor import TwistedConnection
 
-    ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+    ssl_context = SSL.Context(SSL.TLSv1_2_METHOD)
     ssl_context.set_verify(SSL.VERIFY_PEER, callback=lambda _1, _2, _3, _4, ok: ok)
     ssl_context.use_certificate_file('/path/to/client.crt_signed')
     ssl_context.use_privatekey_file('/path/to/client.key')
@@ -303,7 +303,7 @@ deprecated in the next major release.
 
 By default, a ``ca_certs`` value should be supplied (the value should be
 a string pointing to the location of the CA certs file), and you probably
-want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLSv1`` to match
+want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLS`` to match
 Cassandra's default protocol.
 
 For example:
@@ -311,11 +311,11 @@ For example:
 .. code-block:: python
 
     from cassandra.cluster import Cluster
-    from ssl import PROTOCOL_TLSv1, CERT_REQUIRED
+    from ssl import PROTOCOL_TLS, CERT_REQUIRED
 
     ssl_opts = {
         'ca_certs': '/path/to/my/ca.certs',
-        'ssl_version': PROTOCOL_TLSv1,
+        'ssl_version': PROTOCOL_TLS,
         'cert_reqs': CERT_REQUIRED  # Certificates are required and validated
     }
     cluster = Cluster(ssl_options=ssl_opts)

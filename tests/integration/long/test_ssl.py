@@ -54,11 +54,11 @@ DRIVER_CERTFILE_BAD = os.path.abspath("tests/integration/long/ssl/client_bad.key
 USES_PYOPENSSL = "twisted" in EVENT_LOOP_MANAGER or "eventlet" in EVENT_LOOP_MANAGER
 if "twisted" in EVENT_LOOP_MANAGER:
     import OpenSSL
-    ssl_version = OpenSSL.SSL.TLSv1_METHOD
+    ssl_version = OpenSSL.SSL.TLSv1_2_METHOD
     verify_certs = {'cert_reqs': SSL.VERIFY_PEER,
                     'check_hostname': True}
 else:
-    ssl_version = ssl.PROTOCOL_TLSv1
+    ssl_version = ssl.PROTOCOL_TLS
     verify_certs = {'cert_reqs': ssl.CERT_REQUIRED,
                     'check_hostname': True}
 
@@ -404,7 +404,7 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
         @test_category connection:ssl
         """
         if USES_PYOPENSSL:
-            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context = SSL.Context(SSL.TLSv1_2_METHOD)
             ssl_context.load_verify_locations(CLIENT_CA_CERTS)
         else:
             ssl_context = ssl.SSLContext(ssl_version)
@@ -428,7 +428,7 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
         ssl_options = {}
 
         if USES_PYOPENSSL:
-            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context = SSL.Context(SSL.TLSv1_2_METHOD)
             ssl_context.use_certificate_file(abs_driver_certfile)
             with open(abs_driver_keyfile) as keyfile:
                 key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b'cassandra')
@@ -449,7 +449,7 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
         """
         ssl_options = {}
         if USES_PYOPENSSL:
-            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context = SSL.Context(SSL.TLSv1_2_METHOD)
             ssl_context.use_certificate_file(DRIVER_CERTFILE)
             with open(DRIVER_KEYFILE_ENCRYPTED) as keyfile:
                 key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b'cassandra')
@@ -472,7 +472,7 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
     def test_cannot_connect_ssl_context_with_invalid_hostname(self):
         ssl_options = {}
         if USES_PYOPENSSL:
-            ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_context = SSL.Context(SSL.TLSv1_2_METHOD)
             ssl_context.use_certificate_file(DRIVER_CERTFILE)
             with open(DRIVER_KEYFILE_ENCRYPTED) as keyfile:
                 key = crypto.load_privatekey(crypto.FILETYPE_PEM, keyfile.read(), b"cassandra")

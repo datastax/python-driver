@@ -24,7 +24,7 @@ except ImportError:
     import unittest  # noqa
 
 import six
-from ssl import SSLContext, PROTOCOL_TLSv1
+from ssl import SSLContext, PROTOCOL_TLS
 
 from cassandra import DriverException, ConsistencyLevel, InvalidRequest
 from cassandra.cluster import NoHostAvailable, ExecutionProfile, Cluster, _execution_profile_to_string
@@ -92,7 +92,7 @@ class CloudTests(CloudProxyCluster):
 
     def test_error_overriding_ssl_context(self):
         with self.assertRaises(ValueError) as cm:
-            self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLSv1))
+            self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLS))
 
         self.assertIn('cannot be specified with a cloud configuration', str(cm.exception))
 

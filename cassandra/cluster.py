@@ -785,7 +785,7 @@ class Cluster(object):
 
     By default, a ``ca_certs`` value should be supplied (the value should be
     a string pointing to the location of the CA certs file), and you probably
-    want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLSv1`` to match
+    want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLS`` to match
     Cassandra's default protocol.
 
     .. versionchanged:: 3.3.0
