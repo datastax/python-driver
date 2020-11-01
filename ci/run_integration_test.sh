@@ -36,7 +36,7 @@ ccm remove
 echo "export SCYLLA_VERSION=unstable/${BRANCH}:${LATEST_MASTER_JOB_ID}"
 echo "PROTOCOL_VERSION=4 EVENT_LOOP_MANAGER=asyncio pytest --import-mode append tests/integration/standard/"
 export SCYLLA_VERSION=unstable/${BRANCH}:${LATEST_MASTER_JOB_ID}
-export MAPPED_SCYLLA_VERSION=4.1.0
+export MAPPED_SCYLLA_VERSION=3.11.4
 PROTOCOL_VERSION=4 EVENT_LOOP_MANAGER=asyncio pytest -rf --import-mode append $*
 
 
