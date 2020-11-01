@@ -28,6 +28,7 @@ from cassandra.policies import HostDistance, SimpleConvictionPolicy
 
 
 class _PoolTests(unittest.TestCase):
+    __test__ = False
     PoolImpl = None
     uses_single_connection = None
 
@@ -162,7 +163,11 @@ class _PoolTests(unittest.TestCase):
         # the connection should be closed a new creation scheduled
         self.assertTrue(session.cluster.signal_connection_failure.call_args)
         self.assertTrue(conn.close.call_args)
-        self.assertFalse(session.submit.called)
+        if self.PoolImpl is HostConnection:
+            # on shard aware implementation we use submit function regardless
+            self.assertTrue(session.submit.called)
+        else:
+            self.assertFalse(session.submit.called)
         self.assertTrue(pool.is_shutdown)
 
     def test_return_closed_connection(self):
@@ -208,6 +213,7 @@ class _PoolTests(unittest.TestCase):
 
 
 class HostConnectionPoolTests(_PoolTests):
+    __test__ = True
     PoolImpl = HostConnectionPool
     uses_single_connection = False
 
@@ -256,6 +262,7 @@ class HostConnectionPoolTests(_PoolTests):
 
 
 class HostConnectionTests(_PoolTests):
+    __test__ = True
     PoolImpl = HostConnection
     uses_single_connection = True
 
