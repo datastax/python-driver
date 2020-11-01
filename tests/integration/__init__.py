@@ -201,6 +201,8 @@ if DSE_VERSION:
 elif CASSANDRA_DIR:
     log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
     CCM_KWARGS['install_dir'] = CASSANDRA_DIR
+elif os.getenv('SCYLLA_VERSION'):
+    CCM_KWARGS['cassandra_version'] = os.path.join(os.getenv('SCYLLA_VERSION'))
 else:
     log.info('Using Cassandra version: %s', CCM_VERSION)
     CCM_KWARGS['version'] = CCM_VERSION
@@ -584,8 +586,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                             })
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)
-                CCM_CLUSTER.populate(nodes, ipformat=ipformat, use_single_interface=use_single_interface)
-
+                # Since scylla CCM doesn't yet support this options, we skip it
+                # , use_single_interface=use_single_interface)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
         jvm_args = []
 
