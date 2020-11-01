@@ -19,6 +19,7 @@ from six.moves.urllib.request import build_opener, Request, HTTPHandler
 
 from cassandra.metadata import SchemaParserV4, SchemaParserDSE68
 
+from tests.util import wait_until_not_raised
 from tests.integration import CASSANDRA_VERSION, SIMULACRON_JAR, DSE_VERSION
 
 DEFAULT_CLUSTER = "python_simulacron_cluster"
@@ -110,7 +111,8 @@ class SimulacronClient(object):
         request.add_header("Content-Type", 'application/json')
         request.add_header("Content-Length", len(data))
 
-        connection = opener.open(request)
+        # wait that simulacron is ready and listening
+        connection = wait_until_not_raised(lambda: opener.open(request), 1, 10)
         return connection.read().decode('utf-8')
 
     def prime_server_versions(self):
@@ -331,6 +333,33 @@ class ClearLogsQuery(SimulacronRequest):
     def __init__(self, cluster_name=DEFAULT_CLUSTER, dc_id=0):
         self.path = "log/{}/{}".format(cluster_name, dc_id)
 
+    @property
+    def method(self):
+        return "DELETE"
+
+
+class _PauseOrResumeReads(SimulacronRequest):
+    def __init__(self, cluster_name=DEFAULT_CLUSTER, dc_id=None, node_id=None):
+        self.path = "pause-reads/{}".format(cluster_name)
+        if dc_id is not None:
+            self.path += "/{}".format(dc_id)
+            if node_id is not None:
+                self.path += "/{}".format(node_id)
+        elif node_id:
+            raise Exception("Can't set node_id without dc_id")
+
+    @property
+    def method(self):
+        raise NotImplementedError()
+
+
+class PauseReads(_PauseOrResumeReads):
+    @property
+    def method(self):
+        return "PUT"
+
+
+class ResumeReads(_PauseOrResumeReads):
     @property
     def method(self):
         return "DELETE"

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 
 import logging
 log = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ from six.moves import range
 from threading import Event
 
 from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster, EXEC_PROFILE_DEFAULT, ExecutionProfile
+from cassandra.cluster import EXEC_PROFILE_DEFAULT, ExecutionProfile
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
 from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
@@ -44,8 +44,7 @@ class QueryPagingTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Paging state, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = Cluster(
-            protocol_version=PROTOCOL_VERSION,
+        self.cluster = TestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(consistency_level=ConsistencyLevel.LOCAL_QUORUM)}
         )
         if PROTOCOL_VERSION < 3:

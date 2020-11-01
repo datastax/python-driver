@@ -21,9 +21,7 @@ from uuid import uuid1
 import logging
 log = logging.getLogger(__name__)
 
-from cassandra.cluster import Cluster
-
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, TestCluster
 
 
 def setup_module():
@@ -38,7 +36,7 @@ class RoutingTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = TestCluster()
         cls.session = cls.cluster.connect('test1rf')
 
     @classmethod

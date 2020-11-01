@@ -76,6 +76,10 @@ Tokens and Ring Topology
 .. autoclass:: ReplicationStrategy
    :members:
 
+.. autoclass:: ReplicationFactor
+   :members:
+   :exclude-members: create
+
 .. autoclass:: SimpleStrategy
    :members:
 

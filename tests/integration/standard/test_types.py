@@ -25,16 +25,16 @@ import six
 import cassandra
 from cassandra import InvalidRequest
 from cassandra import util
-from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
 from cassandra.util import sortedset, Duration
 from tests.unit.cython.utils import cythontest
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
+from tests.integration import use_singledc, execute_until_pass, notprotocolv1, \
     BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequaldse51, \
-    DSE_VERSION, greaterthanorequalcass3_10, requiredse
+    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_all_samples, get_collection_sample
 
@@ -136,7 +136,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         """
         Test insertion of all datatype primitives
         """
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
 
         # create table
@@ -217,7 +217,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         Test insertion of all collection types
         """
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
         # use tuple encoding, to convert native python tuple into raw CQL
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
@@ -449,7 +449,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
 
         # use this encoder in order to insert tuples
@@ -501,8 +501,9 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION,
-                    execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
+        c = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        )
         s = c.connect(self.keyspace_name)
 
         # set the encoder for tuples for the ability to write tuples
@@ -539,7 +540,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
@@ -567,8 +568,9 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION,
-                    execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
+        c = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        )
         s = c.connect(self.keyspace_name)
 
         # set the encoder for tuples for the ability to write tuples
@@ -665,8 +667,9 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION,
-                    execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
+        c = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        )
         s = c.connect(self.keyspace_name)
 
         # set the encoder for tuples for the ability to write tuples
@@ -1277,7 +1280,7 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
                 self.read_inserts_at_level(pvr)
 
     def read_inserts_at_level(self, proto_ver):
-        session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
+        session = TestCluster(protocol_version=proto_ver).connect(self.keyspace_name)
         try:
             results = session.execute('select * from t')[0]
             self.assertEqual("[SortedSet([1, 2]), SortedSet([3, 5])]", str(results.v))
@@ -1295,7 +1298,7 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
             session.cluster.shutdown()
 
     def run_inserts_at_version(self, proto_ver):
-        session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
+        session = TestCluster(protocol_version=proto_ver).connect(self.keyspace_name)
         try:
             p = session.prepare('insert into t (k, v) values (?, ?)')
             session.execute(p, (0, [{1, 2}, {3, 5}]))

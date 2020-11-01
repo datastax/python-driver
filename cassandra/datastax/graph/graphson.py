@@ -34,7 +34,7 @@ except:
 from cassandra.cqltypes import cql_types_from_string
 from cassandra.metadata import UserType
 from cassandra.util import Polygon, Point, LineString, Duration
-from cassandra.datastax.graph.types import Vertex, VertexProperty, Edge, Path
+from cassandra.datastax.graph.types import Vertex, VertexProperty, Edge, Path, T
 
 __all__ = ['GraphSON1Serializer', 'GraphSON1Deserializer', 'GraphSON1TypeDeserializer',
            'GraphSON2Serializer', 'GraphSON2Deserializer', 'GraphSON2Reader',
@@ -52,7 +52,7 @@ Supported types:
 DSE Graph      GraphSON 2.0     GraphSON 3.0   |  Python Driver
 ------------ | -------------- | -------------- | ------------
 text         | string         | string         | str
-boolean      | g:Boolean      | g:Boolean      | bool
+boolean      |                |                | bool
 bigint       | g:Int64        | g:Int64        | long
 int          | g:Int32        | g:Int32        | int
 double       | g:Double       | g:Double       | float
@@ -125,7 +125,7 @@ class TextTypeIO(GraphSONTypeIO):
 
 
 class BooleanTypeIO(GraphSONTypeIO):
-    graphson_base_type = 'Boolean'
+    graphson_base_type = None
     cql_type = 'boolean'
 
     @classmethod
@@ -745,6 +745,15 @@ class UserTypeIO(GraphSONTypeIO):
         return udt_class(**dict(kwargs))
 
 
+class TTypeIO(GraphSONTypeIO):
+    prefix = 'g'
+    graphson_base_type = 'T'
+
+    @classmethod
+    def deserialize(cls, value, reader=None):
+        return T.name_to_value[value]
+
+
 class _BaseGraphSONSerializer(object):
 
     _serializers = OrderedDict()
@@ -1120,7 +1129,8 @@ GraphSON3Serializer.register(TypeIOWrapper, TypeWrapperTypeIO)
 class GraphSON3Deserializer(GraphSON2Deserializer):
     _TYPES = GraphSON2Deserializer._TYPES + [MapTypeIO, ListTypeIO,
                                              SetTypeIO, TupleTypeIO,
-                                             UserTypeIO, DseDurationTypeIO, BulkSetTypeIO]
+                                             UserTypeIO, DseDurationTypeIO,
+                                             TTypeIO, BulkSetTypeIO]
 
     _deserializers = {t.graphson_type: t for t in _TYPES}
 

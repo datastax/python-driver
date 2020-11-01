@@ -50,7 +50,7 @@ Contents
 :doc:`dates_and_times`
     Some discussion on the driver's approach to working with timestamp, date, time types
 
-:doc:`scylla_cloud`	
+:doc:`scylla_cloud`
     Connect to Scylla Cloud
 
 :doc:`CHANGELOG`

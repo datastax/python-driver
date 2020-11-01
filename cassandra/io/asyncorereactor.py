@@ -35,7 +35,21 @@ import asyncore
 
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING, Timer, TimerManager
 
-log = logging.getLogger(__name__)
+
+# TODO: Remove when Python 2 is removed
+class LogWrapper(object):
+    """ PYTHON-1228. If our logger has disappeared, there's nothing we can do, so just execute nothing """
+    def __init__(self):
+        self._log = logging.getLogger(__name__)
+
+    def __getattr__(self, name):
+        try:
+            return getattr(self._log, name)
+        except:
+            return lambda *args, **kwargs: None
+
+
+log = LogWrapper()
 
 _dispatcher_map = {}
 

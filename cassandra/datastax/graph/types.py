@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = ['Element', 'Vertex', 'Edge', 'VertexProperty', 'Path']
+__all__ = ['Element', 'Vertex', 'Edge', 'VertexProperty', 'Path', 'T']
 
 
 class Element(object):
@@ -159,3 +159,52 @@ class Path(object):
 
     def __repr__(self):
         return "%s(%r, %r)" % (self.__class__.__name__, self.labels, [o.value for o in self.objects])
+
+
+class T(object):
+    """
+    Represents a collection of tokens for more concise Traversal definitions.
+    """
+
+    name = None
+    val = None
+
+    # class attributes
+    id = None
+    """
+    """
+
+    key = None
+    """
+    """
+    label = None
+    """
+    """
+    value = None
+    """
+    """
+
+    def __init__(self, name, val):
+        self.name = name
+        self.val = val
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return "T.%s" % (self.name, )
+
+
+T.id = T("id", 1)
+T.id_ = T("id_", 2)
+T.key = T("key", 3)
+T.label = T("label", 4)
+T.value = T("value", 5)
+
+T.name_to_value = {
+    'id': T.id,
+    'id_': T.id_,
+    'key': T.key,
+    'label': T.label,
+    'value': T.value
+}

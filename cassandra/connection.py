@@ -214,25 +214,26 @@ class DefaultEndPointFactory(EndPointFactory):
 
     port = None
     """
-    If set, force all endpoints to use this port.
+    If no port is discovered in the row, this is the default port
+    used for endpoint creation. 
     """
 
     def __init__(self, port=None):
         self.port = port
 
     def create(self, row):
-        addr = None
-        if "rpc_address" in row:
-            addr = row.get("rpc_address")
-        if "native_transport_address" in row:
-            addr = row.get("native_transport_address")
-        if not addr or addr in ["0.0.0.0", "::"]:
-            addr = row.get("peer")
+        # TODO next major... move this class so we don't need this kind of hack
+        from cassandra.metadata import _NodeInfo
+        addr = _NodeInfo.get_broadcast_rpc_address(row)
+        port = _NodeInfo.get_broadcast_rpc_port(row)
+        if port is None:
+            port = self.port if self.port else 9042
 
         # create the endpoint with the translated address
+        # TODO next major, create a TranslatedEndPoint type
         return DefaultEndPoint(
             self.cluster.address_translator.translate(addr),
-            self.port if self.port is not None else 9042)
+            port)
 
 
 @total_ordering
@@ -694,6 +695,7 @@ class Connection(object):
         self._requests = {}
         self._iobuf = io.BytesIO()
         self._continuous_paging_sessions = {}
+        self._socket_writable = True
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -928,6 +930,8 @@ class Connection(object):
             raise ConnectionShutdown("Connection to %s is defunct" % self.endpoint)
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.endpoint)
+        elif not self._socket_writable:
+            raise ConnectionBusy("Connection %s is overloaded" % self.endpoint)
 
         # queue the decoder function with the request
         # this allows us to inject custom functions per request to encode, decode messages
@@ -1446,7 +1450,7 @@ class HeartbeatFuture(object):
         log.debug("Sending options message heartbeat on idle connection (%s) %s",
                   id(connection), connection.endpoint)
         with connection.lock:
-            if connection.in_flight <= connection.max_request_id:
+            if connection.in_flight < connection.max_request_id:
                 connection.in_flight += 1
                 connection.send_msg(OptionsMessage(), connection.get_request_id(), self._options_callback)
             else:

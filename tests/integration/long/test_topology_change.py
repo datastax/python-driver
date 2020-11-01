@@ -1,8 +1,7 @@
 from unittest import TestCase
 
-from cassandra.cluster import Cluster
 from cassandra.policies import HostStateListener
-from tests.integration import PROTOCOL_VERSION, get_node, use_cluster, local
+from tests.integration import get_node, use_cluster, local, TestCluster
 from tests.integration.long.utils import decommission
 from tests.util import wait_until
 
@@ -32,7 +31,7 @@ class TopologyChangeTests(TestCase):
         use_cluster("test_down_then_removed", [3], start=True)
 
         state_listener = StateListener()
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         self.addCleanup(cluster.shutdown)
         cluster.register_listener(state_listener)
         session = cluster.connect(wait_for_all_pools=True)

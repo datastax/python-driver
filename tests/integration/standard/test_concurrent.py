@@ -17,12 +17,12 @@ import sys, logging, traceback
 
 from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeout, OperationTimedOut, \
     ReadFailure, WriteFailure
-from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args, ExecutionResult
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
 
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 
 from six import next
 
@@ -42,8 +42,7 @@ class ClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = Cluster(
-            protocol_version=PROTOCOL_VERSION,
+        cls.cluster = TestCluster(
             execution_profiles = {
                 EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)
             }

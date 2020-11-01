@@ -160,14 +160,13 @@ class BasicGraphUnitTestCase(BasicKeyspaceUnitTestCase):
             )
         )
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                               execution_profiles={
-                                   EXEC_PROFILE_GRAPH_DEFAULT: ep_graphson1,
-                                   EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT: ep_analytics,
-                                   "graphson1": ep_graphson1,
-                                   "graphson2": ep_graphson2,
-                                   "graphson3": ep_graphson3
-                               })
+        self.cluster = TestCluster(execution_profiles={
+            EXEC_PROFILE_GRAPH_DEFAULT: ep_graphson1,
+            EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT: ep_analytics,
+            "graphson1": ep_graphson1,
+            "graphson2": ep_graphson2,
+            "graphson3": ep_graphson3
+        })
 
         self.session = self.cluster.connect()
         self.ks_name = self._testMethodName.lower()
@@ -276,14 +275,13 @@ class GraphUnitTestCase(BasicKeyspaceUnitTestCase):
             )
         )
 
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                               execution_profiles={
-                                   EXEC_PROFILE_GRAPH_DEFAULT: ep_graphson1,
-                                   EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT: ep_analytics,
-                                   "graphson1": ep_graphson1,
-                                   "graphson2": ep_graphson2,
-                                   "graphson3": ep_graphson3
-                               })
+        self.cluster = TestCluster(execution_profiles={
+            EXEC_PROFILE_GRAPH_DEFAULT: ep_graphson1,
+            EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT: ep_analytics,
+            "graphson1": ep_graphson1,
+            "graphson2": ep_graphson2,
+            "graphson3": ep_graphson3
+        })
 
         self.session = self.cluster.connect()
         self.ks_name = self._testMethodName.lower()
@@ -362,7 +360,7 @@ class BasicSharedGraphUnitTestCase(BasicKeyspaceUnitTestCase):
 
     @classmethod
     def session_setup(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = TestCluster()
         cls.session = cls.cluster.connect()
         cls.ks_name = cls.__name__.lower()
         cls.cass_version, cls.cql_version = get_server_versions()
@@ -420,6 +418,8 @@ class ClassicGraphFixtures(GraphFixtures):
     @staticmethod
     def datatypes():
         data = {
+            "boolean1": ["Boolean()", True, None],
+            "boolean2": ["Boolean()", False, None],
             "point1": ["Point()", Point(.5, .13), GraphSON1Deserializer.deserialize_point],
              "point2": ["Point()", Point(-5, .0), GraphSON1Deserializer.deserialize_point],
 

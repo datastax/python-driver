@@ -21,9 +21,9 @@ except ImportError:
 import six
 
 from cassandra.query import (SimpleStatement, BatchStatement, BatchType)
-from cassandra.cluster import Cluster
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, local
+from tests.integration import use_singledc, PROTOCOL_VERSION, local, TestCluster
+
 
 def setup_module():
     use_singledc()
@@ -38,7 +38,7 @@ class CustomPayloadTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = TestCluster()
         self.session = self.cluster.connect()
 
     def tearDown(self):

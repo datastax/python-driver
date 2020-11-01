@@ -49,7 +49,7 @@ log = logging.getLogger(__name__)
 cql_keywords = set((
     'add', 'aggregate', 'all', 'allow', 'alter', 'and', 'apply', 'as', 'asc', 'ascii', 'authorize', 'batch', 'begin',
     'bigint', 'blob', 'boolean', 'by', 'called', 'clustering', 'columnfamily', 'compact', 'contains', 'count',
-    'counter', 'create', 'custom', 'date', 'decimal', 'delete', 'desc', 'describe', 'deterministic', 'distinct', 'double', 'drop',
+    'counter', 'create', 'custom', 'date', 'decimal', 'default', 'delete', 'desc', 'describe', 'deterministic', 'distinct', 'double', 'drop',
     'entries', 'execute', 'exists', 'filtering', 'finalfunc', 'float', 'from', 'frozen', 'full', 'function',
     'functions', 'grant', 'if', 'in', 'index', 'inet', 'infinity', 'initcond', 'input', 'insert', 'int', 'into', 'is', 'json',
     'key', 'keys', 'keyspace', 'keyspaces', 'language', 'limit', 'list', 'login', 'map', 'materialized', 'modify', 'monotonic', 'nan', 'nologin',
@@ -338,20 +338,23 @@ class Metadata(object):
         with self._hosts_lock:
             return bool(self._hosts.pop(host.endpoint, False))
 
-    def get_host(self, endpoint_or_address):
+    def get_host(self, endpoint_or_address, port=None):
         """
-        Find a host in the metadata for a specific endpoint. If a string inet address is passed,
-        iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` attribute.
+        Find a host in the metadata for a specific endpoint. If a string inet address and port are passed,
+        iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` and
+        :attr:`~.pool.Host.broadcast_rpc_port`attributes.
         """
         if not isinstance(endpoint_or_address, EndPoint):
-            return self._get_host_by_address(endpoint_or_address)
+            return self._get_host_by_address(endpoint_or_address, port)
 
         return self._hosts.get(endpoint_or_address)
 
-    def _get_host_by_address(self, address):
+    def _get_host_by_address(self, address, port=None):
         for host in six.itervalues(self._hosts):
-            if host.broadcast_rpc_address == address:
+            if (host.broadcast_rpc_address == address and
+                    (port is None or host.broadcast_rpc_port is None or host.broadcast_rpc_port == port)):
                 return host
+
         return None
 
     def all_hosts(self):
@@ -381,6 +384,7 @@ class ReplicationStrategyTypeType(type):
         if not name.startswith('_'):
             _replication_strategies[name] = cls
         return cls
+
 
 
 @six.add_metaclass(ReplicationStrategyTypeType)
@@ -450,18 +454,82 @@ class _UnknownStrategy(ReplicationStrategy):
         return {}
 
 
+class ReplicationFactor(object):
+    """
+    Represent the replication factor of a keyspace.
+    """
+
+    all_replicas = None
+    """
+    The number of total replicas.
+    """
+
+    full_replicas = None
+    """
+    The number of replicas that own a full copy of the data. This is the same
+    than `all_replicas` when transient replication is not enabled.
+    """
+
+    transient_replicas = None
+    """
+    The number of transient replicas.
+
+    Only set if the keyspace has transient replication enabled.
+    """
+
+    def __init__(self, all_replicas, transient_replicas=None):
+        self.all_replicas = all_replicas
+        self.transient_replicas = transient_replicas
+        self.full_replicas = (all_replicas - transient_replicas) if transient_replicas else all_replicas
+
+    @staticmethod
+    def create(rf):
+        """
+        Given the inputted replication factor string, parse and return the ReplicationFactor instance.
+        """
+        transient_replicas = None
+        try:
+            all_replicas = int(rf)
+        except ValueError:
+            try:
+                rf = rf.split('/')
+                all_replicas, transient_replicas = int(rf[0]), int(rf[1])
+            except Exception:
+                raise ValueError("Unable to determine replication factor from: {}".format(rf))
+
+        return ReplicationFactor(all_replicas, transient_replicas)
+
+    def __str__(self):
+        return ("%d/%d" % (self.all_replicas, self.transient_replicas) if self.transient_replicas
+                else "%d" % self.all_replicas)
+
+    def __eq__(self, other):
+        if not isinstance(other, ReplicationFactor):
+            return False
+
+        return self.all_replicas == other.all_replicas and self.full_replicas == other.full_replicas
+
+
 class SimpleStrategy(ReplicationStrategy):
 
-    replication_factor = None
+    replication_factor_info = None
     """
-    The replication factor for this keyspace.
+    A :class:`cassandra.metadata.ReplicationFactor` instance.
     """
 
+    @property
+    def replication_factor(self):
+        """
+        The replication factor for this keyspace.
+
+        For backward compatibility, this returns the
+        :attr:`cassandra.metadata.ReplicationFactor.full_replicas` value of
+        :attr:`cassandra.metadata.SimpleStrategy.replication_factor_info`.
+        """
+        return self.replication_factor_info.full_replicas
+
     def __init__(self, options_map):
-        try:
-            self.replication_factor = int(options_map['replication_factor'])
-        except Exception:
-            raise ValueError("SimpleStrategy requires an integer 'replication_factor' option")
+        self.replication_factor_info = ReplicationFactor.create(options_map['replication_factor'])
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
@@ -482,30 +550,41 @@ class SimpleStrategy(ReplicationStrategy):
         Returns a string version of these replication options which are
         suitable for use in a CREATE KEYSPACE statement.
         """
-        return "{'class': 'SimpleStrategy', 'replication_factor': '%d'}" \
-               % (self.replication_factor,)
+        return "{'class': 'SimpleStrategy', 'replication_factor': '%s'}" \
+               % (str(self.replication_factor_info),)
 
     def __eq__(self, other):
         if not isinstance(other, SimpleStrategy):
             return False
 
-        return self.replication_factor == other.replication_factor
+        return str(self.replication_factor_info) == str(other.replication_factor_info)
 
 
 class NetworkTopologyStrategy(ReplicationStrategy):
 
+    dc_replication_factors_info = None
+    """
+    A map of datacenter names to the :class:`cassandra.metadata.ReplicationFactor` instance for that DC.
+    """
+
     dc_replication_factors = None
     """
     A map of datacenter names to the replication factor for that DC.
+
+    For backward compatibility, this maps to the :attr:`cassandra.metadata.ReplicationFactor.full_replicas`
+    value of the :attr:`cassandra.metadata.NetworkTopologyStrategy.dc_replication_factors_info` dict.
     """
 
     def __init__(self, dc_replication_factors):
+        self.dc_replication_factors_info = dict(
+            (str(k), ReplicationFactor.create(v)) for k, v in dc_replication_factors.items())
         self.dc_replication_factors = dict(
-            (str(k), int(v)) for k, v in dc_replication_factors.items())
+            (dc, rf.full_replicas) for dc, rf in self.dc_replication_factors_info.items())
 
     def make_token_replica_map(self, token_to_host_owner, ring):
-        dc_rf_map = dict((dc, int(rf))
-                         for dc, rf in self.dc_replication_factors.items() if rf > 0)
+        dc_rf_map = dict(
+            (dc, full_replicas) for dc, full_replicas in self.dc_replication_factors.items()
+            if full_replicas > 0)
 
         # build a map of DCs to lists of indexes into `ring` for tokens that
         # belong to that DC
@@ -585,15 +664,15 @@ class NetworkTopologyStrategy(ReplicationStrategy):
         suitable for use in a CREATE KEYSPACE statement.
         """
         ret = "{'class': 'NetworkTopologyStrategy'"
-        for dc, repl_factor in sorted(self.dc_replication_factors.items()):
-            ret += ", '%s': '%d'" % (dc, repl_factor)
+        for dc, rf in sorted(self.dc_replication_factors_info.items()):
+            ret += ", '%s': '%s'" % (dc, str(rf))
         return ret + "}"
 
     def __eq__(self, other):
         if not isinstance(other, NetworkTopologyStrategy):
             return False
 
-        return self.dc_replication_factors == other.dc_replication_factors
+        return self.dc_replication_factors_info == other.dc_replication_factors_info
 
 
 class LocalStrategy(ReplicationStrategy):
@@ -3323,3 +3402,48 @@ def group_keys_by_replica(session, keyspace, table, keys):
 
     return dict(keys_per_host)
 
+
+# TODO next major reorg
+class _NodeInfo(object):
+    """
+    Internal utility functions to determine the different host addresses/ports
+    from a local or peers row.
+    """
+
+    @staticmethod
+    def get_broadcast_rpc_address(row):
+        # TODO next major, change the parsing logic to avoid any
+        #  overriding of a non-null value
+        addr = row.get("rpc_address")
+        if "native_address" in row:
+            addr = row.get("native_address")
+        if "native_transport_address" in row:
+            addr = row.get("native_transport_address")
+        if not addr or addr in ["0.0.0.0", "::"]:
+            addr = row.get("peer")
+
+        return addr
+
+    @staticmethod
+    def get_broadcast_rpc_port(row):
+        port = row.get("rpc_port")
+        if port is None or port == 0:
+            port = row.get("native_port")
+
+        return port if port and port > 0 else None
+
+    @staticmethod
+    def get_broadcast_address(row):
+        addr = row.get("broadcast_address")
+        if addr is None:
+            addr = row.get("peer")
+
+        return addr
+
+    @staticmethod
+    def get_broadcast_port(row):
+        port = row.get("broadcast_port")
+        if port is None or port == 0:
+            port = row.get("peer_port")
+
+        return port if port and port > 0 else None

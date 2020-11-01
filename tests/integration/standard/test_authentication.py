@@ -15,11 +15,11 @@
 import logging
 import time
 
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
-    set_default_cass_ip, USE_CASS_EXTERNAL, start_cluster_wait_for_up
+    USE_CASS_EXTERNAL, start_cluster_wait_for_up, TestCluster
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -44,8 +44,6 @@ def setup_module():
         ccm_cluster.set_configuration_options(config_options)
         log.debug("Starting ccm test cluster with %s", config_options)
         start_cluster_wait_for_up(ccm_cluster)
-    else:
-        set_default_cass_ip()
 
 
 def teardown_module():
@@ -77,14 +75,12 @@ class AuthenticationTests(unittest.TestCase):
         # to ensure the role manager is setup
         for _ in range(5):
             try:
-                cluster = Cluster(
-                    protocol_version=PROTOCOL_VERSION,
+                cluster = TestCluster(
                     idle_heartbeat_interval=0,
                     auth_provider=self.get_authentication_provider(username='cassandra', password='cassandra'))
                 cluster.connect(wait_for_all_pools=True)
 
-                return Cluster(
-                    protocol_version=PROTOCOL_VERSION,
+                return TestCluster(
                     idle_heartbeat_interval=0,
                     auth_provider=self.get_authentication_provider(username=usr, password=pwd))
             except Exception as e:
@@ -147,7 +143,7 @@ class AuthenticationTests(unittest.TestCase):
             cluster.shutdown()
 
     def test_connect_no_auth_provider(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         try:
             self.assertRaisesRegexp(NoHostAvailable,
                                     '.*AuthenticationFailed.*',

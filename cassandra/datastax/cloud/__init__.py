@@ -23,7 +23,7 @@ from six.moves.urllib.request import urlopen
 
 _HAS_SSL = True
 try:
-    from ssl import SSLContext, PROTOCOL_TLSv1, CERT_REQUIRED
+    from ssl import SSLContext, PROTOCOL_TLS, CERT_REQUIRED
 except:
     _HAS_SSL = False
 
@@ -41,7 +41,7 @@ log = logging.getLogger(__name__)
 
 __all__ = ['get_cloud_config']
 
-PRODUCT_APOLLO = "DATASTAX_APOLLO"
+DATASTAX_CLOUD_PRODUCT_TYPE = "DATASTAX_APOLLO"
 
 
 class CloudConfig(object):
@@ -97,8 +97,9 @@ def get_cloud_config(cloud_config, create_pyopenssl_context=False):
 
 def read_cloud_config_from_zip(cloud_config, create_pyopenssl_context):
     secure_bundle = cloud_config['secure_connect_bundle']
+    use_default_tempdir = cloud_config.get('use_default_tempdir', None)
     with ZipFile(secure_bundle) as zipfile:
-        base_dir = os.path.dirname(secure_bundle)
+        base_dir = tempfile.gettempdir() if use_default_tempdir else os.path.dirname(secure_bundle)
         tmp_dir = tempfile.mkdtemp(dir=base_dir)
         try:
             zipfile.extractall(path=tmp_dir)
@@ -138,7 +139,7 @@ def read_metadata_info(config, cloud_config):
     except Exception as e:
         log.exception(e)
         raise DriverException("Unable to connect to the metadata service at %s. "
-                              "Check the cluster status in the Constellation cloud console. " % url)
+                              "Check the cluster status in the cloud console. " % url)
 
     if response.code != 200:
         raise DriverException(("Error while fetching the metadata at: %s. "
@@ -169,7 +170,7 @@ def parse_metadata_info(config, http_data):
 
 
 def _ssl_context_from_cert(ca_cert_location, cert_location, key_location):
-    ssl_context = SSLContext(PROTOCOL_TLSv1)
+    ssl_context = SSLContext(PROTOCOL_TLS)
     ssl_context.load_verify_locations(ca_cert_location)
     ssl_context.verify_mode = CERT_REQUIRED
     ssl_context.load_cert_chain(certfile=cert_location, keyfile=key_location)
@@ -183,7 +184,7 @@ def _pyopenssl_context_from_cert(ca_cert_location, cert_location, key_location):
     except ImportError as e:
         six.reraise(
             ImportError,
-            ImportError("PyOpenSSL must be installed to connect to Apollo with the Eventlet or Twisted event loops"),
+            ImportError("PyOpenSSL must be installed to connect to Astra with the Eventlet or Twisted event loops"),
             sys.exc_info()[2]
         )
     ssl_context = SSL.Context(SSL.TLSv1_METHOD)

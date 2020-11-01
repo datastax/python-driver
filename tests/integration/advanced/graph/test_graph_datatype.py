@@ -28,6 +28,7 @@ from cassandra.graph import graph_result_row_factory
 from cassandra.graph.query import GraphProtocol
 from cassandra.graph.types import VertexProperty
 
+from tests.util import wait_until
 from tests.integration.advanced.graph import BasicGraphUnitTestCase, ClassicGraphFixtures, \
     ClassicGraphSchema, CoreGraphSchema
 from tests.integration.advanced.graph import VertexLabel, GraphTestConfiguration, GraphUnitTestCase
@@ -94,14 +95,18 @@ class GenericGraphDataTypeTest(GraphUnitTestCase):
             schema.create_vertex_label(self.session, vertex_label, execution_profile=ep)
             vertex = list(schema.add_vertex(self.session, vertex_label, property_name, value, execution_profile=ep))[0]
 
-            vertex_properties = list(schema.get_vertex_properties(
-                self.session, vertex, execution_profile=ep))
+            def get_vertex_properties():
+                return list(schema.get_vertex_properties(
+                    self.session, vertex, execution_profile=ep))
 
+            prop_returned = 1 if DSE_VERSION < Version('5.1') else 2  # include pkid >=5.1
+            wait_until(
+                lambda: len(get_vertex_properties()) == prop_returned, 0.2, 15)
+
+            vertex_properties = get_vertex_properties()
             if graphson == GraphProtocol.GRAPHSON_1_0:
                 vertex_properties = [vp.as_vertex_property() for vp in vertex_properties]
 
-            prop_returned = 1 if DSE_VERSION < Version('5.1') else 2  # include pkid >=5.1
-            self.assertEqual(len(vertex_properties), prop_returned)
             for vp in vertex_properties:
                 if vp.label == 'pkid':
                     continue
@@ -109,7 +114,7 @@ class GenericGraphDataTypeTest(GraphUnitTestCase):
                 self.assertIsInstance(vp, VertexProperty)
                 self.assertEqual(vp.label, property_name)
                 if graphson == GraphProtocol.GRAPHSON_1_0:
-                    deserialized_value = deserializer(vp.value)
+                    deserialized_value = deserializer(vp.value) if deserializer else vp.value
                     self.assertEqual(deserialized_value, value)
                 else:
                     self.assertEqual(vp.value, value)
@@ -171,10 +176,15 @@ class GenericGraphDataTypeTest(GraphUnitTestCase):
             schema.create_vertex_label(self.session, vertex_label, execution_profile=ep)
 
             vertex = list(schema.add_vertex(self.session, vertex_label, property_name, value, execution_profile=ep))[0]
-            vertex_properties = list(schema.get_vertex_properties(
-                self.session, vertex, execution_profile=ep))
 
-            self.assertEqual(len(vertex_properties), 2)  # include pkid
+            def get_vertex_properties():
+                return list(schema.get_vertex_properties(
+                    self.session, vertex, execution_profile=ep))
+
+            wait_until(
+                lambda: len(get_vertex_properties()) == 2, 0.2, 15)
+
+            vertex_properties = get_vertex_properties()
             for vp in vertex_properties:
                 if vp.label == 'pkid':
                     continue

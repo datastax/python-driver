@@ -48,7 +48,7 @@ from cassandra.auth import _proxy_execute_key, PlainTextAuthProvider
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported,
                                   EndPoint, DefaultEndPoint, DefaultEndPointFactory,
-                                  ContinuousPagingState, SniEndPointFactory)
+                                  ContinuousPagingState, SniEndPointFactory, ConnectionBusy)
 from cassandra.cqltypes import UserType
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
@@ -64,7 +64,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler,
                                 RESULT_KIND_VOID)
-from cassandra.metadata import Metadata, protect_name, murmur3
+from cassandra.metadata import Metadata, protect_name, murmur3, _NodeInfo
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
                                 RetryPolicy, IdentityTranslator, NoSpeculativeExecutionPlan,
@@ -418,7 +418,7 @@ class GraphExecutionProfile(ExecutionProfile):
     """
 
     def __init__(self, load_balancing_policy=_NOT_SET, retry_policy=None,
-                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 consistency_level=_NOT_SET, serial_consistency_level=None,
                  request_timeout=30.0, row_factory=None,
                  graph_options=None, continuous_paging_options=_NOT_SET):
         """
@@ -443,7 +443,7 @@ class GraphExecutionProfile(ExecutionProfile):
 class GraphAnalyticsExecutionProfile(GraphExecutionProfile):
 
     def __init__(self, load_balancing_policy=None, retry_policy=None,
-                 consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None,
+                 consistency_level=_NOT_SET, serial_consistency_level=None,
                  request_timeout=3600. * 24. * 7., row_factory=None,
                  graph_options=None):
         """
@@ -581,7 +581,7 @@ class Cluster(object):
     contact_points = ['127.0.0.1']
     """
     The list of contact points to try connecting for cluster discovery. A
-    contact point can be a string (ip, hostname) or a
+    contact point can be a string (ip or hostname), a tuple (ip/hostname, port) or a
     :class:`.connection.EndPoint` instance.
 
     Defaults to loopback interface.
@@ -993,7 +993,10 @@ class Cluster(object):
         
         {
             # path to the secure connect bundle
-            'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
+            'secure_connect_bundle': '/path/to/secure-connect-dbname.zip',
+
+            # optional config options
+            'use_default_tempdir': True  # use the system temp dir for the zip extraction
         }
 
     The zip file will be temporarily extracted in the same directory to
@@ -1152,20 +1155,24 @@ class Cluster(object):
         self.endpoint_factory = endpoint_factory or DefaultEndPointFactory(port=self.port)
         self.endpoint_factory.configure(self)
 
-        raw_contact_points = [cp for cp in self.contact_points if not isinstance(cp, EndPoint)]
+        raw_contact_points = []
+        for cp in [cp for cp in self.contact_points if not isinstance(cp, EndPoint)]:
+            raw_contact_points.append(cp if isinstance(cp, tuple) else (cp, port))
+
         self.endpoints_resolved = [cp for cp in self.contact_points if isinstance(cp, EndPoint)]
         self._endpoint_map_for_insights = {repr(ep): '{ip}:{port}'.format(ip=ep.address, port=ep.port)
                                            for ep in self.endpoints_resolved}
 
-        strs_resolved_map = _resolve_contact_points_to_string_map(raw_contact_points, port)
+        strs_resolved_map = _resolve_contact_points_to_string_map(raw_contact_points)
         self.endpoints_resolved.extend(list(chain(
             *[
-                [DefaultEndPoint(x, port) for x in xs if x is not None]
+                [DefaultEndPoint(ip, port) for ip, port in xs if ip is not None]
                 for xs in strs_resolved_map.values() if xs is not None
             ]
         )))
+
         self._endpoint_map_for_insights.update(
-            {key: ['{ip}:{port}'.format(ip=ip, port=port) for ip in value]
+            {key: ['{ip}:{port}'.format(ip=ip, port=port) for ip, port in value]
              for key, value in strs_resolved_map.items() if value is not None}
         )
 
@@ -3429,7 +3436,16 @@ class ControlConnection(object):
     _SELECT_SCHEMA_PEERS_TEMPLATE = "SELECT peer, host_id, {nt_col_name}, schema_version FROM system.peers"
     _SELECT_SCHEMA_LOCAL = "SELECT schema_version FROM system.local WHERE key='local'"
 
+    _SELECT_PEERS_V2 = "SELECT * FROM system.peers_v2"
+    _SELECT_PEERS_NO_TOKENS_V2 = "SELECT host_id, peer, peer_port, data_center, rack, native_address, native_port, release_version, schema_version FROM system.peers_v2"
+    _SELECT_SCHEMA_PEERS_V2 = "SELECT host_id, peer, peer_port, native_address, native_port, schema_version FROM system.peers_v2"
+
     _MINIMUM_NATIVE_ADDRESS_DSE_VERSION = Version("6.0.0")
+
+    class PeersQueryType(object):
+        """internal Enum for _peers_query"""
+        PEERS = 0
+        PEERS_SCHEMA = 1
 
     _is_shutdown = False
     _timeout = None
@@ -3441,6 +3457,8 @@ class ControlConnection(object):
 
     _schema_meta_enabled = True
     _token_meta_enabled = True
+
+    _uses_peers_v2 = True
 
     # for testing purposes
     _time = time
@@ -3478,7 +3496,7 @@ class ControlConnection(object):
         self._protocol_version = self._cluster.protocol_version
         self._set_new_connection(self._reconnect_internal())
 
-        self._cluster.metadata.dbaas = self._connection._product_type == dscloud.PRODUCT_APOLLO
+        self._cluster.metadata.dbaas = self._connection._product_type == dscloud.DATASTAX_CLOUD_PRODUCT_TYPE
 
     def _set_new_connection(self, conn):
         """
@@ -3556,13 +3574,25 @@ class ControlConnection(object):
                 "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change')
             }, register_timeout=self._timeout)
 
-            sel_peers = self._peers_query_for_version(connection, self._SELECT_PEERS_NO_TOKENS_TEMPLATE)
+            sel_peers = self._get_peers_query(self.PeersQueryType.PEERS, connection)
             sel_local = self._SELECT_LOCAL if self._token_meta_enabled else self._SELECT_LOCAL_NO_TOKENS
             peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
             local_query = QueryMessage(query=sel_local, consistency_level=ConsistencyLevel.ONE)
-            shared_results = connection.wait_for_responses(
-                peers_query, local_query, timeout=self._timeout)
+            (peers_success, peers_result), (local_success, local_result) = connection.wait_for_responses(
+                peers_query, local_query, timeout=self._timeout, fail_on_error=False)
 
+            if not local_success:
+                raise local_result
+
+            if not peers_success:
+                # error with the peers v2 query, fallback to peers v1
+                self._uses_peers_v2 = False
+                sel_peers = self._get_peers_query(self.PeersQueryType.PEERS, connection)
+                peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
+                peers_result = connection.wait_for_response(
+                    peers_query, timeout=self._timeout)
+
+            shared_results = (peers_result, local_result)
             self._refresh_node_list_and_token_map(connection, preloaded_results=shared_results)
             self._refresh_schema(connection, preloaded_results=shared_results, schema_agreement_wait=-1)
         except Exception:
@@ -3684,20 +3714,18 @@ class ControlConnection(object):
 
     def _refresh_node_list_and_token_map(self, connection, preloaded_results=None,
                                          force_token_rebuild=False):
-
         if preloaded_results:
             log.debug("[control connection] Refreshing node list and token map using preloaded results")
             peers_result = preloaded_results[0]
             local_result = preloaded_results[1]
         else:
             cl = ConsistencyLevel.ONE
+            sel_peers = self._get_peers_query(self.PeersQueryType.PEERS, connection)
             if not self._token_meta_enabled:
                 log.debug("[control connection] Refreshing node list without token map")
-                sel_peers = self._peers_query_for_version(connection, self._SELECT_PEERS_NO_TOKENS_TEMPLATE)
                 sel_local = self._SELECT_LOCAL_NO_TOKENS
             else:
                 log.debug("[control connection] Refreshing node list and token map")
-                sel_peers = self._SELECT_PEERS
                 sel_local = self._SELECT_LOCAL
             peers_query = QueryMessage(query=sel_peers, consistency_level=cl)
             local_query = QueryMessage(query=sel_local, consistency_level=cl)
@@ -3727,13 +3755,17 @@ class ControlConnection(object):
                 self._update_location_info(host, datacenter, rack)
                 host.host_id = local_row.get("host_id")
                 host.listen_address = local_row.get("listen_address")
-                host.broadcast_address = local_row.get("broadcast_address")
+                host.listen_port = local_row.get("listen_port")
+                host.broadcast_address = _NodeInfo.get_broadcast_address(local_row)
+                host.broadcast_port = _NodeInfo.get_broadcast_port(local_row)
 
-                host.broadcast_rpc_address = self._address_from_row(local_row)
+                host.broadcast_rpc_address = _NodeInfo.get_broadcast_rpc_address(local_row)
+                host.broadcast_rpc_port = _NodeInfo.get_broadcast_rpc_port(local_row)
                 if host.broadcast_rpc_address is None:
                     if self._token_meta_enabled:
                         # local rpc_address is not available, use the connection endpoint
                         host.broadcast_rpc_address = connection.endpoint.address
+                        host.broadcast_rpc_port = connection.endpoint.port
                     else:
                         # local rpc_address has not been queried yet, try to fetch it
                         # separately, which might fail because C* < 2.1.6 doesn't have rpc_address
@@ -3746,9 +3778,11 @@ class ControlConnection(object):
                             row = dict_factory(
                                 local_rpc_address_result.column_names,
                                 local_rpc_address_result.parsed_rows)
-                            host.broadcast_rpc_address = row[0]['rpc_address']
+                            host.broadcast_rpc_address = _NodeInfo.get_broadcast_rpc_address(row[0])
+                            host.broadcast_rpc_port = _NodeInfo.get_broadcast_rpc_port(row[0])
                         else:
                             host.broadcast_rpc_address = connection.endpoint.address
+                            host.broadcast_rpc_port = connection.endpoint.port
 
                 host.release_version = local_row.get("release_version")
                 host.dse_version = local_row.get("dse_version")
@@ -3786,8 +3820,10 @@ class ControlConnection(object):
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
             host.host_id = row.get("host_id")
-            host.broadcast_address = row.get("peer")
-            host.broadcast_rpc_address = self._address_from_row(row)
+            host.broadcast_address = _NodeInfo.get_broadcast_address(row)
+            host.broadcast_port = _NodeInfo.get_broadcast_port(row)
+            host.broadcast_rpc_address = _NodeInfo.get_broadcast_rpc_address(row)
+            host.broadcast_rpc_port = _NodeInfo.get_broadcast_rpc_port(row)
             host.release_version = row.get("release_version")
             host.dse_version = row.get("dse_version")
             host.dse_workload = row.get("workload")
@@ -3843,7 +3879,8 @@ class ControlConnection(object):
 
     def _handle_topology_change(self, event):
         change_type = event["change_type"]
-        host = self._cluster.metadata.get_host(event["address"][0])
+        addr, port = event["address"]
+        host = self._cluster.metadata.get_host(addr, port)
         if change_type == "NEW_NODE" or change_type == "MOVED_NODE":
             if self._topology_event_refresh_window >= 0:
                 delay = self._delay_for_event_type('topology_change', self._topology_event_refresh_window)
@@ -3853,7 +3890,8 @@ class ControlConnection(object):
 
     def _handle_status_change(self, event):
         change_type = event["change_type"]
-        host = self._cluster.metadata.get_host(event["address"][0])
+        addr, port = event["address"]
+        host = self._cluster.metadata.get_host(addr, port)
         if change_type == "UP":
             delay = self._delay_for_event_type('status_change', self._status_event_refresh_window)
             if host is None:
@@ -3907,7 +3945,7 @@ class ControlConnection(object):
             elapsed = 0
             cl = ConsistencyLevel.ONE
             schema_mismatches = None
-            select_peers_query = self._peers_query_for_version(connection, self._SELECT_SCHEMA_PEERS_TEMPLATE)
+            select_peers_query = self._get_peers_query(self.PeersQueryType.PEERS_SCHEMA, connection)
 
             while elapsed < total_timeout:
                 peers_query = QueryMessage(query=select_peers_query, consistency_level=cl)
@@ -3964,43 +4002,50 @@ class ControlConnection(object):
 
         return dict((version, list(nodes)) for version, nodes in six.iteritems(versions))
 
-    def _address_from_row(self, row):
+    def _get_peers_query(self, peers_query_type, connection=None):
         """
-        Parse the broadcast rpc address from a row and return it untranslated.
-        """
-        addr = None
-        if "rpc_address" in row:
-            addr = row.get("rpc_address")  # peers and local
-        if "native_transport_address" in row:
-            addr = row.get("native_transport_address")
-        if not addr or addr in ["0.0.0.0", "::"]:
-            addr = row.get("peer")
-        return addr
+        Determine the peers query to use.
 
-    def _peers_query_for_version(self, connection, peers_query_template):
-        """
+        :param peers_query_type: Should be one of PeersQueryType enum.
+
+        If _uses_peers_v2 is True, return the proper peers_v2 query (no templating).
+        Else, apply the logic below to choose the peers v1 address column name:
+
         Given a connection:
 
         - find the server product version running on the connection's host,
         - use that to choose the column name for the transport address (see APOLLO-1130), and
         - use that column name in the provided peers query template.
-
-        The provided template should be a string with a format replacement
-        field named nt_col_name.
         """
-        host_release_version = self._cluster.metadata.get_host(connection.endpoint).release_version
-        host_dse_version = self._cluster.metadata.get_host(connection.endpoint).dse_version
-        uses_native_address_query = (
-            host_dse_version and Version(host_dse_version) >= self._MINIMUM_NATIVE_ADDRESS_DSE_VERSION)
+        if peers_query_type not in (self.PeersQueryType.PEERS, self.PeersQueryType.PEERS_SCHEMA):
+            raise ValueError("Invalid peers query type: %s" % peers_query_type)
 
-        if uses_native_address_query:
-            select_peers_query = peers_query_template.format(nt_col_name="native_transport_address")
-        elif host_release_version:
-                select_peers_query = peers_query_template.format(nt_col_name="rpc_address")
+        if self._uses_peers_v2:
+            if peers_query_type == self.PeersQueryType.PEERS:
+                query = self._SELECT_PEERS_V2 if self._token_meta_enabled else self._SELECT_PEERS_NO_TOKENS_V2
+            else:
+                query = self._SELECT_SCHEMA_PEERS_V2
         else:
-            select_peers_query = self._SELECT_PEERS
+            if peers_query_type == self.PeersQueryType.PEERS and self._token_meta_enabled:
+                query = self._SELECT_PEERS
+            else:
+                query_template = (self._SELECT_SCHEMA_PEERS_TEMPLATE
+                                  if peers_query_type == self.PeersQueryType.PEERS_SCHEMA
+                                  else self._SELECT_PEERS_NO_TOKENS_TEMPLATE)
 
-        return select_peers_query
+                host_release_version = self._cluster.metadata.get_host(connection.endpoint).release_version
+                host_dse_version = self._cluster.metadata.get_host(connection.endpoint).dse_version
+                uses_native_address_query = (
+                    host_dse_version and Version(host_dse_version) >= self._MINIMUM_NATIVE_ADDRESS_DSE_VERSION)
+
+                if uses_native_address_query:
+                    query = query_template.format(nt_col_name="native_transport_address")
+                elif host_release_version:
+                    query = query_template.format(nt_col_name="rpc_address")
+                else:
+                    query = self._SELECT_PEERS
+
+        return query
 
     def _signal_error(self):
         with self._lock:
@@ -4190,7 +4235,7 @@ class ResponseFuture(object):
 
     coordinator_host = None
     """
-    The host from which we recieved a response
+    The host from which we received a response
     """
 
     attempted_hosts = None
@@ -4409,7 +4454,9 @@ class ResponseFuture(object):
         except NoConnectionsAvailable as exc:
             log.debug("All connections for host %s are at capacity, moving to the next host", host)
             self._errors[host] = exc
-            return None
+        except ConnectionBusy as exc:
+            log.debug("Connection for host %s is busy, moving to the next host", host)
+            self._errors[host] = exc
         except Exception as exc:
             log.debug("Error querying host %s", host, exc_info=True)
             self._errors[host] = exc
@@ -4417,7 +4464,8 @@ class ResponseFuture(object):
                 self._metrics.on_connection_error()
             if connection:
                 pool.return_connection(connection)
-            return None
+
+        return None
 
     @property
     def has_more_pages(self):

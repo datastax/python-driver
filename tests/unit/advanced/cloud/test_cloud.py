@@ -6,23 +6,29 @@
 # You may obtain a copy of the License at
 #
 # http://www.datastax.com/terms/datastax-dse-driver-license-terms
+import tempfile
+import os
+import shutil
+import six
+
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-import os
-
+from cassandra import DriverException
 from cassandra.datastax import cloud
 
 from mock import patch
 
+from tests import notwindows
 
 class CloudTests(unittest.TestCase):
 
     current_path = os.path.dirname(os.path.abspath(__file__))
+    creds_path = os.path.join(current_path, './creds.zip')
     config_zip = {
-        'secure_connect_bundle': os.path.join(current_path, './creds.zip')
+        'secure_connect_bundle': creds_path
     }
     metadata_json = """
         {"region":"local",
@@ -75,3 +81,33 @@ class CloudTests(unittest.TestCase):
         ]
         for host_id in host_ids:
             self.assertIn(host_id, config.host_ids)
+
+    @notwindows
+    def test_use_default_tempdir(self):
+        tmpdir = tempfile.mkdtemp()
+
+        def clean_tmp_dir():
+            os.chmod(tmpdir, 0o777)
+            shutil.rmtree(tmpdir)
+        self.addCleanup(clean_tmp_dir)
+
+        tmp_creds_path = os.path.join(tmpdir, 'creds.zip')
+        shutil.copyfile(self.creds_path, tmp_creds_path)
+        os.chmod(tmpdir, 0o544)
+        config = {
+            'secure_connect_bundle': tmp_creds_path
+        }
+
+        # The directory is not writtable.. we expect a permission error
+        exc = PermissionError if six.PY3 else OSError
+        with self.assertRaises(exc):
+            cloud.get_cloud_config(config)
+
+        # With use_default_tempdir, we expect an connection refused
+        # since the cluster doesn't exist
+        with self.assertRaises(DriverException):
+            config = {
+                'secure_connect_bundle': tmp_creds_path,
+                'use_default_tempdir': True
+            }
+            cloud.get_cloud_config(config)

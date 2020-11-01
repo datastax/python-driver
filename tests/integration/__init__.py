@@ -77,7 +77,7 @@ def get_server_versions():
     if cass_version is not None:
         return (cass_version, cql_version)
 
-    c = Cluster()
+    c = TestCluster()
     s = c.connect()
     row = s.execute('SELECT cql_version, release_version FROM system.local')[0]
 
@@ -206,33 +206,16 @@ else:
     CCM_KWARGS['version'] = CCM_VERSION
 
 
-#This changes the default contact_point parameter in Cluster
-def set_default_cass_ip():
-    if CASSANDRA_IP.startswith("127.0.0."):
-        return
-    defaults = list(Cluster.__init__.__defaults__)
-    defaults = [[CASSANDRA_IP]] + defaults[1:]
-    try:
-        Cluster.__init__.__defaults__ = tuple(defaults)
-    except:
-        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
-
-
-def set_default_beta_flag_true():
-    defaults = list(Cluster.__init__.__defaults__)
-    defaults = (defaults[:28] + [True] + defaults[29:])
-    try:
-        Cluster.__init__.__defaults__ = tuple(defaults)
-    except:
-        Cluster.__init__.__func__.__defaults__ = tuple(defaults)
+ALLOW_BETA_PROTOCOL = False
 
 
 def get_default_protocol():
-    if CASSANDRA_VERSION >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
             return ProtocolVersion.DSE_V2
         else:
-            set_default_beta_flag_true()
+            global ALLOW_BETA_PROTOCOL
+            ALLOW_BETA_PROTOCOL = True
             return ProtocolVersion.V5
     if CASSANDRA_VERSION >= Version('3.10'):
         if DSE_VERSION:
@@ -261,7 +244,7 @@ def get_supported_protocol_versions():
     4.0(C*) -> 5(beta),4,3
     4.0(DSE) -> DSE_v2, DSE_V1,4,3
 `   """
-    if CASSANDRA_VERSION >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
             return (3, 4, ProtocolVersion.DSE_V1, ProtocolVersion.DSE_V2)
         else:
@@ -300,7 +283,7 @@ def get_unsupported_upper_protocol():
     supported by the version of C* running
     """
 
-    if CASSANDRA_VERSION >= Version('4.0'):
+    if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
             return None
         else:
@@ -348,9 +331,9 @@ greaterthanorequalcass31 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.1
 greaterthanorequalcass36 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.6'), 'Cassandra version 3.6 or greater required')
 greaterthanorequalcass3_10 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.10'), 'Cassandra version 3.10 or greater required')
 greaterthanorequalcass3_11 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.11'), 'Cassandra version 3.11 or greater required')
-greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0'), 'Cassandra version 4.0 or greater required')
-lessthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION <= Version('4.0'), 'Cassandra version less or equal to 4.0 required')
-lessthancass40 = unittest.skipUnless(CASSANDRA_VERSION < Version('4.0'), 'Cassandra version less than 4.0 required')
+greaterthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION >= Version('4.0-a'), 'Cassandra version 4.0 or greater required')
+lessthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION <= Version('4.0-a'), 'Cassandra version less or equal to 4.0 required')
+lessthancass40 = unittest.skipUnless(CASSANDRA_VERSION < Version('4.0-a'), 'Cassandra version less than 4.0 required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
 greaterthanorequaldse68 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.8'), "DSE 6.8 or greater required for this test")
 greaterthanorequaldse67 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.7'), "DSE 6.7 or greater required for this test")
@@ -366,6 +349,7 @@ requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or
                                                "This test is not suitible for environments with large clock granularity")
 requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
 requirecassandra = unittest.skipIf(DSE_VERSION, "Cassandra required")
+notdse = unittest.skipIf(DSE_VERSION, "DSE not supported")
 requiredse = unittest.skipUnless(DSE_VERSION, "DSE required")
 requirescloudproxy = unittest.skipIf(CLOUD_PROXY_PATH is None, "Cloud Proxy path hasn't been specified")
 
@@ -394,6 +378,9 @@ def check_socket_listening(itf, timeout=60):
     return False
 
 
+USE_SINGLE_INTERFACE = os.getenv('USE_SINGLE_INTERFACE', False)
+
+
 def get_cluster():
     return CCM_CLUSTER
 
@@ -406,8 +393,8 @@ def use_multidc(dc_list, workloads=[]):
     use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True, workloads=workloads)
 
 
-def use_singledc(start=True, workloads=[]):
-    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads)
+def use_singledc(start=True, workloads=[], use_single_interface=USE_SINGLE_INTERFACE):
+    use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads, use_single_interface=use_single_interface)
 
 
 def use_single_node(start=True, workloads=[], configuration_options={}, dse_options={}):
@@ -472,11 +459,10 @@ def start_cluster_wait_for_up(cluster):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, set_keyspace=True, ccm_options=None,
-                configuration_options={}, dse_options={}):
+                configuration_options={}, dse_options={}, use_single_interface=USE_SINGLE_INTERFACE):
     dse_cluster = True if DSE_VERSION else False
     if not workloads:
         workloads = []
-    set_default_cass_ip()
 
     if ccm_options is None and DSE_VERSION:
         ccm_options = {"version": CCM_VERSION}
@@ -555,7 +541,18 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                         }
                     })
                 if 'spark' in workloads:
-                    config_options = {"initial_spark_worker_resources": 0.1}
+                    if Version(dse_version) >= Version('6.8'):
+                        config_options = {
+                            "resource_manager_options": {
+                                "worker_options": {
+                                    "cores_total": 0.1,
+                                    "memory_total": "64M"
+                                }
+                            }
+                        }
+                    else:
+                        config_options = {"initial_spark_worker_resources": 0.1}
+
                     if Version(dse_version) >= Version('6.7'):
                         log.debug("Disabling AlwaysON SQL for a DSE 6.7 Cluster")
                         config_options['alwayson_sql_options'] = {'enabled': False}
@@ -579,16 +576,24 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     if Version(cassandra_version) >= Version('3.0'):
                         CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                        if Version(cassandra_version) >= Version('4.0-a'):
+                            CCM_CLUSTER.set_configuration_options({
+                                'enable_materialized_views': True,
+                                'enable_sasi_indexes': True,
+                                'enable_transient_replication': True,
+                            })
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)
-                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat, use_single_interface=use_single_interface)
 
     try:
         jvm_args = []
 
         # This will enable the Mirroring query handler which will echo our custom payload k,v pairs back
 
-        if 'graph' not in workloads:
+        if 'graph' in workloads:
+            jvm_args += ['-Xms1500M', '-Xmx1500M']
+        else:
             if PROTOCOL_VERSION >= 4 and not SCYLLA_VERSION:
                 jvm_args = [" -Dcassandra.custom_query_handler_class=org.apache.cassandra.cql3.CustomPayloadMirroringQueryHandler"]
         if len(workloads) > 0:
@@ -713,9 +718,9 @@ def setup_keyspace(ipformat=None, wait=True, protocol_version=None):
         _protocol_version = PROTOCOL_VERSION
 
     if not ipformat:
-        cluster = Cluster(protocol_version=_protocol_version)
+        cluster = TestCluster(protocol_version=_protocol_version)
     else:
-        cluster = Cluster(contact_points=["::1"], protocol_version=_protocol_version)
+        cluster = TestCluster(contact_points=["::1"], protocol_version=_protocol_version)
     session = cluster.connect()
 
     try:
@@ -809,7 +814,7 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
 
     @classmethod
     def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, **cluster_kwargs):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, **cluster_kwargs)
+        cls.cluster = TestCluster(**cluster_kwargs)
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
@@ -995,3 +1000,19 @@ def assert_startswith(s, prefix):
         raise AssertionError(
             '{} does not start with {}'.format(repr(s), repr(prefix))
         )
+
+
+class TestCluster(object):
+    DEFAULT_PROTOCOL_VERSION = default_protocol_version
+    DEFAULT_CASSANDRA_IP = CASSANDRA_IP
+    DEFAULT_ALLOW_BETA = ALLOW_BETA_PROTOCOL
+
+    def __new__(cls, **kwargs):
+        if 'protocol_version' not in kwargs:
+            kwargs['protocol_version'] = cls.DEFAULT_PROTOCOL_VERSION
+        if 'contact_points' not in kwargs:
+            kwargs['contact_points'] = [cls.DEFAULT_CASSANDRA_IP]
+        if 'allow_beta_protocol_version' not in kwargs:
+            kwargs['allow_beta_protocol_version'] = cls.DEFAULT_ALLOW_BETA
+        return Cluster(**kwargs)
+

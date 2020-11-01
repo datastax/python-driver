@@ -18,7 +18,7 @@ except ImportError:
     import unittest
 
 import os, sys, traceback, logging, ssl, time, math, uuid
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import NoHostAvailable
 from cassandra.connection import DefaultEndPoint
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -26,7 +26,7 @@ from cassandra.query import SimpleStatement
 from OpenSSL import SSL, crypto
 
 from tests.integration import (
-    PROTOCOL_VERSION, get_cluster, remove_cluster, use_single_node, start_cluster_wait_for_up, EVENT_LOOP_MANAGER,
+    get_cluster, remove_cluster, use_single_node, start_cluster_wait_for_up, EVENT_LOOP_MANAGER, TestCluster
 )
 
 if not hasattr(ssl, 'match_hostname'):
@@ -103,9 +103,8 @@ def validate_ssl_options(**kwargs):
             if tries > 5:
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
-                cluster = Cluster(
+                cluster = TestCluster(
                     contact_points=[DefaultEndPoint(hostname)],
-                    protocol_version=PROTOCOL_VERSION,
                     ssl_options=ssl_options,
                     ssl_context=ssl_context
                 )
@@ -185,7 +184,7 @@ class SSLConnectionTests(unittest.TestCase):
             if tries > 5:
                 raise RuntimeError("Failed to connect to SSL cluster after 5 attempts")
             try:
-                cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
+                cluster = TestCluster(ssl_options=ssl_options)
                 session = cluster.connect(wait_for_all_pools=True)
                 break
             except Exception:
@@ -291,8 +290,8 @@ class SSLConnectionAuthTests(unittest.TestCase):
         @test_category connection:ssl
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options={'ca_certs': CLIENT_CA_CERTS,
-                                                                          'ssl_version': ssl_version})
+        cluster = TestCluster(ssl_options={'ca_certs': CLIENT_CA_CERTS,
+                                           'ssl_version': ssl_version})
 
         with self.assertRaises(NoHostAvailable) as _:
             cluster.connect()
@@ -320,10 +319,11 @@ class SSLConnectionAuthTests(unittest.TestCase):
             # I don't set the bad certfile for pyopenssl because it hangs
             ssl_options['certfile'] = DRIVER_CERTFILE_BAD
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
-                          ssl_options={'ca_certs': CLIENT_CA_CERTS,
-                                       'ssl_version': ssl_version,
-                                       'keyfile': DRIVER_KEYFILE})
+        cluster = TestCluster(
+            ssl_options={'ca_certs': CLIENT_CA_CERTS,
+                         'ssl_version': ssl_version,
+                         'keyfile': DRIVER_KEYFILE}
+        )
 
         with self.assertRaises(NoHostAvailable) as _:
             cluster.connect()
@@ -364,7 +364,7 @@ class SSLSocketErrorTests(unittest.TestCase):
         """
         ssl_options = {'ca_certs': CLIENT_CA_CERTS,
                        'ssl_version': ssl_version}
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, ssl_options=ssl_options)
+        cluster = TestCluster(ssl_options=ssl_options)
         session = cluster.connect(wait_for_all_pools=True)
         try:
             session.execute('drop keyspace ssl_error_test')

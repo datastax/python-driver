@@ -14,12 +14,11 @@
 
 from packaging.version import Version
 
-from cassandra.cluster import Cluster
 from tests.integration import (BasicExistingKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicSharedKeyspaceUnitTestCaseRF1,
                                greaterthanorequaldse51, greaterthanorequaldse60,
                                greaterthanorequaldse68, use_single_node,
-                               DSE_VERSION, requiredse, PROTOCOL_VERSION)
+                               DSE_VERSION, requiredse, TestCluster)
 
 try:
     import unittest2 as unittest
@@ -393,4 +392,4 @@ class GraphMetadataSchemaErrorTests(BasicExistingKeyspaceUnitTestCase):
         """ % (self.ks_name,))
 
         self.session.execute('TRUNCATE system_schema.vertices')
-        Cluster(protocol_version=PROTOCOL_VERSION).connect().shutdown()
+        TestCluster().connect().shutdown()

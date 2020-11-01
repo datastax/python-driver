@@ -24,7 +24,8 @@ from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import create_keyspace_simple, drop_keyspace, CQLENG_ALLOW_SCHEMA_MANAGEMENT
 import cassandra
 
-from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION, CASSANDRA_IP, set_default_cass_ip
+from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION, CASSANDRA_IP, ALLOW_BETA_PROTOCOL
+
 DEFAULT_KEYSPACE = 'cqlengine_test'
 
 
@@ -35,7 +36,6 @@ def setup_package():
     warnings.simplefilter('always')  # for testing warnings, make sure all are let through
     os.environ[CQLENG_ALLOW_SCHEMA_MANAGEMENT] = '1'
 
-    set_default_cass_ip()
     use_single_node()
 
     setup_connection(DEFAULT_KEYSPACE)
@@ -55,6 +55,7 @@ def setup_connection(keyspace_name):
     connection.setup([CASSANDRA_IP],
                      consistency=ConsistencyLevel.ONE,
                      protocol_version=PROTOCOL_VERSION,
+                     allow_beta_protocol_version=ALLOW_BETA_PROTOCOL,
                      default_keyspace=keyspace_name)
 
 
