@@ -30,7 +30,7 @@ from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, ConstantReconnectionPolicy
 from cassandra import OperationTimedOut
 
-from tests.integration import use_cluster, get_node
+from tests.integration import use_cluster, get_node, PROTOCOL_VERSION
 
 
 def setup_module():
@@ -41,7 +41,7 @@ def setup_module():
 class TestShardAwareIntegration(unittest.TestCase):
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=4, load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
+        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
                               reconnection_policy=ConstantReconnectionPolicy(1))
         cls.session = cls.cluster.connect()
 
