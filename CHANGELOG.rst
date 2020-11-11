@@ -11,6 +11,7 @@ Features
 Bug Fixes
 ---------
 * Asyncore race condition cause logging exception on shutdown (PYTHON-1266)
+* Update list of reserved keywords (PYTHON-1269)
 
 Others
 ------
