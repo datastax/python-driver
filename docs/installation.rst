@@ -38,7 +38,7 @@ the `graph` requirements::
 
     pip install scylla-driver[graph]
 
-See :doc:`graph_fluent` for more details about this API.
+See :doc:`graph_fluent <graph_fluent>` for more details about this API.
 
 (*Optional*) Compression Support
 --------------------------------

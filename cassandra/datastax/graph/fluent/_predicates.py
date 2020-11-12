@@ -194,8 +194,8 @@ class Geo(object):
         Search any instance of geometry inside the Distance targeted.
         :param value: A Distance to look for.
         :param units: The units for ``value``. See GeoUnit enum. (Can also
-            provide an integer to use as a multiplier to convert ``value`` to
-            degrees.)
+        provide an integer to use as a multiplier to convert ``value`` to
+        degrees.)
         """
         return GeoP.inside(
             value=Distance(x=value.x, y=value.y, radius=value.radius * units)

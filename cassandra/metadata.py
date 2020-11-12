@@ -3287,10 +3287,10 @@ def group_keys_by_replica(session, keyspace, table, keys):
     :class:`~.NO_VALID_REPLICA`
 
     Example usage::
-        result = group_keys_by_replica(
-                     session, "system", "peers",
-                     (("127.0.0.1", ), ("127.0.0.2", ))
-                 )
+        
+        >>> result = group_keys_by_replica(
+        ...     session, "system", "peers",
+        ...     (("127.0.0.1", ), ("127.0.0.2", )))
     """
     cluster = session.cluster
 

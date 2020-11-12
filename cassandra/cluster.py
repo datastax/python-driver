@@ -408,7 +408,7 @@ class ExecutionProfile(object):
 class GraphExecutionProfile(ExecutionProfile):
     graph_options = None
     """
-    :class:`.GraphOptions` to use with this execution
+    :class:`cassandra.graph.GraphOptions` to use with this execution
 
     Default options for graph queries, initialized as follows by default::
 
