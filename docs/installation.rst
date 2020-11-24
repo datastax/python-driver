@@ -38,8 +38,6 @@ the `graph` requirements::
 
     pip install scylla-driver[graph]
 
-See :doc:`graph_fluent <graph_fluent>` for more details about this API.
-
 (*Optional*) Compression Support
 --------------------------------
 Compression can optionally be used for communication between the driver and
