@@ -1,20 +1,15 @@
-DataStax Python Driver for Apache Cassandra
-===========================================
+DataStax Driver for Apache Cassandra
+====================================
 
-.. image:: https://travis-ci.org/datastax/python-driver.png?branch=master
-   :target: https://travis-ci.org/datastax/python-driver
+.. image:: https://travis-ci.com/datastax/python-driver.png?branch=master
+   :target: https://travis-ci.com/github/datastax/python-driver
 
-A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (2.1+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
+A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (2.1+) and
+DataStax Enterprise (4.7+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
 
-The driver supports Python 2.7, 3.3, 3.4, 3.5, and 3.6.
-
-If you require compatibility with DataStax Enterprise, use the `DataStax Enterprise Python Driver <http://docs.datastax.com/en/developer/python-dse-driver/>`_.
+The driver supports Python 2.7, 3.5, 3.6, 3.7 and 3.8.
 
 **Note:** DataStax products do not support big-endian systems.
-
-Feedback Requested
-------------------
-**Help us focus our efforts!** Provide your input on the `Platform and Runtime Survey <https://docs.google.com/a/datastax.com/forms/d/10wkbKLqmqs91gvhFW5u43y60pg_geZDolVNrxfO5_48/viewform>`_ (we kept it short).
 
 Features
 --------
@@ -27,6 +22,10 @@ Features
 * Configurable `load balancing <http://datastax.github.io/python-driver/api/cassandra/policies.html#load-balancing>`_ and `retry policies <http://datastax.github.io/python-driver/api/cassandra/policies.html#retrying-failed-operations>`_
 * `Concurrent execution utilities <http://datastax.github.io/python-driver/api/cassandra/concurrent.html>`_
 * `Object mapper <http://datastax.github.io/python-driver/object_mapper.html>`_
+* `Connecting to DataStax Astra database (cloud) <https://docs.datastax.com/en/developer/python-driver/latest/cloud/>`_
+* DSE Graph execution API
+* DSE Geometric type serialization
+* DSE PlainText and GSSAPI authentication
 
 Installation
 ------------
@@ -69,11 +68,11 @@ Getting Help
 ------------
 Your best options for getting help with the driver are the
 `mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
-and the ``#datastax-drivers`` channel in the `DataStax Academy Slack <https://academy.datastax.com/slack>`_.
+and the `DataStax Community <https://community.datastax.com>`_.
 
 License
 -------
-Copyright 2013-2017 DataStax
+Copyright DataStax, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

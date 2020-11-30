@@ -1,3 +1,374 @@
+3.25.0
+======
+Not released
+
+Features
+--------
+* Ensure the driver can connect when invalid peer hosts are in system.peers (PYTHON-1260)
+* Implement protocol v5 checksumming (PYTHON-1258)
+* Fix the default cqlengine connection mechanism to work with Astra (PYTHON-1265)
+
+Bug Fixes
+---------
+* Asyncore race condition cause logging exception on shutdown (PYTHON-1266)
+* Update list of reserved keywords (PYTHON-1269)
+
+Others
+------
+* Drop Python 3.4 support (PYTHON-1220)
+* Update security documentation and examples to use PROTOCOL_TLS (PYTHON-1264)
+
+3.24.0
+======
+June 18, 2020
+
+Features
+--------
+* Make geomet an optional dependency at runtime (PYTHON-1237)
+* Add use_default_tempdir cloud config options (PYTHON-1245)
+* Tcp flow control for libevreactor (PYTHON-1248)
+
+Bug Fixes
+---------
+* Unable to connect to a cloud cluster using Ubuntu 20.04 (PYTHON-1238)
+* PlainTextAuthProvider fails with unicode chars and Python3 (PYTHON-1241)
+* [GRAPH] Graph execution profiles consistency level are not set to LOCAL_QUORUM with a cloud cluster (PYTHON-1240)
+* [GRAPH] Can't write data in a Boolean field using the Fluent API (PYTHON-1239)
+* [GRAPH] Fix elementMap() result deserialization (PYTHON-1233)
+
+Others
+------
+* Bump geomet dependency version to 0.2 (PYTHON-1243)
+* Bump gremlinpython dependency version to 3.4.6 (PYTHON-1212)
+* Improve fluent graph documentation for core graphs (PYTHON-1244)
+
+3.23.0
+======
+April 6, 2020
+
+Features
+--------
+* Transient Replication Support (PYTHON-1207)
+* Support system.peers_v2 and port discovery for C* 4.0 (PYTHON-700)
+
+Bug Fixes
+---------
+* Asyncore logging exception on shutdown (PYTHON-1228)
+
+3.22.0
+======
+February 26, 2020
+
+Features
+--------
+
+* Add all() function to the ResultSet API (PYTHON-1203)
+* Parse new schema metadata in NGDG and generate table edges CQL syntax (PYTHON-996)
+* Add GraphSON3 support (PYTHON-788)
+* Use GraphSON3 as default for Native graphs (PYTHON-1004)
+* Add Tuple and UDT types for native graph (PYTHON-1005)
+* Add Duration type for native graph (PYTHON-1000)
+* Add gx:ByteBuffer graphson type support for Blob field (PYTHON-1027)
+* Enable Paging Through DSE Driver for Gremlin Traversals (PYTHON-1045)
+* Provide numerical wrappers to ensure proper graphson schema definition (PYTHON-1051)
+* Resolve the row_factory automatically for native graphs (PYTHON-1056)
+* Add g:TraversalMetrics/g:Metrics graph deserializers (PYTHON-1057)
+* Add g:BulkSet graph deserializers (PYTHON-1060)
+* Update Graph Engine names and the way to create a Classic/Native Graph (PYTHON-1090)
+* Update Native to Core Graph Engine
+* Add graphson3 and native graph support (PYTHON-1039)
+* Enable Paging Through DSE Driver for Gremlin Traversals (PYTHON-1045)
+* Expose filter predicates for cql collections (PYTHON-1019)
+* Add g:TraversalMetrics/Metrics deserializers (PYTHON-1057)
+* Make graph metadata handling more robust (PYTHON-1204)
+
+Bug Fixes
+---------
+* Make sure to only query the native_transport_address column with DSE (PYTHON-1205)
+
+3.21.0
+======
+January 15, 2020
+
+Features
+--------
+* Unified driver: merge core and DSE drivers into a single package (PYTHON-1130)
+* Add Python 3.8 support (PYTHON-1189)
+* Allow passing ssl context for Twisted (PYTHON-1161)
+* Ssl context and cloud support for Eventlet (PYTHON-1162)
+* Cloud Twisted support (PYTHON-1163)
+* Add additional_write_policy and read_repair to system schema parsing (PYTHON-1048)
+* Flexible version parsing (PYTHON-1174)
+* Support NULL in collection deserializer (PYTHON-1123)
+* [GRAPH] Ability to execute Fluent Graph queries asynchronously (PYTHON-1129)
+
+Bug Fixes
+---------
+* Handle prepared id mismatch when repreparing on the fly (PYTHON-1124)
+* re-raising the CQLEngineException will fail on Python 3 (PYTHON-1166)
+* asyncio message chunks can be processed discontinuously (PYTHON-1185)
+* Reconnect attempts persist after downed node removed from peers (PYTHON-1181)
+* Connection fails to validate ssl certificate hostname when SSLContext.check_hostname is set (PYTHON-1186)
+* ResponseFuture._set_result crashes on connection error when used with PrepareMessage (PYTHON-1187)
+* Insights fail to serialize the startup message when the SSL Context is from PyOpenSSL (PYTHON-1192)
+
+Others
+------
+* The driver has a new dependency: geomet. It comes from the dse-driver unification and
+  is used to support DSE geo types.
+* Remove *read_repair_chance table options (PYTHON-1140)
+* Avoid warnings about unspecified load balancing policy when connecting to a cloud cluster (PYTHON-1177)
+* Add new DSE CQL keywords (PYTHON-1122)
+* Publish binary wheel distributions (PYTHON-1013)
+
+Deprecations
+------------
+
+* DSELoadBalancingPolicy will be removed in the next major, consider using
+  the DefaultLoadBalancingPolicy.
+
+Merged from dse-driver:
+
+Features
+--------
+
+* Insights integration (PYTHON-1047)
+* Graph execution profiles should preserve their graph_source when graph_options is overridden (PYTHON-1021)
+* Add NodeSync metadata (PYTHON-799)
+* Add new NodeSync failure values (PYTHON-934)
+* DETERMINISTIC and MONOTONIC Clauses for Functions and Aggregates (PYTHON-955)
+* GraphOptions should show a warning for unknown parameters (PYTHON-819)
+* DSE protocol version 2 and continous paging backpressure (PYTHON-798)
+* GraphSON2 Serialization/Deserialization Support (PYTHON-775)
+* Add graph-results payload option for GraphSON format (PYTHON-773)
+* Create an AuthProvider for the DSE transitional mode (PYTHON-831)
+* Implement serializers for the Graph String API (PYTHON-778)
+* Provide deserializers for GraphSON types (PYTHON-782)
+* Add Graph DurationType support (PYTHON-607)
+* Support DSE DateRange type (PYTHON-668)
+* RLAC CQL output for materialized views (PYTHON-682)
+* Add Geom Types wkt deserializer
+* DSE Graph Client timeouts in custom payload (PYTHON-589)
+* Make DSEGSSAPIAuthProvider accept principal name (PYTHON-574)
+* Add config profiles to DSE graph execution (PYTHON-570)
+* DSE Driver version checking (PYTHON-568)
+* Distinct default timeout for graph queries (PYTHON-477)
+* Graph result parsing for known types (PYTHON-479,487)
+* Distinct read/write CL for graph execution (PYTHON-509)
+* Target graph analytics query to spark master when available (PYTHON-510)
+
+Bug Fixes
+---------
+
+* Continuous paging sessions raise RuntimeError when results are not entirely consumed (PYTHON-1054)
+* GraphSON Property deserializer should return a dict instead of a set (PYTHON-1033)
+* ResponseFuture.has_more_pages may hold the wrong value (PYTHON-946)
+* DETERMINISTIC clause in AGGREGATE misplaced in CQL generation (PYTHON-963)
+* graph module import cause a DLL issue on Windows due to its cythonizing failure (PYTHON-900)
+* Update date serialization to isoformat in graph (PYTHON-805)
+* DateRange Parse Error (PYTHON-729)
+* MontonicTimestampGenerator.__init__ ignores class defaults (PYTHON-728)
+* metadata.get_host returning None unexpectedly (PYTHON-709)
+* Sockets associated with sessions not getting cleaned up on session.shutdown() (PYTHON-673)
+* Resolve FQDN from ip address and use that as host passed to SASLClient (PYTHON-566)
+* Geospatial type implementations don't handle 'EMPTY' values. (PYTHON-481)
+* Correctly handle other types in geo type equality (PYTHON-508)
+
+Other
+-----
+* Add tests around cqlengine and continuous paging (PYTHON-872)
+* Add an abstract GraphStatement to handle different graph statements  (PYTHON-789)
+* Write documentation examples for DSE 2.0 features (PYTHON-732)
+* DSE_V1 protocol should not include all of protocol v5 (PYTHON-694)
+
+3.20.2
+======
+November 19, 2019
+
+Bug Fixes
+---------
+* Fix import error for old python installation without SSLContext (PYTHON-1183)
+
+3.20.1
+======
+November 6, 2019
+
+Bug Fixes
+---------
+* ValueError: too many values to unpack (expected 2)" when there are two dashes in server version number (PYTHON-1172)
+
+3.20.0
+======
+October 28, 2019
+
+Features
+--------
+* DataStax Astra Support (PYTHON-1074)
+* Use 4.0 schema parser in 4 alpha and snapshot builds (PYTHON-1158)
+
+Bug Fixes
+---------
+* Connection setup methods prevent using ExecutionProfile in cqlengine (PYTHON-1009)
+* Driver deadlock if all connections dropped by heartbeat whilst request in flight and request times out (PYTHON-1044)
+* Exception when use pk__token__gt filter In python 3.7 (PYTHON-1121)
+
+3.19.0
+======
+August 26, 2019
+
+Features
+--------
+* Add Python 3.7 support (PYTHON-1016)
+* Future-proof Mapping imports (PYTHON-1023)
+* Include param values in cqlengine logging (PYTHON-1105)
+* NTS Token Replica Map Generation is slow (PYTHON-622)
+
+Bug Fixes
+---------
+* as_cql_query UDF/UDA parameters incorrectly includes "frozen" if arguments are collections (PYTHON-1031)
+* cqlengine does not currently support combining TTL and TIMESTAMP on INSERT (PYTHON-1093)
+* Fix incorrect metadata for compact counter tables (PYTHON-1100)
+* Call ConnectionException with correct kwargs (PYTHON-1117)
+* Can't connect to clusters built from source because version parsing doesn't handle 'x.y-SNAPSHOT' (PYTHON-1118)
+* Discovered node doesn´t honor the configured Cluster port on connection (PYTHON-1127)
+* Exception when use pk__token__gt filter In python 3.7 (PYTHON-1121)
+
+Other
+-----
+* Remove invalid warning in set_session when we initialize a default connection (PYTHON-1104)
+* Set the proper default ExecutionProfile.row_factory value (PYTHON-1119)
+
+3.18.0
+======
+May 27, 2019
+
+Features
+--------
+
+* Abstract Host Connection information (PYTHON-1079)
+* Improve version parsing to support a non-integer 4th component (PYTHON-1091)
+* Expose on_request_error method in the RetryPolicy (PYTHON-1064)
+* Add jitter to ExponentialReconnectionPolicy (PYTHON-1065)
+
+Bug Fixes
+---------
+
+* Fix error when preparing queries with beta protocol v5 (PYTHON-1081)
+* Accept legacy empty strings as column names (PYTHON-1082)
+* Let util.SortedSet handle uncomparable elements (PYTHON-1087)
+
+3.17.1
+======
+May 2, 2019
+
+Bug Fixes
+---------
+* Socket errors EAGAIN/EWOULDBLOCK are not handled properly and cause timeouts (PYTHON-1089)
+
+3.17.0
+======
+February 19, 2019
+
+Features
+--------
+* Send driver name and version in startup message (PYTHON-1068)
+* Add Cluster ssl_context option to enable SSL (PYTHON-995)
+* Allow encrypted private keys for 2-way SSL cluster connections (PYTHON-995)
+* Introduce new method ConsistencyLevel.is_serial (PYTHON-1067)
+* Add Session.get_execution_profile (PYTHON-932)
+* Add host kwarg to Session.execute/execute_async APIs to send a query to a specific node (PYTHON-993)
+
+Bug Fixes
+---------
+* NoHostAvailable when all hosts are up and connectable (PYTHON-891)
+* Serial consistency level is not used (PYTHON-1007)
+
+Other
+-----
+* Fail faster on incorrect lz4 import (PYTHON-1042)
+* Bump Cython dependency version to 0.29 (PYTHON-1036)
+* Expand Driver SSL Documentation (PYTHON-740)
+
+Deprecations
+------------
+
+* Using Cluster.ssl_options to enable SSL is deprecated and will be removed in
+  the next major release, use ssl_context.
+* DowngradingConsistencyRetryPolicy is deprecated and will be
+  removed in the next major release. (PYTHON-937)
+
+3.16.0
+======
+November 12, 2018
+
+Bug Fixes
+---------
+* Improve and fix socket error-catching code in nonblocking-socket reactors (PYTHON-1024)
+* Non-ASCII characters in schema break CQL string generation (PYTHON-1008)
+* Fix OSS driver's virtual table support against DSE 6.0.X and future server releases (PYTHON-1020)
+* ResultSet.one() fails if the row_factory is using a generator (PYTHON-1026)
+* Log profile name on attempt to create existing profile (PYTHON-944)
+* Cluster instantiation fails if any contact points' hostname resolution fails (PYTHON-895)
+
+Other
+-----
+* Fix tests when RF is not maintained if we decomission a node (PYTHON-1017)
+* Fix wrong use of ResultSet indexing (PYTHON-1015)
+
+3.15.1
+======
+September 6, 2018
+
+Bug Fixes
+---------
+* C* 4.0 schema-parsing logic breaks running against DSE 6.0.X (PYTHON-1018)
+
+3.15.0
+======
+August 30, 2018
+
+Features
+--------
+* Parse Virtual Keyspace Metadata (PYTHON-992)
+
+Bug Fixes
+---------
+* Tokenmap.get_replicas returns the wrong value if token coincides with the end of the range (PYTHON-978)
+* Python Driver fails with "more than 255 arguments" python exception when > 255 columns specified in query response (PYTHON-893)
+* Hang in integration.standard.test_cluster.ClusterTests.test_set_keyspace_twice (PYTHON-998)
+* Asyncore reactors should use a global variable instead of a class variable for the event loop (PYTHON-697)
+
+Other
+-----
+* Use global variable for libev loops so it can be subclassed (PYTHON-973)
+* Update SchemaParser for V4 (PYTHON-1006)
+* Bump Cython dependency version to 0.28 (PYTHON-1012)
+
+3.14.0
+======
+April 17, 2018
+
+Features
+--------
+* Add one() function to the ResultSet API (PYTHON-947)
+* Create an utility function to fetch concurrently many keys from the same replica (PYTHON-647)
+* Allow filter queries with fields that have an index managed outside of cqlengine (PYTHON-966)
+* Twisted SSL Support (PYTHON-343)
+* Support IS NOT NULL operator in cqlengine (PYTHON-968)
+
+Other
+-----
+* Fix Broken Links in Docs (PYTHON-916)
+* Reevaluate MONKEY_PATCH_LOOP in test codebase (PYTHON-903)
+* Remove CASS_SERVER_VERSION and replace it for CASSANDRA_VERSION in tests (PYTHON-910)
+* Refactor CASSANDRA_VERSION to a some kind of version object (PYTHON-915)
+* Log warning when driver configures an authenticator, but server does not request authentication (PYTHON-940)
+* Warn users when using the deprecated Session.default_consistency_level (PYTHON-953)
+* Add DSE smoke test to OSS driver tests (PYTHON-894)
+* Document long compilation times and workarounds (PYTHON-868)
+* Improve error for batch WriteTimeouts (PYTHON-941)
+* Deprecate ResultSet indexing (PYTHON-945)
+
 3.13.0
 ======
 January 30, 2018
@@ -14,6 +385,7 @@ Bug Fixes
 * __del__ method in Session is throwing an exception (PYTHON-813)
 * LZ4 import issue with recent versions (PYTHON-897)
 * ResponseFuture._connection can be None when returning request_id (PYTHON-853)
+* ResultSet.was_applied doesn't support batch with LWT statements (PYTHON-848)
 
 Other
 -----

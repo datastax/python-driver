@@ -17,20 +17,22 @@ except ImportError:
     import unittest  # noqa
 
 from cassandra import OperationTimedOut, WriteTimeout
-from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture
+from cassandra.cluster import Cluster, ExecutionProfile, ResponseFuture, EXEC_PROFILE_DEFAULT, NoHostAvailable
 from cassandra.query import SimpleStatement
 from cassandra.policies import ConstantSpeculativeExecutionPolicy, RoundRobinPolicy, RetryPolicy, WriteType
+from cassandra.protocol import OverloadedErrorMessage, IsBootstrappingErrorMessage, TruncateError, ServerError
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass21, requiressimulacron, SIMULACRON_JAR, \
+from tests.integration import greaterthancass21, requiressimulacron, SIMULACRON_JAR, \
     CASSANDRA_VERSION
+from tests.integration.simulacron import PROTOCOL_VERSION
 from tests.integration.simulacron.utils import start_and_prime_singledc, prime_query, \
     stop_simulacron, NO_THEN, clear_queries
 
 from itertools import count
+from packaging.version import Version
 
 
 class BadRoundRobinPolicy(RoundRobinPolicy):
-
     def make_query_plan(self, working_keyspace=None, query=None):
         pos = self._position
         self._position += 1
@@ -48,7 +50,7 @@ class SpecExecTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
 
         start_and_prime_singledc()
@@ -73,7 +75,7 @@ class SpecExecTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
 
         cls.cluster.shutdown()
@@ -182,7 +184,7 @@ class SpecExecTest(unittest.TestCase):
         spec = ExecutionProfile(load_balancing_policy=RoundRobinPolicy(),
                                 speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0, number_of_requests))
 
-        cluster = Cluster()
+        cluster = Cluster(compression=False)
         cluster.add_execution_profile("spec", spec)
         session = cluster.connect(wait_for_all_pools=True)
         self.addCleanup(cluster.shutdown)
@@ -192,7 +194,6 @@ class SpecExecTest(unittest.TestCase):
         def patch_and_count(f):
             def patched(*args, **kwargs):
                 next(counter)
-                print("patched")
                 f(*args, **kwargs)
             return patched
 
@@ -224,6 +225,7 @@ class CounterRetryPolicy(RetryPolicy):
         self.write_timeout = count()
         self.read_timeout = count()
         self.unavailable = count()
+        self.request_error = count()
 
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
@@ -239,28 +241,44 @@ class CounterRetryPolicy(RetryPolicy):
         next(self.unavailable)
         return self.IGNORE, None
 
+    def on_request_error(self, query, consistency, error, retry_num):
+        next(self.request_error)
+        return self.RETHROW, None
+
     def reset_counters(self):
         self.write_timeout = count()
         self.read_timeout = count()
         self.unavailable = count()
+        self.request_error = count()
 
 
 @requiressimulacron
 class RetryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
         start_and_prime_singledc()
 
     @classmethod
     def tearDownClass(cls):
-        if SIMULACRON_JAR is None or CASSANDRA_VERSION < "2.1":
+        if SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
             return
         stop_simulacron()
 
     def tearDown(self):
         clear_queries()
+
+    def set_cluster(self, retry_policy):
+        self.cluster = Cluster(
+            protocol_version=PROTOCOL_VERSION,
+            compression=False,
+            execution_profiles={
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=retry_policy)
+            },
+        )
+        self.session = self.cluster.connect(wait_for_all_pools=True)
+        self.addCleanup(self.cluster.shutdown)
 
     def test_retry_policy_ignores_and_rethrows(self):
         """
@@ -287,12 +305,13 @@ class RetryPolicyTests(unittest.TestCase):
             "write_type": "SIMPLE",
             "ignore_on_prepare": True
           }
-        prime_query(query_to_prime_simple, then=then, rows=None, column_types=None)
+        prime_query(query_to_prime_simple, rows=None, column_types=None, then=then)
         then["write_type"] = "CDC"
-        prime_query(query_to_prime_cdc, then=then, rows=None, column_types=None)
+        prime_query(query_to_prime_cdc, rows=None, column_types=None, then=then)
 
         with self.assertRaises(WriteTimeout):
             self.session.execute(query_to_prime_simple)
+
         #CDC should be ignored
         self.session.execute(query_to_prime_cdc)
 
@@ -377,8 +396,69 @@ class RetryPolicyTests(unittest.TestCase):
         self.session.execute(bound_stmt)
         self.assertEqual(next(counter_policy.write_timeout), 1)
 
-    def set_cluster(self, retry_policy):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
-                          default_retry_policy=retry_policy)
-        self.session = self.cluster.connect(wait_for_all_pools=True)
-        self.addCleanup(self.cluster.shutdown)
+    def test_retry_policy_on_request_error(self):
+        """
+        Test to verify that on_request_error is called properly.
+
+        @since 3.18
+        @jira_ticket PYTHON-1064
+        @expected_result the appropriate retry policy is called
+
+        @test_category connection
+        """
+        overloaded_error = {
+            "result": "overloaded",
+            "message": "overloaded"
+        }
+
+        bootstrapping_error = {
+            "result": "is_bootstrapping",
+            "message": "isbootstrapping"
+        }
+
+        truncate_error = {
+            "result": "truncate_error",
+            "message": "truncate_error"
+        }
+
+        server_error = {
+            "result": "server_error",
+            "message": "server_error"
+        }
+
+        # Test the on_request_error call
+        retry_policy = CounterRetryPolicy()
+        self.set_cluster(retry_policy)
+
+        for prime_error, exc in [
+            (overloaded_error, OverloadedErrorMessage),
+            (bootstrapping_error, IsBootstrappingErrorMessage),
+            (truncate_error, TruncateError),
+            (server_error, ServerError)]:
+
+            clear_queries()
+            query_to_prime = "SELECT * from simulacron_keyspace.simulacron_table;"
+            prime_query(query_to_prime, then=prime_error, rows=None, column_types=None)
+            rf = self.session.execute_async(query_to_prime)
+
+            with self.assertRaises(exc):
+                rf.result()
+
+            self.assertEqual(len(rf.attempted_hosts), 1)  # no retry
+
+        self.assertEqual(next(retry_policy.request_error), 4)
+
+        # Test that by default, retry on next host
+        retry_policy = RetryPolicy()
+        self.set_cluster(retry_policy)
+
+        for e in [overloaded_error, bootstrapping_error, truncate_error, server_error]:
+            clear_queries()
+            query_to_prime = "SELECT * from simulacron_keyspace.simulacron_table;"
+            prime_query(query_to_prime, then=e, rows=None, column_types=None)
+            rf = self.session.execute_async(query_to_prime)
+
+            with self.assertRaises(NoHostAvailable):
+                rf.result()
+
+            self.assertEqual(len(rf.attempted_hosts), 3)  # all 3 nodes failed

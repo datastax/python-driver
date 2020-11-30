@@ -18,6 +18,7 @@ except ImportError:
 
 import mock
 import logging
+from packaging.version import Version
 from cassandra.cqlengine.connection import get_session, get_cluster
 from cassandra.cqlengine import CQLEngineException
 from cassandra.cqlengine import management
@@ -25,11 +26,14 @@ from cassandra.cqlengine.management import _get_table_metadata, sync_table, drop
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import PROTOCOL_VERSION, greaterthancass20, MockLoggingHandler, CASSANDRA_VERSION
+from tests.integration import DSE_VERSION, PROTOCOL_VERSION, greaterthancass20, MockLoggingHandler, CASSANDRA_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 from cassandra.cqlengine.usertype import UserType
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
+
+
+INCLUDE_REPAIR = not CASSANDRA_VERSION >= Version('4-a')  # This should cover DSE 6.0+
 
 
 class KeyspaceManagementTest(BaseCassEngTestCase):
@@ -205,9 +209,13 @@ class ModelWithTableProperties(Model):
 
     __options__ = {'bloom_filter_fp_chance': '0.76328',
                    'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
-                   'gc_grace_seconds': '2063',
-                   'read_repair_chance': '0.17985',
-                   'dclocal_read_repair_chance': '0.50811'}
+                   'gc_grace_seconds': '2063'}
+
+    if INCLUDE_REPAIR:
+        __options__.update(
+            {'read_repair_chance': '0.17985',
+             'dclocal_read_repair_chance': '0.50811'}
+        )
 
     key = columns.UUID(primary_key=True)
 
@@ -223,13 +231,15 @@ class TablePropertiesTests(BaseCassEngTestCase):
         expected = {'bloom_filter_fp_chance': 0.76328,
                     'comment': 'TxfguvBdzwROQALmQBOziRMbkqVGFjqcJfVhwGR',
                     'gc_grace_seconds': 2063,
-                    'read_repair_chance': 0.17985,
                      # For some reason 'dclocal_read_repair_chance' in CQL is called
                      #  just 'local_read_repair_chance' in the schema table.
                      #  Source: https://issues.apache.org/jira/browse/CASSANDRA-6717
                      #  TODO: due to a bug in the native driver i'm not seeing the local read repair chance show up
                      # 'local_read_repair_chance': 0.50811,
                     }
+        if INCLUDE_REPAIR:
+            expected.update({'read_repair_chance': 0.17985})
+
         options = management._get_table_metadata(ModelWithTableProperties).options
         self.assertEqual(dict([(k, options.get(k)) for k in expected.keys()]),
                          expected)
@@ -239,8 +249,9 @@ class TablePropertiesTests(BaseCassEngTestCase):
         ModelWithTableProperties.__options__['comment'] = 'xirAkRWZVVvsmzRvXamiEcQkshkUIDINVJZgLYSdnGHweiBrAiJdLJkVohdRy'
         ModelWithTableProperties.__options__['gc_grace_seconds'] = 96362
 
-        ModelWithTableProperties.__options__['read_repair_chance'] = 0.2989
-        ModelWithTableProperties.__options__['dclocal_read_repair_chance'] = 0.12732
+        if INCLUDE_REPAIR:
+            ModelWithTableProperties.__options__['read_repair_chance'] = 0.2989
+            ModelWithTableProperties.__options__['dclocal_read_repair_chance'] = 0.12732
 
         sync_table(ModelWithTableProperties)
 
@@ -358,7 +369,7 @@ class InconsistentTable(BaseCassEngTestCase):
         sync_table(BaseInconsistent)
         sync_table(ChangedInconsistent)
         self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
-        if CASSANDRA_VERSION >= '2.1':
+        if CASSANDRA_VERSION >= Version('2.1'):
             sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
             mock_handler.reset()
             sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)

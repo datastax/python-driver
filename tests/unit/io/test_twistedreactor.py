@@ -18,6 +18,8 @@ except ImportError:
     import unittest
 from mock import Mock, patch
 
+from cassandra.connection import DefaultEndPoint
+
 try:
     from twisted.test import proto_helpers
     from twisted.python.failure import Failure
@@ -63,9 +65,7 @@ class TestTwistedProtocol(unittest.TestCase):
         self.tr = proto_helpers.StringTransportWithDisconnection()
         self.tr.connector = Mock()
         self.mock_connection = Mock()
-        self.tr.connector.factory = twistedreactor.TwistedConnectionClientFactory(
-            self.mock_connection)
-        self.obj_ut = twistedreactor.TwistedConnectionProtocol()
+        self.obj_ut = twistedreactor.TwistedConnectionProtocol(self.mock_connection)
         self.tr.protocol = self.obj_ut
 
     def tearDown(self):
@@ -90,32 +90,6 @@ class TestTwistedProtocol(unittest.TestCase):
         self.mock_connection._iobuf.write.assert_called_with("foobar")
 
 
-class TestTwistedClientFactory(unittest.TestCase):
-    def setUp(self):
-        if twistedreactor is None:
-            raise unittest.SkipTest("Twisted libraries not available")
-        twistedreactor.TwistedConnection.initialize_reactor()
-        self.mock_connection = Mock()
-        self.obj_ut = twistedreactor.TwistedConnectionClientFactory(
-            self.mock_connection)
-
-    def test_client_connection_failed(self):
-        """
-        Verify that connection failed causes the connection object to close.
-        """
-        exc = Exception('a test')
-        self.obj_ut.clientConnectionFailed(None, Failure(exc))
-        self.mock_connection.defunct.assert_called_with(exc)
-
-    def test_client_connection_lost(self):
-        """
-        Verify that connection lost causes the connection object to close.
-        """
-        exc = Exception('a test')
-        self.obj_ut.clientConnectionLost(None, Failure(exc))
-        self.mock_connection.defunct.assert_called_with(exc)
-
-
 class TestTwistedConnection(unittest.TestCase):
     def setUp(self):
         if twistedreactor is None:
@@ -126,7 +100,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.reactor_run_patcher = patch('twisted.internet.reactor.run')
         self.mock_reactor_cft = self.reactor_cft_patcher.start()
         self.mock_reactor_run = self.reactor_run_patcher.start()
-        self.obj_ut = twistedreactor.TwistedConnection('1.2.3.4',
+        self.obj_ut = twistedreactor.TwistedConnection(DefaultEndPoint('1.2.3.4'),
                                                        cql_version='3.0.1')
 
     def tearDown(self):
@@ -141,22 +115,13 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut._loop._cleanup()
         self.mock_reactor_run.assert_called_with(installSignalHandlers=False)
 
-    @patch('twisted.internet.reactor.connectTCP')
-    def test_add_connection(self, mock_connectTCP):
-        """
-        Verify that add_connection() gives us a valid twisted connector.
-        """
-        self.obj_ut.add_connection()
-        self.assertTrue(self.obj_ut.connector is not None)
-        self.assertTrue(mock_connectTCP.called)
-
     def test_client_connection_made(self):
         """
         Verifiy that _send_options_message() is called in
         client_connection_made()
         """
         self.obj_ut._send_options_message = Mock()
-        self.obj_ut.client_connection_made()
+        self.obj_ut.client_connection_made(Mock())
         self.obj_ut._send_options_message.assert_called_with()
 
     @patch('twisted.internet.reactor.connectTCP')
@@ -164,11 +129,13 @@ class TestTwistedConnection(unittest.TestCase):
         """
         Verify that close() disconnects the connector and errors callbacks.
         """
+        transport = Mock()
         self.obj_ut.error_all_requests = Mock()
         self.obj_ut.add_connection()
+        self.obj_ut.client_connection_made(transport)
         self.obj_ut.is_closed = False
         self.obj_ut.close()
-        self.obj_ut.connector.disconnect.assert_called_with()
+
         self.assertTrue(self.obj_ut.connected_event.is_set())
         self.assertTrue(self.obj_ut.error_all_requests.called)
 
@@ -181,12 +148,12 @@ class TestTwistedConnection(unittest.TestCase):
         # incomplete header
         self.obj_ut._iobuf.write(b'\x84\x00\x00\x00\x00')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), b'\x84\x00\x00\x00\x00')
+        self.assertEqual(self.obj_ut._io_buffer.cql_frame_buffer.getvalue(), b'\x84\x00\x00\x00\x00')
 
         # full header, but incomplete body
         self.obj_ut._iobuf.write(b'\x00\x00\x00\x15')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(),
+        self.assertEqual(self.obj_ut._io_buffer.cql_frame_buffer.getvalue(),
                          b'\x84\x00\x00\x00\x00\x00\x00\x00\x15')
         self.assertEqual(self.obj_ut._current_frame.end_pos, 30)
 
@@ -207,7 +174,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut._iobuf.write(
             b'\x84\x01\x00\x02\x03\x00\x00\x00\x15' + body + extra)
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), extra)
+        self.assertEqual(self.obj_ut._io_buffer.cql_frame_buffer.getvalue(), extra)
         self.obj_ut.process_msg.assert_called_with(
             _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos=9 + len(body)), body)
 
@@ -217,6 +184,8 @@ class TestTwistedConnection(unittest.TestCase):
         Verifiy that push() calls transport.write(data).
         """
         self.obj_ut.add_connection()
+        transport_mock = Mock()
+        self.obj_ut.transport = transport_mock
         self.obj_ut.push('123 pickup')
         self.mock_reactor_cft.assert_called_with(
-            self.obj_ut.connector.transport.write, '123 pickup')
+            transport_mock.write, '123 pickup')

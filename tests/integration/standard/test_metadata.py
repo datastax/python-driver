@@ -17,37 +17,47 @@ try:
 except ImportError:
     import unittest  # noqa
 
+from collections import defaultdict
 import difflib
+import logging
 import six
 import sys
 import time
+import os
+from packaging.version import Version
 from mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
-from cassandra.cluster import Cluster
 from cassandra.encoder import Encoder
-from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate,  protect_name, protect_names,
-                                RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,)
+from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate, protect_name, protect_names,
+                                RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,
+                                group_keys_by_replica, NO_VALID_REPLICA)
+from cassandra.util import SortedSet
 
-from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, get_server_versions, execute_until_pass,
+from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
-                               get_supported_protocol_versions, greaterthanorequalcass30, lessthancass30, local)
+                               greaterthanorequaldse51, greaterthanorequalcass30, lessthancass30, local,
+                               get_supported_protocol_versions, greaterthancass20,
+                               greaterthancass21, assert_startswith, greaterthanorequalcass40,
+                               greaterthanorequaldse67, lessthancass40,
+                               TestCluster, DSE_VERSION)
 
-from tests.integration import greaterthancass21
+
+log = logging.getLogger(__name__)
+
 
 def setup_module():
     use_singledc()
-    global CASS_SERVER_VERSION
-    CASS_SERVER_VERSION = get_server_versions()[0]
 
 
-class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
+class HostMetaDataTests(BasicExistingKeyspaceUnitTestCase):
     @local
-    def test_broadcast_listen_address(self):
+    def test_host_addresses(self):
         """
-        Check to ensure that the broadcast and listen adresss is populated correctly
+        Check to ensure that the broadcast_address, broadcast_rpc_address,
+        listen adresss, ports and host are is populated correctly.
 
         @since 3.3
         @jira_ticket PYTHON-332
@@ -55,15 +65,30 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        # All nodes should have the broadcast_address set
+        # All nodes should have the broadcast_address, rpc_address and host_id set
         for host in self.cluster.metadata.all_hosts():
             self.assertIsNotNone(host.broadcast_address)
+            self.assertIsNotNone(host.broadcast_rpc_address)
+            self.assertIsNotNone(host.host_id)
+
+            if not DSE_VERSION and CASSANDRA_VERSION >= Version('4-a'):
+                self.assertIsNotNone(host.broadcast_port)
+                self.assertIsNotNone(host.broadcast_rpc_port)
+
         con = self.cluster.control_connection.get_connections()[0]
         local_host = con.host
+
         # The control connection node should have the listen address set.
         listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
         self.assertTrue(local_host in listen_addrs)
 
+        # The control connection node should have the broadcast_rpc_address set.
+        rpc_addrs = [host.broadcast_rpc_address for host in self.cluster.metadata.all_hosts()]
+        self.assertTrue(local_host in rpc_addrs)
+
+    @unittest.skipUnless(
+        os.getenv('MAPPED_CASSANDRA_VERSION', None) is not None,
+        "Don't check the host version for test-dse")
     def test_host_release_version(self):
         """
         Checks the hosts release version and validates that it is equal to the
@@ -76,13 +101,15 @@ class HostMetatDataTests(BasicExistingKeyspaceUnitTestCase):
         @test_category metadata
         """
         for host in self.cluster.metadata.all_hosts():
-            self.assertTrue(host.release_version.startswith(CASSANDRA_VERSION))
+            assert_startswith(host.release_version, CASSANDRA_VERSION.base_version)
+
+
 
 @local
 class MetaDataRemovalTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1','127.0.0.2', '127.0.0.3', '126.0.0.186'])
+        self.cluster = TestCluster(contact_points=['127.0.0.1', '127.0.0.2', '127.0.0.3', '126.0.0.186'])
         self.cluster.connect()
 
     def tearDown(self):
@@ -116,11 +143,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
         # Validate metadata is missing where appropriate
-        no_schema = Cluster(schema_metadata_enabled=False)
+        no_schema = TestCluster(schema_metadata_enabled=False)
         no_schema_session = no_schema.connect()
         self.assertEqual(len(no_schema.metadata.keyspaces), 0)
         self.assertEqual(no_schema.metadata.export_schema_as_string(), '')
-        no_token = Cluster(token_metadata_enabled=False)
+        no_token = TestCluster(token_metadata_enabled=False)
         no_token_session = no_token.connect()
         self.assertEqual(len(no_token.metadata.token_map.token_to_host_owner), 0)
 
@@ -206,7 +233,12 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual([u'a', u'b', u'c'], sorted(tablemeta.columns.keys()))
 
         cc = self.cluster.control_connection._connection
-        parser = get_schema_parser(cc, str(CASS_SERVER_VERSION[0]), 1)
+        parser = get_schema_parser(
+            cc,
+            self.cluster.metadata.get_host(cc.host).release_version,
+            self.cluster.metadata.get_host(cc.host).dse_version,
+            1
+        )
 
         for option in tablemeta.options:
             self.assertIn(option, parser.recognized_table_options)
@@ -343,9 +375,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         self.check_create_statement(tablemeta, create_statement)
 
+    @lessthancass30
     def test_cql_compatibility(self):
-        if CASS_SERVER_VERSION >= (3, 0):
-            raise unittest.SkipTest("cql compatibility does not apply Cassandra 3.0+")
 
         # having more than one non-PK column is okay if there aren't any
         # clustering columns
@@ -387,6 +418,57 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         tablemeta = self.get_table_metadata()
         self.check_create_statement(tablemeta, create_statement)
 
+    @lessthancass40
+    def test_compact_storage(self):
+        create_statement = self.make_create_statement(["a"], [], ["b"])
+        create_statement += " WITH COMPACT STORAGE"
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    @lessthancass40
+    def test_dense_compact_storage(self):
+        create_statement = self.make_create_statement(["a"], ["b"], ["c"])
+        create_statement += " WITH COMPACT STORAGE"
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    def test_counter(self):
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text PRIMARY KEY, a1 counter)"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    @lessthancass40
+    def test_counter_with_compact_storage(self):
+        """ PYTHON-1100 """
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text PRIMARY KEY, a1 counter) WITH COMPACT STORAGE"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
+    @lessthancass40
+    def test_counter_with_dense_compact_storage(self):
+        create_statement = (
+            "CREATE TABLE {keyspace}.{table} ("
+            "key text, c1 text, a1 counter, PRIMARY KEY (key, c1)) WITH COMPACT STORAGE"
+        ).format(keyspace=self.keyspace_name, table=self.function_table_name)
+
+        self.session.execute(create_statement)
+        tablemeta = self.get_table_metadata()
+        self.check_create_statement(tablemeta, create_statement)
+
     def test_indexes(self):
         create_statement = self.make_create_statement(["a"], ["b", "c"], ["d", "e", "f"])
         create_statement += " WITH CLUSTERING ORDER BY (b ASC, c ASC)"
@@ -411,9 +493,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn('CREATE INDEX d_index', statement)
         self.assertIn('CREATE INDEX e_index', statement)
 
+    @greaterthancass21
     def test_collection_indexes(self):
-        if CASS_SERVER_VERSION < (2, 1, 0):
-            raise unittest.SkipTest("Secondary index on collections were introduced in Cassandra 2.1")
 
         self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
                              % (self.keyspace_name, self.function_table_name))
@@ -428,11 +509,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
                              % (self.keyspace_name, self.function_table_name))
 
         tablemeta = self.get_table_metadata()
-        target = ' (b)' if CASS_SERVER_VERSION < (3, 0) else 'values(b))'  # explicit values in C* 3+
+        target = ' (b)' if CASSANDRA_VERSION < Version("3.0") else 'values(b))'  # explicit values in C* 3+
         self.assertIn(target, tablemeta.export_as_string())
 
         # test full indexes on frozen collections, if available
-        if CASS_SERVER_VERSION >= (2, 1, 3):
+        if CASSANDRA_VERSION >= Version("2.1.3"):
             self.session.execute("DROP TABLE %s.%s" % (self.keyspace_name, self.function_table_name))
             self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b frozen<map<text, text>>)"
                                  % (self.keyspace_name, self.function_table_name))
@@ -447,7 +528,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         create_statement += " WITH compression = {}"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
-        expected = "compression = {}" if CASS_SERVER_VERSION < (3, 0) else "compression = {'enabled': 'false'}"
+        expected = "compression = {}" if CASSANDRA_VERSION < Version("3.0") else "compression = {'enabled': 'false'}"
         self.assertIn(expected, tablemeta.export_as_string())
 
     def test_non_size_tiered_compaction(self):
@@ -471,8 +552,10 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cql = table_meta.export_as_string()
         self.assertIn("'tombstone_threshold': '0.3'", cql)
         self.assertIn("LeveledCompactionStrategy", cql)
-        self.assertNotIn("min_threshold", cql)
-        self.assertNotIn("max_threshold", cql)
+        # formerly legacy options; reintroduced in 4.0
+        if CASSANDRA_VERSION < Version('4.0-a'):
+            self.assertNotIn("min_threshold", cql)
+            self.assertNotIn("max_threshold", cql)
 
     def test_refresh_schema_metadata(self):
         """
@@ -492,8 +575,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
@@ -533,7 +615,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             self.session.execute("""CREATE FUNCTION {0}.sum_int(key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
-                                LANGUAGE javascript AS 'key + val';""".format(self.keyspace_name))
+                                LANGUAGE java AS 'return key+val;';""".format(self.keyspace_name))
 
             self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
             cluster2.refresh_schema_metadata()
@@ -576,7 +658,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
@@ -607,7 +689,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         table_name = "test"
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, table_name))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
@@ -619,6 +701,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthanorequalcass30
     def test_refresh_metadata_for_mv(self):
         """
         test for synchronously refreshing materialized view metadata
@@ -638,17 +721,15 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
 
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
-
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         try:
             self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
+            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT a, b FROM {0}.{1} "
+                                 "WHERE a IS NOT NULL AND b IS NOT NULL PRIMARY KEY (a, b)"
                                  .format(self.keyspace_name, self.function_table_name))
             self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
@@ -666,12 +747,15 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNot(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
         self.assertEqual(original_meta.as_cql_query(), current_meta.as_cql_query())
 
-        cluster3 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster3 = TestCluster(schema_event_refresh_window=-1)
         cluster3.connect()
         try:
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-            self.session.execute("CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT b FROM {0}.{1} WHERE b IS NOT NULL PRIMARY KEY (a, b)"
-                                 .format(self.keyspace_name, self.function_table_name))
+            self.session.execute(
+                "CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT a, b FROM {0}.{1} "
+                "WHERE a IS NOT NULL AND b IS NOT NULL PRIMARY KEY (a, b)".format(
+                    self.keyspace_name, self.function_table_name)
+            )
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
             cluster3.refresh_materialized_view_metadata(self.keyspace_name, 'mv2')
             self.assertIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
@@ -698,7 +782,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 3:
             raise unittest.SkipTest("Protocol 3+ is required for UDTs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
@@ -710,6 +794,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthancass20
     def test_refresh_user_type_metadata_proto_2(self):
         """
         Test to insure that protocol v1/v2 surface UDT metadata changes
@@ -721,11 +806,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
         supported_versions = get_supported_protocol_versions()
-        if 2 not in supported_versions or CASSANDRA_VERSION < "2.1":  # 1 and 2 were dropped in the same version
+        if 2 not in supported_versions:  # 1 and 2 were dropped in the same version
                 raise unittest.SkipTest("Protocol versions 1 and 2 are not supported in Cassandra version ".format(CASSANDRA_VERSION))
 
         for protocol_version in (1, 2):
-            cluster = Cluster(protocol_version=protocol_version)
+            cluster = TestCluster()
             session = cluster.connect()
             self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
 
@@ -765,14 +850,14 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol 4+ is required for UDFs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
         self.session.execute("""CREATE FUNCTION {0}.sum_int(key int, val int)
                             RETURNS NULL ON NULL INPUT
                             RETURNS int
-                            LANGUAGE javascript AS 'key + val';""".format(self.keyspace_name))
+                            LANGUAGE java AS ' return key + val;';""".format(self.keyspace_name))
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
         cluster2.refresh_user_function_metadata(self.keyspace_name, UserFunctionDescriptor("sum_int", ["int", "int"]))
@@ -801,14 +886,14 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol 4+ is required for UDAs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = Cluster(protocol_version=PROTOCOL_VERSION, schema_event_refresh_window=-1)
+        cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].aggregates, {})
         self.session.execute("""CREATE FUNCTION {0}.sum_int(key int, val int)
                             RETURNS NULL ON NULL INPUT
                             RETURNS int
-                            LANGUAGE javascript AS 'key + val';""".format(self.keyspace_name))
+                            LANGUAGE java AS 'return key + val;';""".format(self.keyspace_name))
 
         self.session.execute("""CREATE AGGREGATE {0}.sum_agg(int)
                              SFUNC sum_int
@@ -822,6 +907,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @greaterthanorequalcass30
     def test_multiple_indices(self):
         """
         test multiple indices on the same column.
@@ -834,8 +920,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
 
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b map<text, int>)".format(self.keyspace_name, self.function_table_name))
         self.session.execute("CREATE INDEX index_1 ON {0}.{1}(b)".format(self.keyspace_name, self.function_table_name))
@@ -865,7 +949,10 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         v = t + 'view'
 
         s.execute("CREATE TABLE %s.%s (k text PRIMARY KEY, v int)" % (ks, t))
-        s.execute("CREATE MATERIALIZED VIEW %s.%s AS SELECT * FROM %s.%s WHERE v IS NOT NULL PRIMARY KEY (v, k)" % (ks, v, ks, t))
+        s.execute(
+            "CREATE MATERIALIZED VIEW %s.%s AS SELECT * FROM %s.%s "
+            "WHERE v IS NOT NULL AND k IS NOT NULL PRIMARY KEY (v, k)" % (ks, v, ks, t)
+        )
 
         table_meta = ks_meta.tables[t]
         view_meta = table_meta.views[v]
@@ -892,7 +979,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertFalse(view_meta.extensions)
         self.assertIn(Ext0.name, _RegisteredExtensionType._extension_registry)
         self.assertIn(Ext1.name, _RegisteredExtensionType._extension_registry)
-        self.assertEqual(len(_RegisteredExtensionType._extension_registry), 2)
+        # There will bee the RLAC extension here.
+        self.assertEqual(len(_RegisteredExtensionType._extension_registry), 3)
 
         self.cluster.refresh_table_metadata(ks, t)
         table_meta = ks_meta.tables[t]
@@ -958,7 +1046,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test export schema functionality
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         cluster.connect()
 
         self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
@@ -969,7 +1057,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test export keyspace schema functionality
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         cluster.connect()
 
         for keyspace in cluster.metadata.keyspaces:
@@ -995,13 +1083,11 @@ class TestCodeCoverage(unittest.TestCase):
                                                          lineterm=''))
             self.fail(diff_string)
 
+    @greaterthancass20
     def test_export_keyspace_schema_udts(self):
         """
         Test udt exports
         """
-
-        if CASS_SERVER_VERSION < (2, 1, 0):
-            raise unittest.SkipTest('UDTs were introduced in Cassandra 2.1')
 
         if PROTOCOL_VERSION < 3:
             raise unittest.SkipTest(
@@ -1011,7 +1097,7 @@ class TestCodeCoverage(unittest.TestCase):
         if sys.version_info[0:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         session = cluster.connect()
 
         session.execute("""
@@ -1079,7 +1165,7 @@ CREATE TABLE export_udts.users (
         Test that names that need to be escaped in CREATE statements are
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         session = cluster.connect()
 
         ksname = 'AnInterestingKeyspace'
@@ -1124,7 +1210,7 @@ CREATE TABLE export_udts.users (
         Ensure AlreadyExists exception is thrown when hit
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         session = cluster.connect()
 
         ksname = 'test3rf'
@@ -1150,7 +1236,7 @@ CREATE TABLE export_udts.users (
         if murmur3 is None:
             raise unittest.SkipTest('the murmur3 extension is not available')
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         self.assertEqual(cluster.metadata.get_replicas('test3rf', 'key'), [])
 
         cluster.connect('test3rf')
@@ -1166,7 +1252,7 @@ CREATE TABLE export_udts.users (
         Test token mappings
         """
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         cluster.connect('test3rf')
         ring = cluster.metadata.token_map.ring
         owners = list(cluster.metadata.token_map.token_to_host_owner[token] for token in ring)
@@ -1177,8 +1263,8 @@ CREATE TABLE export_udts.users (
 
         for i, token in enumerate(ring):
             self.assertEqual(set(get_replicas('test3rf', token)), set(owners))
-            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[(i + 1) % 3], owners[(i + 2) % 3]]))
-            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[(i + 1) % 3]]))
+            self.assertEqual(set(get_replicas('test2rf', token)), set([owners[i], owners[(i + 1) % 3]]))
+            self.assertEqual(set(get_replicas('test1rf', token)), set([owners[i]]))
         cluster.shutdown()
 
 
@@ -1190,7 +1276,7 @@ class TokenMetadataTest(unittest.TestCase):
     def test_token(self):
         expected_node_count = len(get_cluster().nodes)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         cluster.connect()
         tmap = cluster.metadata.token_map
         self.assertTrue(issubclass(tmap.token_class, Token))
@@ -1203,7 +1289,7 @@ class KeyspaceAlterMetadata(unittest.TestCase):
     Test verifies that table metadata is preserved on keyspace alter
     """
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        self.cluster = TestCluster()
         self.session = self.cluster.connect()
         name = self._testMethodName.lower()
         crt_ks = '''
@@ -1248,7 +1334,7 @@ class IndexMapTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = TestCluster()
         cls.session = cls.cluster.connect()
         try:
             if cls.keyspace_name in cls.cluster.metadata.keyspaces:
@@ -1357,7 +1443,7 @@ class FunctionTest(unittest.TestCase):
     @classmethod
     def setup_class(cls):
         if PROTOCOL_VERSION >= 4:
-            cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+            cls.cluster = TestCluster()
             cls.keyspace_name = cls.__name__.lower()
             cls.session = cls.cluster.connect()
             cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
@@ -1419,7 +1505,10 @@ class FunctionMetadata(FunctionTest):
                 'return_type': 'double',
                 'language': 'java',
                 'body': 'return new Double(0.0);',
-                'called_on_null_input': called_on_null}
+                'called_on_null_input': called_on_null,
+                'deterministic': False,
+                'monotonic': False,
+                'monotonic_on': []}
 
     def test_functions_after_udt(self):
         """
@@ -1570,15 +1659,15 @@ class AggregateMetadata(FunctionTest):
             cls.session.execute("""CREATE OR REPLACE FUNCTION sum_int(s int, i int)
                                    RETURNS NULL ON NULL INPUT
                                    RETURNS int
-                                   LANGUAGE javascript AS 's + i';""")
+                                   LANGUAGE java AS 'return s + i;';""")
             cls.session.execute("""CREATE OR REPLACE FUNCTION sum_int_two(s int, i int, j int)
                                    RETURNS NULL ON NULL INPUT
                                    RETURNS int
-                                   LANGUAGE javascript AS 's + i + j';""")
+                                   LANGUAGE java AS 'return s + i + j;';""")
             cls.session.execute("""CREATE OR REPLACE FUNCTION "List_As_String"(l list<text>)
                                    RETURNS NULL ON NULL INPUT
                                    RETURNS int
-                                   LANGUAGE javascript AS ''''' + l';""")
+                                   LANGUAGE java AS 'return l.size();';""")
             cls.session.execute("""CREATE OR REPLACE FUNCTION extend_list(s list<text>, i int)
                                    CALLED ON NULL INPUT
                                    RETURNS list<text>
@@ -1601,7 +1690,8 @@ class AggregateMetadata(FunctionTest):
                 'state_type': state_type,
                 'final_func': final_func,
                 'initial_condition': init_cond,
-                'return_type': "does not matter for creation"}
+                'return_type': "does not matter for creation",
+                'deterministic': False}
 
     def test_return_type_meta(self):
         """
@@ -1635,7 +1725,7 @@ class AggregateMetadata(FunctionTest):
         """
 
         # This is required until the java driver bundled with C* is updated to support v4
-        c = Cluster(protocol_version=3)
+        c = TestCluster(protocol_version=3)
         s = c.connect(self.keyspace_name)
 
         encoder = Encoder()
@@ -1819,22 +1909,24 @@ class BadMetaTest(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = TestCluster()
         cls.keyspace_name = cls.__name__.lower()
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
         cls.session.set_keyspace(cls.keyspace_name)
         connection = cls.cluster.control_connection._connection
-        cls.parser_class = get_schema_parser(connection, str(CASS_SERVER_VERSION[0]), timeout=20).__class__
+
+        cls.parser_class = get_schema_parser(
+            connection,
+            cls.cluster.metadata.get_host(connection.host).release_version,
+            cls.cluster.metadata.get_host(connection.host).dse_version,
+            timeout=20
+        ).__class__
         cls.cluster.control_connection.reconnect = Mock()
 
     @classmethod
     def teardown_class(cls):
         drop_keyspace_shutdown_cluster(cls.keyspace_name, cls.session, cls.cluster)
-
-    def _skip_if_not_version(self, version):
-        if CASS_SERVER_VERSION < version:
-            raise unittest.SkipTest("Requires server version >= %s" % (version,))
 
     def test_bad_keyspace(self):
         with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
@@ -1860,8 +1952,8 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+    @greaterthancass20
     def test_bad_user_type(self):
-        self._skip_if_not_version((2, 1, 0))
         self.session.execute('CREATE TYPE %s (i int, d double)' % self.function_name)
         with patch.object(self.parser_class, '_build_user_type', side_effect=self.BadMetaException):
             self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
@@ -1869,33 +1961,41 @@ class BadMetaTest(unittest.TestCase):
             self.assertIs(m._exc_info[0], self.BadMetaException)
             self.assertIn("/*\nWarning:", m.export_as_string())
 
+    @greaterthancass21
     def test_bad_user_function(self):
-        self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS %s (key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
-                                LANGUAGE javascript AS 'key + val';""" % self.function_name)
-        with patch.object(self.parser_class, '_build_function', side_effect=self.BadMetaException):
-            self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
-            m = self.cluster.metadata.keyspaces[self.keyspace_name]
-            self.assertIs(m._exc_info[0], self.BadMetaException)
-            self.assertIn("/*\nWarning:", m.export_as_string())
+                                LANGUAGE java AS 'return key + val;';""" % self.function_name)
 
+        #We need to patch as well the reconnect function because after patching the _build_function
+        #there will an Error refreshing schema which will trigger a reconnection. If this happened
+        #in a timely manner in the call self.cluster.refresh_schema_metadata() it would return an exception
+        #due to that a connection would be closed
+        with patch.object(self.cluster.control_connection, 'reconnect'):
+            with patch.object(self.parser_class, '_build_function', side_effect=self.BadMetaException):
+                self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
+                m = self.cluster.metadata.keyspaces[self.keyspace_name]
+                self.assertIs(m._exc_info[0], self.BadMetaException)
+                self.assertIn("/*\nWarning:", m.export_as_string())
+
+    @greaterthancass21
     def test_bad_user_aggregate(self):
-        self._skip_if_not_version((2, 2, 0))
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS sum_int (key int, val int)
                                 RETURNS NULL ON NULL INPUT
                                 RETURNS int
-                                LANGUAGE javascript AS 'key + val';""")
+                                LANGUAGE java AS 'return key + val;';""")
         self.session.execute("""CREATE AGGREGATE %s(int)
                                  SFUNC sum_int
                                  STYPE int
                                  INITCOND 0""" % self.function_name)
-        with patch.object(self.parser_class, '_build_aggregate', side_effect=self.BadMetaException):
-            self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
-            m = self.cluster.metadata.keyspaces[self.keyspace_name]
-            self.assertIs(m._exc_info[0], self.BadMetaException)
-            self.assertIn("/*\nWarning:", m.export_as_string())
+        #We have the same issue here as in test_bad_user_function
+        with patch.object(self.cluster.control_connection, 'reconnect'):
+            with patch.object(self.parser_class, '_build_aggregate', side_effect=self.BadMetaException):
+                self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
+                m = self.cluster.metadata.keyspaces[self.keyspace_name]
+                self.assertIs(m._exc_info[0], self.BadMetaException)
+                self.assertIn("/*\nWarning:", m.export_as_string())
 
 
 class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
@@ -1919,16 +2019,27 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         dct_table = self.cluster.metadata.keyspaces.get(self.ks_name).tables.get(self.function_table_name)
 
         # Format can very slightly between versions, strip out whitespace for consistency sake
-        self.assertTrue("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(s=>org.apache.cassandra.db.marshal.UTF8Type,i=>org.apache.cassandra.db.marshal.Int32Type)'" in dct_table.as_cql_query().replace(" ", ""))
+        table_text = dct_table.as_cql_query().replace(" ", "")
+        dynamic_type_text = "c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
+        self.assertIn("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(", table_text)
+        # Types within in the composite can come out in random order, so grab the type definition and find each one
+        type_definition_start = table_text.index("(", table_text.find(dynamic_type_text))
+        type_definition_end = table_text.index(")")
+        type_definition_text = table_text[type_definition_start:type_definition_end]
+        self.assertIn("s=>org.apache.cassandra.db.marshal.UTF8Type", type_definition_text)
+        self.assertIn("i=>org.apache.cassandra.db.marshal.Int32Type", type_definition_text)
 
 
-class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
+@greaterthanorequalcass30
+class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute(
+            "CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} "
+            "WHERE pk IS NOT NULL AND c IS NOT NULL PRIMARY KEY (pk, c)".format(
+                self.keyspace_name, self.function_table_name)
+        )
 
     def tearDown(self):
         self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
@@ -1971,7 +2082,7 @@ class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"] )
+        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
 
         self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.keyspace_name))
         self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
@@ -1999,15 +2110,15 @@ class Materia3lizedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
 
-        self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT c FROM {0}.{1} WHERE c IS NOT NULL PRIMARY KEY (pk, c)".format(self.keyspace_name, self.function_table_name))
+        self.session.execute(
+            "CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} "
+            "WHERE pk IS NOT NULL AND c IS NOT NULL PRIMARY KEY (pk, c)".format(
+                self.keyspace_name, self.function_table_name)
+        )
 
 
+@greaterthanorequalcass30
 class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
-    def setUp(self):
-        if CASS_SERVER_VERSION < (3, 0):
-            raise unittest.SkipTest("Materialized views require Cassandra 3.0+")
-        super(MaterializedViewMetadataTestComplex, self).setUp()
-
     def test_create_view_metadata(self):
         """
         test to ensure that materialized view metadata is properly constructed
@@ -2146,7 +2257,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
                         SELECT * FROM {0}.scores
                         WHERE game IS NOT NULL AND score IS NOT NULL AND user IS NOT NULL AND year IS NOT NULL AND month IS NOT NULL AND day IS NOT NULL
                         PRIMARY KEY (game, score, user, year, month, day)
-                        WITH CLUSTERING ORDER BY (score DESC)""".format(self.keyspace_name)
+                        WITH CLUSTERING ORDER BY (score DESC, user ASC, year ASC, month ASC, day ASC)""".format(self.keyspace_name)
 
         self.session.execute(create_mv)
 
@@ -2187,6 +2298,8 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
 
         test_create_view_metadata tests that materialized views metadata is properly updated when the type of base table
         column is changed.
+
+        Support for alter type was removed in CASSANDRA-12443
 
         @since 3.0.0
         @jira_ticket CASSANDRA-10424
@@ -2306,3 +2419,111 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         value_column = mv_columns[2]
         self.assertIsNotNone(value_column)
         self.assertEqual(value_column.name, 'the Value')
+
+    @greaterthanorequaldse51
+    def test_dse_workloads(self):
+        """
+        Test to ensure dse_workloads is populated appropriately.
+        Field added in DSE 5.1
+
+        @jira_ticket PYTHON-667
+        @expected_result dse_workloads set is set on host model
+
+        @test_category metadata
+        """
+        for host in self.cluster.metadata.all_hosts():
+            self.assertIsInstance(host.dse_workloads, SortedSet)
+            self.assertIn("Cassandra", host.dse_workloads)
+
+
+class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(rf=1, create_class_table=True)
+        cls.table_two_pk = "table_with_two_pk"
+        cls.session.execute(
+            '''
+            CREATE TABLE {0}.{1} (
+                k_one int,
+                k_two int,
+                v int,
+                PRIMARY KEY ((k_one, k_two))
+            )'''.format(cls.ks_name, cls.table_two_pk)
+        )
+
+    def test_group_keys_by_host(self):
+        """
+        Test to ensure group_keys_by_host functions as expected. It is tried
+        with a table with a single field for the partition key and a table
+        with two fields for the partition key
+        @since 3.13
+        @jira_ticket PYTHON-647
+        @expected_result group_keys_by_host return the expected value
+
+        @test_category metadata
+        """
+        stmt = """SELECT * FROM {}.{}
+                         WHERE k_one = ? AND k_two = ? """.format(self.ks_name, self.table_two_pk)
+        keys = ((1, 2), (2, 2), (2, 3), (3, 4))
+        self._assert_group_keys_by_host(keys, self.table_two_pk, stmt)
+
+        stmt = """SELECT * FROM {}.{}
+                                 WHERE k = ? """.format(self.ks_name, self.ks_name)
+        keys = ((1,), (2,), (2,), (3,))
+        self._assert_group_keys_by_host(keys, self.ks_name, stmt)
+
+    def _assert_group_keys_by_host(self, keys, table_name, stmt):
+        keys_per_host = group_keys_by_replica(self.session, self.ks_name, table_name, keys)
+        self.assertNotIn(NO_VALID_REPLICA, keys_per_host)
+
+        prepared_stmt = self.session.prepare(stmt)
+        for key in keys:
+            routing_key = prepared_stmt.bind(key).routing_key
+            hosts = self.cluster.metadata.get_replicas(self.ks_name, routing_key)
+            self.assertEqual(1, len(hosts))  # RF is 1 for this keyspace
+            self.assertIn(key, keys_per_host[hosts[0]])
+
+
+class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
+    virtual_ks_names = ('system_virtual_schema', 'system_views')
+
+    def test_existing_keyspaces_have_correct_virtual_tags(self):
+        for name, ks in self.cluster.metadata.keyspaces.items():
+            if name in self.virtual_ks_names:
+                self.assertTrue(
+                    ks.virtual,
+                    'incorrect .virtual value for {}'.format(name)
+                )
+            else:
+                self.assertFalse(
+                    ks.virtual,
+                    'incorrect .virtual value for {}'.format(name)
+                )
+
+    @greaterthanorequalcass40
+    @greaterthanorequaldse67
+    def test_expected_keyspaces_exist_and_are_virtual(self):
+        for name in self.virtual_ks_names:
+            self.assertTrue(
+                self.cluster.metadata.keyspaces[name].virtual,
+                'incorrect .virtual value for {}'.format(name)
+            )
+
+    @greaterthanorequalcass40
+    @greaterthanorequaldse67
+    def test_virtual_keyspaces_have_expected_schema_structure(self):
+        self.maxDiff = None
+
+        ingested_virtual_ks_structure = defaultdict(dict)
+        for ks_name, ks in self.cluster.metadata.keyspaces.items():
+            if not ks.virtual:
+                continue
+            for tab_name, tab in ks.tables.items():
+                ingested_virtual_ks_structure[ks_name][tab_name] = set(
+                    tab.columns.keys()
+                )
+
+        # Identify a couple known values to verify we parsed the structure correctly
+        self.assertIn('table_name', ingested_virtual_ks_structure['system_virtual_schema']['tables'])
+        self.assertIn('type', ingested_virtual_ks_structure['system_virtual_schema']['columns'])
+        self.assertIn('total', ingested_virtual_ks_structure['system_views']['sstable_tasks'])

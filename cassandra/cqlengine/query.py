@@ -19,7 +19,7 @@ import time
 import six
 from warnings import warn
 
-from cassandra.query import SimpleStatement, BatchType as CBatchType
+from cassandra.query import SimpleStatement, BatchType as CBatchType, BatchStatement
 from cassandra.cqlengine import columns, CQLEngineException, ValidationError, UnicodeMixin
 from cassandra.cqlengine import connection as conn
 from cassandra.cqlengine.functions import Token, BaseQueryFunction, QueryValue
@@ -67,14 +67,16 @@ class MultipleObjectsReturned(QueryException):
 
 def check_applied(result):
     """
-    Raises LWTException if it looks like a failed LWT request.
+    Raises LWTException if it looks like a failed LWT request. A LWTException
+    won't be raised in the special case in which there are several failed LWT
+    in a  :class:`~cqlengine.query.BatchQuery`.
     """
     try:
         applied = result.was_applied
     except Exception:
         applied = True  # result was not LWT form
     if not applied:
-        raise LWTException(result[0])
+        raise LWTException(result.one())
 
 
 class AbstractQueryableColumn(UnicodeMixin):
@@ -839,7 +841,7 @@ class AbstractQuerySet(object):
             query = self._select_query()
             query.count = True
             result = self._execute(query)
-            count_row = result[0].popitem()
+            count_row = result.one().popitem()
             self._count = count_row[1]
         return self._count
 
@@ -1069,19 +1071,33 @@ class ModelQuerySet(AbstractQuerySet):
     """
     def _validate_select_where(self):
         """ Checks that a filterset will not create invalid select statement """
-        # check that there's either a =, a IN or a CONTAINS (collection) relationship with a primary key or indexed field
+        # check that there's either a =, a IN or a CONTAINS (collection)
+        # relationship with a primary key or indexed field. We also allow
+        # custom indexes to be queried with any operator (a difference
+        # between a secondary index)
         equal_ops = [self.model._get_column_by_db_name(w.field) \
-                     for w in self._where if isinstance(w.operator, EqualsOperator) and not isinstance(w.value, Token)]
+                     for w in self._where if not isinstance(w.value, Token)
+                     and (isinstance(w.operator, EqualsOperator)
+                          or self.model._get_column_by_db_name(w.field).custom_index)]
         token_comparison = any([w for w in self._where if isinstance(w.value, Token)])
-        if not any(w.primary_key or w.index for w in equal_ops) and not token_comparison and not self._allow_filtering:
-            raise QueryException(('Where clauses require either  =, a IN or a CONTAINS (collection) '
-                                  'comparison with either a primary key or indexed field'))
+        if not any(w.primary_key or w.has_index for w in equal_ops) and not token_comparison and not self._allow_filtering:
+            raise QueryException(
+                ('Where clauses require either  =, a IN or a CONTAINS '
+                 '(collection) comparison with either a primary key or '
+                 'indexed field. You might want to consider setting '
+                 'custom_index on fields that you manage index outside '
+                 'cqlengine.'))
 
         if not self._allow_filtering:
             # if the query is not on an indexed field
-            if not any(w.index for w in equal_ops):
+            if not any(w.has_index for w in equal_ops):
                 if not any([w.partition_key for w in equal_ops]) and not token_comparison:
-                    raise QueryException('Filtering on a clustering key without a partition key is not allowed unless allow_filtering() is called on the querset')
+                    raise QueryException(
+                        ('Filtering on a clustering key without a partition '
+                         'key is not allowed unless allow_filtering() is '
+                         'called on the queryset. You might want to consider '
+                         'setting custom_index on fields that you manage '
+                         'index outside cqlengine.'))
 
     def _select_fields(self):
         if self._defer_fields or self._only_fields:

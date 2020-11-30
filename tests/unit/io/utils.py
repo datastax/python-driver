@@ -12,22 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.connection import (ConnectionException, ProtocolError,
-                                  HEADER_DIRECTION_TO_CLIENT)
-from cassandra.marshal import int32_pack, uint8_pack, uint32_pack
-from cassandra.protocol import (write_stringmultimap, write_int, write_string,
-                                SupportedMessage, ReadyMessage, ServerError)
+from cassandra.connection import (
+    ConnectionException, ProtocolError, HEADER_DIRECTION_TO_CLIENT
+)
+from cassandra.marshal import uint8_pack, uint32_pack
+from cassandra.protocol import (
+    write_stringmultimap, write_int, write_string, SupportedMessage, ReadyMessage, ServerError
+)
+from cassandra.connection import DefaultEndPoint
 from tests import is_monkey_patched
 
+import io
+import random
 from functools import wraps
+from itertools import cycle
 import six
 from six import binary_type, BytesIO
 from mock import Mock
 
 import errno
+import logging
 import math
 import os
 from socket import error as socket_error
+import ssl
 
 try:
     import unittest2 as unittest
@@ -35,6 +43,9 @@ except ImportError:
     import unittest # noqa
 
 import time
+
+
+log = logging.getLogger(__name__)
 
 
 class TimerCallback(object):
@@ -145,6 +156,7 @@ class TimerTestMixin(object):
 
     def setUp(self):
         self.connection = self.connection_class(
+            DefaultEndPoint("127.0.0.1"),
             connect_timeout=5
         )
 
@@ -201,7 +213,7 @@ class ReactorTestMixin(object):
         ]))
 
     def make_connection(self):
-        c = self.connection_class('1.2.3.4', cql_version='3.0.1', connect_timeout=5)
+        c = self.connection_class(DefaultEndPoint('1.2.3.4'), cql_version='3.0.1', connect_timeout=5)
         mocket = Mock()
         mocket.send.side_effect = lambda x: len(x)
         self.set_socket(c, mocket)
@@ -247,36 +259,68 @@ class ReactorTestMixin(object):
         return c
 
     def test_eagain_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(errno.EAGAIN)
+
+    def test_ewouldblock_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(errno.EWOULDBLOCK)
+
+    def test_sslwantread_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(
+            ssl.SSL_ERROR_WANT_READ,
+            error_class=ssl.SSLError)
+
+    def test_sslwantwrite_on_buffer_size(self):
+        self._check_error_recovery_on_buffer_size(
+            ssl.SSL_ERROR_WANT_WRITE,
+            error_class=ssl.SSLError)
+
+    def _check_error_recovery_on_buffer_size(self, error_code, error_class=socket_error):
         c = self.test_successful_connection()
 
-        header = six.b('\x00\x00\x00\x00') + int32_pack(20000)
-        responses = [
-            header + (six.b('a') * (4096 - len(header))),
-            six.b('a') * 4096,
-            socket_error(errno.EAGAIN),
-            six.b('a') * 100,
-            socket_error(errno.EAGAIN)]
+        # current data, used by the recv side_effect
+        message_chunks = None
 
-        def side_effect(*args):
-            response = responses.pop(0)
-            if isinstance(response, socket_error):
+        def recv_side_effect(*args):
+            response = message_chunks.pop(0)
+            if isinstance(response, error_class):
                 raise response
             else:
                 return response
 
-        self.get_socket(c).recv.side_effect = side_effect
-        c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._current_frame.end_pos, 20000 + len(header))
-        # the EAGAIN prevents it from reading the last 100 bytes
-        c._iobuf.seek(0, os.SEEK_END)
-        pos = c._iobuf.tell()
-        self.assertEqual(pos, 4096 + 4096)
+        # setup
+        self.get_socket(c).recv.side_effect = recv_side_effect
+        c.process_io_buffer = Mock()
 
-        # now tell it to read the last 100 bytes
-        c.handle_read(*self.null_handle_function_args)
-        c._iobuf.seek(0, os.SEEK_END)
-        pos = c._iobuf.tell()
-        self.assertEqual(pos, 4096 + 4096 + 100)
+        def chunk(size):
+            return six.b('a') * size
+
+        buf_size = c.in_buffer_size
+
+        # List of messages to test. A message = (chunks, expected_read_size)
+        messages = [
+            ([chunk(200)], 200),
+            ([chunk(200), chunk(200)], 200),  # first chunk < in_buffer_size, process the message
+            ([chunk(buf_size), error_class(error_code)], buf_size),
+            ([chunk(buf_size), chunk(buf_size), error_class(error_code)], buf_size*2),
+            ([chunk(buf_size), chunk(buf_size), chunk(10)], (buf_size*2) + 10),
+            ([chunk(buf_size), chunk(buf_size), error_class(error_code), chunk(10)], buf_size*2),
+            ([error_class(error_code), chunk(buf_size)], 0)
+        ]
+
+        for message, expected_size in messages:
+            message_chunks = message
+            c._io_buffer._io_buffer = io.BytesIO()
+            c.process_io_buffer.reset_mock()
+            c.handle_read(*self.null_handle_function_args)
+            c._io_buffer.io_buffer.seek(0, os.SEEK_END)
+
+            # Ensure the message size is the good one and that the
+            # message has been processed if it is non-empty
+            self.assertEqual(c._io_buffer.io_buffer.tell(), expected_size)
+            if expected_size == 0:
+                c.process_io_buffer.assert_not_called()
+            else:
+                c.process_io_buffer.assert_called_once_with()
 
     def test_protocol_error(self):
         c = self.make_connection()
@@ -391,11 +435,11 @@ class ReactorTestMixin(object):
 
         self.get_socket(c).recv.return_value = message[0:1]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._iobuf.getvalue(), message[0:1])
+        self.assertEqual(c._io_buffer.cql_frame_buffer.getvalue(), message[0:1])
 
         self.get_socket(c).recv.return_value = message[1:]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._io_buffer.io_buffer.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(*self.null_handle_function_args)
@@ -417,12 +461,12 @@ class ReactorTestMixin(object):
         # read in the first nine bytes
         self.get_socket(c).recv.return_value = message[:9]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._iobuf.getvalue(), message[:9])
+        self.assertEqual(c._io_buffer.cql_frame_buffer.getvalue(), message[:9])
 
         # ... then read in the rest
         self.get_socket(c).recv.return_value = message[9:]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(six.binary_type(), c._iobuf.getvalue())
+        self.assertEqual(six.binary_type(), c._io_buffer.io_buffer.getvalue())
 
         # let it write out a StartupMessage
         c.handle_write(*self.null_handle_function_args)
@@ -433,3 +477,41 @@ class ReactorTestMixin(object):
 
         self.assertTrue(c.connected_event.is_set())
         self.assertFalse(c.is_defunct)
+
+    def test_mixed_message_and_buffer_sizes(self):
+        """
+        Validate that all messages are processed with different scenarios:
+
+        - various message sizes
+        - various socket buffer sizes
+        - random non-fatal errors raised
+        """
+        c = self.make_connection()
+        c.process_io_buffer = Mock()
+
+        errors = cycle([
+            ssl.SSLError(ssl.SSL_ERROR_WANT_READ),
+            ssl.SSLError(ssl.SSL_ERROR_WANT_WRITE),
+            socket_error(errno.EWOULDBLOCK),
+            socket_error(errno.EAGAIN)
+        ])
+
+        for buffer_size in [512, 1024, 2048, 4096, 8192]:
+            c.in_buffer_size = buffer_size
+
+            for i in range(1, 15):
+                c.process_io_buffer.reset_mock()
+                c._io_buffer._io_buffer = io.BytesIO()
+                message = io.BytesIO(six.b('a') * (2**i))
+
+                def recv_side_effect(*args):
+                    if random.randint(1,10) % 3 == 0:
+                        raise next(errors)
+                    return message.read(args[0])
+
+                self.get_socket(c).recv.side_effect = recv_side_effect
+                c.handle_read(*self.null_handle_function_args)
+                if c._io_buffer.io_buffer.tell():
+                    c.process_io_buffer.assert_called_once()
+                else:
+                    c.process_io_buffer.assert_not_called()

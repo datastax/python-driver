@@ -49,13 +49,12 @@ def execute_concurrent(session, statements_and_parameters, concurrency=100, rais
 
     `results_generator` controls how the results are returned.
 
-        If :const:`False`, the results are returned only after all requests have completed.
-
-        If :const:`True`, a generator expression is returned. Using a generator results in a constrained
-        memory footprint when the results set will be large -- results are yielded
-        as they return instead of materializing the entire list at once. The trade for lower memory
-        footprint is marginal CPU overhead (more thread coordination and sorting out-of-order results
-        on-the-fly).
+    * If :const:`False`, the results are returned only after all requests have completed.
+    * If :const:`True`, a generator expression is returned. Using a generator results in a constrained
+      memory footprint when the results set will be large -- results are yielded
+      as they return instead of materializing the entire list at once. The trade for lower memory
+      footprint is marginal CPU overhead (more thread coordination and sorting out-of-order results
+      on-the-fly).
 
     A sequence of ``ExecutionResult(success, result_or_exc)`` namedtuples is returned
     in the same order that the statements were passed in.  If ``success`` is :const:`False`,

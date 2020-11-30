@@ -21,10 +21,10 @@ from struct import pack
 import logging, sys, traceback, time
 
 from cassandra import ConsistencyLevel, OperationTimedOut, WriteTimeout
-from cassandra.cluster import Cluster
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.query import dict_factory
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION
+from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 from tests.integration.long.utils import create_schema
 
 try:
@@ -61,11 +61,10 @@ class LargeDataTests(unittest.TestCase):
         self.keyspace = 'large_data'
 
     def make_session_and_keyspace(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster(execution_profiles={
+            EXEC_PROFILE_DEFAULT: ExecutionProfile(request_timeout=20, row_factory=dict_factory)
+        })
         session = cluster.connect()
-        session.default_timeout = 20.0  # increase the default timeout
-        session.row_factory = dict_factory
-
         create_schema(cluster, session, self.keyspace)
         return session
 

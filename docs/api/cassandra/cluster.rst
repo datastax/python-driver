@@ -32,6 +32,8 @@
 
    .. autoattribute:: metrics
 
+   .. autoattribute:: ssl_context
+
    .. autoattribute:: ssl_options
 
    .. autoattribute:: sockopts
@@ -67,6 +69,10 @@
       :annotation: = True
 
    .. autoattribute:: timestamp_generator
+
+   .. autoattribute:: endpoint_factory
+
+   .. autoattribute:: cloud
 
    .. automethod:: connect
 
@@ -114,14 +120,29 @@
 
    .. automethod:: set_meta_refresh_enabled
 
-.. autoclass:: ExecutionProfile (load_balancing_policy=<object object>, retry_policy=None, consistency_level=LOCAL_ONE, serial_consistency_level=None, request_timeout=10.0, row_factory=<function tuple_factory>, speculative_execution_policy=None)
+.. autoclass:: ExecutionProfile (load_balancing_policy=<object object>, retry_policy=None, consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None, request_timeout=10.0, row_factory=<function named_tuple_factory>, speculative_execution_policy=None)
    :members:
    :exclude-members: consistency_level
 
    .. autoattribute:: consistency_level
       :annotation: = LOCAL_ONE
 
+.. autoclass:: GraphExecutionProfile (load_balancing_policy=_NOT_SET, retry_policy=None, consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None, request_timeout=30.0, row_factory=None, graph_options=None, continuous_paging_options=_NOT_SET)
+   :members:
+
+.. autoclass:: GraphAnalyticsExecutionProfile (load_balancing_policy=None, retry_policy=None, consistency_level=ConsistencyLevel.LOCAL_ONE, serial_consistency_level=None, request_timeout=3600. * 24. * 7., row_factory=None, graph_options=None)
+   :members:
+
 .. autodata:: EXEC_PROFILE_DEFAULT
+   :annotation:
+
+.. autodata:: EXEC_PROFILE_GRAPH_DEFAULT
+   :annotation:
+
+.. autodata:: EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT
+   :annotation:
+
+.. autodata:: EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT
    :annotation:
 
 .. autoclass:: Session ()
@@ -148,15 +169,21 @@
 
    .. autoattribute:: client_protocol_handler
 
-   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload])
+   .. automethod:: execute(statement[, parameters][, timeout][, trace][, custom_payload][, paging_state][, host][, execute_as])
 
-   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload])
+   .. automethod:: execute_async(statement[, parameters][, trace][, custom_payload][, paging_state][, host][, execute_as])
+
+   .. automethod:: execute_graph(statement[, parameters][, trace][, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT][, execute_as])
+
+   .. automethod:: execute_graph_async(statement[, parameters][, trace][, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT][, execute_as])
 
    .. automethod:: prepare(statement)
 
    .. automethod:: shutdown()
 
    .. automethod:: set_keyspace(keyspace)
+
+   .. automethod:: get_execution_profile
 
    .. automethod:: execution_profile_clone_update
 

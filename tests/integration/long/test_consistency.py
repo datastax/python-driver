@@ -12,32 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct, time, traceback, sys, logging
+import logging
+import struct
+import sys
+import time
+import traceback
 
-from random import randint
 from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, Unavailable
-from cassandra.cluster import Cluster
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass
+from tests.integration import use_singledc, execute_until_pass, TestCluster
 
-from tests.integration.long.utils import (force_stop, create_schema, wait_for_down, wait_for_up,
-                                          start, CoordinatorStats)
+from tests.integration.long.utils import (
+    force_stop, create_schema, wait_for_down, wait_for_up, start, CoordinatorStats
+)
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
 
-ALL_CONSISTENCY_LEVELS = set([
-    ConsistencyLevel.ANY, ConsistencyLevel.ONE, ConsistencyLevel.TWO,
-    ConsistencyLevel.QUORUM, ConsistencyLevel.THREE,
-    ConsistencyLevel.ALL, ConsistencyLevel.LOCAL_QUORUM,
-    ConsistencyLevel.EACH_QUORUM])
-
-MULTI_DC_CONSISTENCY_LEVELS = set([
-    ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM])
-
+ALL_CONSISTENCY_LEVELS = {
+    ConsistencyLevel.ANY, ConsistencyLevel.ONE, ConsistencyLevel.TWO, ConsistencyLevel.QUORUM,
+    ConsistencyLevel.THREE, ConsistencyLevel.ALL, ConsistencyLevel.LOCAL_QUORUM,
+    ConsistencyLevel.EACH_QUORUM
+}
+MULTI_DC_CONSISTENCY_LEVELS = {ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM}
 SINGLE_DC_CONSISTENCY_LEVELS = ALL_CONSISTENCY_LEVELS - MULTI_DC_CONSISTENCY_LEVELS
 
 log = logging.getLogger(__name__)
@@ -128,9 +129,9 @@ class ConsistencyTests(unittest.TestCase):
                 pass
 
     def _test_tokenaware_one_node_down(self, keyspace, rf, accepted):
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()))}
+        )
         session = cluster.connect(wait_for_all_pools=True)
         wait_for_up(cluster, 1)
         wait_for_up(cluster, 2)
@@ -180,9 +181,9 @@ class ConsistencyTests(unittest.TestCase):
 
     def test_rfthree_tokenaware_none_down(self):
         keyspace = 'test_rfthree_tokenaware_none_down'
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()))}
+        )
         session = cluster.connect(wait_for_all_pools=True)
         wait_for_up(cluster, 1)
         wait_for_up(cluster, 2)
@@ -204,10 +205,10 @@ class ConsistencyTests(unittest.TestCase):
         cluster.shutdown()
 
     def _test_downgrading_cl(self, keyspace, rf, accepted):
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
-            protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster(execution_profiles={
+            EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()),
+                                                   DowngradingConsistencyRetryPolicy())
+        })
         session = cluster.connect(wait_for_all_pools=True)
 
         create_schema(cluster, session, keyspace, replication_factor=rf)
@@ -248,19 +249,19 @@ class ConsistencyTests(unittest.TestCase):
 
     def test_rfthree_roundrobin_downgradingcl(self):
         keyspace = 'test_rfthree_roundrobin_downgradingcl'
-        cluster = Cluster(
-            load_balancing_policy=RoundRobinPolicy(),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
-            protocol_version=PROTOCOL_VERSION)
-        self.rfthree_downgradingcl(cluster, keyspace, True)
+        with TestCluster(execution_profiles={
+            EXEC_PROFILE_DEFAULT: ExecutionProfile(RoundRobinPolicy(),
+                                                   DowngradingConsistencyRetryPolicy())
+        }) as cluster:
+            self.rfthree_downgradingcl(cluster, keyspace, True)
 
     def test_rfthree_tokenaware_downgradingcl(self):
         keyspace = 'test_rfthree_tokenaware_downgradingcl'
-        cluster = Cluster(
-            load_balancing_policy=TokenAwarePolicy(RoundRobinPolicy()),
-            default_retry_policy=DowngradingConsistencyRetryPolicy(),
-            protocol_version=PROTOCOL_VERSION)
-        self.rfthree_downgradingcl(cluster, keyspace, False)
+        with TestCluster(execution_profiles={
+            EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()),
+                                                   DowngradingConsistencyRetryPolicy())
+        }) as cluster:
+            self.rfthree_downgradingcl(cluster, keyspace, False)
 
     def rfthree_downgradingcl(self, cluster, keyspace, roundrobin):
         session = cluster.connect(wait_for_all_pools=True)
@@ -338,7 +339,7 @@ class ConnectivityTest(unittest.TestCase):
         all_contact_points = ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
 
         # Connect up and find out which host will bet queries routed to to first
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         cluster.connect(wait_for_all_pools=True)
         hosts = cluster.metadata.all_hosts()
         address = hosts[0].address
@@ -348,13 +349,13 @@ class ConnectivityTest(unittest.TestCase):
         # We now register a cluster that has it's Control Connection NOT on the node that we are shutting down.
         # We do this so we don't miss the event
         contact_point = '127.0.0.{0}'.format(self.get_node_not_x(node_to_stop))
-        cluster = Cluster(contact_points=[contact_point], protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster(contact_points=[contact_point])
         cluster.connect(wait_for_all_pools=True)
         try:
             force_stop(node_to_stop)
             wait_for_down(cluster, node_to_stop)
             # Attempt a query against that node. It should complete
-            cluster2 = Cluster(contact_points=all_contact_points, protocol_version=PROTOCOL_VERSION)
+            cluster2 = TestCluster(contact_points=all_contact_points)
             session2 = cluster2.connect()
             session2.execute("SELECT * FROM system.local")
         finally:

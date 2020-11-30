@@ -29,11 +29,11 @@ import types
 from uuid import UUID
 import six
 
+from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
+                            sortedset, Time, Date, Point, LineString, Polygon)
+
 if six.PY3:
     import ipaddress
-
-from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
-                            sortedset, Time, Date)
 
 if six.PY3:
     long = int
@@ -91,7 +91,10 @@ class Encoder(object):
             sortedset: self.cql_encode_set_collection,
             frozenset: self.cql_encode_set_collection,
             types.GeneratorType: self.cql_encode_list_collection,
-            ValueSequence: self.cql_encode_sequence
+            ValueSequence: self.cql_encode_sequence,
+            Point: self.cql_encode_str_quoted,
+            LineString: self.cql_encode_str_quoted,
+            Polygon: self.cql_encode_str_quoted
         }
 
         if six.PY2:
@@ -127,6 +130,9 @@ class Encoder(object):
         Escapes quotes in :class:`str` objects.
         """
         return cql_quote(val)
+
+    def cql_encode_str_quoted(self, val):
+        return "'%s'" % val
 
     if six.PY3:
         def cql_encode_bytes(self, val):
@@ -224,12 +230,15 @@ class Encoder(object):
         """
         return '{%s}' % ', '.join(self.mapping.get(type(v), self.cql_encode_object)(v) for v in val)
 
-    def cql_encode_all_types(self, val):
+    def cql_encode_all_types(self, val, as_text_type=False):
         """
         Converts any type into a CQL string, defaulting to ``cql_encode_object``
         if :attr:`~Encoder.mapping` does not contain an entry for the type.
         """
-        return self.mapping.get(type(val), self.cql_encode_object)(val)
+        encoded = self.mapping.get(type(val), self.cql_encode_object)(val)
+        if as_text_type and not isinstance(encoded, six.text_type):
+            return encoded.decode('utf-8')
+        return encoded
 
     if six.PY3:
         def cql_encode_ipaddress(self, val):

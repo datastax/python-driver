@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 13, 0)
+__version_info__ = (3, 24, 0)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -92,6 +92,11 @@ class ConsistencyLevel(object):
     one response.
     """
 
+    @staticmethod
+    def is_serial(cl):
+        return cl == ConsistencyLevel.SERIAL or cl == ConsistencyLevel.LOCAL_SERIAL
+
+
 ConsistencyLevel.value_to_name = {
     ConsistencyLevel.ANY: 'ANY',
     ConsistencyLevel.ONE: 'ONE',
@@ -159,7 +164,17 @@ class ProtocolVersion(object):
     v5, in beta from 3.x+
     """
 
-    SUPPORTED_VERSIONS = (V5, V4, V3, V2, V1)
+    DSE_V1 = 0x41
+    """
+    DSE private protocol v1, supported in DSE 5.1+
+    """
+
+    DSE_V2 = 0x42
+    """
+    DSE private protocol v2, supported in DSE 6.0+
+    """
+
+    SUPPORTED_VERSIONS = (DSE_V2, DSE_V1, V5, V4, V3, V2, V1)
     """
     A tuple of all supported protocol versions
     """
@@ -176,7 +191,7 @@ class ProtocolVersion(object):
 
     MAX_SUPPORTED = max(SUPPORTED_VERSIONS)
     """
-    Maximum protocol versioni supported by this driver.
+    Maximum protocol version supported by this driver.
     """
 
     @classmethod
@@ -198,11 +213,11 @@ class ProtocolVersion(object):
 
     @classmethod
     def uses_prepare_flags(cls, version):
-        return version >= cls.V5
+        return version >= cls.V5 and version != cls.DSE_V1
 
     @classmethod
     def uses_prepared_metadata(cls, version):
-        return version >= cls.V5
+        return version >= cls.V5 and version != cls.DSE_V1
 
     @classmethod
     def uses_error_code_map(cls, version):
@@ -210,7 +225,88 @@ class ProtocolVersion(object):
 
     @classmethod
     def uses_keyspace_flag(cls, version):
-        return version >= cls.V5
+        return version >= cls.V5 and version != cls.DSE_V1
+
+    @classmethod
+    def has_continuous_paging_support(cls, version):
+        return version >= cls.DSE_V1
+
+    @classmethod
+    def has_continuous_paging_next_pages(cls, version):
+        return version >= cls.DSE_V2
+
+    @classmethod
+    def has_checksumming_support(cls, version):
+        return cls.V5 <= version < cls.DSE_V1
+
+
+class WriteType(object):
+    """
+    For usage with :class:`.RetryPolicy`, this describe a type
+    of write operation.
+    """
+
+    SIMPLE = 0
+    """
+    A write to a single partition key. Such writes are guaranteed to be atomic
+    and isolated.
+    """
+
+    BATCH = 1
+    """
+    A write to multiple partition keys that used the distributed batch log to
+    ensure atomicity.
+    """
+
+    UNLOGGED_BATCH = 2
+    """
+    A write to multiple partition keys that did not use the distributed batch
+    log. Atomicity for such writes is not guaranteed.
+    """
+
+    COUNTER = 3
+    """
+    A counter write (for one or multiple partition keys). Such writes should
+    not be replayed in order to avoid overcount.
+    """
+
+    BATCH_LOG = 4
+    """
+    The initial write to the distributed batch log that Cassandra performs
+    internally before a BATCH write.
+    """
+
+    CAS = 5
+    """
+    A lighweight-transaction write, such as "DELETE ... IF EXISTS".
+    """
+
+    VIEW = 6
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete MV operations.
+    """
+
+    CDC = 7
+    """
+    This WriteType is only seen in results for requests that were unable to
+    complete CDC operations.
+    """
+
+
+WriteType.name_to_value = {
+    'SIMPLE': WriteType.SIMPLE,
+    'BATCH': WriteType.BATCH,
+    'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
+    'COUNTER': WriteType.COUNTER,
+    'BATCH_LOG': WriteType.BATCH_LOG,
+    'CAS': WriteType.CAS,
+    'VIEW': WriteType.VIEW,
+    'CDC': WriteType.CDC
+}
+
+
+WriteType.value_to_name = {v: k for k, v in WriteType.name_to_value.items()}
 
 
 class SchemaChangeType(object):
@@ -339,14 +435,21 @@ class Timeout(RequestExecutionException):
     the operation
     """
 
-    def __init__(self, summary_message, consistency=None, required_responses=None, received_responses=None):
+    def __init__(self, summary_message, consistency=None, required_responses=None,
+                 received_responses=None, **kwargs):
         self.consistency = consistency
         self.required_responses = required_responses
         self.received_responses = received_responses
-        Exception.__init__(self, summary_message + ' info=' +
-                           repr({'consistency': consistency_value_to_name(consistency),
-                                 'required_responses': required_responses,
-                                 'received_responses': received_responses}))
+
+        if "write_type" in kwargs:
+            kwargs["write_type"] = WriteType.value_to_name[kwargs["write_type"]]
+
+        info = {'consistency': consistency_value_to_name(consistency),
+                'required_responses': required_responses,
+                'received_responses': received_responses}
+        info.update(kwargs)
+
+        Exception.__init__(self, summary_message + ' info=' + repr(info))
 
 
 class ReadTimeout(Timeout):
@@ -387,6 +490,7 @@ class WriteTimeout(Timeout):
     """
 
     def __init__(self, message, write_type=None, **kwargs):
+        kwargs["write_type"] = write_type
         Timeout.__init__(self, message, **kwargs)
         self.write_type = write_type
 
@@ -607,5 +711,15 @@ class UnsupportedOperation(DriverException):
     An attempt was made to use a feature that is not supported by the
     selected protocol version.  See :attr:`Cluster.protocol_version`
     for more details.
+    """
+    pass
+
+
+class UnresolvableContactPoints(DriverException):
+    """
+    The driver was unable to resolve any provided hostnames.
+
+    Note that this is *not* raised when a :class:`.Cluster` is created with no
+    contact points, only when lookup fails for all hosts
     """
     pass

@@ -74,6 +74,10 @@ class CreateWithTimestampTest(BaseTimestampTest):
         tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
         tmp.should.be.ok
 
+    def test_non_batch_syntax_with_tll_integration(self):
+        tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).ttl(30).create(count=1)
+        tmp.should.be.ok
+
     def test_non_batch_syntax_unit(self):
 
         with mock.patch.object(self.session, "execute") as m:
@@ -82,6 +86,16 @@ class CreateWithTimestampTest(BaseTimestampTest):
         query = m.call_args[0][0].query_string
 
         "USING TIMESTAMP".should.be.within(query)
+
+    def test_non_batch_syntax_with_ttl_unit(self):
+
+        with mock.patch.object(self.session, "execute") as m:
+            TestTimestampModel.timestamp(timedelta(seconds=30)).ttl(30).create(
+                count=1)
+
+        query = m.call_args[0][0].query_string
+
+        query.should.match(r"USING TTL \d* AND TIMESTAMP")
 
 
 class UpdateWithTimestampTest(BaseTimestampTest):

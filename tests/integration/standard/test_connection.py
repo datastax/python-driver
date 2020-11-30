@@ -18,14 +18,18 @@ except ImportError:
     import unittest  # noqa
 
 from functools import partial
+from mock import patch
+import logging
 from six.moves import range
 import sys
+import threading
 from threading import Thread, Event
 import time
-import weakref
+from unittest import SkipTest
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import NoHostAvailable, ConnectionShutdown, Cluster
+from cassandra.cluster import NoHostAvailable, ConnectionShutdown, ExecutionProfile, EXEC_PROFILE_DEFAULT
+import cassandra.io.asyncorereactor
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
@@ -33,12 +37,17 @@ from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateList
 from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
-from tests.integration import use_singledc, PROTOCOL_VERSION, get_node, CASSANDRA_IP, local, \
-    requiresmallclockgranularity, greaterthancass20
+from tests.integration import use_singledc, get_node, CASSANDRA_IP, local, \
+    requiresmallclockgranularity, greaterthancass20, TestCluster
+
 try:
     from cassandra.io.libevreactor import LibevConnection
+    import cassandra.io.libevreactor
 except ImportError:
     LibevConnection = None
+
+
+log = logging.getLogger(__name__)
 
 
 def setup_module():
@@ -48,20 +57,20 @@ def setup_module():
 class ConnectionTimeoutTest(unittest.TestCase):
 
     def setUp(self):
-        self.defaultInFlight = Connection.max_in_flight
-        Connection.max_in_flight = 2
-        self.cluster = Cluster(
-            protocol_version=PROTOCOL_VERSION,
-            load_balancing_policy=HostFilterPolicy(
-                RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
+        self.cluster = TestCluster(execution_profiles={
+            EXEC_PROFILE_DEFAULT: ExecutionProfile(
+                load_balancing_policy=HostFilterPolicy(
+                    RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
+                )
             )
-        )
+        })
+
         self.session = self.cluster.connect()
 
     def tearDown(self):
-        Connection.max_in_flight = self.defaultInFlight
         self.cluster.shutdown()
 
+    @patch('cassandra.connection.Connection.max_in_flight', 2)
     def test_in_flight_timeout(self):
         """
         Test to ensure that connection id fetching will block when max_id is reached/
@@ -78,7 +87,7 @@ class ConnectionTimeoutTest(unittest.TestCase):
         """
         futures = []
         query = '''SELECT * FROM system.local'''
-        for i in range(100):
+        for _ in range(100):
             futures.append(self.session.execute_async(query))
 
         for future in futures:
@@ -108,7 +117,7 @@ class HeartbeatTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.cluster = Cluster(protocol_version=PROTOCOL_VERSION, idle_heartbeat_interval=1)
+        self.cluster = TestCluster(idle_heartbeat_interval=1)
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
     def tearDown(self):
@@ -119,7 +128,7 @@ class HeartbeatTest(unittest.TestCase):
     def test_heart_beat_timeout(self):
         # Setup a host listener to ensure the nodes don't go down
         test_listener = TestHostListener()
-        host = "127.0.0.1"
+        host = "127.0.0.1:9042"
         node = get_node(1)
         initial_connections = self.fetch_connections(host, self.cluster)
         self.assertNotEqual(len(initial_connections), 0)
@@ -207,7 +216,12 @@ class ConnectionTests(object):
         for i in range(5):
             try:
                 contact_point = CASSANDRA_IP
-                conn = self.klass.factory(host=contact_point, timeout=timeout, protocol_version=PROTOCOL_VERSION)
+                conn = self.klass.factory(
+                    endpoint=contact_point,
+                    timeout=timeout,
+                    protocol_version=TestCluster.DEFAULT_PROTOCOL_VERSION,
+                    allow_beta_protocol_version=TestCluster.DEFAULT_ALLOW_BETA
+                )
                 break
             except (OperationTimedOut, NoHostAvailable, ConnectionShutdown) as e:
                 continue
@@ -391,20 +405,56 @@ class ConnectionTests(object):
                 break
         self.assertTrue(exception_thrown)
 
+    def test_subclasses_share_loop(self):
+
+        if self.klass not in (AsyncoreConnection, LibevConnection):
+            raise SkipTest
+
+        class C1(self.klass):
+            pass
+
+        class C2(self.klass):
+            pass
+
+        clusterC1 = TestCluster(connection_class=C1)
+        clusterC1.connect(wait_for_all_pools=True)
+
+        clusterC2 = TestCluster(connection_class=C2)
+        clusterC2.connect(wait_for_all_pools=True)
+        self.addCleanup(clusterC1.shutdown)
+        self.addCleanup(clusterC2.shutdown)
+
+        self.assertEqual(len(get_eventloop_threads(self.event_loop_name)), 1)
+
+
+def get_eventloop_threads(name):
+    all_threads = list(threading.enumerate())
+    log.debug('all threads: {}'.format(all_threads))
+    log.debug('all names: {}'.format([thread.name for thread in all_threads]))
+    event_loops_threads = [thread for thread in all_threads if name == thread.name]
+
+    return event_loops_threads
+
 
 class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = AsyncoreConnection
+    event_loop_name = "asyncore_cassandra_driver_event_loop"
 
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
         ConnectionTests.setUp(self)
 
+    def clean_global_loop(self):
+        cassandra.io.asyncorereactor._global_loop._cleanup()
+        cassandra.io.asyncorereactor._global_loop = None
+
 
 class LibevConnectionTests(ConnectionTests, unittest.TestCase):
 
     klass = LibevConnection
+    event_loop_name = "event_loop"
 
     def setUp(self):
         if is_monkey_patched():
@@ -413,3 +463,7 @@ class LibevConnectionTests(ConnectionTests, unittest.TestCase):
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')
         ConnectionTests.setUp(self)
+
+    def clean_global_loop(self):
+        cassandra.io.libevreactor._global_loop._cleanup()
+        cassandra.io.libevreactor._global_loop = None

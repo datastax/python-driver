@@ -3,11 +3,16 @@ getting_started
 execution_profiles
 lwt
 object_mapper
+geo_types
+graph
+graph_fluent
+classic_graph
 performance
 query_paging
 security
 upgrading
 user_defined_types
 dates_and_times
+cloud
 faq
 api

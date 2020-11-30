@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.integration import get_server_versions, use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass
+from tests.integration import get_server_versions, use_singledc, \
+    BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass, TestCluster
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest # noqa
 
-from cassandra.cluster import Cluster, ResultSet
+from cassandra.cluster import ResultSet, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
 from cassandra.util import OrderedDict
 
@@ -31,8 +32,7 @@ def setup_module():
 class NameTupleFactory(BasicSharedKeyspaceUnitTestCase):
 
     def setUp(self):
-        super(NameTupleFactory, self).setUp()
-        self.session.row_factory = named_tuple_factory
+        self.common_setup(1, execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=named_tuple_factory)})
         ddl = '''
                 CREATE TABLE {0}.{1} (
                     k int PRIMARY KEY,
@@ -78,38 +78,23 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
     """
     Test different row_factories and access code
     """
-    def setUp(self):
-        super(RowFactoryTests, self).setUp()
-        self.insert1 = '''
-            INSERT INTO {0}.{1}
-                ( k , v )
-            VALUES
-                ( 1 , 1 )
-        '''.format(self.keyspace_name, self.function_table_name)
+    @classmethod
+    def setUpClass(cls):
+        cls.common_setup(rf=1, create_class_table=True)
+        q = "INSERT INTO {0}.{1} (k, v) VALUES (%s, %s)".format(cls.ks_name, cls.ks_name)
+        cls.session.execute(q, (1, 1))
+        cls.session.execute(q, (2, 2))
+        cls.select = "SELECT * FROM {0}.{1}".format(cls.ks_name, cls.ks_name)
 
-        self.insert2 = '''
-            INSERT INTO {0}.{1}
-                ( k , v )
-            VALUES
-                ( 2 , 2 )
-        '''.format(self.keyspace_name, self.function_table_name)
-
-        self.select = '''
-            SELECT * FROM {0}.{1}
-        '''.format(self.keyspace_name, self.function_table_name)
-
-    def tearDown(self):
-        self.drop_function_table()
+    def _results_from_row_factory(self, row_factory):
+        cluster = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=row_factory)}
+        )
+        with cluster:
+            return cluster.connect().execute(self.select)
 
     def test_tuple_factory(self):
-        session = self.session
-        session.row_factory = tuple_factory
-
-        session.execute(self.insert1)
-        session.execute(self.insert2)
-
-        result = session.execute(self.select)
-
+        result = self._results_from_row_factory(tuple_factory)
         self.assertIsInstance(result, ResultSet)
         self.assertIsInstance(result[0], tuple)
 
@@ -122,14 +107,7 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         self.assertEqual(result[1][0], 2)
 
     def test_named_tuple_factory(self):
-        session = self.session
-        session.row_factory = named_tuple_factory
-
-        session.execute(self.insert1)
-        session.execute(self.insert2)
-
-        result = session.execute(self.select)
-
+        result = self._results_from_row_factory(named_tuple_factory)
         self.assertIsInstance(result, ResultSet)
         result = list(result)
 
@@ -141,17 +119,10 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         self.assertEqual(result[1].k, result[1].v)
         self.assertEqual(result[1].k, 2)
 
-    def test_dict_factory(self):
-        session = self.session
-        session.row_factory = dict_factory
-
-        session.execute(self.insert1)
-        session.execute(self.insert2)
-
-        result = session.execute(self.select)
-
+    def _test_dict_factory(self, row_factory, row_type):
+        result = self._results_from_row_factory(row_factory)
         self.assertIsInstance(result, ResultSet)
-        self.assertIsInstance(result[0], dict)
+        self.assertIsInstance(result[0], row_type)
 
         for row in result:
             self.assertEqual(row['k'], row['v'])
@@ -160,26 +131,43 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         self.assertEqual(result[0]['k'], 1)
         self.assertEqual(result[1]['k'], result[1]['v'])
         self.assertEqual(result[1]['k'], 2)
+
+    def test_dict_factory(self):
+        self._test_dict_factory(dict_factory, dict)
 
     def test_ordered_dict_factory(self):
+        self._test_dict_factory(ordered_dict_factory, OrderedDict)
+
+    def test_generator_row_factory(self):
+        """
+        Test that ResultSet.one() works with a row_factory that contains a generator.
+
+        @since 3.16
+        @jira_ticket PYTHON-1026
+        @expected_result one() returns the first row
+
+        @test_category queries
+        """
+        def generator_row_factory(column_names, rows):
+            return _gen_row_factory(rows)
+
+        def _gen_row_factory(rows):
+            for r in rows:
+                yield r
+
         session = self.session
-        session.row_factory = ordered_dict_factory
+        session.row_factory = generator_row_factory
 
-        session.execute(self.insert1)
-        session.execute(self.insert2)
-
+        session.execute('''
+             INSERT INTO {0}.{1}
+                 ( k , v )
+             VALUES
+                 ( 1 , 1 )
+        '''.format(self.keyspace_name, self.function_table_name))
         result = session.execute(self.select)
-
         self.assertIsInstance(result, ResultSet)
-        self.assertIsInstance(result[0], OrderedDict)
-
-        for row in result:
-            self.assertEqual(row['k'], row['v'])
-
-        self.assertEqual(result[0]['k'], result[0]['v'])
-        self.assertEqual(result[0]['k'], 1)
-        self.assertEqual(result[1]['k'], result[1]['v'])
-        self.assertEqual(result[1]['k'], 2)
+        first_row = result.one()
+        self.assertEqual(first_row[0], first_row[1])
 
 
 class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
@@ -188,12 +176,11 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
     @classmethod
     def setup_class(cls):
-        cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cls.cluster = TestCluster()
         cls.session = cls.cluster.connect()
         cls._cass_version, cls._cql_version = get_server_versions()
         ddl = '''
-            CREATE TABLE test1rf.table_num_col ( key blob PRIMARY KEY, "626972746864617465" blob )
-            WITH COMPACT STORAGE'''
+            CREATE TABLE test1rf.table_num_col ( key blob PRIMARY KEY, "626972746864617465" blob )'''
         cls.session.execute(ddl)
 
     @classmethod
@@ -226,8 +213,10 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
         """
         can SELECT numeric column  using  dict_factory
         """
-        self.session.row_factory = dict_factory
-        try:
-            self.session.execute('SELECT * FROM test1rf.table_num_col')
-        except ValueError as e:
-            self.fail("Unexpected ValueError exception: %s" % e.message)
+        with TestCluster(
+                execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        ) as cluster:
+            try:
+                cluster.connect().execute('SELECT * FROM test1rf.table_num_col')
+            except ValueError as e:
+                self.fail("Unexpected ValueError exception: %s" % e.message)

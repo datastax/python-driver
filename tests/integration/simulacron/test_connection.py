@@ -19,24 +19,27 @@ except ImportError:
 import logging
 import time
 
-from concurrent.futures import ThreadPoolExecutor
-
-from mock import Mock
+from mock import Mock, patch
 
 from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,
                                _Scheduler, NoHostAvailable)
-from cassandra.policies import HostStateListener, RoundRobinPolicy
-from cassandra.io.asyncorereactor import AsyncoreConnection
-from tests.integration import (CASSANDRA_VERSION, PROTOCOL_VERSION,
-                               requiressimulacron)
+from cassandra.policies import HostStateListener, RoundRobinPolicy, WhiteListRoundRobinPolicy
+
+from tests import connection_class, thread_pool_executor_class
+from tests.util import late
+from tests.integration import requiressimulacron, libevtest
 from tests.integration.util import assert_quiescent_pool_state
-from tests.integration.simulacron import SimulacronBase
+# important to import the patch PROTOCOL_VERSION from the simulacron module
+from tests.integration.simulacron import SimulacronBase, PROTOCOL_VERSION
+from cassandra.connection import DEFAULT_CQL_VERSION, Connection
+from tests.unit.cython.utils import cythontest
 from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 prime_query, prime_request,
                                                 start_and_prime_cluster_defaults,
                                                 start_and_prime_singledc,
-                                                clear_queries)
+                                                clear_queries, RejectConnections,
+                                                RejectType, AcceptConnections, PauseReads, ResumeReads)
 
 
 class TrackDownListener(HostStateListener):
@@ -46,7 +49,16 @@ class TrackDownListener(HostStateListener):
     def on_down(self, host):
         self.hosts_marked_down.append(host)
 
-class ThreadTracker(ThreadPoolExecutor):
+    def on_up(self, host):
+        pass
+
+    def on_add(self, host):
+        pass
+
+    def on_remove(self, host):
+        pass
+
+class ThreadTracker(thread_pool_executor_class):
     called_functions = []
 
     def submit(self, fn, *args, **kwargs):
@@ -66,9 +78,20 @@ class OrderedRoundRobinPolicy(RoundRobinPolicy):
         return hosts
 
 
+def _send_options_message(self):
+    """
+    Mock that doesn't the OptionMessage. It is required for the heart_beat_timeout
+    test to avoid a condition where the CC tries to reconnect in the executor but can't
+    since we prime that message."""
+    self._compressor = None
+    self.cql_version = DEFAULT_CQL_VERSION
+    self._send_startup_message(no_compact=self.no_compact)
+
+
 @requiressimulacron
 class ConnectionTests(SimulacronBase):
 
+    @patch('cassandra.connection.Connection._send_options_message', _send_options_message)
     def test_heart_beat_timeout(self):
         """
         Test to ensure the hosts are marked as down after a OTO is received.
@@ -87,7 +110,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_timeout = 5
         idle_heartbeat_interval = 1
 
-        start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc, CASSANDRA_VERSION)
+        start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc)
 
         listener = TrackDownListener()
         executor = ThreadTracker(max_workers=8)
@@ -96,6 +119,7 @@ class ConnectionTests(SimulacronBase):
         cluster = Cluster(compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
+                          protocol_version=PROTOCOL_VERSION,
                           executor_threads=8,
                           execution_profiles={
                               EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())})
@@ -170,6 +194,79 @@ class ConnectionTests(SimulacronBase):
         errback.assert_called_once()
         callback.assert_not_called()
 
+    @cythontest
+    @libevtest
+    def test_heartbeat_defunct_deadlock(self):
+        """
+        Ensure that there is no deadlock when request is in-flight and heartbeat defuncts connection
+        @since 3.16
+        @jira_ticket PYTHON-1044
+        @expected_result an OperationTimeout is raised and no deadlock occurs
+
+        @test_category connection
+        """
+        start_and_prime_singledc()
+
+        # This is all about timing. We will need the QUERY response future to time out and the heartbeat to defunct
+        # at the same moment. The latter will schedule a QUERY retry to another node in case the pool is not
+        # already shut down.  If and only if the response future timeout falls in between the retry scheduling and
+        # its execution the deadlock occurs. The odds are low, so we need to help fate a bit:
+        # 1) Make one heartbeat messages be sent to every node
+        # 2) Our QUERY goes always to the same host
+        # 3) This host needs to defunct first
+        # 4) Open a small time window for the response future timeout, i.e. block executor threads for retry
+        #    execution and last connection to defunct
+        query_to_prime = "SELECT * from testkesypace.testtable"
+        query_host = "127.0.0.2"
+        heartbeat_interval = 1
+        heartbeat_timeout = 1
+        lag = 0.05
+        never = 9999
+
+        class PatchedRoundRobinPolicy(RoundRobinPolicy):
+            # Send always to same host
+            def make_query_plan(self, working_keyspace=None, query=None):
+                if query and query.query_string == query_to_prime:
+                    return filter(lambda h: h == query_host, self._live_hosts)
+                else:
+                    return super(PatchedRoundRobinPolicy, self).make_query_plan()
+
+        class PatchedCluster(Cluster):
+            # Make sure that QUERY connection will timeout first
+            def get_connection_holders(self):
+                holders = super(PatchedCluster, self).get_connection_holders()
+                return sorted(holders, reverse=True, key=lambda v: int(v._connection.host == query_host))
+
+            # Block executor thread like closing a dead socket could do
+            def connection_factory(self, *args, **kwargs):
+                conn = super(PatchedCluster, self).connection_factory(*args, **kwargs)
+                conn.defunct = late(seconds=2*lag)(conn.defunct)
+                return conn
+
+        cluster = PatchedCluster(
+            protocol_version=PROTOCOL_VERSION,
+            compression=False,
+            idle_heartbeat_interval=heartbeat_interval,
+            idle_heartbeat_timeout=heartbeat_timeout,
+            load_balancing_policy=PatchedRoundRobinPolicy()
+        )
+        session = cluster.connect()
+        self.addCleanup(cluster.shutdown)
+
+        prime_query(query_to_prime, then={"delay_in_ms": never})
+
+        # Make heartbeat due
+        time.sleep(heartbeat_interval)
+
+        future = session.execute_async(query_to_prime, timeout=heartbeat_interval+heartbeat_timeout+3*lag)
+        # Delay thread execution like kernel could do
+        future._retry_task = late(seconds=4*lag)(future._retry_task)
+
+        prime_request(PrimeOptions(then={"result": "no_result", "delay_in_ms": never}))
+        prime_request(RejectConnections("unbind"))
+
+        self.assertRaisesRegexp(OperationTimedOut, "Connection defunct by heartbeat", future.result)
+
     def test_close_when_query(self):
         """
         Test to ensure the driver behaves correctly if the connection is closed
@@ -195,7 +292,7 @@ class ConnectionTests(SimulacronBase):
                 "scope": "connection"
             }
 
-            prime_query(query_to_prime, then=then, rows=None, column_types=None)
+            prime_query(query_to_prime, rows=None, column_types=None, then=then)
             self.assertRaises(NoHostAvailable, session.execute, query_to_prime)
 
     def test_retry_after_defunct(self):
@@ -221,7 +318,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_timeout = 1
         idle_heartbeat_interval = 5
 
-        simulacron_cluster = start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc, CASSANDRA_VERSION)
+        simulacron_cluster = start_and_prime_cluster_defaults(number_of_dcs, nodes_per_dc)
 
         dc_ids = sorted(simulacron_cluster.data_center_ids)
         last_host = dc_ids.pop()
@@ -229,7 +326,7 @@ class ConnectionTests(SimulacronBase):
                     cluster_name="{}/{}".format(simulacron_cluster.cluster_name, last_host))
 
         roundrobin_lbp = OrderedRoundRobinPolicy()
-        cluster = Cluster(compression=False,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout,
                           execution_profiles={
@@ -283,7 +380,7 @@ class ConnectionTests(SimulacronBase):
         idle_heartbeat_interval = 1
 
         listener = TrackDownListener()
-        cluster = Cluster(compression=False,
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False,
                           idle_heartbeat_interval=idle_heartbeat_interval,
                           idle_heartbeat_timeout=idle_heartbeat_timeout)
         session = cluster.connect(wait_for_all_pools=True)
@@ -314,7 +411,7 @@ class ConnectionTests(SimulacronBase):
         prime_query(query_to_prime, then=NO_THEN)
 
         listener = TrackDownListener()
-        cluster = Cluster(compression=False)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         session = cluster.connect(wait_for_all_pools=True)
         cluster.register_listener(listener)
 
@@ -330,12 +427,87 @@ class ConnectionTests(SimulacronBase):
         self.assertEqual(listener.hosts_marked_down, [])
         assert_quiescent_pool_state(self, cluster)
 
-    def test_can_shutdown_asyncoreconnection_subclass(self):
+    def test_can_shutdown_connection_subclass(self):
         start_and_prime_singledc()
-        class ExtendedConnection(AsyncoreConnection):
+        class ExtendedConnection(connection_class):
             pass
 
-        cluster = Cluster(contact_points=["127.0.0.2"],
-                          connection_class=ExtendedConnection)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION,
+                          contact_points=["127.0.0.2"],
+                          connection_class=ExtendedConnection,
+                          compression=False)
         cluster.connect()
         cluster.shutdown()
+
+    def test_driver_recovers_nework_isolation(self):
+        start_and_prime_singledc()
+
+        idle_heartbeat_timeout = 3
+        idle_heartbeat_interval = 1
+
+        listener = TrackDownListener()
+
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, contact_points=['127.0.0.1'],
+                          idle_heartbeat_timeout=idle_heartbeat_timeout,
+                          idle_heartbeat_interval=idle_heartbeat_interval,
+                          executor_threads=16,
+                          compression=False,
+                          execution_profiles={
+                              EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
+                          })
+        session = cluster.connect(wait_for_all_pools=True)
+
+        cluster.register_listener(listener)
+
+        prime_request(PrimeOptions(then=NO_THEN))
+        prime_request(RejectConnections(RejectType.REJECT_STARTUP))
+
+        time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval) * 2)
+
+        for host in cluster.metadata.all_hosts():
+            self.assertIn(host, listener.hosts_marked_down)
+
+        self.assertRaises(NoHostAvailable, session.execute, "SELECT * from system.local")
+
+        clear_queries()
+        prime_request(AcceptConnections())
+
+        time.sleep(idle_heartbeat_timeout + idle_heartbeat_interval + 2)
+
+        self.assertIsNotNone(session.execute("SELECT * from system.local"))
+
+    def test_max_in_flight(self):
+        """ Verify we don't exceed max_in_flight when borrowing connections or sending heartbeats """
+        Connection.max_in_flight = 50
+        start_and_prime_singledc()
+        profile = ExecutionProfile(request_timeout=1, load_balancing_policy=WhiteListRoundRobinPolicy(['127.0.0.1']))
+        cluster = Cluster(
+            protocol_version=PROTOCOL_VERSION,
+            compression=False,
+            execution_profiles={EXEC_PROFILE_DEFAULT: profile},
+            idle_heartbeat_interval=.1,
+            idle_heartbeat_timeout=.1,
+        )
+        session = cluster.connect(wait_for_all_pools=True)
+        self.addCleanup(cluster.shutdown)
+
+        query = session.prepare("INSERT INTO table1 (id) VALUES (?)")
+
+        prime_request(PauseReads())
+
+        futures = []
+        # + 50 because simulacron doesn't immediately block all queries
+        for i in range(Connection.max_in_flight + 50):
+            futures.append(session.execute_async(query, ['a']))
+
+        prime_request(ResumeReads())
+
+        for future in futures:
+            # We're veryfing we don't get an assertion error from Connection.get_request_id,
+            # so skip any valid errors
+            try:
+                future.result()
+            except OperationTimedOut:
+                pass
+            except NoHostAvailable:
+                pass

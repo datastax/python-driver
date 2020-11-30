@@ -20,7 +20,6 @@ import socket
 import ssl
 from threading import Lock, Thread
 import time
-import weakref
 
 from six.moves import range
 
@@ -41,12 +40,9 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
-def _cleanup(loop_weakref):
-    try:
-        loop = loop_weakref()
-    except ReferenceError:
-        return
-    loop._cleanup()
+def _cleanup(loop):
+    if loop:
+        loop._cleanup()
 
 
 class LibevLoop(object):
@@ -83,8 +79,6 @@ class LibevLoop(object):
 
         self._timers = TimerManager()
         self._loop_timer = libev.Timer(self._loop, self._on_loop_timer)
-
-        atexit.register(partial(_cleanup, weakref.ref(self)))
 
     def maybe_start(self):
         should_start = False
@@ -228,11 +222,14 @@ class LibevLoop(object):
             self._notifier.send()
 
 
+_global_loop = None
+atexit.register(partial(_cleanup, _global_loop))
+
+
 class LibevConnection(Connection):
     """
     An implementation of :class:`.Connection` that uses libev for its event loop.
     """
-    _libevloop = None
     _write_watcher_is_active = False
     _read_watcher = None
     _write_watcher = None
@@ -240,24 +237,26 @@ class LibevConnection(Connection):
 
     @classmethod
     def initialize_reactor(cls):
-        if not cls._libevloop:
-            cls._libevloop = LibevLoop()
+        global _global_loop
+        if not _global_loop:
+            _global_loop = LibevLoop()
         else:
-            if cls._libevloop._pid != os.getpid():
+            if _global_loop._pid != os.getpid():
                 log.debug("Detected fork, clearing and reinitializing reactor state")
                 cls.handle_fork()
-                cls._libevloop = LibevLoop()
+                _global_loop = LibevLoop()
 
     @classmethod
     def handle_fork(cls):
-        if cls._libevloop:
-            cls._libevloop._cleanup()
-            cls._libevloop = None
+        global _global_loop
+        if _global_loop:
+            _global_loop._cleanup()
+            _global_loop = None
 
     @classmethod
     def create_timer(cls, timeout, callback):
         timer = Timer(timeout, callback)
-        cls._libevloop.add_timer(timer)
+        _global_loop.add_timer(timer)
         return timer
 
     def __init__(self, *args, **kwargs):
@@ -268,16 +267,16 @@ class LibevConnection(Connection):
         self._connect_socket()
         self._socket.setblocking(0)
 
-        with self._libevloop._lock:
-            self._read_watcher = libev.IO(self._socket.fileno(), libev.EV_READ, self._libevloop._loop, self.handle_read)
-            self._write_watcher = libev.IO(self._socket.fileno(), libev.EV_WRITE, self._libevloop._loop, self.handle_write)
+        with _global_loop._lock:
+            self._read_watcher = libev.IO(self._socket.fileno(), libev.EV_READ, _global_loop._loop, self.handle_read)
+            self._write_watcher = libev.IO(self._socket.fileno(), libev.EV_WRITE, _global_loop._loop, self.handle_write)
 
         self._send_options_message()
 
-        self._libevloop.connection_created(self)
+        _global_loop.connection_created(self)
 
         # start the global event loop if needed
-        self._libevloop.maybe_start()
+        _global_loop.maybe_start()
 
     def close(self):
         with self.lock:
@@ -285,15 +284,16 @@ class LibevConnection(Connection):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection (%s) to %s", id(self), self.host)
-        self._libevloop.connection_destroyed(self)
+        log.debug("Closing connection (%s) to %s", id(self), self.endpoint)
+
+        _global_loop.connection_destroyed(self)
         self._socket.close()
-        log.debug("Closed socket to %s", self.host)
+        log.debug("Closed socket to %s", self.endpoint)
 
         # don't leave in-progress operations hanging
         if not self.is_defunct:
             self.error_all_requests(
-                ConnectionShutdown("Connection to %s was closed" % self.host))
+                ConnectionShutdown("Connection to %s was closed" % self.endpoint))
 
     def handle_write(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
@@ -310,12 +310,17 @@ class LibevConnection(Connection):
                 with self._deque_lock:
                     next_msg = self.deque.popleft()
             except IndexError:
+                if not self._socket_writable:
+                    self._socket_writable = True
                 return
 
             try:
                 sent = self._socket.send(next_msg)
             except socket.error as err:
-                if (err.args[0] in NONBLOCKING):
+                if (err.args[0] in NONBLOCKING or
+                        err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE)):
+                    if err.args[0] in NONBLOCKING:
+                        self._socket_writable = False
                     with self._deque_lock:
                         self.deque.appendleft(next_msg)
                 else:
@@ -325,6 +330,11 @@ class LibevConnection(Connection):
                 if sent < len(next_msg):
                     with self._deque_lock:
                         self.deque.appendleft(next_msg[sent:])
+                    # we've seen some cases that 0 is returned instead of NONBLOCKING. But usually,
+                    # we don't expect this to happen. https://bugs.python.org/issue20951
+                    if sent == 0:
+                        self._socket_writable = False
+                        return
 
     def handle_read(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
@@ -342,11 +352,17 @@ class LibevConnection(Connection):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if ssl and isinstance(err, ssl.SSLError):
-                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+            if isinstance(err, ssl.SSLError):
+                if err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                    if not self._iobuf.tell():
+                        return
+                else:
                     self.defunct(err)
                     return
-            elif err.args[0] not in NONBLOCKING:
+            elif err.args[0] in NONBLOCKING:
+                if not self._iobuf.tell():
+                    return
+            else:
                 self.defunct(err)
                 return
 
@@ -367,4 +383,4 @@ class LibevConnection(Connection):
 
         with self._deque_lock:
             self.deque.extend(chunks)
-            self._libevloop.notify()
+            _global_loop.notify()

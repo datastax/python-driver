@@ -21,6 +21,7 @@ import sys
 import socket
 import platform
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 log = logging.getLogger()
 log.setLevel('DEBUG')
@@ -45,21 +46,22 @@ def is_gevent_monkey_patched():
     return socket.socket is gevent.socket.socket
 
 
-def is_gevent_time_monkey_patched():
-    import gevent.monkey
-    return "time" in gevent.monkey.saved
-
-
-def is_eventlet_time_monkey_patched():
-    import eventlet
-    return eventlet.patcher.is_monkey_patched('time')
-
-
 def is_monkey_patched():
     return is_gevent_monkey_patched() or is_eventlet_monkey_patched()
 
-
+MONKEY_PATCH_LOOP = bool(os.getenv('MONKEY_PATCH_LOOP', False))
 EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
+
+
+# If set to to true this will force the Cython tests to run regardless of whether they are installed
+cython_env = os.getenv('VERIFY_CYTHON', "False")
+
+VERIFY_CYTHON = False
+if(cython_env == 'True'):
+    VERIFY_CYTHON = True
+
+thread_pool_executor_class = ThreadPoolExecutor
+
 if "gevent" in EVENT_LOOP_MANAGER:
     import gevent.monkey
     gevent.monkey.patch_all()
@@ -71,6 +73,13 @@ elif "eventlet" in EVENT_LOOP_MANAGER:
 
     from cassandra.io.eventletreactor import EventletConnection
     connection_class = EventletConnection
+
+    try:
+        from futurist import GreenThreadPoolExecutor
+        thread_pool_executor_class = GreenThreadPoolExecutor
+    except:
+        # futurist is installed only with python >=3.7
+        pass
 elif "asyncore" in EVENT_LOOP_MANAGER:
     from cassandra.io.asyncorereactor import AsyncoreConnection
     connection_class = AsyncoreConnection
@@ -85,12 +94,18 @@ else:
     try:
         from cassandra.io.libevreactor import LibevConnection
         connection_class = LibevConnection
-    except ImportError:
+    except ImportError as e:
+        log.debug('Could not import LibevConnection, '
+                  'using connection_class=None; '
+                  'failed with error:\n {}'.format(
+                      repr(e)
+                  ))
         connection_class = None
 
 
-MONKEY_PATCH_LOOP = os.getenv('MONKEY_PATCH_LOOP', False)
+def is_windows():
+    return "Windows" in platform.system()
 
-notwindows = unittest.skipUnless(not "Windows" in platform.system(), "This test is not adequate for windows")
+
+notwindows = unittest.skipUnless(not is_windows(), "This test is not adequate for windows")
 notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")
-notmonkeypatch = unittest.skipUnless(MONKEY_PATCH_LOOP, "Skipping this test because monkey patching is required")

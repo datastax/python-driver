@@ -19,19 +19,22 @@ except ImportError:
 
 from datetime import datetime
 import math
+from packaging.version import Version
 import six
 
 import cassandra
 from cassandra import InvalidRequest
-from cassandra.cluster import Cluster
+from cassandra import util
+from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
 from cassandra.util import sortedset, Duration
 from tests.unit.cython.utils import cythontest
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, execute_until_pass, notprotocolv1, \
-    BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequalcass3_10
+from tests.integration import use_singledc, execute_until_pass, notprotocolv1, \
+    BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequaldse51, \
+    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_all_samples, get_collection_sample
 
@@ -133,7 +136,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         """
         Test insertion of all datatype primitives
         """
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
 
         # create table
@@ -200,9 +203,9 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             self.assertEqual(actual, expected)
 
         # verify data with with prepared statement, use dictionary with no explicit columns
-        s.row_factory = ordered_dict_factory
         select = s.prepare("SELECT * FROM alltypes")
-        results = s.execute(select)[0]
+        results = s.execute(select,
+                            execution_profile=s.execution_profile_clone_update(EXEC_PROFILE_DEFAULT, row_factory=ordered_dict_factory))[0]
 
         for expected, actual in zip(params, results.values()):
             self.assertEqual(actual, expected)
@@ -214,7 +217,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         Test insertion of all collection types
         """
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
         # use tuple encoding, to convert native python tuple into raw CQL
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
@@ -278,9 +281,10 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             self.assertEqual(actual, expected)
 
         # verify data with with prepared statement, use dictionary with no explicit columns
-        s.row_factory = ordered_dict_factory
         select = s.prepare("SELECT * FROM allcoltypes")
-        results = s.execute(select)[0]
+        results = s.execute(select,
+                            execution_profile=s.execution_profile_clone_update(EXEC_PROFILE_DEFAULT,
+                                                                               row_factory=ordered_dict_factory))[0]
 
         for expected, actual in zip(params, results.values()):
             self.assertEqual(actual, expected)
@@ -445,7 +449,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
 
         # use this encoder in order to insert tuples
@@ -497,12 +501,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        )
         s = c.connect(self.keyspace_name)
 
-        # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
-        s.row_factory = dict_factory
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         # programmatically create the table with tuples of said sizes
@@ -536,7 +540,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster()
         s = c.connect(self.keyspace_name)
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
@@ -564,12 +568,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        )
         s = c.connect(self.keyspace_name)
 
-        # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
-        s.row_factory = dict_factory
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         values = []
@@ -663,12 +667,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         if self.cass_version < (2, 1, 0):
             raise unittest.SkipTest("The tuple type was introduced in Cassandra 2.1")
 
-        c = Cluster(protocol_version=PROTOCOL_VERSION)
+        c = TestCluster(
+            execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
+        )
         s = c.connect(self.keyspace_name)
 
-        # set the row_factory to dict_factory for programmatic access
         # set the encoder for tuples for the ability to write tuples
-        s.row_factory = dict_factory
         s.encoder.mapping[tuple] = s.encoder.cql_encode_tuple
 
         # create a table with multiple sizes of nested tuples
@@ -865,6 +869,372 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         self.assertRaises(ValueError, self.session.execute, prepared,
                           (1, Duration(int("8FFFFFFFFFFFFFF0", 16), 0, 0)))
 
+
+@requiredse
+class AbstractDateRangeTest():
+
+    def test_single_value_daterange_round_trip(self):
+        self._daterange_round_trip(
+            util.DateRange(
+                value=util.DateRangeBound(
+                    datetime(2014, 10, 1, 0),
+                    util.DateRangePrecision.YEAR
+                )
+            ),
+            util.DateRange(
+                value=util.DateRangeBound(
+                    datetime(2014, 1, 1, 0),
+                    util.DateRangePrecision.YEAR
+                )
+            )
+        )
+
+    def test_open_high_daterange_round_trip(self):
+        self._daterange_round_trip(
+            util.DateRange(
+                lower_bound=util.DateRangeBound(
+                    datetime(2013, 10, 1, 6, 20, 39),
+                    util.DateRangePrecision.SECOND
+                )
+            )
+        )
+
+    def test_open_low_daterange_round_trip(self):
+        self._daterange_round_trip(
+            util.DateRange(
+                upper_bound=util.DateRangeBound(
+                    datetime(2013, 10, 28),
+                    util.DateRangePrecision.DAY
+                )
+            )
+        )
+
+    def test_open_both_daterange_round_trip(self):
+        self._daterange_round_trip(
+            util.DateRange(
+                lower_bound=util.OPEN_BOUND,
+                upper_bound=util.OPEN_BOUND,
+            )
+        )
+
+    def test_closed_daterange_round_trip(self):
+        insert = util.DateRange(
+            lower_bound=util.DateRangeBound(
+                datetime(2015, 3, 1, 10, 15, 30, 1000),
+                util.DateRangePrecision.MILLISECOND
+            ),
+            upper_bound=util.DateRangeBound(
+                datetime(2016, 1, 1, 10, 15, 30, 999000),
+                util.DateRangePrecision.MILLISECOND
+            )
+        )
+        self._daterange_round_trip(insert)
+
+    def test_epoch_value_round_trip(self):
+        insert = util.DateRange(
+            value=util.DateRangeBound(
+                datetime(1970, 1, 1),
+                util.DateRangePrecision.YEAR
+            )
+        )
+        self._daterange_round_trip(insert)
+
+    def test_double_bounded_daterange_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '[2015-03-01T10:15:30.010Z TO 2016-01-01T10:15:30.999Z]',
+            util.DateRange(
+                lower_bound=util.DateRangeBound(
+                    datetime(2015, 3, 1, 10, 15, 30, 10000),
+                    util.DateRangePrecision.MILLISECOND
+                ),
+                upper_bound=util.DateRangeBound(
+                    datetime(2016, 1, 1, 10, 15, 30, 999000),
+                    util.DateRangePrecision.MILLISECOND
+                ),
+            )
+        )
+
+    def test_open_high_daterange_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '[2015-03 TO *]',
+            util.DateRange(
+                lower_bound=util.DateRangeBound(
+                    datetime(2015, 3, 1, 0, 0),
+                    util.DateRangePrecision.MONTH
+                ),
+                upper_bound=util.DateRangeBound(None, None)
+            )
+        )
+
+    def test_open_low_daterange_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '[* TO 2015-03]',
+            util.DateRange(
+                lower_bound=util.DateRangeBound(None, None),
+                upper_bound=util.DateRangeBound(
+                    datetime(2015, 3, 1, 0, 0),
+                    'MONTH'
+                )
+            )
+        )
+
+    def test_no_bounds_daterange_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '[* TO *]',
+            util.DateRange(
+                lower_bound=(None, None),
+                upper_bound=(None, None)
+            )
+        )
+
+    def test_single_no_bounds_daterange_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '*',
+            util.DateRange(
+                value=(None, None)
+            )
+        )
+
+    def test_single_value_daterange_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '2001-01-01T12:30:30.000Z',
+            util.DateRange(
+                value=util.DateRangeBound(
+                    datetime(2001, 1, 1, 12, 30, 30),
+                    'MILLISECOND'
+                )
+            )
+        )
+
+    def test_daterange_with_negative_bound_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '[-1991-01-01T00:00:00.001 TO 1990-02-03]',
+            util.DateRange(
+                lower_bound=(-124997039999999, 'MILLISECOND'),
+                upper_bound=util.DateRangeBound(
+                    datetime(1990, 2, 3, 12, 30, 30),
+                    'DAY'
+                )
+            )
+        )
+
+    def test_epoch_value_round_trip_from_string(self):
+        self._daterange_round_trip(
+            '1970',
+            util.DateRange(
+                value=util.DateRangeBound(
+                    datetime(1970, 1, 1),
+                    util.DateRangePrecision.YEAR
+                )
+            )
+        )
+
+
+@greaterthanorequaldse51
+class TestDateRangePrepared(AbstractDateRangeTest, BasicSharedKeyspaceUnitTestCase):
+    """
+    Tests various inserts and queries using Date-ranges and prepared queries
+
+    @since 2.0.0
+    @jira_ticket PYTHON-668
+    @expected_result Date ranges will be inserted and retrieved succesfully
+
+    @test_category data_types
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestDateRangePrepared, cls).setUpClass()
+        cls.session.set_keyspace(cls.ks_name)
+        if DSE_VERSION and DSE_VERSION >= Version('5.1'):
+            cls.session.execute("CREATE TABLE tab (dr 'DateRangeType' PRIMARY KEY)")
+
+
+    def _daterange_round_trip(self, to_insert, expected=None):
+        if isinstance(to_insert, util.DateRange):
+            prep = self.session.prepare("INSERT INTO tab (dr) VALUES (?);")
+            self.session.execute(prep, (to_insert,))
+            prep_sel = self.session.prepare("SELECT * FROM tab WHERE dr = ? ")
+            results = self.session.execute(prep_sel, (to_insert,))
+        else:
+            prep = self.session.prepare("INSERT INTO tab (dr) VALUES ('%s');" % (to_insert,))
+            self.session.execute(prep)
+            prep_sel = self.session.prepare("SELECT * FROM tab WHERE dr = '%s' " % (to_insert,))
+            results =  self.session.execute(prep_sel)
+
+        dr = results[0].dr
+        # sometimes this is truncated in the assertEquals output on failure;
+        if isinstance(expected, six.string_types):
+            self.assertEqual(str(dr), expected)
+        else:
+            self.assertEqual(dr, expected or to_insert)
+
+    # This can only be run as a prepared statement
+    def test_daterange_wide(self):
+        self._daterange_round_trip(
+            util.DateRange(
+                lower_bound=(-9223372036854775808, 'MILLISECOND'),
+                upper_bound=(9223372036854775807, 'MILLISECOND')
+            ),
+            '[-9223372036854775808ms TO 9223372036854775807ms]'
+    )
+    # This can only be run as a prepared statement
+    def test_daterange_with_negative_bound_round_trip_to_string(self):
+        self._daterange_round_trip(
+            util.DateRange(
+                lower_bound=(-124997039999999, 'MILLISECOND'),
+                upper_bound=util.DateRangeBound(
+                    datetime(1990, 2, 3, 12, 30, 30),
+                    'DAY'
+                )
+            ),
+            '[-124997039999999ms TO 1990-02-03]'
+        )
+
+@greaterthanorequaldse51
+class TestDateRangeSimple(AbstractDateRangeTest, BasicSharedKeyspaceUnitTestCase):
+    """
+    Tests various inserts and queries using Date-ranges and simple queries
+
+    @since 2.0.0
+    @jira_ticket PYTHON-668
+    @expected_result DateRanges will be inserted and retrieved successfully
+    @test_category data_types
+    """
+    @classmethod
+    def setUpClass(cls):
+        super(TestDateRangeSimple, cls).setUpClass()
+        cls.session.set_keyspace(cls.ks_name)
+        if DSE_VERSION and DSE_VERSION >= Version('5.1'):
+            cls.session.execute("CREATE TABLE tab (dr 'DateRangeType' PRIMARY KEY)")
+
+
+    def _daterange_round_trip(self, to_insert, expected=None):
+
+        query = "INSERT INTO tab (dr) VALUES ('{0}');".format(to_insert)
+        self.session.execute("INSERT INTO tab (dr) VALUES ('{0}');".format(to_insert))
+        query = "SELECT * FROM tab WHERE dr = '{0}' ".format(to_insert)
+        results= self.session.execute("SELECT * FROM tab WHERE dr = '{0}' ".format(to_insert))
+
+        dr = results[0].dr
+        # sometimes this is truncated in the assertEquals output on failure;
+        if isinstance(expected, six.string_types):
+            self.assertEqual(str(dr), expected)
+        else:
+            self.assertEqual(dr, expected or to_insert)
+
+
+@greaterthanorequaldse51
+class TestDateRangeCollection(BasicSharedKeyspaceUnitTestCase):
+
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestDateRangeCollection, cls).setUpClass()
+        cls.session.set_keyspace(cls.ks_name)
+
+    def test_date_range_collection(self):
+        """
+        Tests DateRange type in collections
+
+        @since 2.0.0
+        @jira_ticket PYTHON-668
+        @expected_result DateRanges will be inserted and retrieved successfully when part of a list or map
+        @test_category data_types
+        """
+        self.session.execute("CREATE TABLE dateRangeIntegrationTest5 (k int PRIMARY KEY, l list<'DateRangeType'>, s set<'DateRangeType'>, dr2i map<'DateRangeType', int>, i2dr map<int, 'DateRangeType'>)")
+        self.session.execute("INSERT INTO dateRangeIntegrationTest5 (k, l, s, i2dr, dr2i) VALUES (" +
+                             "1, " +
+                             "['[2000-01-01T10:15:30.001Z TO 2020]', '[2010-01-01T10:15:30.001Z TO 2020]', '2001-01-02'], " +
+                             "{'[2000-01-01T10:15:30.001Z TO 2020]', '[2000-01-01T10:15:30.001Z TO 2020]', '[2010-01-01T10:15:30.001Z TO 2020]'}, " +
+                             "{1: '[2000-01-01T10:15:30.001Z TO 2020]', 2: '[2010-01-01T10:15:30.001Z TO 2020]'}, " +
+                             "{'[2000-01-01T10:15:30.001Z TO 2020]': 1, '[2010-01-01T10:15:30.001Z TO 2020]': 2})")
+        results = list(self.session.execute("SELECT * FROM dateRangeIntegrationTest5"))
+        self.assertEqual(len(results),1)
+
+        lower_bound_1 = util.DateRangeBound(datetime(2000, 1, 1, 10, 15, 30, 1000), 'MILLISECOND')
+
+        lower_bound_2 = util.DateRangeBound(datetime(2010, 1, 1, 10, 15, 30, 1000), 'MILLISECOND')
+
+        upper_bound_1 = util.DateRangeBound(datetime(2020, 1, 1), 'YEAR')
+
+        value_1 = util.DateRangeBound(datetime(2001, 1, 2), 'DAY')
+
+        dt = util.DateRange(lower_bound=lower_bound_1, upper_bound=upper_bound_1)
+        dt2 = util.DateRange(lower_bound=lower_bound_2, upper_bound=upper_bound_1)
+        dt3 = util.DateRange(value=value_1)
+
+
+
+        list_result = results[0].l
+        self.assertEqual(3, len(list_result))
+        self.assertEqual(list_result[0],dt)
+        self.assertEqual(list_result[1],dt2)
+        self.assertEqual(list_result[2],dt3)
+
+        set_result = results[0].s
+        self.assertEqual(len(set_result), 2)
+        self.assertIn(dt, set_result)
+        self.assertIn(dt2, set_result)
+
+        d2i = results[0].dr2i
+        self.assertEqual(len(d2i), 2)
+        self.assertEqual(d2i[dt],1)
+        self.assertEqual(d2i[dt2],2)
+
+        i2r = results[0].i2dr
+        self.assertEqual(len(i2r), 2)
+        self.assertEqual(i2r[1],dt)
+        self.assertEqual(i2r[2],dt2)
+
+    def test_allow_date_range_in_udt_tuple(self):
+        """
+        Tests DateRanges in tuples and udts
+
+        @since 2.0.0
+        @jira_ticket PYTHON-668
+        @expected_result DateRanges will be inserted and retrieved successfully in udt's and tuples
+        @test_category data_types
+        """
+        self.session.execute("CREATE TYPE IF NOT EXISTS test_udt (i int, range 'DateRangeType')")
+        self.session.execute("CREATE TABLE dateRangeIntegrationTest4 (k int PRIMARY KEY, u test_udt, uf frozen<test_udt>, t tuple<'DateRangeType', int>, tf frozen<tuple<'DateRangeType', int>>)")
+        self.session.execute("INSERT INTO dateRangeIntegrationTest4 (k, u, uf, t, tf) VALUES (" +
+                         "1, " +
+                         "{i: 10, range: '[2000-01-01T10:15:30.003Z TO 2020-01-01T10:15:30.001Z]'}, " +
+                         "{i: 20, range: '[2000-01-01T10:15:30.003Z TO 2020-01-01T10:15:30.001Z]'}, " +
+                         "('[2000-01-01T10:15:30.003Z TO 2020-01-01T10:15:30.001Z]', 30), " +
+                         "('[2000-01-01T10:15:30.003Z TO 2020-01-01T10:15:30.001Z]', 40))")
+
+        lower_bound = util.DateRangeBound(
+                        datetime(2000, 1, 1, 10, 15, 30, 3000),
+                        'MILLISECOND')
+
+        upper_bound = util.DateRangeBound(
+                        datetime(2020, 1, 1, 10, 15, 30, 1000),
+                        'MILLISECOND')
+
+        expected_dt = util.DateRange(lower_bound=lower_bound ,upper_bound=upper_bound)
+
+        results_list = list(self.session.execute("SELECT * FROM dateRangeIntegrationTest4"))
+        self.assertEqual(len(results_list), 1)
+        udt = results_list[0].u
+        self.assertEqual(udt.range, expected_dt)
+        self.assertEqual(udt.i, 10)
+
+
+        uf = results_list[0].uf
+        self.assertEqual(uf.range, expected_dt)
+        self.assertEqual(uf.i, 20)
+
+        t = results_list[0].t
+        self.assertEqual(t[0], expected_dt)
+        self.assertEqual(t[1], 30)
+
+        tf = results_list[0].tf
+        self.assertEqual(tf[0], expected_dt)
+        self.assertEqual(tf[1], 40)
+
+
 class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
     @greaterthancass21
@@ -903,13 +1273,13 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
         self.session.execute(ddl)
 
-        for pvi in range(1, 5):
+        for pvi in range(3, 5):
             self.run_inserts_at_version(pvi)
-            for pvr in range(1, 5):
+            for pvr in range(3, 5):
                 self.read_inserts_at_level(pvr)
 
     def read_inserts_at_level(self, proto_ver):
-        session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
+        session = TestCluster(protocol_version=proto_ver).connect(self.keyspace_name)
         try:
             results = session.execute('select * from t')[0]
             self.assertEqual("[SortedSet([1, 2]), SortedSet([3, 5])]", str(results.v))
@@ -927,7 +1297,7 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
             session.cluster.shutdown()
 
     def run_inserts_at_version(self, proto_ver):
-        session = Cluster(protocol_version=proto_ver).connect(self.keyspace_name)
+        session = TestCluster(protocol_version=proto_ver).connect(self.keyspace_name)
         try:
             p = session.prepare('insert into t (k, v) values (?, ?)')
             session.execute(p, (0, [{1, 2}, {3, 5}]))
@@ -943,6 +1313,3 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
         finally:
             session.cluster.shutdown()
-
-
-

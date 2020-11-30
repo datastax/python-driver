@@ -15,11 +15,11 @@
 import logging
 import time
 
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
-    set_default_cass_ip
+    USE_CASS_EXTERNAL, start_cluster_wait_for_up, TestCluster
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 
 def setup_module():
-    if CASSANDRA_IP.startswith("127.0.0."):
+    if CASSANDRA_IP.startswith("127.0.0.") and not USE_CASS_EXTERNAL:
         use_singledc(start=False)
         ccm_cluster = get_cluster()
         ccm_cluster.stop()
@@ -43,12 +43,7 @@ def setup_module():
                           'authorizer': 'CassandraAuthorizer'}
         ccm_cluster.set_configuration_options(config_options)
         log.debug("Starting ccm test cluster with %s", config_options)
-        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-        # there seems to be some race, with some versions of C* taking longer to
-        # get the auth (and default user) setup. Sleep here to give it a chance
-        time.sleep(10)
-    else:
-        set_default_cass_ip()
+        start_cluster_wait_for_up(ccm_cluster)
 
 
 def teardown_module():
@@ -59,7 +54,6 @@ class AuthenticationTests(unittest.TestCase):
     """
     Tests to cover basic authentication functionality
     """
-
     def get_authentication_provider(self, username, password):
         """
         Return correct authentication provider based on protocol version.
@@ -77,9 +71,22 @@ class AuthenticationTests(unittest.TestCase):
             return PlainTextAuthProvider(username=username, password=password)
 
     def cluster_as(self, usr, pwd):
-        return Cluster(protocol_version=PROTOCOL_VERSION,
-                       idle_heartbeat_interval=0,
-                       auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+        # test we can connect at least once with creds
+        # to ensure the role manager is setup
+        for _ in range(5):
+            try:
+                cluster = TestCluster(
+                    idle_heartbeat_interval=0,
+                    auth_provider=self.get_authentication_provider(username='cassandra', password='cassandra'))
+                cluster.connect(wait_for_all_pools=True)
+
+                return TestCluster(
+                    idle_heartbeat_interval=0,
+                    auth_provider=self.get_authentication_provider(username=usr, password=pwd))
+            except Exception as e:
+                time.sleep(5)
+
+        raise Exception('Unable to connect with creds: {}/{}'.format(usr, pwd))
 
     def test_auth_connect(self):
         user = 'u'
@@ -90,10 +97,10 @@ class AuthenticationTests(unittest.TestCase):
 
         try:
             cluster = self.cluster_as(user, passwd)
-            session = cluster.connect()
+            session = cluster.connect(wait_for_all_pools=True)
             try:
                 self.assertTrue(session.execute('SELECT release_version FROM system.local'))
-                assert_quiescent_pool_state(self, cluster)
+                assert_quiescent_pool_state(self, cluster, wait=1)
                 for pool in session.get_pools():
                     connection, _ = pool.borrow_connection(timeout=0)
                     self.assertEqual(connection.authenticator.server_authenticator_class, 'org.apache.cassandra.auth.PasswordAuthenticator')
@@ -102,7 +109,7 @@ class AuthenticationTests(unittest.TestCase):
                 cluster.shutdown()
         finally:
             root_session.execute('DROP USER %s', user)
-            assert_quiescent_pool_state(self, root_session.cluster)
+            assert_quiescent_pool_state(self, root_session.cluster, wait=1)
             root_session.cluster.shutdown()
 
     def test_connect_wrong_pwd(self):
@@ -136,7 +143,7 @@ class AuthenticationTests(unittest.TestCase):
             cluster.shutdown()
 
     def test_connect_no_auth_provider(self):
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION)
+        cluster = TestCluster()
         try:
             self.assertRaisesRegexp(NoHostAvailable,
                                     '.*AuthenticationFailed.*',
@@ -150,7 +157,6 @@ class SaslAuthenticatorTests(AuthenticationTests):
     """
     Test SaslAuthProvider as PlainText
     """
-
     def setUp(self):
         if PROTOCOL_VERSION < 2:
             raise unittest.SkipTest('Sasl authentication not available for protocol v1')

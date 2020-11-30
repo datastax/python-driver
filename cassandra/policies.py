@@ -17,6 +17,15 @@ import logging
 from random import randint, shuffle
 from threading import Lock
 import socket
+import warnings
+from cassandra import WriteType as WT
+
+
+# This is done this way because WriteType was originally
+# defined here and in order not to break the API.
+# It may removed in the next mayor.
+WriteType = WT
+
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 
@@ -146,8 +155,6 @@ class RoundRobinPolicy(LoadBalancingPolicy):
     A subclass of :class:`.LoadBalancingPolicy` which evenly
     distributes queries across all nodes in the cluster,
     regardless of what datacenter the nodes may be in.
-
-    This load balancing policy is used by default.
     """
     _live_hosts = frozenset(())
     _position = 0
@@ -221,7 +228,7 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         self.used_hosts_per_remote_dc = used_hosts_per_remote_dc
         self._dc_live_hosts = {}
         self._position = 0
-        self._contact_points = []
+        self._endpoints = []
         LoadBalancingPolicy.__init__(self)
 
     def _dc(self, host):
@@ -232,7 +239,9 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
             self._dc_live_hosts[dc] = tuple(set(dc_hosts))
 
         if not self.local_dc:
-            self._contact_points = cluster.contact_points_resolved
+            self._endpoints = [
+                endpoint
+                for endpoint in cluster.endpoints_resolved]
 
         self._position = randint(0, len(hosts) - 1) if hosts else 0
 
@@ -275,13 +284,13 @@ class DCAwareRoundRobinPolicy(LoadBalancingPolicy):
         # not worrying about threads because this will happen during
         # control connection startup/refresh
         if not self.local_dc and host.datacenter:
-            if host.address in self._contact_points:
+            if host.endpoint in self._endpoints:
                 self.local_dc = host.datacenter
                 log.info("Using datacenter '%s' for DCAwareRoundRobinPolicy (via host '%s'); "
                          "if incorrect, please specify a local_dc to the constructor, "
                          "or limit contact points to local cluster nodes" %
-                         (self.local_dc, host.address))
-                del self._contact_points
+                         (self.local_dc, host.endpoint))
+                del self._endpoints
 
         dc = self._dc(host)
         with self._hosts_lock:
@@ -412,7 +421,7 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
         The `hosts` parameter should be a sequence of hosts to permit
         connections to.
         """
-        self._allowed_hosts = hosts
+        self._allowed_hosts = tuple(hosts)
         self._allowed_hosts_resolved = [endpoint[4][0] for a in self._allowed_hosts
                                         for endpoint in socket.getaddrinfo(a, None, socket.AF_UNSPEC, socket.SOCK_STREAM)]
 
@@ -648,6 +657,10 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
     A :class:`.ReconnectionPolicy` subclass which exponentially increases
     the length of the delay inbetween each reconnection attempt up to
     a set maximum delay.
+
+    A random amount of jitter (+/- 15%) will be added to the pure exponential
+    delay value to avoid the situations where many reconnection handlers are
+    trying to reconnect at exactly the same time.
     """
 
     # TODO: max_attempts is 64 to preserve legacy default behavior
@@ -682,78 +695,18 @@ class ExponentialReconnectionPolicy(ReconnectionPolicy):
                 yield self.max_delay
             else:
                 try:
-                    yield min(self.base_delay * (2 ** i), self.max_delay)
+                    yield self._add_jitter(min(self.base_delay * (2 ** i), self.max_delay))
                 except OverflowError:
                     overflowed = True
                     yield self.max_delay
 
             i += 1
 
-
-class WriteType(object):
-    """
-    For usage with :class:`.RetryPolicy`, this describe a type
-    of write operation.
-    """
-
-    SIMPLE = 0
-    """
-    A write to a single partition key. Such writes are guaranteed to be atomic
-    and isolated.
-    """
-
-    BATCH = 1
-    """
-    A write to multiple partition keys that used the distributed batch log to
-    ensure atomicity.
-    """
-
-    UNLOGGED_BATCH = 2
-    """
-    A write to multiple partition keys that did not use the distributed batch
-    log. Atomicity for such writes is not guaranteed.
-    """
-
-    COUNTER = 3
-    """
-    A counter write (for one or multiple partition keys). Such writes should
-    not be replayed in order to avoid overcount.
-    """
-
-    BATCH_LOG = 4
-    """
-    The initial write to the distributed batch log that Cassandra performs
-    internally before a BATCH write.
-    """
-
-    CAS = 5
-    """
-    A lighweight-transaction write, such as "DELETE ... IF EXISTS".
-    """
-
-    VIEW = 6
-    """
-    This WriteType is only seen in results for requests that were unable to
-    complete MV operations.
-    """
-
-    CDC = 7
-    """
-    This WriteType is only seen in results for requests that were unable to
-    complete CDC operations.
-    """
-
-
-WriteType.name_to_value = {
-    'SIMPLE': WriteType.SIMPLE,
-    'BATCH': WriteType.BATCH,
-    'UNLOGGED_BATCH': WriteType.UNLOGGED_BATCH,
-    'COUNTER': WriteType.COUNTER,
-    'BATCH_LOG': WriteType.BATCH_LOG,
-    'CAS': WriteType.CAS,
-    'VIEW': WriteType.VIEW,
-    'CDC': WriteType.CDC
-}
+    # Adds -+ 15% to the delay provided
+    def _add_jitter(self, value):
+        jitter = randint(85, 115)
+        delay = (jitter * value) / 100
+        return min(max(self.base_delay, delay), self.max_delay)
 
 
 class RetryPolicy(object):
@@ -872,7 +825,7 @@ class RetryPolicy(object):
         This is called when the coordinator node determines that a read or
         write operation cannot be successful because the number of live
         replicas are too low to meet the requested :class:`.ConsistencyLevel`.
-        This means that the read or write operation was never forwared to
+        This means that the read or write operation was never forwarded to
         any replicas.
 
         `query` is the :class:`.Statement` that failed.
@@ -888,9 +841,36 @@ class RetryPolicy(object):
         `retry_num` counts how many times the operation has been retried, so
         the first time this method is called, `retry_num` will be 0.
 
-        By default, no retries will be attempted and the error will be re-raised.
+        By default, if this is the first retry, it triggers a retry on the next
+        host in the query plan with the same consistency level. If this is not the
+        first retry, no retries will be attempted and the error will be re-raised.
         """
-        return (self.RETRY_NEXT_HOST, consistency) if retry_num == 0 else (self.RETHROW, None)
+        return (self.RETRY_NEXT_HOST, None) if retry_num == 0 else (self.RETHROW, None)
+
+    def on_request_error(self, query, consistency, error, retry_num):
+        """
+        This is called when an unexpected error happens. This can be in the
+        following situations:
+
+        * On a connection error
+        * On server errors: overloaded, isBootstrapping, serverError, etc.
+
+        `query` is the :class:`.Statement` that timed out.
+
+        `consistency` is the :class:`.ConsistencyLevel` that the operation was
+        attempted at.
+
+        `error` the instance of the exception.
+
+        `retry_num` counts how many times the operation has been retried, so
+        the first time this method is called, `retry_num` will be 0.
+
+        The default, it triggers a retry on the next host in the query plan
+        with the same consistency level.
+        """
+        # TODO revisit this for the next major
+        # To preserve the same behavior than before, we don't take retry_num into account
+        return self.RETRY_NEXT_HOST, None
 
 
 class FallthroughRetryPolicy(RetryPolicy):
@@ -908,9 +888,14 @@ class FallthroughRetryPolicy(RetryPolicy):
     def on_unavailable(self, *args, **kwargs):
         return self.RETHROW, None
 
+    def on_request_error(self, *args, **kwargs):
+        return self.RETHROW, None
+
 
 class DowngradingConsistencyRetryPolicy(RetryPolicy):
     """
+    *Deprecated:* This retry policy will be removed in the next major release.
+
     A retry policy that sometimes retries with a lower consistency level than
     the one initially requested.
 
@@ -956,6 +941,12 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     to make sure the data is persisted, and that reading something is better
     than reading nothing, even if there is a risk of reading stale data.
     """
+    def __init__(self, *args, **kwargs):
+        super(DowngradingConsistencyRetryPolicy, self).__init__(*args, **kwargs)
+        warnings.warn('DowngradingConsistencyRetryPolicy is deprecated '
+                      'and will be removed in the next major release.',
+                      DeprecationWarning)
+
     def _pick_consistency(self, num_responses):
         if num_responses >= 3:
             return self.RETRY, ConsistencyLevel.THREE
@@ -969,6 +960,9 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     def on_read_timeout(self, query, consistency, required_responses,
                         received_responses, data_retrieved, retry_num):
         if retry_num != 0:
+            return self.RETHROW, None
+        elif ConsistencyLevel.is_serial(consistency):
+            # Downgrading does not make sense for a CAS read query
             return self.RETHROW, None
         elif received_responses < required_responses:
             return self._pick_consistency(received_responses)
@@ -998,6 +992,9 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     def on_unavailable(self, query, consistency, required_replicas, alive_replicas, retry_num):
         if retry_num != 0:
             return self.RETHROW, None
+        elif ConsistencyLevel.is_serial(consistency):
+            # failed at the paxos phase of a LWT, retry on the next host
+            return self.RETRY_NEXT_HOST, None
         else:
             return self._pick_consistency(alive_replicas)
 
@@ -1105,3 +1102,82 @@ class ConstantSpeculativeExecutionPolicy(SpeculativeExecutionPolicy):
 
     def new_plan(self, keyspace, statement):
         return self.ConstantSpeculativeExecutionPlan(self.delay, self.max_attempts)
+
+
+class WrapperPolicy(LoadBalancingPolicy):
+
+    def __init__(self, child_policy):
+        self._child_policy = child_policy
+
+    def distance(self, *args, **kwargs):
+        return self._child_policy.distance(*args, **kwargs)
+
+    def populate(self, cluster, hosts):
+        self._child_policy.populate(cluster, hosts)
+
+    def on_up(self, *args, **kwargs):
+        return self._child_policy.on_up(*args, **kwargs)
+
+    def on_down(self, *args, **kwargs):
+        return self._child_policy.on_down(*args, **kwargs)
+
+    def on_add(self, *args, **kwargs):
+        return self._child_policy.on_add(*args, **kwargs)
+
+    def on_remove(self, *args, **kwargs):
+        return self._child_policy.on_remove(*args, **kwargs)
+
+
+class DefaultLoadBalancingPolicy(WrapperPolicy):
+    """
+    A :class:`.LoadBalancingPolicy` wrapper that adds the ability to target a specific host first.
+
+    If no host is set on the query, the child policy's query plan will be used as is.
+    """
+
+    _cluster_metadata = None
+
+    def populate(self, cluster, hosts):
+        self._cluster_metadata = cluster.metadata
+        self._child_policy.populate(cluster, hosts)
+
+    def make_query_plan(self, working_keyspace=None, query=None):
+        if query and query.keyspace:
+            keyspace = query.keyspace
+        else:
+            keyspace = working_keyspace
+
+        # TODO remove next major since execute(..., host=XXX) is now available
+        addr = getattr(query, 'target_host', None) if query else None
+        target_host = self._cluster_metadata.get_host(addr)
+
+        child = self._child_policy
+        if target_host and target_host.is_up:
+            yield target_host
+            for h in child.make_query_plan(keyspace, query):
+                if h != target_host:
+                    yield h
+        else:
+            for h in child.make_query_plan(keyspace, query):
+                yield h
+
+
+# TODO for backward compatibility, remove in next major
+class DSELoadBalancingPolicy(DefaultLoadBalancingPolicy):
+    """
+    *Deprecated:* This will be removed in the next major release,
+    consider using :class:`.DefaultLoadBalancingPolicy`.
+    """
+    def __init__(self, *args, **kwargs):
+        super(DSELoadBalancingPolicy, self).__init__(*args, **kwargs)
+        warnings.warn("DSELoadBalancingPolicy will be removed in 4.0. Consider using "
+                      "DefaultLoadBalancingPolicy.", DeprecationWarning)
+
+
+class NeverRetryPolicy(RetryPolicy):
+    def _rethrow(self, *args, **kwargs):
+        return self.RETHROW, None
+
+    on_read_timeout = _rethrow
+    on_write_timeout = _rethrow
+    on_unavailable = _rethrow

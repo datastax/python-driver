@@ -14,7 +14,7 @@
 
 .. autoclass:: Metadata ()
    :members:
-   :exclude-members: rebuild_schema, rebuild_token_map, add_host, remove_host, get_host
+   :exclude-members: rebuild_schema, rebuild_token_map, add_host, remove_host
 
 Schemas
 -------
@@ -34,6 +34,12 @@ Schemas
 .. autoclass:: TableMetadata ()
    :members:
 
+.. autoclass:: TableMetadataV3 ()
+   :members:
+
+.. autoclass:: TableMetadataDSE68 ()
+   :members:
+
 .. autoclass:: ColumnMetadata ()
    :members:
 
@@ -41,6 +47,12 @@ Schemas
    :members:
 
 .. autoclass:: MaterializedViewMetadata ()
+   :members:
+
+.. autoclass:: VertexMetadata ()
+   :members:
+
+.. autoclass:: EdgeMetadata ()
    :members:
 
 Tokens and Ring Topology
@@ -64,6 +76,10 @@ Tokens and Ring Topology
 .. autoclass:: ReplicationStrategy
    :members:
 
+.. autoclass:: ReplicationFactor
+   :members:
+   :exclude-members: create
+
 .. autoclass:: SimpleStrategy
    :members:
 
@@ -72,3 +88,5 @@ Tokens and Ring Topology
 
 .. autoclass:: LocalStrategy
    :members:
+
+.. autofunction:: group_keys_by_replica

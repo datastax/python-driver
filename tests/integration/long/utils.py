@@ -17,12 +17,11 @@ import logging
 import time
 
 from collections import defaultdict
-from ccmlib.node import Node
+from packaging.version import Version
 
-from cassandra.query import named_tuple_factory
-from cassandra.cluster import ConsistencyLevel
+from tests.integration import (get_node, get_cluster, wait_for_node_socket,
+                               DSE_VERSION, CASSANDRA_VERSION)
 
-from tests.integration import get_node, get_cluster, wait_for_node_socket
 
 IP_FORMAT = '127.0.0.%s'
 
@@ -35,6 +34,7 @@ class CoordinatorStats():
         self.coordinator_counts = defaultdict(int)
 
     def add_coordinator(self, future):
+        log.debug('adding coordinator from {}'.format(future))
         future.result()
         coordinator = future._current_host.address
         self.coordinator_counts[coordinator] += 1
@@ -58,10 +58,6 @@ class CoordinatorStats():
 
 def create_schema(cluster, session, keyspace, simple_strategy=True,
                   replication_factor=1, replication_strategy=None):
-    row_factory = session.row_factory
-    session.row_factory = named_tuple_factory
-    session.default_consistency_level = ConsistencyLevel.QUORUM
-
     if keyspace in cluster.metadata.keyspaces.keys():
         session.execute('DROP KEYSPACE %s' % keyspace, timeout=20)
 
@@ -81,9 +77,6 @@ def create_schema(cluster, session, keyspace, simple_strategy=True,
     session.execute(ddl % keyspace, timeout=10)
     session.execute('USE %s' % keyspace)
 
-    session.row_factory = row_factory
-    session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
-
 
 def start(node):
     get_node(node).start()
@@ -100,30 +93,45 @@ def force_stop(node):
 
 
 def decommission(node):
-    get_node(node).decommission()
+    if (DSE_VERSION and DSE_VERSION >= Version("5.1")) or CASSANDRA_VERSION >= Version("4.0-a"):
+        # CASSANDRA-12510
+        get_node(node).decommission(force=True)
+    else:
+        get_node(node).decommission()
     get_node(node).stop()
 
 
 def bootstrap(node, data_center=None, token=None):
-    node_instance = Node('node%s' % node,
-                         get_cluster(),
-                         auto_bootstrap=False,
-                         thrift_interface=(IP_FORMAT % node, 9160),
-                         storage_interface=(IP_FORMAT % node, 7000),
-                         binary_interface=(IP_FORMAT % node, 9042),
-                         jmx_port=str(7000 + 100 * node),
-                         remote_debug_port=0,
-                         initial_token=token if token else node * 10)
-    get_cluster().add(node_instance, is_seed=False, data_center=data_center)
+    log.debug('called bootstrap('
+              'node={node}, data_center={data_center}, '
+              'token={token})')
+    cluster = get_cluster()
+    # for now assumes cluster has at least one node
+    node_type = type(next(iter(cluster.nodes.values())))
+    node_instance = node_type(
+        'node%s' % node,
+        cluster,
+        auto_bootstrap=False,
+        thrift_interface=(IP_FORMAT % node, 9160),
+        storage_interface=(IP_FORMAT % node, 7000),
+        binary_interface=(IP_FORMAT % node, 9042),
+        jmx_port=str(7000 + 100 * node),
+        remote_debug_port=0,
+        initial_token=token if token else node * 10
+    )
+    cluster.add(node_instance, is_seed=False, data_center=data_center)
 
     try:
-        start(node)
-    except:
+        node_instance.start()
+    except Exception as e0:
+        log.debug('failed 1st bootstrap attempt with: \n{}'.format(e0))
         # Try only twice
         try:
-            start(node)
-        except:
+            node_instance.start()
+        except Exception as e1:
+            log.debug('failed 2nd bootstrap attempt with: \n{}'.format(e1))
             log.error('Added node failed to start twice.')
+            raise e1
 
 
 def ring(node):
@@ -140,7 +148,7 @@ def wait_for_up(cluster, node):
             log.debug("Done waiting for node %s to be up", node)
             return
         else:
-            log.debug("Host is still marked down, waiting")
+            log.debug("Host {} is still marked down, waiting".format(addr))
             tries += 1
             time.sleep(1)
 

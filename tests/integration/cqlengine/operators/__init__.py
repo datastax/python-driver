@@ -11,3 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from cassandra.cqlengine.operators import BaseWhereOperator
+
+
+def check_lookup(test_case, symbol, expected):
+    op = BaseWhereOperator.get_operator(symbol)
+    test_case.assertEqual(op, expected)

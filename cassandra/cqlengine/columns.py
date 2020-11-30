@@ -114,6 +114,13 @@ class Column(object):
     bool flag, indicates an index should be created for this column
     """
 
+    custom_index = False
+    """
+    bool flag, indicates an index is managed outside of cqlengine. This is
+    useful if you want to do filter queries on fields that have custom
+    indexes.
+    """
+
     db_field = None
     """
     the fieldname this field will map to in the database
@@ -161,10 +168,12 @@ class Column(object):
                  required=False,
                  clustering_order=None,
                  discriminator_column=False,
-                 static=False):
+                 static=False,
+                 custom_index=False):
         self.partition_key = partition_key
         self.primary_key = partition_key or primary_key
         self.index = index
+        self.custom_index = custom_index
         self.db_field = db_field
         self.default = default
         self.required = required
@@ -279,12 +288,16 @@ class Column(object):
     @property
     def db_field_name(self):
         """ Returns the name of the cql name of this column """
-        return self.db_field or self.column_name
+        return self.db_field if self.db_field is not None else self.column_name
 
     @property
     def db_index_name(self):
         """ Returns the name of the cql index """
         return 'index_{0}'.format(self.db_field_name)
+
+    @property
+    def has_index(self):
+        return self.index or self.custom_index
 
     @property
     def cql(self):
@@ -920,7 +933,7 @@ class Map(BaseContainerColumn):
     """
     Stores a key -> value map (dictionary)
 
-    http://www.datastax.com/documentation/cql/3.1/cql/cql_using/use_map_t.html
+    https://docs.datastax.com/en/dse/6.7/cql/cql/cql_using/useMap.html
     """
 
     _python_type_hashable = False
@@ -1058,7 +1071,7 @@ class _PartitionKeysToken(Column):
     """
 
     def __init__(self, model):
-        self.partition_columns = model._partition_keys.values()
+        self.partition_columns = list(model._partition_keys.values())
         super(_PartitionKeysToken, self).__init__(partition_key=True)
 
     @property

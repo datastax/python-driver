@@ -16,15 +16,33 @@ from __future__ import with_statement
 import calendar
 import datetime
 from functools import total_ordering
+import logging
+from itertools import chain
 import random
+import re
 import six
 import uuid
 import sys
 
+_HAS_GEOMET = True
+try:
+    from geomet import wkt
+except:
+    _HAS_GEOMET = False
+
+
+from cassandra import DriverException
+
 DATETIME_EPOC = datetime.datetime(1970, 1, 1)
+UTC_DATETIME_EPOC = datetime.datetime.utcfromtimestamp(0)
+
+_nan = float('nan')
+
+log = logging.getLogger(__name__)
 
 assert sys.byteorder in ('little', 'big')
 is_little_endian = sys.byteorder == 'little'
+
 
 def datetime_from_timestamp(timestamp):
     """
@@ -36,6 +54,28 @@ def datetime_from_timestamp(timestamp):
     """
     dt = DATETIME_EPOC + datetime.timedelta(seconds=timestamp)
     return dt
+
+
+def utc_datetime_from_ms_timestamp(timestamp):
+    """
+    Creates a UTC datetime from a timestamp in milliseconds. See
+    :meth:`datetime_from_timestamp`.
+
+    Raises an `OverflowError` if the timestamp is out of range for
+    :class:`~datetime.datetime`.
+
+    :param timestamp: timestamp, in milliseconds
+    """
+    return UTC_DATETIME_EPOC + datetime.timedelta(milliseconds=timestamp)
+
+
+def ms_timestamp_from_datetime(dt):
+    """
+    Converts a datetime to a timestamp expressed in milliseconds.
+
+    :param dt: a :class:`datetime.datetime`
+    """
+    return int(round((dt - UTC_DATETIME_EPOC).total_seconds() * 1000))
 
 
 def unix_time_from_uuid1(uuid_arg):
@@ -134,6 +174,42 @@ LOWEST_TIME_UUID = uuid.UUID('00000000-0000-1000-8080-808080808080')
 
 HIGHEST_TIME_UUID = uuid.UUID('ffffffff-ffff-1fff-bf7f-7f7f7f7f7f7f')
 """ The highest possible TimeUUID, as sorted by Cassandra. """
+
+
+def _addrinfo_or_none(contact_point, port):
+    """
+    A helper function that wraps socket.getaddrinfo and returns None
+    when it fails to, e.g. resolve one of the hostnames. Used to address
+    PYTHON-895.
+    """
+    try:
+        value = socket.getaddrinfo(contact_point, port,
+                                  socket.AF_UNSPEC, socket.SOCK_STREAM)
+        return value
+    except socket.gaierror:
+        log.debug('Could not resolve hostname "{}" '
+                  'with port {}'.format(contact_point, port))
+        return None
+
+
+def _addrinfo_to_ip_strings(addrinfo):
+    """
+    Helper function that consumes the data output by socket.getaddrinfo and
+    extracts the IP address from the sockaddr portion of the result.
+
+    Since this is meant to be used in conjunction with _addrinfo_or_none,
+    this will pass None and EndPoint instances through unaffected.
+    """
+    if addrinfo is None:
+        return None
+    return [(entry[4][0], entry[4][1]) for entry in addrinfo]
+
+
+def _resolve_contact_points_to_string_map(contact_points):
+    return OrderedDict(
+        ('{cp}:{port}'.format(cp=cp, port=port), _addrinfo_to_ip_strings(_addrinfo_or_none(cp, port)))
+        for cp, port in contact_points
+    )
 
 
 try:
@@ -487,9 +563,6 @@ class WeakSet(object):
         return len(self.intersection(other)) == 0
 
 
-from bisect import bisect_left
-
-
 class SortedSet(object):
     '''
     A sorted set based on sorted list
@@ -593,7 +666,7 @@ class SortedSet(object):
         return self
 
     def __contains__(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         return i < len(self._items) and self._items[i] == item
 
     def __delitem__(self, i):
@@ -603,7 +676,7 @@ class SortedSet(object):
         del self._items[i:j]
 
     def add(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         if i < len(self._items):
             if self._items[i] != item:
                 self._items.insert(i, item)
@@ -637,7 +710,7 @@ class SortedSet(object):
         return self._items.pop()
 
     def remove(self, item):
-        i = bisect_left(self._items, item)
+        i = self._find_insertion(item)
         if i < len(self._items):
             if self._items[i] == item:
                 self._items.pop(i)
@@ -648,18 +721,8 @@ class SortedSet(object):
         union = sortedset()
         union._items = list(self._items)
         for other in others:
-            if isinstance(other, self.__class__):
-                i = 0
-                for item in other._items:
-                    i = bisect_left(union._items, item, i)
-                    if i < len(union._items):
-                        if item != union._items[i]:
-                            union._items.insert(i, item)
-                    else:
-                        union._items.append(item)
-            else:
-                for item in other:
-                    union.add(item)
+            for item in other:
+                union.add(item)
         return union
 
     def intersection(self, *others):
@@ -685,42 +748,48 @@ class SortedSet(object):
 
     def _diff(self, other):
         diff = sortedset()
-        if isinstance(other, self.__class__):
-            i = 0
-            for item in self._items:
-                i = bisect_left(other._items, item, i)
-                if i < len(other._items):
-                    if item != other._items[i]:
-                        diff._items.append(item)
-                else:
-                    diff._items.append(item)
-        else:
-            for item in self._items:
-                if item not in other:
-                    diff.add(item)
+        for item in self._items:
+            if item not in other:
+                diff.add(item)
         return diff
 
     def _intersect(self, other):
         isect = sortedset()
-        if isinstance(other, self.__class__):
-            i = 0
-            for item in self._items:
-                i = bisect_left(other._items, item, i)
-                if i < len(other._items):
-                    if item == other._items[i]:
-                        isect._items.append(item)
-                else:
-                    break
-        else:
-            for item in self._items:
-                if item in other:
-                    isect.add(item)
+        for item in self._items:
+            if item in other:
+                isect.add(item)
         return isect
+
+    def _find_insertion(self, x):
+        # this uses bisect_left algorithm unless it has elements it can't compare,
+        # in which case it defaults to grouping non-comparable items at the beginning or end,
+        # and scanning sequentially to find an insertion point
+        a = self._items
+        lo = 0
+        hi = len(a)
+        try:
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if a[mid] < x: lo = mid + 1
+                else: hi = mid
+        except TypeError:
+            # could not compare a[mid] with x
+            # start scanning to find insertion point while swallowing type errors
+            lo = 0
+            compared_one = False  # flag is used to determine whether uncomparables are grouped at the front or back
+            while lo < hi:
+                try:
+                    if a[lo] == x or a[lo] >= x: break
+                    compared_one = True
+                except TypeError:
+                    if compared_one: break
+                lo += 1
+        return lo
 
 sortedset = SortedSet  # backwards-compatibility
 
 
-from collections import Mapping
+from cassandra.compat import Mapping
 from six.moves import cPickle
 
 
@@ -739,7 +808,7 @@ class OrderedMap(Mapping):
         ['value', 'value2']
 
     These constructs are needed to support nested collections in Cassandra 2.1.3+,
-    where frozen collections can be specified as parameters to others\*::
+    where frozen collections can be specified as parameters to others::
 
         CREATE TABLE example (
             ...
@@ -749,11 +818,6 @@ class OrderedMap(Mapping):
 
     This class derives from the (immutable) Mapping API. Objects in these maps
     are not intended be modified.
-
-    \* Note: Because of the way Cassandra encodes nested types, when using the
-    driver with nested collections, :attr:`~.Cluster.protocol_version` must be 3
-    or higher.
-
     '''
 
     def __init__(self, *args, **kwargs):
@@ -883,9 +947,9 @@ class Time(object):
         """
         Initializer value can be:
 
-            - integer_type: absolute nanoseconds in the day
-            - datetime.time: built-in time
-            - string_type: a string time of the form "HH:MM:SS[.mmmuuunnn]"
+        - integer_type: absolute nanoseconds in the day
+        - datetime.time: built-in time
+        - string_type: a string time of the form "HH:MM:SS[.mmmuuunnn]"
         """
         if isinstance(value, six.integer_types):
             self._from_timestamp(value)
@@ -1012,9 +1076,9 @@ class Date(object):
         """
         Initializer value can be:
 
-            - integer_type: absolute days from epoch (1970, 1, 1). Can be negative.
-            - datetime.date: built-in date
-            - string_type: a string time of the form "yyyy-mm-dd"
+        - integer_type: absolute days from epoch (1970, 1, 1). Can be negative.
+        - datetime.date: built-in date
+        - string_type: a string time of the form "yyyy-mm-dd"
         """
         if isinstance(value, six.integer_types):
             self.days_from_epoch = value
@@ -1204,14 +1268,284 @@ def _sanitize_identifiers(field_names):
     return names_out
 
 
+def list_contents_to_tuple(to_convert):
+    if isinstance(to_convert, list):
+        for n, i in enumerate(to_convert):
+            if isinstance(to_convert[n], list):
+                to_convert[n] = tuple(to_convert[n])
+        return tuple(to_convert)
+    else:
+        return to_convert
+
+
+class Point(object):
+    """
+    Represents a point geometry for DSE
+    """
+
+    x = None
+    """
+    x coordinate of the point
+    """
+
+    y = None
+    """
+    y coordinate of the point
+    """
+
+    def __init__(self, x=_nan, y=_nan):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        return isinstance(other, Point) and self.x == other.x and self.y == other.y
+
+    def __hash__(self):
+        return hash((self.x, self.y))
+
+    def __str__(self):
+        """
+        Well-known text representation of the point
+        """
+        return "POINT (%r %r)" % (self.x, self.y)
+
+    def __repr__(self):
+        return "%s(%r, %r)" % (self.__class__.__name__, self.x, self.y)
+
+    @staticmethod
+    def from_wkt(s):
+        """
+        Parse a Point geometry from a wkt string and return a new Point object.
+        """
+        if not _HAS_GEOMET:
+            raise DriverException("Geomet is required to deserialize a wkt geometry.")
+
+        try:
+            geom = wkt.loads(s)
+        except ValueError:
+            raise ValueError("Invalid WKT geometry: '{0}'".format(s))
+
+        if geom['type'] != 'Point':
+            raise ValueError("Invalid WKT geometry type. Expected 'Point', got '{0}': '{1}'".format(geom['type'], s))
+
+        coords = geom['coordinates']
+        if len(coords) < 2:
+            x = y = _nan
+        else:
+            x = coords[0]
+            y = coords[1]
+
+        return Point(x=x, y=y)
+
+
+class LineString(object):
+    """
+    Represents a linestring geometry for DSE
+    """
+
+    coords = None
+    """
+    Tuple of (x, y) coordinates in the linestring
+    """
+    def __init__(self, coords=tuple()):
+        """
+        'coords`: a sequence of (x, y) coordinates of points in the linestring
+        """
+        self.coords = tuple(coords)
+
+    def __eq__(self, other):
+        return isinstance(other, LineString) and self.coords == other.coords
+
+    def __hash__(self):
+        return hash(self.coords)
+
+    def __str__(self):
+        """
+        Well-known text representation of the LineString
+        """
+        if not self.coords:
+            return "LINESTRING EMPTY"
+        return "LINESTRING (%s)" % ', '.join("%r %r" % (x, y) for x, y in self.coords)
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.coords)
+
+    @staticmethod
+    def from_wkt(s):
+        """
+        Parse a LineString geometry from a wkt string and return a new LineString object.
+        """
+        if not _HAS_GEOMET:
+            raise DriverException("Geomet is required to deserialize a wkt geometry.")
+
+        try:
+            geom = wkt.loads(s)
+        except ValueError:
+            raise ValueError("Invalid WKT geometry: '{0}'".format(s))
+
+        if geom['type'] != 'LineString':
+            raise ValueError("Invalid WKT geometry type. Expected 'LineString', got '{0}': '{1}'".format(geom['type'], s))
+
+        geom['coordinates'] = list_contents_to_tuple(geom['coordinates'])
+
+        return LineString(coords=geom['coordinates'])
+
+
+class _LinearRing(object):
+    # no validation, no implicit closing; just used for poly composition, to
+    # mimic that of shapely.geometry.Polygon
+    def __init__(self, coords=tuple()):
+        self.coords = list_contents_to_tuple(coords)
+
+    def __eq__(self, other):
+        return isinstance(other, _LinearRing) and self.coords == other.coords
+
+    def __hash__(self):
+        return hash(self.coords)
+
+    def __str__(self):
+        if not self.coords:
+            return "LINEARRING EMPTY"
+        return "LINEARRING (%s)" % ', '.join("%r %r" % (x, y) for x, y in self.coords)
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.coords)
+
+
+class Polygon(object):
+    """
+    Represents a polygon geometry for DSE
+    """
+
+    exterior = None
+    """
+    _LinearRing representing the exterior of the polygon
+    """
+
+    interiors = None
+    """
+    Tuple of _LinearRings representing interior holes in the polygon
+    """
+
+    def __init__(self, exterior=tuple(), interiors=None):
+        """
+        'exterior`: a sequence of (x, y) coordinates of points in the linestring
+        `interiors`: None, or a sequence of sequences or (x, y) coordinates of points describing interior linear rings
+        """
+        self.exterior = _LinearRing(exterior)
+        self.interiors = tuple(_LinearRing(e) for e in interiors) if interiors else tuple()
+
+    def __eq__(self, other):
+        return isinstance(other, Polygon) and self.exterior == other.exterior and self.interiors == other.interiors
+
+    def __hash__(self):
+        return hash((self.exterior, self.interiors))
+
+    def __str__(self):
+        """
+        Well-known text representation of the polygon
+        """
+        if not self.exterior.coords:
+            return "POLYGON EMPTY"
+        rings = [ring.coords for ring in chain((self.exterior,), self.interiors)]
+        rings = ["(%s)" % ', '.join("%r %r" % (x, y) for x, y in ring) for ring in rings]
+        return "POLYGON (%s)" % ', '.join(rings)
+
+    def __repr__(self):
+        return "%s(%r, %r)" % (self.__class__.__name__, self.exterior.coords, [ring.coords for ring in self.interiors])
+
+    @staticmethod
+    def from_wkt(s):
+        """
+        Parse a Polygon geometry from a wkt string and return a new Polygon object.
+        """
+        if not _HAS_GEOMET:
+            raise DriverException("Geomet is required to deserialize a wkt geometry.")
+
+        try:
+            geom = wkt.loads(s)
+        except ValueError:
+            raise ValueError("Invalid WKT geometry: '{0}'".format(s))
+
+        if geom['type'] != 'Polygon':
+            raise ValueError("Invalid WKT geometry type. Expected 'Polygon', got '{0}': '{1}'".format(geom['type'], s))
+
+        coords = geom['coordinates']
+        exterior = coords[0] if len(coords) > 0 else tuple()
+        interiors = coords[1:] if len(coords) > 1 else None
+
+        return Polygon(exterior=exterior, interiors=interiors)
+
+
+_distance_wkt_pattern = re.compile("distance *\\( *\\( *([\\d\\.-]+) *([\\d+\\.-]+) *\\) *([\\d+\\.-]+) *\\) *$", re.IGNORECASE)
+
+
+class Distance(object):
+    """
+    Represents a Distance geometry for DSE
+    """
+
+    x = None
+    """
+    x coordinate of the center point
+    """
+
+    y = None
+    """
+    y coordinate of the center point
+    """
+
+    radius = None
+    """
+    radius to represent the distance from the center point
+    """
+
+    def __init__(self, x=_nan, y=_nan, radius=_nan):
+        self.x = x
+        self.y = y
+        self.radius = radius
+
+    def __eq__(self, other):
+        return isinstance(other, Distance) and self.x == other.x and self.y == other.y and self.radius == other.radius
+
+    def __hash__(self):
+        return hash((self.x, self.y, self.radius))
+
+    def __str__(self):
+        """
+        Well-known text representation of the point
+        """
+        return "DISTANCE ((%r %r) %r)" % (self.x, self.y, self.radius)
+
+    def __repr__(self):
+        return "%s(%r, %r, %r)" % (self.__class__.__name__, self.x, self.y, self.radius)
+
+    @staticmethod
+    def from_wkt(s):
+        """
+        Parse a Distance geometry from a wkt string and return a new Distance object.
+        """
+
+        distance_match = _distance_wkt_pattern.match(s)
+
+        if distance_match is None:
+            raise ValueError("Invalid WKT geometry: '{0}'".format(s))
+
+        x, y, radius = distance_match.groups()
+        return Distance(x, y, radius)
+
+
 class Duration(object):
     """
     Cassandra Duration Type
     """
 
     months = 0
+    ""
     days = 0
+    ""
     nanoseconds = 0
+    ""
 
     def __init__(self, months=0, days=0, nanoseconds=0):
         self.months = months
@@ -1232,3 +1566,474 @@ class Duration(object):
             abs(self.days),
             abs(self.nanoseconds)
         )
+
+
+class DateRangePrecision(object):
+    """
+    An "enum" representing the valid values for :attr:`DateRange.precision`.
+    """
+    YEAR = 'YEAR'
+    """
+    """
+
+    MONTH = 'MONTH'
+    """
+    """
+
+    DAY = 'DAY'
+    """
+    """
+
+    HOUR = 'HOUR'
+    """
+    """
+
+    MINUTE = 'MINUTE'
+    """
+    """
+
+    SECOND = 'SECOND'
+    """
+    """
+
+    MILLISECOND = 'MILLISECOND'
+    """
+    """
+
+    PRECISIONS = (YEAR, MONTH, DAY, HOUR,
+                  MINUTE, SECOND, MILLISECOND)
+    """
+    """
+
+    @classmethod
+    def _to_int(cls, precision):
+        return cls.PRECISIONS.index(precision.upper())
+
+    @classmethod
+    def _round_to_precision(cls, ms, precision, default_dt):
+        try:
+            dt = utc_datetime_from_ms_timestamp(ms)
+        except OverflowError:
+            return ms
+        precision_idx = cls._to_int(precision)
+        replace_kwargs = {}
+        if precision_idx <= cls._to_int(DateRangePrecision.YEAR):
+            replace_kwargs['month'] = default_dt.month
+        if precision_idx <= cls._to_int(DateRangePrecision.MONTH):
+            replace_kwargs['day'] = default_dt.day
+        if precision_idx <= cls._to_int(DateRangePrecision.DAY):
+            replace_kwargs['hour'] = default_dt.hour
+        if precision_idx <= cls._to_int(DateRangePrecision.HOUR):
+            replace_kwargs['minute'] = default_dt.minute
+        if precision_idx <= cls._to_int(DateRangePrecision.MINUTE):
+            replace_kwargs['second'] = default_dt.second
+        if precision_idx <= cls._to_int(DateRangePrecision.SECOND):
+            # truncate to nearest 1000 so we deal in ms, not us
+            replace_kwargs['microsecond'] = (default_dt.microsecond // 1000) * 1000
+        if precision_idx == cls._to_int(DateRangePrecision.MILLISECOND):
+            replace_kwargs['microsecond'] = int(round(dt.microsecond, -3))
+        return ms_timestamp_from_datetime(dt.replace(**replace_kwargs))
+
+    @classmethod
+    def round_up_to_precision(cls, ms, precision):
+        # PYTHON-912: this is the only case in which we can't take as upper bound
+        # datetime.datetime.max because the month from ms may be February and we'd
+        # be setting 31 as the month day
+        if precision == cls.MONTH:
+            date_ms = utc_datetime_from_ms_timestamp(ms)
+            upper_date = datetime.datetime.max.replace(year=date_ms.year, month=date_ms.month,
+                                                       day=calendar.monthrange(date_ms.year, date_ms.month)[1])
+        else:
+            upper_date = datetime.datetime.max
+        return cls._round_to_precision(ms, precision, upper_date)
+
+    @classmethod
+    def round_down_to_precision(cls, ms, precision):
+        return cls._round_to_precision(ms, precision, datetime.datetime.min)
+
+
+@total_ordering
+class DateRangeBound(object):
+    """DateRangeBound(value, precision)
+    Represents a single date value and its precision for :class:`DateRange`.
+
+    .. attribute:: milliseconds
+
+        Integer representing milliseconds since the UNIX epoch. May be negative.
+
+    .. attribute:: precision
+
+        String representing the precision of a bound. Must be a valid
+        :class:`DateRangePrecision` member.
+
+    :class:`DateRangeBound` uses a millisecond offset from the UNIX epoch to
+    allow :class:`DateRange` to represent values `datetime.datetime` cannot.
+    For such values, string representions will show this offset rather than the
+    CQL representation.
+    """
+    milliseconds = None
+    precision = None
+
+    def __init__(self, value, precision):
+        """
+        :param value: a value representing ms since the epoch. Accepts an
+            integer or a datetime.
+        :param precision: a string representing precision
+        """
+        if precision is not None:
+            try:
+                self.precision = precision.upper()
+            except AttributeError:
+                raise TypeError('precision must be a string; got %r' % precision)
+
+        if value is None:
+            milliseconds = None
+        elif isinstance(value, six.integer_types):
+            milliseconds = value
+        elif isinstance(value, datetime.datetime):
+            value = value.replace(
+                microsecond=int(round(value.microsecond, -3))
+            )
+            milliseconds = ms_timestamp_from_datetime(value)
+        else:
+            raise ValueError('%r is not a valid value for DateRangeBound' % value)
+
+        self.milliseconds = milliseconds
+        self.validate()
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return (self.milliseconds == other.milliseconds and
+                self.precision == other.precision)
+
+    def __lt__(self, other):
+        return ((str(self.milliseconds), str(self.precision)) <
+                (str(other.milliseconds), str(other.precision)))
+
+    def datetime(self):
+        """
+        Return :attr:`milliseconds` as a :class:`datetime.datetime` if possible.
+        Raises an `OverflowError` if the value is out of range.
+        """
+        return utc_datetime_from_ms_timestamp(self.milliseconds)
+
+    def validate(self):
+        attrs = self.milliseconds, self.precision
+        if attrs == (None, None):
+            return
+        if None in attrs:
+            raise TypeError(
+                ("%s.datetime and %s.precision must not be None unless both "
+                 "are None; Got: %r") % (self.__class__.__name__,
+                                         self.__class__.__name__,
+                                         self)
+            )
+        if self.precision not in DateRangePrecision.PRECISIONS:
+            raise ValueError(
+                "%s.precision: expected value in %r; got %r" % (
+                    self.__class__.__name__,
+                    DateRangePrecision.PRECISIONS,
+                    self.precision
+                )
+            )
+
+    @classmethod
+    def from_value(cls, value):
+        """
+        Construct a new :class:`DateRangeBound` from a given value. If
+        possible, use the `value['milliseconds']` and `value['precision']` keys
+        of the argument. Otherwise, use the argument as a `(milliseconds,
+        precision)` iterable.
+
+        :param value: a dictlike or iterable object
+        """
+        if isinstance(value, cls):
+            return value
+
+        # if possible, use as a mapping
+        try:
+            milliseconds, precision = value.get('milliseconds'), value.get('precision')
+        except AttributeError:
+            milliseconds = precision = None
+        if milliseconds is not None and precision is not None:
+            return DateRangeBound(value=milliseconds, precision=precision)
+
+        # otherwise, use as an iterable
+        return DateRangeBound(*value)
+
+    def round_up(self):
+        if self.milliseconds is None or self.precision is None:
+            return self
+        self.milliseconds = DateRangePrecision.round_up_to_precision(
+            self.milliseconds, self.precision
+        )
+        return self
+
+    def round_down(self):
+        if self.milliseconds is None or self.precision is None:
+            return self
+        self.milliseconds = DateRangePrecision.round_down_to_precision(
+            self.milliseconds, self.precision
+        )
+        return self
+
+    _formatter_map = {
+        DateRangePrecision.YEAR: '%Y',
+        DateRangePrecision.MONTH: '%Y-%m',
+        DateRangePrecision.DAY: '%Y-%m-%d',
+        DateRangePrecision.HOUR: '%Y-%m-%dT%HZ',
+        DateRangePrecision.MINUTE: '%Y-%m-%dT%H:%MZ',
+        DateRangePrecision.SECOND: '%Y-%m-%dT%H:%M:%SZ',
+        DateRangePrecision.MILLISECOND: '%Y-%m-%dT%H:%M:%S',
+    }
+
+    def __str__(self):
+        if self == OPEN_BOUND:
+            return '*'
+
+        try:
+            dt = self.datetime()
+        except OverflowError:
+            return '%sms' % (self.milliseconds,)
+
+        formatted = dt.strftime(self._formatter_map[self.precision])
+
+        if self.precision == DateRangePrecision.MILLISECOND:
+            # we'd like to just format with '%Y-%m-%dT%H:%M:%S.%fZ', but %f
+            # gives us more precision than we want, so we strftime up to %S and
+            # do the rest ourselves
+            return '%s.%03dZ' % (formatted, dt.microsecond / 1000)
+
+        return formatted
+
+    def __repr__(self):
+        return '%s(milliseconds=%r, precision=%r)' % (
+            self.__class__.__name__, self.milliseconds, self.precision
+        )
+
+
+OPEN_BOUND = DateRangeBound(value=None, precision=None)
+"""
+Represents `*`, an open value or bound for :class:`DateRange`.
+"""
+
+
+@total_ordering
+class DateRange(object):
+    """DateRange(lower_bound=None, upper_bound=None, value=None)
+    DSE DateRange Type
+
+    .. attribute:: lower_bound
+
+        :class:`~DateRangeBound` representing the lower bound of a bounded range.
+
+    .. attribute:: upper_bound
+
+        :class:`~DateRangeBound` representing the upper bound of a bounded range.
+
+    .. attribute:: value
+
+        :class:`~DateRangeBound` representing the value of a single-value range.
+
+    As noted in its documentation, :class:`DateRangeBound` uses a millisecond
+    offset from the UNIX epoch to allow :class:`DateRange` to represent values
+    `datetime.datetime` cannot. For such values, string representions will show
+    this offset rather than the CQL representation.
+    """
+    lower_bound = None
+    upper_bound = None
+    value = None
+
+    def __init__(self, lower_bound=None, upper_bound=None, value=None):
+        """
+        :param lower_bound: a :class:`DateRangeBound` or object accepted by
+            :meth:`DateRangeBound.from_value` to be used as a
+            :attr:`lower_bound`. Mutually exclusive with `value`. If
+            `upper_bound` is specified and this is not, the :attr:`lower_bound`
+            will be open.
+        :param upper_bound: a :class:`DateRangeBound` or object accepted by
+            :meth:`DateRangeBound.from_value` to be used as a
+            :attr:`upper_bound`. Mutually exclusive with `value`. If
+            `lower_bound` is specified and this is not, the :attr:`upper_bound`
+            will be open.
+        :param value: a :class:`DateRangeBound` or object accepted by
+            :meth:`DateRangeBound.from_value` to be used as :attr:`value`. Mutually
+            exclusive with `lower_bound` and `lower_bound`.
+        """
+
+        # if necessary, transform non-None args to DateRangeBounds
+        lower_bound = (DateRangeBound.from_value(lower_bound).round_down()
+                       if lower_bound else lower_bound)
+        upper_bound = (DateRangeBound.from_value(upper_bound).round_up()
+                       if upper_bound else upper_bound)
+        value = (DateRangeBound.from_value(value).round_down()
+                 if value else value)
+
+        # if we're using a 2-ended range but one bound isn't specified, specify
+        # an open bound
+        if lower_bound is None and upper_bound is not None:
+            lower_bound = OPEN_BOUND
+        if upper_bound is None and lower_bound is not None:
+            upper_bound = OPEN_BOUND
+
+        self.lower_bound, self.upper_bound, self.value = (
+            lower_bound, upper_bound, value
+        )
+        self.validate()
+
+    def validate(self):
+        if self.value is None:
+            if self.lower_bound is None or self.upper_bound is None:
+                raise ValueError(
+                    '%s instances where value attribute is None must set '
+                    'lower_bound or upper_bound; got %r' % (
+                        self.__class__.__name__,
+                        self
+                    )
+                )
+        else:  # self.value is not None
+            if self.lower_bound is not None or self.upper_bound is not None:
+                raise ValueError(
+                    '%s instances where value attribute is not None must not '
+                    'set lower_bound or upper_bound; got %r' % (
+                        self.__class__.__name__,
+                        self
+                    )
+                )
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return (self.lower_bound == other.lower_bound and
+                self.upper_bound == other.upper_bound and
+                self.value == other.value)
+
+    def __lt__(self, other):
+        return ((str(self.lower_bound), str(self.upper_bound), str(self.value)) <
+                (str(other.lower_bound), str(other.upper_bound), str(other.value)))
+
+    def __str__(self):
+        if self.value:
+            return str(self.value)
+        else:
+            return '[%s TO %s]' % (self.lower_bound, self.upper_bound)
+
+    def __repr__(self):
+        return '%s(lower_bound=%r, upper_bound=%r, value=%r)' % (
+            self.__class__.__name__,
+            self.lower_bound, self.upper_bound, self.value
+        )
+
+
+@total_ordering
+class Version(object):
+    """
+    Internal minimalist class to compare versions.
+    A valid version is: <int>.<int>.<int>.<int or str>.
+
+    TODO: when python2 support is removed, use packaging.version.
+    """
+
+    _version = None
+    major = None
+    minor = 0
+    patch = 0
+    build = 0
+    prerelease = 0
+
+    def __init__(self, version):
+        self._version = version
+        if '-' in version:
+            version_without_prerelease, self.prerelease = version.split('-', 1)
+        else:
+            version_without_prerelease = version
+        parts = list(reversed(version_without_prerelease.split('.')))
+        if len(parts) > 4:
+            prerelease_string = "-{}".format(self.prerelease) if self.prerelease else ""
+            log.warning("Unrecognized version: {}. Only 4 components plus prerelease are supported. "
+                        "Assuming version as {}{}".format(version, '.'.join(parts[:-5:-1]), prerelease_string))
+
+        try:
+            self.major = int(parts.pop())
+        except ValueError:
+            six.reraise(
+                ValueError,
+                ValueError("Couldn't parse version {}. Version should start with a number".format(version)),
+                sys.exc_info()[2]
+            )
+        try:
+            self.minor = int(parts.pop()) if parts else 0
+            self.patch = int(parts.pop()) if parts else 0
+
+            if parts:  # we have a build version
+                build = parts.pop()
+                try:
+                    self.build = int(build)
+                except ValueError:
+                    self.build = build
+        except ValueError:
+            assumed_version = "{}.{}.{}.{}-{}".format(self.major, self.minor, self.patch, self.build, self.prerelease)
+            log.warning("Unrecognized version {}. Assuming version as {}".format(version, assumed_version))
+
+    def __hash__(self):
+        return self._version
+
+    def __repr__(self):
+        version_string = "Version({0}, {1}, {2}".format(self.major, self.minor, self.patch)
+        if self.build:
+            version_string += ", {}".format(self.build)
+        if self.prerelease:
+            version_string += ", {}".format(self.prerelease)
+        version_string += ")"
+
+        return version_string
+
+    def __str__(self):
+        return self._version
+
+    @staticmethod
+    def _compare_version_part(version, other_version, cmp):
+        if not (isinstance(version, six.integer_types) and
+                isinstance(other_version, six.integer_types)):
+            version = str(version)
+            other_version = str(other_version)
+
+        return cmp(version, other_version)
+
+    def __eq__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+
+        return (self.major == other.major and
+                self.minor == other.minor and
+                self.patch == other.patch and
+                self._compare_version_part(self.build, other.build, lambda s, o: s == o) and
+                self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s == o)
+                )
+
+    def __gt__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+
+        is_major_ge = self.major >= other.major
+        is_minor_ge = self.minor >= other.minor
+        is_patch_ge = self.patch >= other.patch
+        is_build_gt = self._compare_version_part(self.build, other.build, lambda s, o: s > o)
+        is_build_ge = self._compare_version_part(self.build, other.build, lambda s, o: s >= o)
+
+        # By definition, a prerelease comes BEFORE the actual release, so if a version
+        # doesn't have a prerelease, it's automatically greater than anything that does
+        if self.prerelease and not other.prerelease:
+            is_prerelease_gt = False
+        elif other.prerelease and not self.prerelease:
+            is_prerelease_gt = True
+        else:
+            is_prerelease_gt = self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s > o) \
+
+        return (self.major > other.major or
+                (is_major_ge and self.minor > other.minor) or
+                (is_major_ge and is_minor_ge and self.patch > other.patch) or
+                (is_major_ge and is_minor_ge and is_patch_ge and is_build_gt) or
+                (is_major_ge and is_minor_ge and is_patch_ge and is_build_ge and is_prerelease_gt)
+                )

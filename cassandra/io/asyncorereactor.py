@@ -22,6 +22,7 @@ from threading import Lock, Thread, Event
 import time
 import weakref
 import sys
+import ssl
 
 from six.moves import range
 
@@ -32,24 +33,16 @@ except ImportError:
 
 import asyncore
 
-try:
-    import ssl
-except ImportError:
-    ssl = None  # NOQA
-
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING, Timer, TimerManager
+
 
 log = logging.getLogger(__name__)
 
 _dispatcher_map = {}
 
-def _cleanup(loop_weakref):
-    try:
-        loop = loop_weakref()
-    except ReferenceError:
-        return
-
-    loop._cleanup()
+def _cleanup(loop):
+    if loop:
+        loop._cleanup()
 
 
 class WaitableTimer(Timer):
@@ -228,8 +221,6 @@ class AsyncoreLoop(object):
             dispatcher = _BusyWaitDispatcher()
         self._loop_dispatcher = dispatcher
 
-        atexit.register(partial(_cleanup, weakref.ref(self)))
-
     def maybe_start(self):
         should_start = False
         did_acquire = False
@@ -243,7 +234,7 @@ class AsyncoreLoop(object):
                 self._loop_lock.release()
 
         if should_start:
-            self._thread = Thread(target=self._run_loop, name="cassandra_driver_event_loop")
+            self._thread = Thread(target=self._run_loop, name="asyncore_cassandra_driver_event_loop")
             self._thread.daemon = True
             self._thread.start()
 
@@ -258,7 +249,13 @@ class AsyncoreLoop(object):
                     self._loop_dispatcher.loop(self.timer_resolution)
                     self._timers.service_timeouts()
                 except Exception:
-                    log.debug("Asyncore event loop stopped unexepectedly", exc_info=True)
+                    try:
+                        log.debug("Asyncore event loop stopped unexpectedly", exc_info=True)
+                    except Exception:
+                        # TODO: Remove when Python 2 support is removed
+                        # PYTHON-1266. If our logger has disappeared, there's nothing we
+                        # can do, so just log nothing.
+                        pass
                     break
             self._started = False
 
@@ -299,40 +296,43 @@ class AsyncoreLoop(object):
         log.debug("Dispatchers were closed")
 
 
+_global_loop = None
+atexit.register(partial(_cleanup, _global_loop))
+
+
 class AsyncoreConnection(Connection, asyncore.dispatcher):
     """
     An implementation of :class:`.Connection` that uses the ``asyncore``
     module in the Python standard library for its event loop.
     """
 
-    _loop = None
-
     _writable = False
     _readable = False
 
     @classmethod
     def initialize_reactor(cls):
-        if not cls._loop:
-            cls._loop = AsyncoreLoop()
+        global _global_loop
+        if not _global_loop:
+            _global_loop = AsyncoreLoop()
         else:
             current_pid = os.getpid()
-            if cls._loop._pid != current_pid:
+            if _global_loop._pid != current_pid:
                 log.debug("Detected fork, clearing and reinitializing reactor state")
                 cls.handle_fork()
-                cls._loop = AsyncoreLoop()
+                _global_loop = AsyncoreLoop()
 
     @classmethod
     def handle_fork(cls):
-        global _dispatcher_map
+        global _dispatcher_map, _global_loop
         _dispatcher_map = {}
-        if cls._loop:
-            cls._loop._cleanup()
-            cls._loop = None
+        if _global_loop:
+            _global_loop._cleanup()
+            _global_loop = None
 
     @classmethod
     def create_timer(cls, timeout, callback):
         timer = Timer(timeout, callback)
-        cls._loop.add_timer(timer)
+        _global_loop.add_timer(timer)
         return timer
 
     def __init__(self, *args, **kwargs):
@@ -344,14 +344,14 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         self._connect_socket()
 
         # start the event loop if needed
-        self._loop.maybe_start()
+        _global_loop.maybe_start()
 
         init_handler = WaitableTimer(
             timeout=0,
             callback=partial(asyncore.dispatcher.__init__,
                              self, self._socket, _dispatcher_map)
         )
-        self._loop.add_timer(init_handler)
+        _global_loop.add_timer(init_handler)
         init_handler.wait(kwargs["connect_timeout"])
 
         self._writable = True
@@ -365,22 +365,22 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 return
             self.is_closed = True
 
-        log.debug("Closing connection (%s) to %s", id(self), self.host)
+        log.debug("Closing connection (%s) to %s", id(self), self.endpoint)
         self._writable = False
         self._readable = False
 
         # We don't have to wait for this to be closed, we can just schedule it
         self.create_timer(0, partial(asyncore.dispatcher.close, self))
 
-        log.debug("Closed socket to %s", self.host)
+        log.debug("Closed socket to %s", self.endpoint)
 
         if not self.is_defunct:
             self.error_all_requests(
-                ConnectionShutdown("Connection to %s was closed" % self.host))
+                ConnectionShutdown("Connection to %s was closed" % self.endpoint))
 
             #This happens when the connection is shutdown while waiting for the ReadyMessage
             if not self.connected_event.is_set():
-                self.last_error = ConnectionShutdown("Connection to %s was closed" % self.host)
+                self.last_error = ConnectionShutdown("Connection to %s was closed" % self.endpoint)
 
             # don't leave in-progress operations hanging
             self.connected_event.set()
@@ -405,7 +405,8 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 sent = self.send(next_msg)
                 self._readable = True
             except socket.error as err:
-                if (err.args[0] in NONBLOCKING):
+                if (err.args[0] in NONBLOCKING or
+                        err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE)):
                     with self.deque_lock:
                         self.deque.appendleft(next_msg)
                 else:
@@ -426,11 +427,17 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
                 if len(buf) < self.in_buffer_size:
                     break
         except socket.error as err:
-            if ssl and isinstance(err, ssl.SSLError):
-                if err.args[0] not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+            if isinstance(err, ssl.SSLError):
+                if err.args[0] in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                    if not self._iobuf.tell():
+                        return
+                else:
                     self.defunct(err)
                     return
-            elif err.args[0] not in NONBLOCKING:
+            elif err.args[0] in NONBLOCKING:
+                if not self._iobuf.tell():
+                    return
+            else:
                 self.defunct(err)
                 return
 
@@ -451,10 +458,10 @@ class AsyncoreConnection(Connection, asyncore.dispatcher):
         with self.deque_lock:
             self.deque.extend(chunks)
             self._writable = True
-        self._loop.wake_loop()
+        _global_loop.wake_loop()
 
     def writable(self):
         return self._writable
 
     def readable(self):
-        return self._readable or (self.is_control_connection and not (self.is_defunct or self.is_closed))
+        return self._readable or ((self.is_control_connection or self._continuous_paging_sessions) and not (self.is_defunct or self.is_closed))
