@@ -42,7 +42,7 @@ from cassandra.connection import DefaultEndPoint
 from tests import notwindows
 from tests.integration import use_singledc, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
-    get_unsupported_upper_protocol, protocolv5, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40, \
+    get_unsupported_upper_protocol, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40, \
     DSE_VERSION, TestCluster, PROTOCOL_VERSION
 from tests.integration.util import assert_quiescent_pool_state
 import sys
@@ -261,6 +261,18 @@ class ClusterTests(unittest.TestCase):
         elif DSE_VERSION and DSE_VERSION >= Version("5.1"):
             self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.DSE_V1)
             self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.DSE_V1)
+        elif CASSANDRA_VERSION >= Version('4.0-beta4'):
+            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V5)
+            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V5)
+        elif CASSANDRA_VERSION >= Version('4.0-a'):
+            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V4)
+            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V4)
+        elif CASSANDRA_VERSION >= Version('3.11'):
+            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V4)
+            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V4)
+        elif CASSANDRA_VERSION >= Version('3.0'):
+            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V4)
+            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V4)
         elif CASSANDRA_VERSION >= Version('2.2'):
             self.assertEqual(updated_protocol_version, 4)
             self.assertEqual(updated_cluster_version, 4)
@@ -1473,42 +1485,42 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         cluster.shutdown()
 
 
-@protocolv5
+@protocolv6
 class BetaProtocolTest(unittest.TestCase):
 
-    @protocolv5
+    @protocolv6
     def test_invalid_protocol_version_beta_option(self):
         """
-        Test cluster connection with protocol v5 and beta flag not set
+        Test cluster connection with protocol v6 and beta flag not set
 
         @since 3.7.0
-        @jira_ticket PYTHON-614
-        @expected_result client shouldn't connect with V5 and no beta flag set
+        @jira_ticket PYTHON-614, PYTHON-1232
+        @expected_result client shouldn't connect with V6 and no beta flag set
 
         @test_category connection
         """
 
-        cluster = TestCluster(protocol_version=cassandra.ProtocolVersion.V5, allow_beta_protocol_version=False)
+        cluster = TestCluster(protocol_version=cassandra.ProtocolVersion.V6, allow_beta_protocol_version=False)
         try:
             with self.assertRaises(NoHostAvailable):
                 cluster.connect()
         except Exception as e:
             self.fail("Unexpected error encountered {0}".format(e.message))
 
-    @protocolv5
+    @protocolv6
     def test_valid_protocol_version_beta_options_connect(self):
         """
         Test cluster connection with protocol version 5 and beta flag set
 
         @since 3.7.0
-        @jira_ticket PYTHON-614
-        @expected_result client should connect with protocol v5 and beta flag set.
+        @jira_ticket PYTHON-614, PYTHON-1232
+        @expected_result client should connect with protocol v6 and beta flag set.
 
         @test_category connection
         """
-        cluster = Cluster(protocol_version=cassandra.ProtocolVersion.V5, allow_beta_protocol_version=True)
+        cluster = Cluster(protocol_version=cassandra.ProtocolVersion.V6, allow_beta_protocol_version=True)
         session = cluster.connect()
-        self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.V5)
+        self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.V6)
         self.assertTrue(session.execute("select release_version from system.local")[0])
         cluster.shutdown()
 
