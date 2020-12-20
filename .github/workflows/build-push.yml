@@ -1,0 +1,167 @@
+name: Build and upload to PyPi
+
+on: [push, pull_request]
+
+
+env:
+ CIBW_TEST_COMMAND_LINUX: "pytest --import-mode append {project}/tests/unit -k 'not (test_connection_initialization or test_cloud)' && EVENT_LOOP_MANAGER=gevent pytest --import-mode append {project}/tests/unit/io/test_geventreactor.py && EVENT_LOOP_MANAGER=eventlet pytest --import-mode append {project}/tests/unit/io/test_eventletreactor.py "
+ CIBW_TEST_COMMAND_MACOS: "pytest --import-mode append {project}/tests/unit -k 'not (test_multi_timer_validation or test_empty_connections or test_connection_initialization or test_timer_cancellation or test_cloud)' "
+ CIBW_TEST_COMMAND_WINDOWS: "pytest --import-mode append {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor or test_connection_initialization or test_cloud)\" "
+ CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt pytest"
+ CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y epel-release && yum install -y redhat-rpm-config gcc libffi-devel python-devel libev libev-devel openssl openssl-devel"
+ CASS_DRIVER_BUILD_CONCURRENCY: 2
+ CIBW_SKIP: cp35*
+
+jobs:
+  build_wheels:
+    name: Build wheels ${{ matrix.os }} (${{ matrix.platform }})
+    if: contains(github.event.pull_request.labels.*.name, 'test-build') || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-18.04
+            platform: x86_64
+
+          - os: ubuntu-18.04
+            platform: i686
+
+          - os: ubuntu-18.04
+            platform: PyPy
+
+          - os: windows-latest
+            platform: win32
+
+          - os: windows-latest
+            platform: win64
+
+          - os: windows-latest
+            platform: PyPy
+
+          - os: macos-latest
+            platform: all
+
+          - os: macos-latest
+            platform: PyPy
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        name: Install Python
+        with:
+          python-version: '3.7'
+
+      - name: Install cibuildwheel
+        run: |
+          python -m pip install cibuildwheel==1.7.1
+
+      - name: Install Visual C++ for Python 2.7
+        if: runner.os == 'Windows'
+        run: |
+          choco install vcpython27 -f -y
+
+      - name: Install OpenSSL for Windows
+        if: runner.os == 'Windows'
+        run: |
+          choco install openssl -f -y
+
+      - name: Install OpenSSL for MacOS
+        if: runner.os == 'MacOs'
+        run: |
+          brew install libev
+
+      - name: Overwrite for Linux 64
+        if: runner.os == 'Linux' && matrix.platform == 'x86_64'
+        run: |
+          echo "CIBW_BUILD=cp*_x86_64" >> $GITHUB_ENV
+
+      - name: Overwrite for Linux 32
+        if: runner.os == 'Linux' && matrix.platform == 'i686'
+        run: |
+          echo "CIBW_BUILD=cp*_i686" >> $GITHUB_ENV
+          echo "CIBW_TEST_COMMAND_LINUX=" >> $GITHUB_ENV
+
+      - name: Overwrite for Linux PyPy
+        if: runner.os == 'Linux' && matrix.platform == 'PyPy'
+        run: |
+          echo "CIBW_BUILD=pp*" >> $GITHUB_ENV
+          echo "CIBW_TEST_COMMAND_LINUX=" >> $GITHUB_ENV
+          echo "CIBW_MANYLINUX_PYPY_X86_64_IMAGE=pypywheels/manylinux2010-pypy_x86_64:2020-12-11-f1e0e80" >> $GITHUB_ENV
+
+      - name: Overwrite for Windows 64
+        if: runner.os == 'Windows' && matrix.platform == 'win64'
+        run: |
+          echo "CIBW_BUILD=cp*win_amd64" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+          echo "CIBW_SKIP=cp39*" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+
+      - name: Overwrite for Windows 32
+        if: runner.os == 'Windows' && matrix.platform == 'win32'
+        run: |
+          echo "CIBW_BUILD=cp*win32" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+          echo "CIBW_SKIP=cp39*" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+
+      - name: Overwrite for Windows PyPY
+        if: runner.os == 'Windows' && matrix.platform == 'PyPy'
+        run: |
+          echo "CIBW_BUILD=pp*" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+          echo "CIBW_TEST_COMMAND_WINDOWS=" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+
+      - name: Overwrite for MacOs
+        if: runner.os == 'MacOs' && matrix.platform == 'all'
+        run: |
+          echo "CIBW_BUILD=cp37* cp38*" >> $GITHUB_ENV
+          echo "CIBW_BEFORE_TEST_MACOS=pip install -r {project}/test-requirements.txt pytest" >> $GITHUB_ENV
+
+      - name: Overwrite for MacOs PyPy
+        if: runner.os == 'MacOs' && matrix.platform == 'PyPy'
+        run: |
+          echo "CIBW_BUILD=pp*" >> $GITHUB_ENV
+          echo "CIBW_BEFORE_TEST_MACOS=pip install -r {project}/test-requirements.txt pytest" >> $GITHUB_ENV
+          echo "CIBW_TEST_COMMAND_MACOS=" >> $GITHUB_ENV
+
+      - name: Build wheels
+        run: |
+          python -m cibuildwheel --output-dir wheelhouse
+
+      - uses: actions/upload-artifact@v2
+        with:
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    if: contains(github.event.pull_request.labels.*.name, 'test-build') || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        name: Install Python
+        with:
+          python-version: '3.7'
+
+      - name: Build sdist
+        run: python setup.py sdist
+
+      - uses: actions/upload-artifact@v2
+        with:
+          path: dist/*.tar.gz
+
+  upload_pypi:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    # upload to PyPI on every tag starting with 'v'
+    if: github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
+    # alternatively, to publish when a GitHub Release is created, use the following rule:
+    # if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: artifact
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
