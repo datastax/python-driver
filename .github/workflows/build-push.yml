@@ -9,7 +9,7 @@ env:
  CIBW_TEST_COMMAND_WINDOWS: "pytest --import-mode append {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor or test_connection_initialization or test_cloud)\" "
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt pytest"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y epel-release && yum install -y redhat-rpm-config gcc libffi-devel python-devel libev libev-devel openssl openssl-devel"
- CASS_DRIVER_BUILD_CONCURRENCY: 2
+ CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2"
  CIBW_SKIP: cp35*
 
 jobs:
