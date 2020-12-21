@@ -418,6 +418,7 @@ def run_setup(extensions):
         version=__version__,
         description='Scylla Driver for Apache Cassandra',
         long_description=long_description,
+        long_description_content_type='text/x-rst',
         url='https://github.com/scylladb/python-driver',
         project_urls={
             'Documentation': 'https://scylladb.github.io/python-driver/',
