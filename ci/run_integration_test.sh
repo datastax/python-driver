@@ -1,6 +1,6 @@
 #! /bin/bash -e
 
-BRANCH='branch-4.1'
+BRANCH='branch-4.2'
 
 python3 -m venv .test-venv
 source .test-venv/bin/activate
