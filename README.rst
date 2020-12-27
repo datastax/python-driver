@@ -4,8 +4,8 @@ Scylla Python Driver
 A modern, feature-rich and highly-tunable Python client library for Scylla Open Source (2.1+) and Apache Cassandra (2.1+) and
 Scylla Enterprise (2018.1.x+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
 
-.. image:: https://travis-ci.org/scylladb/python-driver.png?branch=master
-   :target: https://travis-ci.org/github/scylladb/python-driver
+.. image:: https://github.com/scylladb/python-driver/workflows/Build%20and%20upload%20to%20PyPi/badge.svg?tag=*-scylla
+   :target: https://github.com/scylladb/python-driver/actions?query=event%3Apush+branch%3A*-scylla
 
 The driver supports Python versions 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
 
