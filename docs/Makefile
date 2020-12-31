@@ -72,3 +72,7 @@ multiversion: setup
 	$(POETRY) run sphinx-multiversion $(SOURCEDIR) $(BUILDDIR)/dirhtml
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
+
+.PHONY: multiversionpreview
+multiversionpreview: multiversion
+	$(POETRY) run python3 -m http.server 5500 --directory $(BUILDDIR)/dirhtml
