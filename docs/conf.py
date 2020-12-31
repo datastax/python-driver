@@ -92,7 +92,7 @@ html_use_index = False
 htmlhelp_basename = 'CassandraDriverdoc'
 
 # URL which points to the root of the HTML documentation. 
-html_baseurl = 'https://scylladb.github.io/python-driver'
+html_baseurl = 'https://python-driver.docs.scylladb.com'
 
 # Dictionary of values to pass into the template engine’s context for all pages
 html_context = {'html_baseurl': html_baseurl}
