@@ -4,14 +4,17 @@ on:
   push:
     branches:
     - master
-    tags:       
+    tags:
     - '**'
+    paths:
+    - 'docs/**'
+
 jobs:
   release:
     name: Build
     runs-on: ubuntu-latest
     env:
-      LATEST_VERSION: 3.22.0-scylla
+      LATEST_VERSION: stable
     steps:
     - name: Checkout
       uses: actions/checkout@v2
