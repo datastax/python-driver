@@ -35,7 +35,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Cassandra Driver'
-copyright = u'2013-2017 DataStax'
+copyright = u'ScyllaDB 2021 and © DataStax 2013-2017'
+
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
