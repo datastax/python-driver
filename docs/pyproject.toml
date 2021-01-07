@@ -10,7 +10,7 @@ geomet = "0.1.2"
 six = "1.15.0"
 futures = "2.2.0"
 eventlet = "0.25.2"
-gevent = "20.6.2"
+gevent = "20.12.1"
 scales = "1.0.9"
 [tool.poetry.dev-dependencies]
 sphinx-autobuild = "0.7.1"

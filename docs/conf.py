@@ -52,7 +52,7 @@ autoclass_content = 'both'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build', 'cloud.rst', 'core_graph.rst', 'geo_types.rst', 'graph.rst', 'graph_fluent.rst']
+exclude_patterns = ['_build', 'cloud.rst', 'core_graph.rst', 'classic_graph.rst', 'geo_types.rst', 'graph.rst', 'graph_fluent.rst']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -76,7 +76,7 @@ html_theme = 'sphinx_scylladb_theme'
 # documentation.
 html_theme_options = {
     'header_links': [
-    ('Scylla Python Driver', 'https://scylladb.github.io/python-driver/'),
+    ('Scylla Python Driver', 'https://python-driver.docs.scylladb.com/'),
     ('Scylla Cloud', 'https://docs.scylladb.com/scylla-cloud/'),
     ('Scylla University', 'https://university.scylladb.com/'),
     ('ScyllaDB Home', 'https://www.scylladb.com/')],

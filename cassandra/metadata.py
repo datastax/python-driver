@@ -342,7 +342,7 @@ class Metadata(object):
         """
         Find a host in the metadata for a specific endpoint. If a string inet address and port are passed,
         iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` and
-        :attr:`~.pool.Host.broadcast_rpc_port`attributes.
+        :attr:`~.pool.Host.broadcast_rpc_port`attributes`.
         """
         if not isinstance(endpoint_or_address, EndPoint):
             return self._get_host_by_address(endpoint_or_address, port)
