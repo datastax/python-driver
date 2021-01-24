@@ -11,8 +11,6 @@ jobs:
   release:
     name: Build
     runs-on: ubuntu-latest
-    env:
-      LATEST_VERSION: stable
     steps:
     - name: Checkout
       uses: actions/checkout@v2
