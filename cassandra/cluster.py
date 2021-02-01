@@ -1570,7 +1570,7 @@ class Cluster(object):
         If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
         is not supported (there is always one connection per host, unless
         the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
+        and using this will result in an :exc:`~.UnsupportedOperation`.
         """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
@@ -1603,7 +1603,7 @@ class Cluster(object):
         If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
         is not supported (there is always one connection per host, unless
         the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
+        and using this will result in an :exc:`~.UnsupportedOperation`.
         """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
