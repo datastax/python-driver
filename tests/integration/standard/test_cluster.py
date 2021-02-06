@@ -261,7 +261,7 @@ class ClusterTests(unittest.TestCase):
         elif DSE_VERSION and DSE_VERSION >= Version("5.1"):
             self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.DSE_V1)
             self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.DSE_V1)
-        elif CASSANDRA_VERSION >= Version('4.0-beta4'):
+        elif CASSANDRA_VERSION >= Version('4.0-beta5'):
             self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V5)
             self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V5)
         elif CASSANDRA_VERSION >= Version('4.0-a'):

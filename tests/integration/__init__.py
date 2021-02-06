@@ -235,7 +235,7 @@ def get_supported_protocol_versions():
     4.0(C*) -> 6(beta),5,4,3
     4.0(DSE) -> DSE_v2, DSE_V1,4,3
 `   """
-    if CASSANDRA_VERSION >= Version('4.0-beta4'):
+    if CASSANDRA_VERSION >= Version('4.0-beta5'):
         if not DSE_VERSION:
             return (3, 4, 5, 6)
     if CASSANDRA_VERSION >= Version('4.0-a'):

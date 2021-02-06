@@ -161,12 +161,12 @@ class ProtocolVersion(object):
 
     V5 = 5
     """
-    v5, in beta from 3.x+. Finalised in 4.0-beta4
+    v5, in beta from 3.x+. Finalised in 4.0-beta5
     """
 
     V6 = 6
     """
-    v6, in beta from 4.0-beta4 
+    v6, in beta from 4.0-beta5
     """
 
     DSE_V1 = 0x41
