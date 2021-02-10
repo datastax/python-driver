@@ -1345,6 +1345,9 @@ class Connection(object):
                           "if DSE authentication is configured with transitional mode" % (self.host,))
                 raise AuthenticationFailed('Remote end requires authentication')
 
+            if ProtocolVersion.has_checksumming_support(self.protocol_version):
+                self._enable_checksumming()
+
             if isinstance(self.authenticator, dict):
                 log.debug("Sending credentials-based auth response on %s", self)
                 cm = CredentialsMessage(creds=self.authenticator)
