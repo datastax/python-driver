@@ -63,7 +63,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler,
-                                RESULT_KIND_VOID)
+                                RESULT_KIND_VOID, ProtocolException)
 from cassandra.metadata import Metadata, protect_name, murmur3, _NodeInfo
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -1570,7 +1570,7 @@ class Cluster(object):
         If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
         is not supported (there is always one connection per host, unless
         the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
+        and using this will result in an :exc:`~.UnsupportedOperation`.
         """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
@@ -1603,7 +1603,7 @@ class Cluster(object):
         If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
         is not supported (there is always one connection per host, unless
         the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
+        and using this will result in an :exc:`~.UnsupportedOperation`.
         """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
@@ -3548,6 +3548,14 @@ class ControlConnection(object):
                 break
             except ProtocolVersionUnsupported as e:
                 self._cluster.protocol_downgrade(host.endpoint, e.startup_version)
+            except ProtocolException as e:
+                # protocol v5 is out of beta in C* >=4.0-beta5 and is now the default driver
+                # protocol version. If the protocol version was not explicitly specified,
+                # and that the server raises a beta protocol error, we should downgrade.
+                if not self._cluster._protocol_version_explicit and e.is_beta_protocol_error:
+                    self._cluster.protocol_downgrade(host.endpoint, self._cluster.protocol_version)
+                else:
+                    raise
 
         log.debug("[control connection] Established new connection %r, "
                   "registering watchers and refreshing schema and topology",
