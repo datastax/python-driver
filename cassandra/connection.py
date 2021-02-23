@@ -897,10 +897,6 @@ class Connection(object):
             for args in self.sockopts:
                 self._socket.setsockopt(*args)
 
-    def _enable_compression(self):
-        if self._compressor:
-            self.compressor = self._compressor
-
     def _enable_checksumming(self):
         self._io_buffer.set_checksumming_buffer()
         self._is_checksumming_enabled = True
@@ -1332,7 +1328,8 @@ class Connection(object):
                             self.authenticator.__class__.__name__)
 
             log.debug("Got ReadyMessage on new connection (%s) from %s", id(self), self.endpoint)
-            self._enable_compression()
+            if self._compressor:
+                self.compressor = self._compressor
 
             if ProtocolVersion.has_checksumming_support(self.protocol_version):
                 self._enable_checksumming()
@@ -1347,10 +1344,6 @@ class Connection(object):
                           "consider using TransitionalModePlainTextAuthProvider "
                           "if DSE authentication is configured with transitional mode" % (self.host,))
                 raise AuthenticationFailed('Remote end requires authentication')
-
-            self._enable_compression()
-            if ProtocolVersion.has_checksumming_support(self.protocol_version):
-                self._enable_checksumming()
 
             if isinstance(self.authenticator, dict):
                 log.debug("Sending credentials-based auth response on %s", self)

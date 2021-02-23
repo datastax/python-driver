@@ -207,6 +207,8 @@ def get_default_protocol():
         if DSE_VERSION:
             return ProtocolVersion.DSE_V2
         else:
+            global ALLOW_BETA_PROTOCOL
+            ALLOW_BETA_PROTOCOL = True
             return ProtocolVersion.V5
     if CASSANDRA_VERSION >= Version('3.10'):
         if DSE_VERSION:
@@ -232,12 +234,9 @@ def get_supported_protocol_versions():
     3.X -> 4, 3
     3.10(C*) -> 5(beta),4,3
     3.10(DSE) -> DSE_V1,4,3
-    4.0(C*) -> 6(beta),5,4,3
+    4.0(C*) -> 5(beta),4,3
     4.0(DSE) -> DSE_v2, DSE_V1,4,3
 `   """
-    if CASSANDRA_VERSION >= Version('4.0-beta5'):
-        if not DSE_VERSION:
-            return (3, 4, 5, 6)
     if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
             return (3, 4, ProtocolVersion.DSE_V1, ProtocolVersion.DSE_V2)
@@ -317,7 +316,7 @@ local = local_decorator_creator()
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
-protocolv6 = unittest.skipUnless(6 in get_supported_protocol_versions(), 'Protocol versions less than 6 are not supported')
+protocolv5 = unittest.skipUnless(5 in get_supported_protocol_versions(), 'Protocol versions less than 5 are not supported')
 greaterthancass20 = unittest.skipUnless(CASSANDRA_VERSION >= Version('2.1'), 'Cassandra version 2.1 or greater required')
 greaterthancass21 = unittest.skipUnless(CASSANDRA_VERSION >= Version('2.2'), 'Cassandra version 2.2 or greater required')
 greaterthanorequalcass30 = unittest.skipUnless(CASSANDRA_VERSION >= Version('3.0'), 'Cassandra version 3.0 or greater required')

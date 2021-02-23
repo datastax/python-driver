@@ -180,10 +180,6 @@ class ProtocolException(ErrorMessageSub):
     summary = 'Protocol error'
     error_code = 0x000A
 
-    @property
-    def is_beta_protocol_error(self):
-        return 'USE_BETA flag is unset' in str(self)
-
 
 class BadCredentials(ErrorMessageSub):
     summary = 'Bad credentials'
