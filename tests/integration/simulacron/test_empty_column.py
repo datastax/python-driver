@@ -27,8 +27,8 @@ from cassandra.cqlengine import columns
 from cassandra.cqlengine.connection import set_session
 from cassandra.cqlengine.models import Model
 
-from tests.integration import PROTOCOL_VERSION, requiressimulacron
-from tests.integration.simulacron import SimulacronCluster
+from tests.integration import requiressimulacron
+from tests.integration.simulacron import PROTOCOL_VERSION, SimulacronCluster
 from tests.integration.simulacron.utils import PrimeQuery, prime_request
 
 
