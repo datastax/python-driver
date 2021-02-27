@@ -1122,8 +1122,9 @@ class Connection(object):
                     segment = self._segment_codec.decode(self._iobuf, segment_header)
                     self._io_buffer.cql_frame_buffer.write(segment.payload)
                 else:
-                    # not enough data to read the segment
-                    self._io_buffer.io_buffer.seek(0, 2)
+                    # not enough data to read the segment. reset the buffer pointer at the
+                    # beginning to not lose what we previously read (header).
+                    self._io_buffer.io_buffer.seek(0)
             except CrcException as exc:
                 # re-raise an exception that inherits from ConnectionException
                 raise CrcMismatchException(str(exc), self.endpoint)
