@@ -621,6 +621,7 @@ class _ConnectionIOBuffer(object):
     _io_buffer = None
     _cql_frame_buffer = None
     _connection = None
+    _segment_consumed = False
 
     def __init__(self, connection):
         self._io_buffer = io.BytesIO()
@@ -642,6 +643,10 @@ class _ConnectionIOBuffer(object):
     @property
     def is_checksumming_enabled(self):
         return self._connection._is_checksumming_enabled
+
+    @property
+    def has_consumed_segment(self):
+        return self._segment_consumed;
 
     def readable_io_bytes(self):
         return self.io_buffer.tell()
@@ -1118,21 +1123,32 @@ class Connection(object):
             try:
                 self._io_buffer.io_buffer.seek(0)
                 segment_header = self._segment_codec.decode_header(self._io_buffer.io_buffer)
+
                 if readable_bytes >= segment_header.segment_length:
                     segment = self._segment_codec.decode(self._iobuf, segment_header)
+                    self._io_buffer._segment_consumed = True
                     self._io_buffer.cql_frame_buffer.write(segment.payload)
                 else:
-                    # not enough data to read the segment
-                    self._io_buffer.io_buffer.seek(0, 2)
+                    # not enough data to read the segment. reset the buffer pointer at the
+                    # beginning to not lose what we previously read (header).
+                    self._io_buffer._segment_consumed = False
+                    self._io_buffer.io_buffer.seek(0)
             except CrcException as exc:
                 # re-raise an exception that inherits from ConnectionException
                 raise CrcMismatchException(str(exc), self.endpoint)
+        else:
+            self._io_buffer._segment_consumed = False
 
     def process_io_buffer(self):
         while True:
-            if self._is_checksumming_enabled:
+            if self._is_checksumming_enabled and self._io_buffer.readable_io_bytes():
                 self._process_segment_buffer()
                 self._io_buffer.reset_io_buffer()
+
+            if self._is_checksumming_enabled and not self._io_buffer.has_consumed_segment:
+                # We couldn't read an entire segment from the io buffer, so return
+                # control to allow more bytes to be read off the wire
+                return
 
             if not self._current_frame:
                 pos = self._read_frame_header()
