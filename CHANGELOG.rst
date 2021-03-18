@@ -1,6 +1,6 @@
 3.25.0
 ======
-Not released
+March 18, 2021
 
 Features
 --------
