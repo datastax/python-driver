@@ -1,4 +1,3 @@
--r requirements.txt
 scales
 nose
 mock>1.1
