@@ -1,17 +1,11 @@
 dist: xenial
-sudo: false
-
 language: python
-python:
-  - "2.7"
-  - "3.5"
-  - "3.6"
-  - "3.7"
-  - "pypy2.7-6.0"
-  - "pypy3.5"
+os: linux
+services: docker
 
 env:
-  - CASS_DRIVER_NO_CYTHON=1
+  global:
+    - CASS_DRIVER_NO_CYTHON=1
 
 addons:
   apt:
@@ -24,10 +18,46 @@ addons:
     - libev-dev
 
 install:
+  - pip install --upgrade setuptools
   - pip install tox-travis
   - if [[ $TRAVIS_PYTHON_VERSION != pypy3.5 ]]; then pip install lz4; fi
+  - if [[ $PLAT == aarch64 ]]; then uname -m; docker pull $DOCKER_IMAGE; fi
 
 script:
   - tox
   - tox -e gevent_loop
   - tox -e eventlet_loop
+  - if [[ $PLAT == aarch64 ]]; then docker run --rm -e PLAT=$PLAT -e PYTHON=$PYTHON -v $(realpath .):/src $DOCKER_IMAGE /src/build-arm64-wheels.sh; fi
+jobs:
+  include:
+    - arch: amd64
+      python: "pypy2.7-6.0"
+
+    - arch: amd64
+      python: "pypy3.5"
+
+    - arch: amd64
+      python: "3.5"
+
+    - arch: amd64
+      python: "2.7"
+
+    - arch: amd64
+      python: "3.6"
+
+    - arch: amd64
+      python: "3.7"
+
+    - arch: arm64
+      python: "3.7"
+      env:
+       - DOCKER_IMAGE=quay.io/pypa/manylinux2014_aarch64
+       - PLAT=aarch64
+       - PYTHON=cp37-cp37m
+    
+    - arch: arm64
+      python: "3.8"
+      env:
+        - DOCKER_IMAGE=quay.io/pypa/manylinux2014_aarch64
+        - PLAT=aarch64
+        - PYTHON=cp38-cp38
