@@ -1,0 +1,79 @@
+diff --git a/.travis.yml b/.travis.yml
+index b485e212..a23cbed8 100644
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -1,14 +1,6 @@
+ dist: xenial
+-sudo: false
+-
+ language: python
+-python:
+-  - "2.7"
+-  - "3.5"
+-  - "3.6"
+-  - "3.7"
+-  - "pypy2.7-6.0"
+-  - "pypy3.5"
++os: linux
+ 
+ env:
+   - CASS_DRIVER_NO_CYTHON=1
+@@ -24,6 +16,7 @@ addons:
+     - libev-dev
+ 
+ install:
++  - pip install --upgrade setuptools
+   - pip install tox-travis
+   - if [[ $TRAVIS_PYTHON_VERSION != pypy3.5 ]]; then pip install lz4; fi
+ 
+@@ -31,3 +24,38 @@ script:
+   - tox
+   - tox -e gevent_loop
+   - tox -e eventlet_loop
++  - python setup.py bdist_wheel
++jobs:
++  include:
++    - arch: amd64
++      python: "pypy2.7-6.0"
++
++    - arch: amd64
++      python: "pypy3.5"
++
++    - arch: amd64
++      python: "3.5"
++
++    - arch: amd64
++      python: "2.7"
++
++    - arch: amd64
++      python: "3.6"
++
++    - arch: amd64
++      python: "3.7"
++
++    - arch: arm64
++      python: "3.8"
++    
++    - arch: arm64
++      python: "3.5"
++    
++    - arch: arm64
++      python: "3.6"
++
++    - arch: arm64
++      python: "3.7"
++
++    - arch: arm64
++      python: "2.7"
+diff --git a/tox.ini b/tox.ini
+index d883a1f9..6d94e112 100644
+--- a/tox.ini
++++ b/tox.ini
+@@ -12,6 +12,7 @@ deps = nose
+        pure-sasl
+        kerberos
+        futurist
++       greenlet>=0.4.14,<0.4.17
+ lz4_dependency = py27,py35,py36,py37,py38: lz4
+ 
+ [testenv]
