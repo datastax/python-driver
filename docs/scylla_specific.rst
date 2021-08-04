@@ -8,7 +8,7 @@ Shard Awareness
 As a result, latency is significantly reduced because there is no need to pass data between the shards.
 
 Details on the scylla cql protocol extensions
-https://github.com/scylladb/scylla/blob/master/docs/protocol-extensions.md
+https://github.com/scylladb/scylla/blob/master/docs/design-notes/protocol-extensions.md
 
 For using it you only need to enable ``TokenAwarePolicy`` on the ``Cluster``
 
