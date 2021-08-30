@@ -30,14 +30,14 @@ jobs:
           - os: ubuntu-18.04
             platform: PyPy
 
-          - os: windows-latest
-            platform: win32
+          #- os: windows-latest
+          #  platform: win32
 
-          - os: windows-latest
-            platform: win64
+          #- os: windows-latest
+          #  platform: win64
 
-          - os: windows-latest
-            platform: PyPy
+          #- os: windows-latest
+          #  platform: PyPy
 
           - os: macos-latest
             platform: all
