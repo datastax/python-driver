@@ -41,6 +41,19 @@ class ResultSetTests(unittest.TestCase):
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, False))  # after init to avoid side effects being consumed by init
         self.assertListEqual(list(itr), expected)
 
+    def test_iter_paged_with_empty_pages(self):
+        expected = list(range(10))
+        response_future = Mock(has_more_pages=True, _continuous_paging_session=None)
+        response_future.result.side_effect = [
+            ResultSet(Mock(), []),
+            ResultSet(Mock(), [0, 1, 2, 3, 4]),
+            ResultSet(Mock(), []),
+            ResultSet(Mock(), [5, 6, 7, 8, 9]),
+        ]
+        rs = ResultSet(response_future, [])
+        itr = iter(rs)
+        self.assertListEqual(list(itr), expected)
+
     def test_list_non_paged(self):
         # list access on RS for backwards-compatibility
         expected = list(range(10))
