@@ -5141,6 +5141,7 @@ class ResultSet(object):
         if not self.response_future._continuous_paging_session:
             self.fetch_next_page()
             self._page_iter = iter(self._current_rows)
+            return self.next()
 
         return next(self._page_iter)
 
