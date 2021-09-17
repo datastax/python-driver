@@ -5141,6 +5141,11 @@ class ResultSet(object):
         if not self.response_future._continuous_paging_session:
             self.fetch_next_page()
             self._page_iter = iter(self._current_rows)
+
+            # Some servers can return empty pages in this case; Scylla is known to do
+            # so in some circumstances.  Guard against this by recursing to handle
+            # the next(iter) call.  If we have an empty page in that case it will
+            # get handled by the StopIteration handler when we recurse.
             return self.next()
 
         return next(self._page_iter)
