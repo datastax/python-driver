@@ -4361,8 +4361,11 @@ class ResponseFuture(object):
 
             pool = self.session._pools.get(self._current_host)
             if pool and not pool.is_shutdown:
-                with self._connection.lock:
-                    self._connection.request_ids.append(self._req_id)
+                # Do not return the stream ID to the pool yet. We cannot reuse it
+                # because the node might still be processing the query and will
+                # return a late response to that query - if we used such stream
+                # before the response to the previous query has arrived, the new
+                # query could get a response from the old query
 
                 pool.return_connection(self._connection)
 
