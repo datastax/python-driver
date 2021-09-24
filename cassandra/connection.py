@@ -1075,6 +1075,8 @@ class Connection(object):
                 # This can only happen if the stream_id was
                 # removed due to an OperationTimedOut
                 except KeyError:
+                    with self.lock:
+                        self.request_ids.append(stream_id)
                     return
 
         try:
