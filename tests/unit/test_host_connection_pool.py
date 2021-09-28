@@ -46,7 +46,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
 
         c, request_id = pool.borrow_connection(timeout=0.01)
         self.assertIs(c, conn)
@@ -65,7 +65,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -83,7 +83,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -111,7 +111,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.get_max_connections_per_host.return_value = 2
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -134,7 +134,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
@@ -153,7 +153,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
@@ -178,7 +178,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True
