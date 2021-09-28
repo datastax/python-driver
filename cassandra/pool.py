@@ -399,7 +399,7 @@ class HostConnection(object):
             return
 
         log.debug("Initializing connection for host %s", self.host)
-        self._connection = session.cluster.connection_factory(host.endpoint)
+        self._connection = session.cluster.connection_factory(host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
         self._keyspace = session.keyspace
         if self._keyspace:
             self._connection.set_keyspace_blocking(self._keyspace)
@@ -463,6 +463,14 @@ class HostConnection(object):
                     self._is_replacing = True
                     self._session.submit(self._replace, connection)
 
+    def on_orphaned_stream_released(self):
+        """
+        Called when a response for an orphaned stream (timed out on the client
+        side) was received.
+        """
+        with self._stream_available_condition:
+            self._stream_available_condition.notify()
+
     def _replace(self, connection):
         with self._lock:
             if self.is_shutdown:
@@ -470,7 +478,7 @@ class HostConnection(object):
 
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.endpoint)
+            conn = self._session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._keyspace)
             self._connection = conn
@@ -549,7 +557,7 @@ class HostConnectionPool(object):
 
         log.debug("Initializing new connection pool for host %s", self.host)
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
-        self._connections = [session.cluster.connection_factory(host.endpoint)
+        self._connections = [session.cluster.connection_factory(host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
                              for i in range(core_conns)]
 
         self._keyspace = session.keyspace
@@ -653,7 +661,7 @@ class HostConnectionPool(object):
 
         log.debug("Going to open new connection to host %s", self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.endpoint)
+            conn = self._session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._session.keyspace)
             self._next_trash_allowed_at = time.time() + _MIN_TRASH_INTERVAL
@@ -751,6 +759,13 @@ class HostConnectionPool(object):
                 self._maybe_trash_connection(connection)
             else:
                 self._signal_available_conn()
+
+    def on_orphaned_stream_released(self):
+        """
+        Called when a response for an orphaned stream (timed out on the client
+        side) was received.
+        """
+        self._signal_available_conn()
 
     def _maybe_trash_connection(self, connection):
         core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
