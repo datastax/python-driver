@@ -626,7 +626,7 @@ class ResponseFutureTests(unittest.TestCase):
         connection._requests[1] = (connection._handle_options_response, ProtocolHandler.decode_message, [])
 
         rf._on_timeout()
-        pool.return_connection.assert_called_once_with(connection)
+        pool.return_connection.assert_called_once_with(connection, stream_was_orphaned=True)
         self.assertRaisesRegexp(OperationTimedOut, "Client request timeout", rf.result)
 
         assert len(connection.request_ids) == 0, \

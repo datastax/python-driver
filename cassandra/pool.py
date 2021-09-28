@@ -430,11 +430,12 @@ class HostConnection(object):
 
         raise NoConnectionsAvailable("All request IDs are currently in use")
 
-    def return_connection(self, connection):
-        with connection.lock:
-            connection.in_flight -= 1
-        with self._stream_available_condition:
-            self._stream_available_condition.notify()
+    def return_connection(self, connection, stream_was_orphaned=False):
+        if not stream_was_orphaned:
+            with connection.lock:
+                connection.in_flight -= 1
+            with self._stream_available_condition:
+                self._stream_available_condition.notify()
 
         if connection.is_defunct or connection.is_closed:
             if connection.signaled_error and not self.shutdown_on_error:
@@ -712,9 +713,10 @@ class HostConnectionPool(object):
 
         raise NoConnectionsAvailable()
 
-    def return_connection(self, connection):
+    def return_connection(self, connection, stream_was_orphaned=False):
         with connection.lock:
-            connection.in_flight -= 1
+            if not stream_was_orphaned:
+                connection.in_flight -= 1
             in_flight = connection.in_flight
 
         if connection.is_defunct or connection.is_closed:

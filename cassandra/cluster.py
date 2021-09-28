@@ -4366,8 +4366,10 @@ class ResponseFuture(object):
                 # return a late response to that query - if we used such stream
                 # before the response to the previous query has arrived, the new
                 # query could get a response from the old query
+                with self._connection.lock:
+                    self._connection.orphaned_request_ids.add(self._req_id)
 
-                pool.return_connection(self._connection)
+                pool.return_connection(self._connection, stream_was_orphaned=True)
 
         errors = self._errors
         if not errors:
