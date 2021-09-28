@@ -625,6 +625,7 @@ class Connection(object):
 
     # The current number of operations that are in flight. More precisely,
     # the number of request IDs that are currently in use.
+    # This includes orphaned requests.
     in_flight = 0
 
     # Max concurrent requests allowed per connection. This is set optimistically high, allowing
@@ -641,6 +642,11 @@ class Connection(object):
     # Tracks the highest used request ID in order to help with growing the
     # request_ids set
     highest_request_id = 0
+
+    # Tracks the request IDs which are no longer waited on (timed out), but
+    # cannot be reused yet because the node might still send a response
+    # on this stream
+    orphaned_request_ids = None
 
     is_defunct = False
     is_closed = False
@@ -696,6 +702,7 @@ class Connection(object):
         self._iobuf = io.BytesIO()
         self._continuous_paging_sessions = {}
         self._socket_writable = True
+        self.orphaned_request_ids = set()
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -1070,6 +1077,11 @@ class Connection(object):
                 decoder = paging_session.decoder
                 result_metadata = None
             else:
+                with self.lock:
+                    if stream_id in self.orphaned_request_ids:
+                        self.in_flight -= 1
+                        self.orphaned_request_ids.remove(stream_id)
+
                 try:
                     callback, decoder, result_metadata = self._requests.pop(stream_id)
                 # This can only happen if the stream_id was
