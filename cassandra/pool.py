@@ -407,6 +407,10 @@ class HostConnection(object):
         # After we get at least one connection for each shard, we can close
         # the additional connections.
         self._excess_connections = set()
+        # Contains connections which shouldn't be used anymore
+        # and are waiting until all requests time out or complete
+        # so that we can dispose of them.
+        self._trash = set()
 
         if host_distance == HostDistance.IGNORED:
             log.debug("Not opening connection to ignored host %s", self.host)
@@ -425,7 +429,7 @@ class HostConnection(object):
             first_connection.set_keyspace_blocking(self._keyspace)
 
         if first_connection.sharding_info:
-            self.host.sharding_info = weakref.proxy(first_connection.sharding_info)
+            self.host.sharding_info = first_connection.sharding_info
             self._open_connections_for_all_shards()
 
         log.debug("Finished initializing connection for host %s", self.host)
@@ -455,6 +459,19 @@ class HostConnection(object):
                     self.host,
                     routing_key
                 )
+                if conn.orphaned_threshold_reached and shard_id not in self._connecting:
+                    # The connection has met its orphaned stream ID limit
+                    # and needs to be replaced. Start opening a connection
+                    # to the same shard and replace when it is opened.
+                    self._connecting.add(shard_id)
+                    self._session.submit(self._open_connection_to_missing_shard, shard_id)
+                    log.debug(
+                        "Connection to shard_id=%i reached orphaned stream limit, replacing on host %s (%s/%i)",
+                        shard_id,
+                        self.host,
+                        len(self._connections.keys()),
+                        self.host.sharding_info.shards_count
+                    )
             elif shard_id not in self._connecting:
                 # rate controlled optimistic attempt to connect to a missing shard
                 self._connecting.add(shard_id)
@@ -476,13 +493,16 @@ class HostConnection(object):
         remaining = timeout
         while True:
             with conn.lock:
-                if conn.in_flight < conn.max_request_id:
+                if not conn.is_closed and conn.in_flight < conn.max_request_id:
                     conn.in_flight += 1
                     return conn, conn.get_request_id()
             if timeout is not None:
                 remaining = timeout - time.time() + start
                 if remaining < 0:
                     break
+            # The connection might have been closed in the meantime - if so, try again
+            if conn.is_closed:
+                return self.borrow_connection(timeout, routing_key)
             with self._stream_available_condition:
                 self._stream_available_condition.wait(remaining)
 
@@ -521,6 +541,16 @@ class HostConnection(object):
                         return
                     self._is_replacing = True
                     self._session.submit(self._replace, connection)
+        else:
+            if connection in self._trash:
+                with connection.lock:
+                    if connection.in_flight == len(connection.orphaned_request_ids):
+                        with self._lock:
+                            if connection in self._trash:
+                                self._trash.remove(connection)
+                        log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
+                        connection.close()
+                return
 
     def on_orphaned_stream_released(self):
         """
@@ -572,6 +602,16 @@ class HostConnection(object):
 
         self._close_excess_connections()
 
+        trash_conns = None
+        with self._lock:
+            if self._trash:
+                trash_conns = self._trash
+                self._trash = set()
+
+        if trash_conns is not None:
+            for conn in self._trash:
+                conn.close()
+
     def _close_excess_connections(self):
         with self._lock:
             if not self._excess_connections:
@@ -610,32 +650,68 @@ class HostConnection(object):
         if self.is_shutdown:
             log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", id(conn), self.host)
             conn.close()
-        elif conn.shard_id not in self._connections.keys():
+        elif conn.shard_id not in self._connections.keys() or self._connections[conn.shard_id].orphaned_threshold_reached:
             log.debug(
                 "New connection (%s) created to shard_id=%i on host %s",
                 id(conn),
                 conn.shard_id,
                 self.host
             )
-            self._connections[conn.shard_id] = conn
+            old_conn = None
+            with self._lock:
+                if conn.shard_id in self._connections.keys():
+                    # Move the current connection to the trash and use the new one from now on
+                    old_conn = self._connections[conn.shard_id]
+                    log.debug(
+                        "Replacing overloaded connection (%s) with (%s) for shard %i for host %s",
+                        id(old_conn),
+                        id(conn),
+                        conn.shard_id,
+                        self.host
+                    )
+                self._connections[conn.shard_id] = conn
+            if old_conn is not None:
+                with old_conn.lock:
+                    remaining = old_conn.in_flight - len(old_conn.orphaned_request_ids)
+                    if remaining == 0:
+                        log.debug(
+                            "Immediately closing the old connection (%s) for shard %i on host %s",
+                            id(old_conn),
+                            old_conn.shard_id,
+                            self.host
+                        )
+                        old_conn.close()
+                    else:
+                        log.debug(
+                            "Moving the connection (%s) for shard %i to trash on host %s, %i requests remaining",
+                            id(old_conn),
+                            old_conn.shard_id,
+                            self.host,
+                            remaining,
+                        )
+                        with self._lock:
+                            if self.is_shutdown:
+                                old_conn.close()
+                            else:
+                                self._trash.add(old_conn)
             if self._keyspace:
                 self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
-            num_missing = self.host.sharding_info.shards_count - len(self._connections.keys())
+            num_missing_or_needing_replacement = self.num_missing_or_needing_replacement
             log.debug(
-                "Connected to %s/%i shards on host %s (%i missing)",
+                "Connected to %s/%i shards on host %s (%i missing or needs replacement)",
                 len(self._connections.keys()),
                 self.host.sharding_info.shards_count,
                 self.host,
-                num_missing
+                num_missing_or_needing_replacement
             )
-            if num_missing == 0:
+            if num_missing_or_needing_replacement == 0:
                 log.debug(
                     "All shards of host %s have at least one connection, closing %i excess connections",
                     self.host,
                     len(self._excess_connections)
                 )
                 self._close_excess_connections()
-        elif self.host.sharding_info.shards_count == len(self._connections.keys()):
+        elif self.host.sharding_info.shards_count == len(self._connections.keys()) and self.num_missing_or_needing_replacement == 0:
             log.debug(
                 "All shards are already covered, closing newly opened excess connection for host %s",
                 self.host
@@ -710,6 +786,11 @@ class HostConnection(object):
     def get_state(self):
         in_flights = [c.in_flight for c in self._connections.values()]
         return {'shutdown': self.is_shutdown, 'open_count': self.open_count, 'in_flights': in_flights}
+
+    @property
+    def num_missing_or_needing_replacement(self):
+        return self.host.sharding_info.shards_count \
+            - sum(1 for c in self._connections.values() if not c.orphaned_threshold_reached)
 
     @property
     def open_count(self):

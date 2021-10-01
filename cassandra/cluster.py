@@ -4360,6 +4360,8 @@ class ResponseFuture(object):
                 # query could get a response from the old query
                 with self._connection.lock:
                     self._connection.orphaned_request_ids.add(self._req_id)
+                    if len(self._connection.orphaned_request_ids) >= self._connection.orphaned_threshold:
+                        self._connection.orphaned_threshold_reached = True
 
                 pool.return_connection(self._connection, stream_was_orphaned=True)
 
