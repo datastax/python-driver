@@ -384,6 +384,10 @@ class HostConnection(object):
     _lock = None
     _keyspace = None
 
+    # If the number of excess connections exceeds the number of shards times
+    # the number below, all excess connections will be closed.
+    max_excess_connections_per_shard_multiplier = 3
+
     def __init__(self, host, host_distance, session):
         self.host = host
         self.host_distance = host_distance
@@ -394,6 +398,15 @@ class HostConnection(object):
         self._is_replacing = False
         self._connecting = set()
         self._connections = {}
+        # A pool of additional connections which are not used but affect how Scylla
+        # assigns shards to them. Scylla tends to assign the shard which has
+        # the lowest number of connections. If connections are not distributed
+        # evenly at the moment, we might need to open several dummy connections
+        # to other shards before Scylla returns a connection to the shards we are
+        # interested in.
+        # After we get at least one connection for each shard, we can close
+        # the additional connections.
+        self._excess_connections = set()
 
         if host_distance == HostDistance.IGNORED:
             log.debug("Not opening connection to ignored host %s", self.host)
@@ -557,6 +570,19 @@ class HostConnection(object):
                 c.close()
             self._connections = {}
 
+        self._close_excess_connections()
+
+    def _close_excess_connections(self):
+        with self._lock:
+            if not self._excess_connections:
+                return
+            conns = self._excess_connections
+            self._excess_connections = set()
+
+        for c in conns:
+            log.debug("Closing excess connection (%s) to %s", id(c), self.host)
+            c.close()
+
     def _open_connection_to_missing_shard(self, shard_id):
         """
         Creates a new connection, checks its shard_id and populates our shard
@@ -569,30 +595,72 @@ class HostConnection(object):
         NOTE: This is an optimistic implementation since we cannot control
         which shard we want to connect to from the client side and depend on
         the round-robin of the system.clients shard_id attribution.
+
+        If we get a duplicate connection to some shard, we put it into the
+        excess connection pool. The more connections a particular shard has,
+        the smaller the chance that further connections will be assigned
+        to that shard.
         """
         with self._lock:
             if self.is_shutdown:
                 return
 
         conn = self._session.cluster.connection_factory(self.host.endpoint)
-        if not self.is_shutdown and conn.shard_id not in self._connections.keys():
+        log.debug("Received a connection for shard_id=%i on host %s", conn.shard_id, self.host)
+        if self.is_shutdown:
+            log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", id(conn), self.host)
+            conn.close()
+        elif conn.shard_id not in self._connections.keys():
             log.debug(
-                "New connection created to shard_id=%i on host %s",
+                "New connection (%s) created to shard_id=%i on host %s",
+                id(conn),
                 conn.shard_id,
                 self.host
             )
             self._connections[conn.shard_id] = conn
             if self._keyspace:
                 self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
+            num_missing = self.host.sharding_info.shards_count - len(self._connections.keys())
             log.debug(
                 "Connected to %s/%i shards on host %s (%i missing)",
                 len(self._connections.keys()),
                 self.host.sharding_info.shards_count,
                 self.host,
-                self.host.sharding_info.shards_count - len(self._connections.keys())
+                num_missing
             )
-        else:
+            if num_missing == 0:
+                log.debug(
+                    "All shards of host %s have at least one connection, closing %i excess connections",
+                    self.host,
+                    len(self._excess_connections)
+                )
+                self._close_excess_connections()
+        elif self.host.sharding_info.shards_count == len(self._connections.keys()):
+            log.debug(
+                "All shards are already covered, closing newly opened excess connection for host %s",
+                self.host
+            )
             conn.close()
+        else:
+            if len(self._excess_connections) >= self._excess_connection_limit:
+                log.debug(
+                    "Excess connection pool size limit (%i) reached for host %s, closing all %i of them",
+                    self._excess_connection_limit,
+                    self.host,
+                    len(self._excess_connections)
+                )
+                self._close_excess_connections()
+
+            log.debug(
+                "Putting a connection to shard %i to the excess pool of host %s",
+                conn.shard_id,
+                self.host
+            )
+            with self._lock:
+                if self.is_shutdown:
+                    conn.close()
+                else:
+                    self._excess_connections.add(conn)
         self._connecting.discard(shard_id)
 
     def _open_connections_for_all_shards(self):
@@ -646,6 +714,10 @@ class HostConnection(object):
     @property
     def open_count(self):
         return sum([1 if c and not (c.is_closed or c.is_defunct) else 0 for c in self._connections.values()])
+
+    @property
+    def _excess_connection_limit(self):
+        return self.host.sharding_info.shards_count * self.max_excess_connections_per_shard_multiplier
 
 
 _MAX_SIMULTANEOUS_CREATION = 1
