@@ -63,7 +63,7 @@ community) is now maintained as an integral part of this package. Refer to
 
 Contributing
 ------------
-See CONTRIBUTING.md <https://github.com/scylladb/python-driver/blob/master/CONTRIBUTING.rst>`_.
+See `CONTRIBUTING <https://github.com/scylladb/python-driver/blob/master/CONTRIBUTING.rst>`_.
 
 Reporting Problems
 ------------------
