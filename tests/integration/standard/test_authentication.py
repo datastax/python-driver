@@ -15,6 +15,7 @@
 import logging
 import time
 
+import six
 from cassandra.cluster import NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
@@ -112,7 +113,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
         try:
-            self.assertRaisesRegexp(NoHostAvailable,
+            six.assertRaisesRegex(self, NoHostAvailable,
                                     '.*AuthenticationFailed.',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)
@@ -122,7 +123,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_wrong_username(self):
         cluster = self.cluster_as('wrong_user', 'cassandra')
         try:
-            self.assertRaisesRegexp(NoHostAvailable,
+            six.assertRaisesRegex(self, NoHostAvailable,
                                     '.*AuthenticationFailed.*',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)
@@ -132,7 +133,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_empty_pwd(self):
         cluster = self.cluster_as('Cassandra', '')
         try:
-            self.assertRaisesRegexp(NoHostAvailable,
+            six.assertRaisesRegex(self, NoHostAvailable,
                                     '.*AuthenticationFailed.*',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)
@@ -142,7 +143,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_no_auth_provider(self):
         cluster = TestCluster()
         try:
-            self.assertRaisesRegexp(NoHostAvailable,
+            six.assertRaisesRegex(self, NoHostAvailable,
                                     '.*AuthenticationFailed.*',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)
