@@ -15,7 +15,7 @@
 """
 Connection pooling and host management.
 """
-
+from concurrent.futures import Future
 from functools import total_ordering
 import logging
 import socket
@@ -411,6 +411,7 @@ class HostConnection(object):
         # and are waiting until all requests time out or complete
         # so that we can dispose of them.
         self._trash = set()
+        self._shard_connections_futures = []
 
         if host_distance == HostDistance.IGNORED:
             log.debug("Not opening connection to ignored host %s", self.host)
@@ -537,9 +538,9 @@ class HostConnection(object):
             if is_down:
                 self.shutdown()
             else:
-                connection.close()
-                del self._connections[connection.shard_id]
                 with self._lock:
+                    connection.close()
+                    self._connections.pop(connection.shard_id, None)
                     if self._is_replacing:
                         return
                     self._is_replacing = True
@@ -597,11 +598,14 @@ class HostConnection(object):
                 self.is_shutdown = True
             self._stream_available_condition.notify_all()
 
-        if self._connections:
-            for c in self._connections.values():
-                log.debug("Closing connection (%s) to %s", id(c), self.host)
-                c.close()
-            self._connections = {}
+            for future in self._shard_connections_futures:
+                future.cancel()
+
+            if self._connections:
+                for c in self._connections.values():
+                    log.debug("Closing connection (%s) to %s", id(c), self.host)
+                    c.close()
+                self._connections = {}
 
         self._close_excess_connections()
 
@@ -620,7 +624,7 @@ class HostConnection(object):
             if not self._excess_connections:
                 return
             conns = self._excess_connections
-            self._excess_connections = set()
+            self._excess_connections.clear()
 
         for c in conns:
             log.debug("Closing excess connection (%s) to %s", id(c), self.host)
@@ -653,7 +657,9 @@ class HostConnection(object):
         if self.is_shutdown:
             log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", id(conn), self.host)
             conn.close()
-        elif conn.shard_id not in self._connections.keys() or self._connections[conn.shard_id].orphaned_threshold_reached:
+            return
+        old_conn = self._connections.get(conn.shard_id)
+        if old_conn is None or old_conn.orphaned_threshold_reached:
             log.debug(
                 "New connection (%s) created to shard_id=%i on host %s",
                 id(conn),
@@ -698,7 +704,8 @@ class HostConnection(object):
                             else:
                                 self._trash.add(old_conn)
             if self._keyspace:
-                self._connections[conn.shard_id].set_keyspace_blocking(self._keyspace)
+                if old_conn := self._connections.get(conn.shard_id):
+                    old_conn.set_keyspace_blocking(self._keyspace)
             num_missing_or_needing_replacement = self.num_missing_or_needing_replacement
             log.debug(
                 "Connected to %s/%i shards on host %s (%i missing or needs replacement)",
@@ -750,9 +757,11 @@ class HostConnection(object):
             if self.is_shutdown:
                 return
 
-        for shard_id in range(self.host.sharding_info.shards_count):
-            self._connecting.add(shard_id)
-            self._session.submit(self._open_connection_to_missing_shard, shard_id)
+            for shard_id in range(self.host.sharding_info.shards_count):
+                future = self._session.submit(self._open_connection_to_missing_shard, shard_id)
+                if isinstance(future, Future):
+                    self._connecting.add(shard_id)
+                    self._shard_connections_futures.append(future)
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         """
