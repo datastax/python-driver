@@ -11,13 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from concurrent.futures import ThreadPoolExecutor
+import logging
+import time
+
+from cassandra.shard_info import _ShardingInfo
 
 try:
     import unittest2 as unittest
 except ImportError:
-    import unittest # noqa
+    import unittest  # noqa
+    import unittest.mock as mock
 
-from mock import Mock, NonCallableMagicMock
+from mock import Mock, NonCallableMagicMock, MagicMock
 from threading import Thread, Event, Lock
 
 from cassandra.cluster import Session
@@ -25,6 +31,8 @@ from cassandra.connection import Connection
 from cassandra.pool import HostConnection, HostConnectionPool
 from cassandra.pool import Host, NoConnectionsAvailable
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
+
+LOGGER = logging.getLogger(__name__)
 
 
 class _PoolTests(unittest.TestCase):
@@ -79,7 +87,8 @@ class _PoolTests(unittest.TestCase):
     def test_successful_wait_for_connection(self):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
-        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False, max_request_id=100, lock=Lock())
+        conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False, max_request_id=100,
+                                    lock=Lock())
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
@@ -266,3 +275,50 @@ class HostConnectionTests(_PoolTests):
     PoolImpl = HostConnection
     uses_single_connection = True
 
+    def test_fast_shutdown(self):
+        class MockSession(MagicMock):
+            is_shutdown = False
+            keyspace = "reprospace"
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.cluster = MagicMock()
+                self.cluster.executor = ThreadPoolExecutor(max_workers=2, initializer=self.executor_init)
+                self.cluster.signal_connection_failure = lambda *args, **kwargs: False
+                self.cluster.connection_factory = self.mock_connection_factory
+                self.connection_counter = 0
+
+            def submit(self, fn, *args, **kwargs):
+                LOGGER.info("Scheduling %s with args: %s, kwargs: %s", fn, args, kwargs)
+                if not self.is_shutdown:
+                    return self.cluster.executor.submit(fn, *args, **kwargs)
+
+            def mock_connection_factory(self, *args, **kwargs):
+                connection = MagicMock()
+                connection.is_shutdown = False
+                connection.is_defunct = False
+                connection.is_closed = False
+                connection.shard_id = self.connection_counter
+                self.connection_counter += 1
+                connection.sharding_info = _ShardingInfo(shard_id=1, shards_count=14,
+                                                         partitioner="", sharding_algorithm="", sharding_ignore_msb=0)
+
+                return connection
+
+            def executor_init(self, *args):
+                time.sleep(0.5)
+                LOGGER.info("Future start: %s", args)
+
+        for attempt_num in range(20):
+            LOGGER.info("Testing fast shutdown %d / 20 times", attempt_num + 1)
+            host = MagicMock()
+            host.endpoint = "1.2.3.4"
+            session = MockSession()
+
+            pool = HostConnection(host=host, host_distance=HostDistance.REMOTE, session=session)
+            LOGGER.info("Initialized pool %s", pool)
+            LOGGER.info("Connections: %s", pool._connections)
+            time.sleep(0.5)
+            pool.shutdown()
+            time.sleep(3)
+            session.cluster.executor.shutdown()
