@@ -434,7 +434,7 @@ class HostConnection(object):
 
         log.debug("Finished initializing connection for host %s", self.host)
 
-    def borrow_connection(self, timeout, routing_key=None):
+    def _get_connection_for_routing_key(self, routing_key=None):
         if self.is_shutdown:
             raise ConnectionException(
                 "Pool for %s is shutdown" % (self.host,), self.host)
@@ -487,11 +487,17 @@ class HostConnection(object):
         # we couldn't find a shard aware connection, let's pick a random one
         # from our pool
         if not conn:
-            conn = self._connections.get(random.choice(list(self._connections.keys())))
+            conn = random.choice(list(self._connections.values()))
+        return conn
 
+    def borrow_connection(self, timeout, routing_key=None):
+        conn = self._get_connection_for_routing_key(routing_key)
         start = time.time()
         remaining = timeout
         while True:
+            if conn.is_closed:
+                # The connection might have been closed in the meantime - if so, try again
+                conn = self._get_connection_for_routing_key(routing_key)
             with conn.lock:
                 if not conn.is_closed and conn.in_flight < conn.max_request_id:
                     conn.in_flight += 1
@@ -500,9 +506,6 @@ class HostConnection(object):
                 remaining = timeout - time.time() + start
                 if remaining < 0:
                     break
-            # The connection might have been closed in the meantime - if so, try again
-            if conn.is_closed:
-                return self.borrow_connection(timeout, routing_key)
             with self._stream_available_condition:
                 self._stream_available_condition.wait(remaining)
 
