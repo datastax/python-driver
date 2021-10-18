@@ -703,7 +703,8 @@ class HostConnection(object):
                             else:
                                 self._trash.add(old_conn)
             if self._keyspace:
-                if old_conn := self._connections.get(conn.shard_id):
+                old_conn = self._connections.get(conn.shard_id)
+                if old_conn:
                     old_conn.set_keyspace_blocking(self._keyspace)
             num_missing_or_needing_replacement = self.num_missing_or_needing_replacement
             log.debug(
