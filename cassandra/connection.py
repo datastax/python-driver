@@ -625,6 +625,7 @@ class Connection(object):
 
     # The current number of operations that are in flight. More precisely,
     # the number of request IDs that are currently in use.
+    # This includes orphaned requests.
     in_flight = 0
 
     # Max concurrent requests allowed per connection. This is set optimistically high, allowing
@@ -641,6 +642,20 @@ class Connection(object):
     # Tracks the highest used request ID in order to help with growing the
     # request_ids set
     highest_request_id = 0
+
+    # Tracks the request IDs which are no longer waited on (timed out), but
+    # cannot be reused yet because the node might still send a response
+    # on this stream
+    orphaned_request_ids = None
+
+    # Set to true if the orphaned stream ID count cross configured threshold
+    # and the connection will be replaced
+    orphaned_threshold_reached = False
+
+    # If the number of orphaned streams reaches this threshold, this connection
+    # will become marked and will be replaced with a new connection by the
+    # owning pool (currently, only HostConnection supports this)
+    orphaned_threshold = 3  * max_in_flight // 4
 
     is_defunct = False
     is_closed = False
@@ -667,6 +682,8 @@ class Connection(object):
     _check_hostname = False
     _product_type = None
 
+    _owning_pool = None
+
     shard_id = 0
     sharding_info = None
 
@@ -674,7 +691,7 @@ class Connection(object):
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
                  user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False,
-                 ssl_context=None):
+                 ssl_context=None, owning_pool=None):
 
         # TODO next major rename host to endpoint and remove port kwarg.
         self.endpoint = host if isinstance(host, EndPoint) else DefaultEndPoint(host, port)
@@ -696,6 +713,8 @@ class Connection(object):
         self._iobuf = io.BytesIO()
         self._continuous_paging_sessions = {}
         self._socket_writable = True
+        self.orphaned_request_ids = set()
+        self._owning_pool = owning_pool
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -1070,11 +1089,22 @@ class Connection(object):
                 decoder = paging_session.decoder
                 result_metadata = None
             else:
+                need_notify_of_release = False
+                with self.lock:
+                    if stream_id in self.orphaned_request_ids:
+                        self.in_flight -= 1
+                        self.orphaned_request_ids.remove(stream_id)
+                        need_notify_of_release = True
+                if need_notify_of_release and self._owning_pool:
+                    self._owning_pool.on_orphaned_stream_released()
+
                 try:
                     callback, decoder, result_metadata = self._requests.pop(stream_id)
                 # This can only happen if the stream_id was
                 # removed due to an OperationTimedOut
                 except KeyError:
+                    with self.lock:
+                        self.request_ids.append(stream_id)
                     return
 
         try:
