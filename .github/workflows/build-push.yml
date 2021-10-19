@@ -42,8 +42,10 @@ jobs:
           - os: macos-latest
             platform: all
 
-          - os: macos-latest
-            platform: PyPy
+          #- os: macos-latest
+          #  platform: PyPy
+          # It is disabled due to the https://foss.heptapod.net/pypy/pypy/-/issues/3314
+          # Re-enable when PyPy 7.3.7 is released https://downloads.python.org/pypy/versions.json
 
     steps:
       - uses: actions/checkout@v2
