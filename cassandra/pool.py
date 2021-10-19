@@ -485,28 +485,36 @@ class HostConnection(object):
                     self.host.sharding_info.shards_count
                 )
 
-        # we couldn't find a shard aware connection, let's pick a random one
-        # from our pool
-        if not conn:
-            conn = random.choice(list(self._connections.values()))
-        return conn
+        if conn and not conn.is_closed:
+            return conn
+        active_connections = [conn for conn in list(self._connections.values()) if not conn.is_closed]
+        if active_connections:
+            return random.choice(active_connections)
+        return random.choice(list(self._connections.values()))
 
     def borrow_connection(self, timeout, routing_key=None):
         conn = self._get_connection_for_routing_key(routing_key)
         start = time.time()
         remaining = timeout
+        last_retry = False
         while True:
             if conn.is_closed:
                 # The connection might have been closed in the meantime - if so, try again
                 conn = self._get_connection_for_routing_key(routing_key)
             with conn.lock:
-                if not conn.is_closed and conn.in_flight < conn.max_request_id:
+                if (not conn.is_closed or last_retry) and conn.in_flight < conn.max_request_id:
+                    # On last retry we ignore connection status, since it is better to return closed connection than
+                    #  raise Exception
                     conn.in_flight += 1
                     return conn, conn.get_request_id()
             if timeout is not None:
                 remaining = timeout - time.time() + start
                 if remaining < 0:
-                    break
+                    # When timeout reached we try to get connection last time and break if it fails
+                    if last_retry:
+                        break
+                    last_retry = True
+                    continue
             with self._stream_available_condition:
                 self._stream_available_condition.wait(remaining)
 

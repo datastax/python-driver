@@ -70,7 +70,8 @@ jobs:
       - name: Overwrite for Linux 64
         if: runner.os == 'Linux' && matrix.platform == 'x86_64'
         run: |
-          echo "CIBW_BUILD=cp*_x86_64" >> $GITHUB_ENV
+          echo "CIBW_BUILD=cp3*_x86_64" >> $GITHUB_ENV
+          echo "CIBW_SKIP=cp35* cp36*" >> $GITHUB_ENV
 
       - name: Overwrite for Linux 32
         if: runner.os == 'Linux' && matrix.platform == 'i686'
