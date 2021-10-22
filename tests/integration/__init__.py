@@ -1019,7 +1019,7 @@ def assert_startswith(s, prefix):
 
 
 class TestCluster(object):
-    DEFAULT_PROTOCOL_VERSION = default_protocol_version
+    DEFAULT_PROTOCOL_VERSION = PROTOCOL_VERSION
     DEFAULT_CASSANDRA_IP = CASSANDRA_IP
     DEFAULT_ALLOW_BETA = ALLOW_BETA_PROTOCOL
 
