@@ -16,7 +16,9 @@ import os
 from cassandra.cluster import Cluster
 
 from tests import connection_class, EVENT_LOOP_MANAGER
-Cluster.connection_class = connection_class
+
+if connection_class is not None:
+    Cluster.connection_class = connection_class
 
 try:
     import unittest2 as unittest

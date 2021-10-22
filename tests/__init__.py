@@ -50,7 +50,7 @@ def is_monkey_patched():
     return is_gevent_monkey_patched() or is_eventlet_monkey_patched()
 
 MONKEY_PATCH_LOOP = bool(os.getenv('MONKEY_PATCH_LOOP', False))
-EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', "libev")
+EVENT_LOOP_MANAGER = os.getenv('EVENT_LOOP_MANAGER', '')
 
 
 # If set to to true this will force the Cython tests to run regardless of whether they are installed
