@@ -236,6 +236,17 @@ def get_default_protocol():
         raise Exception("Running tests with an unsupported Cassandra version: {0}".format(CASSANDRA_VERSION))
 
 
+def get_scylla_default_protocol():
+    if len(CASSANDRA_VERSION.release) == 4:
+        # An enterprise, i.e. 2021.1.6
+        if CASSANDRA_VERSION > Version('2019'):
+            return 4
+        return 3
+    if CASSANDRA_VERSION >= Version('3.0'):
+        return 4
+    return 3
+
+
 def get_supported_protocol_versions():
     """
     1.2 -> 1
@@ -307,7 +318,7 @@ def get_unsupported_upper_protocol():
         return 2
 
 
-default_protocol_version = get_default_protocol()
+default_protocol_version = get_scylla_default_protocol() if SCYLLA_VERSION else get_default_protocol()
 
 
 PROTOCOL_VERSION = int(os.getenv('PROTOCOL_VERSION', default_protocol_version))
