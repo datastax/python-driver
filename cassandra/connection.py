@@ -222,7 +222,7 @@ class DefaultEndPointFactory(EndPointFactory):
     port = None
     """
     If no port is discovered in the row, this is the default port
-    used for endpoint creation. 
+    used for endpoint creation.
     """
 
     def __init__(self, port=None):
@@ -238,8 +238,17 @@ class DefaultEndPointFactory(EndPointFactory):
 
         # create the endpoint with the translated address
         # TODO next major, create a TranslatedEndPoint type
+        ## Overriden by Pandu. using ip + port translation
+        translated_address = self.cluster.address_translator.translate(addr)
+        log.debug( "PANDU: translated address {}".format(translated_address))
+        if type(translated_address) is tuple and len(translated_address)>1:
+            ip = translated_address[0]
+            port = translated_address[1]
+            log.debug( "PANDU: CREATING Default endpoint {} {}".format(ip, port))
+        else:
+            ip = translated_address
         return DefaultEndPoint(
-            self.cluster.address_translator.translate(addr),
+            ip,
             port)
 
 
