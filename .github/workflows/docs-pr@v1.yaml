@@ -1,15 +1,14 @@
-name: "CI Docs"
+name: "Docs / Build PR"
 
 on:
-  push:
+  pull_request:
     branches:
     - master
     paths:
-    - 'docs/**'
+    - "docs/**"
 
 jobs:
-  release:
-    name: Build
+  build:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -21,12 +20,9 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: 3.7
+    - name: Setup Cassandra dependencies
+      run: sudo apt-get install gcc python-dev libev4 libev-dev
+    - name: Build driver
+      run: python setup.py develop
     - name: Build docs
-      run: |
-        export PATH=$PATH:~/.local/bin
-        cd docs
-        make multiversion
-    - name: Deploy
-      run : ./docs/_utils/deploy.sh
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: make -C docs test

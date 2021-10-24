@@ -18,7 +18,7 @@ Sphinx = "2.4.4"
 jinja2 = "2.8.1"
 gremlinpython = "3.4.7"
 recommonmark = "0.5.0"
-sphinx-scylladb-theme = "~0.1.10"
+sphinx-scylladb-theme = "~1.0.0"
 sphinx-multiversion-scylla = "~0.2.6"
 
 [build-system]

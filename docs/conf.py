@@ -75,13 +75,12 @@ html_theme = 'sphinx_scylladb_theme'
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-    'header_links': [
-    ('Scylla Python Driver', 'https://python-driver.docs.scylladb.com/'),
-    ('Scylla Cloud', 'https://docs.scylladb.com/scylla-cloud/'),
-    ('Scylla University', 'https://university.scylladb.com/'),
-    ('ScyllaDB Home', 'https://www.scylladb.com/')],
+    'conf_py_path': 'docs/',
+    'github_repository': 'scylladb/python-driver',
     'github_issues_repository': 'scylladb/python-driver',
-    'show_sidebar_index': True,
+    'hide_edit_this_page_button': 'false',
+    'hide_sidebar_index': 'false',
+    'hide_version_dropdown': ['master'],
 }
 
 # Custom sidebar templates, maps document names to template names.
@@ -117,7 +116,7 @@ redirects_file = "_utils/redirections.yaml"
 TAGS = ['3.21.0-scylla', '3.22.0-scylla', '3.22.3-scylla', '3.24.0-scylla', '3.24.1-scylla']
 smv_tag_whitelist = multiversion_regex_builder(TAGS)
 # Whitelist pattern for branches (set to None to ignore all branches)
-BRANCHES = []
+BRANCHES = ['master']
 smv_branch_whitelist = multiversion_regex_builder(BRANCHES)
 # Defines which version is considered to be the latest stable version.
 # Must be listed in smv_tag_whitelist or smv_branch_whitelist.
@@ -129,20 +128,3 @@ smv_remote_whitelist = r"^origin$"
 smv_released_pattern = r'^tags/.*$'
 # Format for versioned output directories inside the build directory
 smv_outputdir_format = '{ref.name}'
-
-# -- Options for LaTeX output --------------------------------------------------
-
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title, author, documentclass [howto/manual]).
-latex_documents = [
-    ('index', 'scylla-driver.tex', u'Cassandra Driver Documentation', u'DataStax', 'manual'),
-]
-
-# -- Options for manual page output --------------------------------------------
-
-# One entry per manual page. List of tuples
-# (source start file, name, description, authors, manual section).
-man_pages = [
-    ('index', 'scylla-driver', u'Cassandra Driver Documentation',
-     [u'DataStax'], 1)
-]
