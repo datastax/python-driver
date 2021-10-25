@@ -617,7 +617,8 @@ class ResponseFutureTests(unittest.TestCase):
         session.cluster._default_load_balancing_policy.make_query_plan.return_value = [Mock(endpoint='ip1'), Mock(endpoint='ip2')]
         pool = self.make_pool()
         session._pools.get.return_value = pool
-        connection = Mock(spec=Connection, lock=RLock(), _requests={}, request_ids=deque())
+        connection = Mock(spec=Connection, lock=RLock(), _requests={}, request_ids=deque(),
+                orphaned_request_ids=set(), orphaned_threshold=256)
         pool.borrow_connection.return_value = (connection, 1)
 
         rf = self.make_response_future(session)

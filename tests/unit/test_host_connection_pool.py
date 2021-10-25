@@ -26,7 +26,6 @@ from cassandra.pool import HostConnection, HostConnectionPool
 from cassandra.pool import Host, NoConnectionsAvailable
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
 
-
 class _PoolTests(unittest.TestCase):
     PoolImpl = None
     uses_single_connection = None
@@ -148,7 +147,8 @@ class _PoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False,
-                                    max_request_id=100, signaled_error=False)
+                                    max_request_id=100, signaled_error=False,
+                                    orphaned_threshold_reached=False)
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
@@ -169,7 +169,7 @@ class _PoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=True, max_request_id=100,
-                                    signaled_error=False)
+                                    signaled_error=False, orphaned_threshold_reached=False)
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)

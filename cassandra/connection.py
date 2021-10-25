@@ -713,6 +713,15 @@ class Connection(object):
     # on this stream
     orphaned_request_ids = None
 
+    # Set to true if the orphaned stream ID count cross configured threshold
+    # and the connection will be replaced
+    orphaned_threshold_reached = False
+
+    # If the number of orphaned streams reaches this threshold, this connection
+    # will become marked and will be replaced with a new connection by the
+    # owning pool (currently, only HostConnection supports this)
+    orphaned_threshold = 3  * max_in_flight // 4
+
     is_defunct = False
     is_closed = False
     lock = None
