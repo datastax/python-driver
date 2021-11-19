@@ -546,8 +546,8 @@ class HostConnection(object):
             if is_down:
                 self.shutdown()
             else:
+                connection.close()
                 with self._lock:
-                    connection.close()
                     self._connections.pop(connection.shard_id, None)
                     if self._is_replacing:
                         return
@@ -577,24 +577,24 @@ class HostConnection(object):
             if self.is_shutdown:
                 return
 
-            log.debug("Replacing connection (%s) to %s", id(connection), self.host)
-            try:
-                if connection.shard_id in self._connections.keys():
-                    del self._connections[connection.shard_id]
-                if self.host.sharding_info:
-                    self._connecting.add(connection.shard_id)
-                    self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
-                else:
-                    connection = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
-                    if self._keyspace:
-                        connection.set_keyspace_blocking(self._keyspace)
-                    self._connections[connection.shard_id] = connection
-            except Exception:
-                log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
-                self._session.submit(self._replace, connection)
+        log.debug("Replacing connection (%s) to %s", id(connection), self.host)
+        try:
+            if connection.shard_id in self._connections.keys():
+                del self._connections[connection.shard_id]
+            if self.host.sharding_info:
+                self._connecting.add(connection.shard_id)
+                self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
             else:
-                self._is_replacing = False
-                self._stream_available_condition.notify()
+                connection = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+                if self._keyspace:
+                    connection.set_keyspace_blocking(self._keyspace)
+                self._connections[connection.shard_id] = connection
+        except Exception:
+            log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
+            self._session.submit(self._replace, connection)
+        else:
+            self._is_replacing = False
+            self._stream_available_condition.notify()
 
     def shutdown(self):
         log.debug("Shutting down connections to %s", self.host)
@@ -608,11 +608,15 @@ class HostConnection(object):
             for future in self._shard_connections_futures:
                 future.cancel()
 
-            if self._connections:
-                for connection in self._connections.values():
-                    log.debug("Closing connection (%s) to %s", id(connection), self.host)
-                    connection.close()
-                self._connections.clear()
+            connections_to_close = self._connections.copy()
+            self._connections.clear()
+
+        # connection.close can call pool.return_connection, which will
+        #  obtain self._lock via self._stream_available_condition.
+        # So, it never should be called within self._lock context
+        for connection in connections_to_close.values():
+            log.debug("Closing connection (%s) to %s", id(connection), self.host)
+            connection.close()
 
         self._close_excess_connections()
 
@@ -622,8 +626,8 @@ class HostConnection(object):
                 trash_conns = self._trash
                 self._trash = set()
 
-        if trash_conns is not None:
-            for conn in self._trash:
+        if trash_conns:
+            for conn in trash_conns:
                 conn.close()
 
     def _close_excess_connections(self):
@@ -687,29 +691,28 @@ class HostConnection(object):
                     )
                 self._connections[conn.shard_id] = conn
             if old_conn is not None:
-                with old_conn.lock:
-                    remaining = old_conn.in_flight - len(old_conn.orphaned_request_ids)
-                    if remaining == 0:
-                        log.debug(
-                            "Immediately closing the old connection (%s) for shard %i on host %s",
-                            id(old_conn),
-                            old_conn.shard_id,
-                            self.host
-                        )
-                        old_conn.close()
-                    else:
-                        log.debug(
-                            "Moving the connection (%s) for shard %i to trash on host %s, %i requests remaining",
-                            id(old_conn),
-                            old_conn.shard_id,
-                            self.host,
-                            remaining,
-                        )
-                        with self._lock:
-                            if self.is_shutdown:
-                                old_conn.close()
-                            else:
-                                self._trash.add(old_conn)
+                remaining = old_conn.in_flight - len(old_conn.orphaned_request_ids)
+                if remaining == 0:
+                    log.debug(
+                        "Immediately closing the old connection (%s) for shard %i on host %s",
+                        id(old_conn),
+                        old_conn.shard_id,
+                        self.host
+                    )
+                    old_conn.close()
+                else:
+                    log.debug(
+                        "Moving the connection (%s) for shard %i to trash on host %s, %i requests remaining",
+                        id(old_conn),
+                        old_conn.shard_id,
+                        self.host,
+                        remaining,
+                    )
+                    with self._lock:
+                        if self.is_shutdown:
+                            old_conn.close()
+                        else:
+                            self._trash.add(old_conn)
             if self._keyspace:
                 old_conn = self._connections.get(conn.shard_id)
                 if old_conn:
@@ -750,11 +753,14 @@ class HostConnection(object):
                 conn.shard_id,
                 self.host
             )
+            close_connection = False
             with self._lock:
                 if self.is_shutdown:
-                    conn.close()
+                    close_connection = True
                 else:
                     self._excess_connections.add(conn)
+            if close_connection:
+                conn.close()
         self._connecting.discard(shard_id)
 
     def _open_connections_for_all_shards(self):
@@ -1127,7 +1133,7 @@ class HostConnectionPool(object):
             conn.close()
             self.open_count -= 1
 
-        for conn in self._trash:
+        for conn in list(self._trash):
             conn.close()
 
     def ensure_core_connections(self):
