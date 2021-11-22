@@ -15,10 +15,7 @@
 from tests.integration import get_server_versions, use_singledc, \
     BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass, TestCluster
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest # noqa
+import unittest
 
 from cassandra.cluster import ResultSet, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory

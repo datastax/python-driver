@@ -14,10 +14,7 @@
 
 import os
 import warnings
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 from cassandra import ConsistencyLevel
 
 from cassandra.cqlengine import connection

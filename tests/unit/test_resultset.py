@@ -13,10 +13,7 @@
 # limitations under the License.
 from cassandra.query import named_tuple_factory, dict_factory, tuple_factory
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest # noqa
+import unittest
 
 from mock import Mock, PropertyMock, patch
 

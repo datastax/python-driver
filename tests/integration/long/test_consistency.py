@@ -28,10 +28,7 @@ from tests.integration.long.utils import (
     force_stop, create_schema, wait_for_down, wait_for_up, start, CoordinatorStats
 )
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 ALL_CONSISTENCY_LEVELS = {
     ConsistencyLevel.ANY, ConsistencyLevel.ONE, ConsistencyLevel.TWO, ConsistencyLevel.QUORUM,

@@ -18,10 +18,7 @@ try:
 except ImportError:
     VERIFY_CYTHON = False
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 def cyimport(import_path):
     """

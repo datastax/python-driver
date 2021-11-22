@@ -14,10 +14,7 @@
 
 
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from packaging.version import Version
 

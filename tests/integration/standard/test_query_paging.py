@@ -16,10 +16,7 @@ from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 import logging
 log = logging.getLogger(__name__)
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from itertools import cycle, count
 from six.moves import range
