@@ -26,10 +26,7 @@ from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 
 from six import next
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 log = logging.getLogger(__name__)
 

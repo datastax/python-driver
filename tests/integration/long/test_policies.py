@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from cassandra import ConsistencyLevel, Unavailable
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
