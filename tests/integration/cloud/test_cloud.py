@@ -18,7 +18,10 @@ from cassandra.cqlengine.management import sync_table, create_keyspace_simple
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import six
 from ssl import SSLContext, PROTOCOL_TLS

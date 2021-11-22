@@ -21,7 +21,10 @@ from tests.integration import use_singledc, execute_until_pass, TestCluster
 
 import time
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 log = logging.getLogger(__name__)
 

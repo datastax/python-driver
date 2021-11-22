@@ -28,7 +28,10 @@ from tests.integration import greaterthanorequaldse60
 from tests.integration.advanced.graph.fluent import (
     BaseExplicitExecutionTest, create_traversal_profiles, check_equality_base)
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 @greaterthanorequaldse60

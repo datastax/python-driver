@@ -6,7 +6,10 @@
 # You may obtain a copy of the License at
 #
 # http://www.datastax.com/terms/datastax-dse-driver-license-terms
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import itertools
 

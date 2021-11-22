@@ -16,7 +16,10 @@
 #
 from cassandra import InvalidRequest
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 from cassandra.protocol import ConfigurationException

@@ -13,7 +13,10 @@
 # limitations under the License
 from cassandra.cluster import Cluster
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import os
 import subprocess

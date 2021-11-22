@@ -13,7 +13,10 @@
 # limitations under the License.
 
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 import logging
 from mock import sentinel

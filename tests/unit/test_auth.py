@@ -16,7 +16,10 @@
 import six
 from cassandra.auth import PlainTextAuthenticator
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 class TestPlainTextAuthenticator(unittest.TestCase):

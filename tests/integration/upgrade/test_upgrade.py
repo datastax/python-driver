@@ -20,7 +20,10 @@ from cassandra.cluster import ConsistencyLevel, Cluster, DriverException, Execut
 from cassandra.policies import ConstantSpeculativeExecutionPolicy
 from tests.integration.upgrade import UpgradeBase, UpgradeBaseAuth, UpgradePath, upgrade_paths
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 # Previous Cassandra upgrade

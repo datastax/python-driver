@@ -21,7 +21,10 @@ from tests.unit.cython.utils import notcython
 from tests.integration import (execute_until_pass,
                                execute_with_long_wait_retry, use_cluster, TestCluster)
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 CCM_IS_DSE = (os.environ.get('CCM_IS_DSE', None) == 'true')

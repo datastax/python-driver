@@ -22,7 +22,10 @@ from itertools import chain
 import json
 import time
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 from cassandra import OperationTimedOut, ConsistencyLevel, InvalidRequest
 from cassandra.cluster import EXEC_PROFILE_GRAPH_DEFAULT, NoHostAvailable

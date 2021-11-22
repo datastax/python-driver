@@ -15,7 +15,10 @@
 from tests.unit.cython.utils import cyimport, cythontest
 bytesio_testhelper = cyimport('tests.unit.cython.bytesio_testhelper')
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 class BytesIOTest(unittest.TestCase):

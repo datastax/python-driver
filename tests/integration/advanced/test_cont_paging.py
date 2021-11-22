@@ -18,7 +18,10 @@ from tests.integration import use_singledc, greaterthanorequaldse51, BasicShared
 import logging
 log = logging.getLogger(__name__)
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 from itertools import cycle, count
 from six.moves import range

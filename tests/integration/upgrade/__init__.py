@@ -27,7 +27,10 @@ from ccmlib.node import TimeoutError
 import time
 import logging
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 def setup_module():

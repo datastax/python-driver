@@ -15,7 +15,10 @@
 from tests.unit.cython.utils import cyimport, cythontest
 utils_testhelper = cyimport('tests.unit.cython.utils_testhelper')
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # noqa
 
 
 class UtilsTest(unittest.TestCase):
