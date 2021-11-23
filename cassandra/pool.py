@@ -390,6 +390,10 @@ class HostConnection(object):
         # this is used in conjunction with the connection streams. Not using the connection lock because the connection can be replaced in the lifetime of the pool.
         self._stream_available_condition = Condition(self._lock)
         self._is_replacing = False
+        # Contains connections which shouldn't be used anymore
+        # and are waiting until all requests time out or complete
+        # so that we can dispose of them.
+        self._trash = set()
 
         if host_distance == HostDistance.IGNORED:
             log.debug("Not opening connection to ignored host %s", self.host)
@@ -399,13 +403,13 @@ class HostConnection(object):
             return
 
         log.debug("Initializing connection for host %s", self.host)
-        self._connection = session.cluster.connection_factory(host.endpoint)
+        self._connection = session.cluster.connection_factory(host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
         self._keyspace = session.keyspace
         if self._keyspace:
             self._connection.set_keyspace_blocking(self._keyspace)
         log.debug("Finished initializing connection for host %s", self.host)
 
-    def borrow_connection(self, timeout):
+    def _get_connection(self):
         if self.is_shutdown:
             raise ConnectionException(
                 "Pool for %s is shutdown" % (self.host,), self.host)
@@ -413,12 +417,25 @@ class HostConnection(object):
         conn = self._connection
         if not conn:
             raise NoConnectionsAvailable()
+        return conn
+
+    def borrow_connection(self, timeout):
+        conn = self._get_connection()
+        if conn.orphaned_threshold_reached:
+            with self._lock:
+                if not self._is_replacing:
+                    self._is_replacing = True
+                    self._session.submit(self._replace, conn)
+                    log.debug(
+                        "Connection to host %s reached orphaned stream limit, replacing...",
+                        self.host
+                    )
 
         start = time.time()
         remaining = timeout
         while True:
             with conn.lock:
-                if conn.in_flight < conn.max_request_id:
+                if not (conn.orphaned_threshold_reached and conn.is_closed) and conn.in_flight < conn.max_request_id:
                     conn.in_flight += 1
                     return conn, conn.get_request_id()
             if timeout is not None:
@@ -426,15 +443,19 @@ class HostConnection(object):
                 if remaining < 0:
                     break
             with self._stream_available_condition:
-                self._stream_available_condition.wait(remaining)
+                if conn.orphaned_threshold_reached and conn.is_closed:
+                    conn = self._get_connection()
+                else:
+                    self._stream_available_condition.wait(remaining)
 
         raise NoConnectionsAvailable("All request IDs are currently in use")
 
-    def return_connection(self, connection):
-        with connection.lock:
-            connection.in_flight -= 1
-        with self._stream_available_condition:
-            self._stream_available_condition.notify()
+    def return_connection(self, connection, stream_was_orphaned=False):
+        if not stream_was_orphaned:
+            with connection.lock:
+                connection.in_flight -= 1
+            with self._stream_available_condition:
+                self._stream_available_condition.notify()
 
         if connection.is_defunct or connection.is_closed:
             if connection.signaled_error and not self.shutdown_on_error:
@@ -461,6 +482,24 @@ class HostConnection(object):
                         return
                     self._is_replacing = True
                     self._session.submit(self._replace, connection)
+        else:
+            if connection in self._trash:
+                with connection.lock:
+                    if connection.in_flight == len(connection.orphaned_request_ids):
+                        with self._lock:
+                            if connection in self._trash:
+                                self._trash.remove(connection)
+                                log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
+                                connection.close()
+                return
+
+    def on_orphaned_stream_released(self):
+        """
+        Called when a response for an orphaned stream (timed out on the client
+        side) was received.
+        """
+        with self._stream_available_condition:
+            self._stream_available_condition.notify()
 
     def _replace(self, connection):
         with self._lock:
@@ -469,7 +508,7 @@ class HostConnection(object):
 
         log.debug("Replacing connection (%s) to %s", id(connection), self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.endpoint)
+            conn = self._session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._keyspace)
             self._connection = conn
@@ -477,9 +516,15 @@ class HostConnection(object):
             log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
             self._session.submit(self._replace, connection)
         else:
-            with self._lock:
-                self._is_replacing = False
-                self._stream_available_condition.notify()
+            with connection.lock:
+                with self._lock:
+                    if connection.orphaned_threshold_reached:
+                        if connection.in_flight == len(connection.orphaned_request_ids):
+                            connection.close()
+                        else:
+                            self._trash.add(connection)
+                    self._is_replacing = False
+                    self._stream_available_condition.notify()
 
     def shutdown(self):
         with self._lock:
@@ -492,6 +537,16 @@ class HostConnection(object):
         if self._connection:
             self._connection.close()
             self._connection = None
+
+        trash_conns = None
+        with self._lock:
+            if self._trash:
+                trash_conns = self._trash
+                self._trash = set()
+
+        if trash_conns is not None:
+            for conn in self._trash:
+                conn.close()
 
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         if self.is_shutdown or not self._connection:
@@ -548,7 +603,7 @@ class HostConnectionPool(object):
 
         log.debug("Initializing new connection pool for host %s", self.host)
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
-        self._connections = [session.cluster.connection_factory(host.endpoint)
+        self._connections = [session.cluster.connection_factory(host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
                              for i in range(core_conns)]
 
         self._keyspace = session.keyspace
@@ -652,7 +707,7 @@ class HostConnectionPool(object):
 
         log.debug("Going to open new connection to host %s", self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.endpoint)
+            conn = self._session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._session.keyspace)
             self._next_trash_allowed_at = time.time() + _MIN_TRASH_INTERVAL
@@ -712,9 +767,10 @@ class HostConnectionPool(object):
 
         raise NoConnectionsAvailable()
 
-    def return_connection(self, connection):
+    def return_connection(self, connection, stream_was_orphaned=False):
         with connection.lock:
-            connection.in_flight -= 1
+            if not stream_was_orphaned:
+                connection.in_flight -= 1
             in_flight = connection.in_flight
 
         if connection.is_defunct or connection.is_closed:
@@ -749,6 +805,13 @@ class HostConnectionPool(object):
                 self._maybe_trash_connection(connection)
             else:
                 self._signal_available_conn()
+
+    def on_orphaned_stream_released(self):
+        """
+        Called when a response for an orphaned stream (timed out on the client
+        side) was received.
+        """
+        self._signal_available_conn()
 
     def _maybe_trash_connection(self, connection):
         core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)

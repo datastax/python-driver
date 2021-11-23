@@ -4361,10 +4361,17 @@ class ResponseFuture(object):
 
             pool = self.session._pools.get(self._current_host)
             if pool and not pool.is_shutdown:
+                # Do not return the stream ID to the pool yet. We cannot reuse it
+                # because the node might still be processing the query and will
+                # return a late response to that query - if we used such stream
+                # before the response to the previous query has arrived, the new
+                # query could get a response from the old query
                 with self._connection.lock:
-                    self._connection.request_ids.append(self._req_id)
+                    self._connection.orphaned_request_ids.add(self._req_id)
+                    if len(self._connection.orphaned_request_ids) >= self._connection.orphaned_threshold:
+                        self._connection.orphaned_threshold_reached = True
 
-                pool.return_connection(self._connection)
+                pool.return_connection(self._connection, stream_was_orphaned=True)
 
         errors = self._errors
         if not errors:
