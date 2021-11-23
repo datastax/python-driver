@@ -49,6 +49,8 @@ class SingleInterfaceTest(unittest.TestCase):
         if self.cluster is not None:
             self.cluster.shutdown()
 
+    # TODO: enable after https://github.com/scylladb/python-driver/issues/121 is fixed
+    @unittest.skip('Fails on scylla due to the broadcast_rpc_port is None')
     def test_single_interface(self):
         """
         Test that we can connect to a multiple hosts bound to a single interface.

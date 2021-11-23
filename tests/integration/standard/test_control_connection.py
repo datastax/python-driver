@@ -103,6 +103,8 @@ class ControlConnectionTests(unittest.TestCase):
         new_host = self.cluster.get_control_connection_host()
         self.assertNotEqual(host, new_host)
 
+    # TODO: enable after https://github.com/scylladb/python-driver/issues/121 is fixed
+    @unittest.skip('Fails on scylla due to the broadcast_rpc_port is None')
     @notdse
     @greaterthanorequalcass40
     def test_control_connection_port_discovery(self):
