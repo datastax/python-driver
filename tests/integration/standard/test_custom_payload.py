@@ -45,7 +45,8 @@ class CustomPayloadTests(unittest.TestCase):
 
         self.cluster.shutdown()
 
-    @unittest.skip('Failing with scylla')
+    # Scylla error: 'truncated frame: expected 65540 bytes, length is 64'
+    @unittest.expectedFailure
     def test_custom_query_basic(self):
         """
         Test to validate that custom payloads work with simple queries
@@ -68,7 +69,8 @@ class CustomPayloadTests(unittest.TestCase):
         # Validate that various types of custom payloads are sent and received okay
         self.validate_various_custom_payloads(statement=statement)
 
-    @unittest.skip('Failing with scylla')
+    # Scylla error: 'Invalid query kind in BATCH messages. Must be 0 or 1 but got 4'"
+    @unittest.expectedFailure
     def test_custom_query_batching(self):
         """
         Test to validate that custom payloads work with batch queries
@@ -93,7 +95,9 @@ class CustomPayloadTests(unittest.TestCase):
         # Validate that various types of custom payloads are sent and received okay
         self.validate_various_custom_payloads(statement=batch)
 
-    @unittest.skip('Failing with scylla')
+    # Scylla error: 'Got different query ID in server response (b'\x00') than we had before
+    # (b'\x84P\xd0K0\xe2=\x11\xba\x02\x16W\xfatN\xf1')'")
+    @unittest.expectedFailure
     def test_custom_query_prepared(self):
         """
         Test to validate that custom payloads work with prepared queries

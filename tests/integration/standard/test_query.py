@@ -472,7 +472,6 @@ class ForcedHostIndexPolicy(RoundRobinPolicy):
 
 class PreparedStatementMetdataTest(unittest.TestCase):
 
-    @unittest.skip('Failing with scylla')
     def test_prepared_metadata_generation(self):
         """
         Test to validate that result metadata is appropriately populated across protocol version
@@ -957,7 +956,8 @@ class LightweightTransactionTests(unittest.TestCase):
         # Make sure test passed
         self.assertTrue(received_timeout)
 
-    @unittest.skip('Failing with scylla')
+    # Failed on Scylla because error `SERIAL/LOCAL_SERIAL consistency may only be requested for one partition at a time`
+    @unittest.expectedFailure
     def test_was_applied_batch_stmt(self):
         """
         Test to ensure `:attr:cassandra.cluster.ResultSet.was_applied` works as expected
@@ -1043,7 +1043,8 @@ class LightweightTransactionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             results.was_applied
 
-    @unittest.skip("Skipping until PYTHON-943 is resolved")
+    # Skipping until PYTHON-943 is resolved
+    @unittest.expectedFailure
     def test_was_applied_batch_string(self):
         batch_statement = BatchStatement(BatchType.LOGGED)
         batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",
@@ -1395,7 +1396,6 @@ class BaseKeyspaceTests():
         cls.cluster.shutdown()
 
 
-@unittest.skip('Failing with scylla')
 class QueryKeyspaceTests(BaseKeyspaceTests):
 
     def test_setting_keyspace(self):
@@ -1464,10 +1464,9 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
         self._check_set_keyspace_in_statement(session)
 
 
-@unittest.skip('Failing with scylla')
 @greaterthanorequalcass40
 class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
-    @unittest.skip
+    @unittest.expectedFailure
     def test_lower_protocol(self):
         cluster = TestCluster(protocol_version=ProtocolVersion.V4)
         session = cluster.connect(self.ks_name)
@@ -1493,7 +1492,6 @@ class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
         self.assertEqual(results[0], (1, 1))
 
 
-@unittest.skip('Failing with scylla')
 @greaterthanorequalcass40
 class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
     def _check_set_keyspace_in_statement(self, session):
@@ -1520,7 +1518,6 @@ class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
         self.assertEqual(set(range(10)), values, msg=results)
 
 
-@unittest.skip('Failing with scylla')
 @greaterthanorequalcass40
 class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 

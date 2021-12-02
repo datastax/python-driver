@@ -17,7 +17,6 @@ import unittest
 from tests.integration import USE_CASS_EXTERNAL, use_cluster, TestCluster
 
 
-@unittest.skip('Failing with scylla')
 class MisconfiguredAuthenticationTests(unittest.TestCase):
     """ One node (not the contact point) has password auth. The rest of the nodes have no auth """
     # TODO: 	Fix ccm to apply following options to scylla.yaml

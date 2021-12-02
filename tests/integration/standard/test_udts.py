@@ -51,7 +51,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         super(UDTTests, self).setUp()
         self.session.set_keyspace(self.keyspace_name)
 
-    @unittest.skip('Failing with scylla')
     @greaterthanorequalcass36
     def test_non_frozen_udts(self):
         """
@@ -75,7 +74,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         table_sql = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].as_cql_query()
         self.assertNotIn("<frozen>", table_sql)
 
-    @unittest.skip('Failing with scylla')
     def test_can_insert_unprepared_registered_udts(self):
         """
         Test the insertion of unprepared, registered UDTs
@@ -120,7 +118,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
-    @unittest.skip('Failing with scylla')
     def test_can_register_udt_before_connecting(self):
         """
         Test the registration of UDTs before session creation
@@ -179,7 +176,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
-    @unittest.skip('Failing with scylla')
     def test_can_insert_prepared_unregistered_udts(self):
         """
         Test the insertion of prepared, unregistered UDTs
@@ -224,7 +220,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
-    @unittest.skip('Failing with scylla')
     def test_can_insert_prepared_registered_udts(self):
         """
         Test the insertion of prepared, registered UDTs
@@ -394,7 +389,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
         )
 
-    @unittest.skip('Failing with scylla')
     def test_can_insert_nested_registered_udts(self):
         """
         Test for ensuring nested registered udts are properly inserted
@@ -422,7 +416,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
             # insert udts and verify inserts with reads
             self.nested_udt_verification_helper(s, max_nesting_depth, udts)
 
-    @unittest.skip('Failing with scylla')
     def test_can_insert_nested_unregistered_udts(self):
         """
         Test for ensuring nested unregistered udts are properly inserted
@@ -459,7 +452,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
                 result = s.execute("SELECT v_{0} FROM mytable WHERE k=0".format(i))[0]
                 self.assertEqual(udt, result["v_{0}".format(i)])
 
-    @unittest.skip('Failing with scylla')
     def test_can_insert_nested_registered_udts_with_different_namedtuples(self):
         """
         Test for ensuring nested udts are inserted correctly when the
@@ -489,7 +481,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
             # insert udts and verify inserts with reads
             self.nested_udt_verification_helper(s, max_nesting_depth, udts)
 
-    @unittest.skip('Failing with scylla')
     def test_raise_error_on_nonexisting_udts(self):
         """
         Test for ensuring that an error is raised for operating on a nonexisting udt or an invalid keyspace
@@ -555,7 +546,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
-    @unittest.skip('Failing with scylla')
     def test_can_insert_udt_all_collection_datatypes(self):
         """
         Test for inserting various types of COLLECTION_TYPES into UDT's
@@ -672,7 +662,6 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         c.shutdown()
 
-    @unittest.skip('Failing with scylla')
     def test_non_alphanum_identifiers(self):
         """
         PYTHON-413

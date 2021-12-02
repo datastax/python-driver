@@ -27,7 +27,9 @@ def setup_module():
     use_singledc()
 
 
-@unittest.skip('Failing with scylla')
+# Failing with scylla because there is no warning message when changing the value of 'batch_size_warn_threshold_in_kb'
+# config")
+@unittest.expectedFailure
 class ClientWarningTests(unittest.TestCase):
 
     @classmethod

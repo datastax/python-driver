@@ -734,7 +734,6 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         s.execute(u"SELECT * FROM system.local WHERE key = 'ef\u2052ef'")
         s.execute(u"SELECT * FROM system.local WHERE key = %s", (u"fe\u2051fe",))
 
-    @unittest.skip('Failing with scylla')
     def test_can_read_composite_type(self):
         """
         Test to ensure that CompositeTypes can be used in a query
