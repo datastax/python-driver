@@ -1,6 +1,6 @@
 #! /bin/bash -e
 
-BRANCH='branch-4.2'
+BRANCH='master'
 
 python3 -m venv .test-venv
 source .test-venv/bin/activate
@@ -17,12 +17,13 @@ pip install awscli
 pip install https://github.com/scylladb/scylla-ccm/archive/master.zip
 
 # download version
-LATEST_MASTER_JOB_ID=`aws --no-sign-request s3 ls downloads.scylladb.com/relocatable/unstable/${BRANCH}/ | grep '2020-' | tr -s ' ' | cut -d ' ' -f 3 | tr -d '\/'  | sort -g | tail -n 1`
-AWS_BASE=s3://downloads.scylladb.com/relocatable/unstable/${BRANCH}/${LATEST_MASTER_JOB_ID}
+LATEST_MASTER_JOB_ID=`aws --no-sign-request s3 ls downloads.scylladb.com/unstable/scylla/${BRANCH}/relocatable/ | grep '2021-' | tr -s ' ' | cut -d ' ' -f 3 | tr -d '\/'  | sort -g | tail -n 1`
+AWS_BASE=s3://downloads.scylladb.com/unstable/scylla/${BRANCH}/relocatable/${LATEST_MASTER_JOB_ID}
 
-aws s3 --no-sign-request cp ${AWS_BASE}/scylla-package.tar.gz .
-aws s3 --no-sign-request cp ${AWS_BASE}/scylla-tools-package.tar.gz .
-aws s3 --no-sign-request cp ${AWS_BASE}/scylla-jmx-package.tar.gz .
+aws s3 --no-sign-request cp ${AWS_BASE}/scylla-package.tar.gz . &
+aws s3 --no-sign-request cp ${AWS_BASE}/scylla-tools-package.tar.gz . &
+aws s3 --no-sign-request cp ${AWS_BASE}/scylla-jmx-package.tar.gz . &
+wait
 
 ccm create scylla-driver-temp -n 1 --scylla --version unstable/${BRANCH}:$LATEST_MASTER_JOB_ID \
  --scylla-core-package-uri=./scylla-package.tar.gz \
