@@ -10,7 +10,7 @@ env:
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt pytest"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2"
- CIBW_SKIP: cp35* cp36*
+ CIBW_SKIP: cp35* cp36* *musllinux*
 
 jobs:
   build_wheels:
@@ -69,7 +69,6 @@ jobs:
         if: runner.os == 'Linux' && matrix.platform == 'x86_64'
         run: |
           echo "CIBW_BUILD=cp3*_x86_64" >> $GITHUB_ENV
-          echo "CIBW_SKIP=cp35* cp36*" >> $GITHUB_ENV
 
       - name: Overwrite for Linux 32
         if: runner.os == 'Linux' && matrix.platform == 'i686'
