@@ -36,7 +36,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 class _PoolTests(unittest.TestCase):
-    __test__ = False
     PoolImpl = None
     uses_single_connection = None
 
@@ -187,7 +186,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True
@@ -222,7 +221,6 @@ class _PoolTests(unittest.TestCase):
 
 
 class HostConnectionPoolTests(_PoolTests):
-    __test__ = True
     PoolImpl = HostConnectionPool
     uses_single_connection = False
 
@@ -271,7 +269,6 @@ class HostConnectionPoolTests(_PoolTests):
 
 
 class HostConnectionTests(_PoolTests):
-    __test__ = True
     PoolImpl = HostConnection
     uses_single_connection = True
 

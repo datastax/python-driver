@@ -286,7 +286,7 @@ set            set or list
 tuple          tuple
 udt            class or namedtuple
 ============   =================
->>>>>>> c88255f202a21bbbae35f16e603b0f10f2f2cf36
+=======
 
 Named Parameters
 ~~~~~~~~~~~~~~~~

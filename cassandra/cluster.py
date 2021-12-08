@@ -63,7 +63,7 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler,
-                                RESULT_KIND_VOID)
+                                RESULT_KIND_VOID, ProtocolException)
 from cassandra.metadata import Metadata, protect_name, murmur3, _NodeInfo
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -785,7 +785,7 @@ class Cluster(object):
 
     By default, a ``ca_certs`` value should be supplied (the value should be
     a string pointing to the location of the CA certs file), and you probably
-    want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLSv1`` to match
+    want to specify ``ssl_version`` as ``ssl.PROTOCOL_TLS`` to match
     Cassandra's default protocol.
 
     .. versionchanged:: 3.3.0
@@ -1570,7 +1570,7 @@ class Cluster(object):
         If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
         is not supported (there is always one connection per host, unless
         the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
+        and using this will result in an :exc:`~.UnsupportedOperation`.
         """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
@@ -1603,7 +1603,7 @@ class Cluster(object):
         If :attr:`~.Cluster.protocol_version` is set to 3 or higher, this
         is not supported (there is always one connection per host, unless
         the host is remote and :attr:`connect_to_remote_hosts` is :const:`False`)
-        and using this will result in an :exc:`~.UnsupporteOperation`.
+        and using this will result in an :exc:`~.UnsupportedOperation`.
         """
         if self.protocol_version >= 3:
             raise UnsupportedOperation(
@@ -3557,6 +3557,14 @@ class ControlConnection(object):
                 break
             except ProtocolVersionUnsupported as e:
                 self._cluster.protocol_downgrade(host.endpoint, e.startup_version)
+            except ProtocolException as e:
+                # protocol v5 is out of beta in C* >=4.0-beta5 and is now the default driver
+                # protocol version. If the protocol version was not explicitly specified,
+                # and that the server raises a beta protocol error, we should downgrade.
+                if not self._cluster._protocol_version_explicit and e.is_beta_protocol_error:
+                    self._cluster.protocol_downgrade(host.endpoint, self._cluster.protocol_version)
+                else:
+                    raise
 
         log.debug("[control connection] Established new connection %r, "
                   "registering watchers and refreshing schema and topology",
@@ -3797,12 +3805,14 @@ class ControlConnection(object):
         # any new nodes, so we need this additional check.  (See PYTHON-90)
         should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
         for row in peers_result:
+            if not self._is_valid_peer(row):
+                log.warning(
+                    "Found an invalid row for peer (%s). Ignoring host." %
+                    _NodeInfo.get_broadcast_rpc_address(row))
+                continue
+
             endpoint = self._cluster.endpoint_factory.create(row)
 
-            tokens = row.get("tokens", None)
-            if 'tokens' in row and not tokens:  # it was selected, but empty
-                log.warning("Excluding host (%s) with no tokens in system.peers table of %s." % (endpoint, connection.endpoint))
-                continue
             if endpoint in found_hosts:
                 log.warning("Found multiple hosts with the same endpoint (%s). Excluding peer %s", endpoint, row.get("peer"))
                 continue
@@ -3829,6 +3839,7 @@ class ControlConnection(object):
             host.dse_workload = row.get("workload")
             host.dse_workloads = row.get("workloads")
 
+            tokens = row.get("tokens", None)
             if partitioner and tokens and self._token_meta_enabled:
                 token_map[host] = tokens
 
@@ -3842,6 +3853,12 @@ class ControlConnection(object):
         if partitioner and should_rebuild_token_map:
             log.debug("[control connection] Rebuilding token map due to topology changes")
             self._cluster.metadata.rebuild_token_map(partitioner, token_map)
+
+    @staticmethod
+    def _is_valid_peer(row):
+        return bool(_NodeInfo.get_broadcast_rpc_address(row) and row.get("host_id") and
+                    row.get("data_center") and row.get("rack") and
+                    ('tokens' not in row or row.get('tokens')))
 
     def _update_location_info(self, host, datacenter, rack):
         if host.datacenter == datacenter and host.rack == rack:

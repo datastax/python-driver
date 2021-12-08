@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 24, 7)
+__version_info__ = (3, 25, 0)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -161,7 +161,12 @@ class ProtocolVersion(object):
 
     V5 = 5
     """
-    v5, in beta from 3.x+
+    v5, in beta from 3.x+. Finalised in 4.0-beta5
+    """
+
+    V6 = 6
+    """
+    v6, in beta from 4.0-beta5
     """
 
     DSE_V1 = 0x41
@@ -174,12 +179,12 @@ class ProtocolVersion(object):
     DSE private protocol v2, supported in DSE 6.0+
     """
 
-    SUPPORTED_VERSIONS = (DSE_V2, DSE_V1, V5, V4, V3, V2, V1)
+    SUPPORTED_VERSIONS = (DSE_V2, DSE_V1, V6, V5, V4, V3, V2, V1)
     """
     A tuple of all supported protocol versions
     """
 
-    BETA_VERSIONS = (V5,)
+    BETA_VERSIONS = (V6,)
     """
     A tuple of all beta protocol versions
     """
@@ -234,6 +239,10 @@ class ProtocolVersion(object):
     @classmethod
     def has_continuous_paging_next_pages(cls, version):
         return version >= cls.DSE_V2
+
+    @classmethod
+    def has_checksumming_support(cls, version):
+        return cls.V5 <= version < cls.DSE_V1
 
 
 class WriteType(object):

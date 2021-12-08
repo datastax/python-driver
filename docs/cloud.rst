@@ -56,3 +56,36 @@ Limitations
 Event loops
 ^^^^^^^^^^^
 Evenlet isn't yet supported for python 3.7+ due to an `issue in Eventlet <https://github.com/eventlet/eventlet/issues/526>`_.
+
+
+CqlEngine
+=========
+
+When using the object mapper, you can configure cqlengine with :func:`~.cqlengine.connection.set_session`:
+
+.. code:: python
+
+  from cassandra.cqlengine import connection
+  ...
+
+  c = Cluster(cloud={'secure_connect_bundle':'/path/to/secure-connect-test.zip'},
+              auth_provider=PlainTextAuthProvider('user', 'pass'))
+  s = c.connect('myastrakeyspace')
+  connection.set_session(s)
+  ...
+
+If you are using some third-party libraries (flask, django, etc.), you might not be able to change the
+configuration mechanism. For this reason, the `hosts` argument of the default
+:func:`~.cqlengine.connection.setup` function will be ignored if a `cloud` config is provided:
+
+.. code:: python
+
+  from cassandra.cqlengine import connection
+  ...
+
+  connection.setup(
+    None,  # or anything else
+    "myastrakeyspace", cloud={
+      'secure_connect_bundle':'/path/to/secure-connect-test.zip'
+    },
+    auth_provider=PlainTextAuthProvider('user', 'pass'))

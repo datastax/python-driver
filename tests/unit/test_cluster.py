@@ -209,6 +209,8 @@ class ProtocolVersionTests(unittest.TestCase):
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V2)
         self.assertEqual(ProtocolVersion.DSE_V1, lower)
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V1)
+        self.assertEqual(ProtocolVersion.V5,lower)
+        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V5)
         self.assertEqual(ProtocolVersion.V4,lower)
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V4)
         self.assertEqual(ProtocolVersion.V3,lower)
