@@ -3,7 +3,7 @@ scales
 nose
 mock>1.1
 #ccm>=2.1.2
-unittest2
+unittest2; python_version < '3.5'
 pytz
 sure
 pure-sasl
