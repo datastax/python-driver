@@ -2,10 +2,10 @@ name: experimental
 on: [push, pull_request]
 
 env:
- CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y epel-release && yum install -y redhat-rpm-config gcc libffi-devel python-devel libev libev-devel openssl openssl-devel"
+ CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2"
- CIBW_BUILD: "cp38* cp39*"
-
+ CIBW_BUILD: "cp38* cp39* cp310*"
+ CIBW_SKIP: "*musllinux*"
 jobs:
   build_wheels:
     if: contains(github.event.pull_request.labels.*.name, 'test-build-experimental') || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
@@ -29,12 +29,10 @@ jobs:
 
       - uses: actions/setup-python@v2
         name: Install Python
-        with:
-          python-version: '3.7'
 
       - name: Install cibuildwheel
         run: |
-          python -m pip install cibuildwheel==2.1.1
+          python -m pip install cibuildwheel==2.3.0
 
       - name: Build wheels
         run: |
