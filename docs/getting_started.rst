@@ -12,29 +12,6 @@ with.
 
 First, make sure you have the Cassandra driver properly :doc:`installed <installation>`.
 
-Connecting to Astra
-+++++++++++++++++++
-
-If you are a DataStax `Astra <https://www.datastax.com/products/datastax-astra>`_ user,
-here is how to connect to your cluster:
-
-1. Download the secure connect bundle from your Astra account.
-2. Connect to your cluster with
-
-.. code-block:: python
-
-    from cassandra.cluster import Cluster
-    from cassandra.auth import PlainTextAuthProvider
-
-    cloud_config = {
-        'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
-    }
-    auth_provider = PlainTextAuthProvider(username='user', password='pass')
-    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
-    session = cluster.connect()
-
-See `Astra <https://docs.datastax.com/en/astra/aws/doc/index.html>`_ and :doc:`cloud` for more details.
-
 Connecting to Cassandra
 +++++++++++++++++++++++
 The simplest way to create a :class:`~.Cluster` is like this:
@@ -210,7 +187,7 @@ is different than for simple, non-prepared statements (although future versions
 of the driver may use the same placeholders for both).
 
 Passing Parameters to CQL Queries
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------
 Althought it is not recommended, you can also pass parameters to non-prepared
 statements. The driver supports two forms of parameter place-holders: positional
 and named.
@@ -280,7 +257,7 @@ normal string formatting).
 .. _type-conversions:
 
 Type Conversions
-^^^^^^^^^^^^^^^^
+----------------
 For non-prepared statements, Python types are cast to CQL literals in the
 following way:
 
@@ -334,7 +311,7 @@ following way:
 
 
 Asynchronous Queries
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 The driver supports asynchronous query execution through
 :meth:`~.Session.execute_async()`.  Instead of waiting for the query to
 complete and returning rows directly, this method almost immediately
@@ -431,7 +408,7 @@ in a :class:`~.SimpleStatement`:
     session.execute(query, ('John', 42))
 
 Setting a Consistency Level with Prepared Statements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------------------------------
 To specify a consistency level for prepared statements, you have two options.
 
 The first is to set a default consistency level for every execution of the
@@ -462,7 +439,7 @@ level on that:
     user3 = session.execute(user3_lookup)
 
 Speculative Execution
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 Speculative execution is a way to minimize latency by preemptively executing several
 instances of the same query against different nodes. For more details about this
