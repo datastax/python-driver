@@ -471,6 +471,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         tablemeta = self.get_table_metadata()
         self.check_create_statement(tablemeta, create_statement)
 
+    @unittest.expectedFailure
     def test_indexes(self):
         create_statement = self.make_create_statement(["a"], ["b", "c"], ["d", "e", "f"])
         create_statement += " WITH CLUSTERING ORDER BY (b ASC, c ASC)"
@@ -496,6 +497,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn('CREATE INDEX e_index', statement)
 
     @greaterthancass21
+    @unittest.expectedFailure
     def test_collection_indexes(self):
 
         self.session.execute("CREATE TABLE %s.%s (a int PRIMARY KEY, b map<text, text>)"
@@ -525,6 +527,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             tablemeta = self.get_table_metadata()
             self.assertIn('(full(b))', tablemeta.export_as_string())
 
+    @unittest.expectedFailure
     def test_compression_disabled(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
         create_statement += " WITH compression = {}"
@@ -559,6 +562,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             self.assertNotIn("min_threshold", cql)
             self.assertNotIn("max_threshold", cql)
 
+    @unittest.expectedFailure
     def test_refresh_schema_metadata(self):
         """
         test for synchronously refreshing all cluster metadata
@@ -831,7 +835,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
             cluster.shutdown()
 
-
+    @unittest.expectedFailure
     def test_refresh_user_function_metadata(self):
         """
         test for synchronously refreshing UDF metadata in keyspace
@@ -868,6 +872,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         cluster2.shutdown()
 
+    @unittest.expectedFailure
     def test_refresh_user_aggregate_metadata(self):
         """
         test for synchronously refreshing UDA metadata in keyspace
@@ -911,6 +916,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster2.shutdown()
 
     @greaterthanorequalcass30
+    @unittest.expectedFailure
     def test_multiple_indices(self):
         """
         test multiple indices on the same column.
@@ -1163,6 +1169,7 @@ CREATE TABLE export_udts.users (
         cluster.shutdown()
 
     @greaterthancass21
+    @unittest.expectedFailure
     def test_case_sensitivity(self):
         """
         Test that names that need to be escaped in CREATE statements are
@@ -1232,6 +1239,7 @@ CREATE TABLE export_udts.users (
         cluster.shutdown()
 
     @local
+    @unittest.expectedFailure
     def test_replicas(self):
         """
         Ensure cluster.metadata.get_replicas return correctly when not attached to keyspace
@@ -1498,6 +1506,7 @@ class FunctionTest(unittest.TestCase):
             super(FunctionTest.VerifiedAggregate, self).__init__(test_case, Aggregate, test_case.keyspace_aggregate_meta, **kwargs)
 
 
+@unittest.expectedFailure
 class FunctionMetadata(FunctionTest):
 
     def make_function_kwargs(self, called_on_null=True):
@@ -1696,6 +1705,7 @@ class AggregateMetadata(FunctionTest):
                 'return_type': "does not matter for creation",
                 'deterministic': False}
 
+    @unittest.expectedFailure
     def test_return_type_meta(self):
         """
         Test to verify to that the return type of a an aggregate is honored in the metadata
@@ -1713,6 +1723,7 @@ class AggregateMetadata(FunctionTest):
         with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('sum_int', 'int', init_cond='1')) as va:
             self.assertEqual(self.keyspace_aggregate_meta[va.signature].return_type, 'int')
 
+    @unittest.expectedFailure
     def test_init_cond(self):
         """
         Test to verify that various initial conditions are correctly surfaced in various aggregate functions
@@ -1763,6 +1774,7 @@ class AggregateMetadata(FunctionTest):
                 self.assertDictContainsSubset(init_not_updated, map_res)
         c.shutdown()
 
+    @unittest.expectedFailure
     def test_aggregates_after_functions(self):
         """
         Test to verify that aggregates are listed after function in metadata
@@ -1785,6 +1797,7 @@ class AggregateMetadata(FunctionTest):
             self.assertNotIn(-1, (aggregate_idx, func_idx), "AGGREGATE or FUNCTION not found in keyspace_cql: " + keyspace_cql)
             self.assertGreater(aggregate_idx, func_idx)
 
+    @unittest.expectedFailure
     def test_same_name_diff_types(self):
         """
         Test to verify to that aggregates with different signatures are differentiated in metadata
@@ -1807,6 +1820,7 @@ class AggregateMetadata(FunctionTest):
                 self.assertEqual(len(aggregates), 2)
                 self.assertNotEqual(aggregates[0].argument_types, aggregates[1].argument_types)
 
+    @unittest.expectedFailure
     def test_aggregates_follow_keyspace_alter(self):
         """
         Test to verify to that aggregates maintain equality after a keyspace is altered
@@ -1831,6 +1845,7 @@ class AggregateMetadata(FunctionTest):
             finally:
                 self.session.execute('ALTER KEYSPACE %s WITH durable_writes = true' % self.keyspace_name)
 
+    @unittest.expectedFailure
     def test_cql_optional_params(self):
         """
         Test to verify that the initial_cond and final_func parameters are correctly honored
@@ -1965,6 +1980,7 @@ class BadMetaTest(unittest.TestCase):
             self.assertIn("/*\nWarning:", m.export_as_string())
 
     @greaterthancass21
+    @unittest.expectedFailure
     def test_bad_user_function(self):
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS %s (key int, val int)
                                 RETURNS NULL ON NULL INPUT
@@ -1983,6 +1999,7 @@ class BadMetaTest(unittest.TestCase):
                 self.assertIn("/*\nWarning:", m.export_as_string())
 
     @greaterthancass21
+    @unittest.expectedFailure
     def test_bad_user_aggregate(self):
         self.session.execute("""CREATE FUNCTION IF NOT EXISTS sum_int (key int, val int)
                                 RETURNS NULL ON NULL INPUT
@@ -2003,6 +2020,7 @@ class BadMetaTest(unittest.TestCase):
 
 class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
 
+    @unittest.expectedFailure
     def test_dct_alias(self):
         """
         Tests to make sure DCT's have correct string formatting
