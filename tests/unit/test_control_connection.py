@@ -137,12 +137,6 @@ class MockConnection(object):
             [["192.168.1.1", 9042, "10.0.0.1", 7042, "a", "dc1", "rack1", ["1", "101", "201"], "uuid1"],
              ["192.168.1.2", 9042, "10.0.0.2", 7040, "a", "dc1", "rack1", ["2", "102", "202"], "uuid2"]]
         ]
-
-        self.peer_results_v2 = [
-            ["native_address",  "native_port", "peer", "peer_port", "schema_version", "data_center", "rack", "tokens"],
-            [["192.168.1.1", 9042, "10.0.0.1", 7042, "a", "dc1", "rack1", ["1", "101", "201"]],
-             ["192.168.1.2", 9042, "10.0.0.2", 7040, "a", "dc1", "rack1", ["2", "102", "202"]]]
-        ]
         self.wait_for_responses = Mock(return_value=_node_meta_results(self.local_results, self.peer_results))
 
 
