@@ -38,6 +38,7 @@ class MisconfiguredAuthenticationTests(unittest.TestCase):
 
             cls.ccm_cluster = ccm_cluster
 
+    @unittest.expectedFailure
     def test_connect_no_auth_provider(self):
         cluster = TestCluster()
         cluster.connect()

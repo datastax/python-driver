@@ -1530,7 +1530,6 @@ class BetaProtocolTest(unittest.TestCase):
 
 
 class DeprecationWarningTest(unittest.TestCase):
-    @unittest.expectedFailure
     def test_deprecation_warnings_legacy_parameters(self):
         """
         Tests the deprecation warning has been added when using

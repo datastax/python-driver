@@ -13,7 +13,7 @@ if (( aio_max_nr !=  aio_max_nr_recommended_value  )); then
    fi
 fi
 
-BRANCH='branch-4.6'
+BRANCH='branch-4.5'
 
 python3 -m venv .test-venv
 source .test-venv/bin/activate
