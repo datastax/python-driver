@@ -1,3 +1,8 @@
+import abc
+import sys
+
+import six
+
 from cassandra.connection import Connection, ConnectionShutdown
 
 import asyncio
@@ -9,24 +14,16 @@ from threading import Lock, Thread, get_ident
 
 
 log = logging.getLogger(__name__)
+is_at_least_python_version_3_5 = sys.version_info >= (3, 5)
 
 
-# This module uses ``yield from`` and ``@asyncio.coroutine`` over ``await`` and
-# ``async def`` for pre-Python-3.5 compatibility, so keep in mind that the
-# managed coroutines are generator-based, not native coroutines. See PEP 492:
-# https://www.python.org/dev/peps/pep-0492/#coroutine-objects
+if not hasattr(asyncio, "run_coroutine_threadsafe"):
+    raise ImportError("Cannot use asyncioreactor without access to asyncio.run_coroutine_threadsafe"
+                      " (added in 3.4.6 and 3.5.1)")
 
 
-try:
-    asyncio.run_coroutine_threadsafe
-except AttributeError:
-    raise ImportError(
-        'Cannot use asyncioreactor without access to '
-        'asyncio.run_coroutine_threadsafe (added in 3.4.6 and 3.5.1)'
-    )
-
-
-class AsyncioTimer(object):
+@six.add_metaclass(abc.ABCMeta)
+class BaseAsyncioTimer(object):
     """
     An ``asyncioreactor``-specific Timer. Similar to :class:`.connection.Timer,
     but with a slightly different API due to limitations in the underlying
@@ -45,12 +42,6 @@ class AsyncioTimer(object):
                                           loop=loop)
         self._handle = asyncio.run_coroutine_threadsafe(delayed, loop=loop)
 
-    @staticmethod
-    @asyncio.coroutine
-    def _call_delayed_coro(timeout, callback, loop):
-        yield from asyncio.sleep(timeout, loop=loop)
-        return callback()
-
     def __lt__(self, other):
         try:
             return self._handle < other._handle
@@ -66,15 +57,21 @@ class AsyncioTimer(object):
         raise NotImplementedError('{} is not compatible with TimerManager and '
                                   'does not implement .finish()')
 
+    @staticmethod
+    @abc.abstractmethod
+    def _call_delayed_coro(timeout, callback, loop):
+        pass
 
-class AsyncioConnection(Connection):
-    """
-    An experimental implementation of :class:`.Connection` that uses the
-    ``asyncio`` module in the Python standard library for its event loop.
 
-    Note that it requires ``asyncio`` features that were only introduced in the
-    3.4 line in 3.4.6, and in the 3.5 line in 3.5.1.
+@six.add_metaclass(abc.ABCMeta)
+class BaseAsyncioConnection(Connection):
     """
+          An experimental implementation of :class:`.Connection` that uses the
+          ``asyncio`` module in the Python standard library for its event loop.
+
+          Note that it requires ``asyncio`` features that were only introduced in the
+          3.4 line in 3.4.6, and in the 3.5 line in 3.5.1.
+          """
 
     _loop = None
     _pid = os.getpid()
@@ -136,26 +133,6 @@ class AsyncioConnection(Connection):
             self._close(), loop=self._loop
         )
 
-    @asyncio.coroutine
-    def _close(self):
-        log.debug("Closing connection (%s) to %s" % (id(self), self.endpoint))
-        if self._write_watcher:
-            self._write_watcher.cancel()
-        if self._read_watcher:
-            self._read_watcher.cancel()
-        if self._socket:
-            self._loop.remove_writer(self._socket.fileno())
-            self._loop.remove_reader(self._socket.fileno())
-            self._socket.close()
-
-        log.debug("Closed socket to %s" % (self.endpoint,))
-
-        if not self.is_defunct:
-            self.error_all_requests(
-                ConnectionShutdown("Connection to %s was closed" % self.endpoint))
-            # don't leave in-progress operations hanging
-            self.connected_event.set()
-
     def push(self, data):
         buff_size = self.out_buffer_size
         if len(data) > buff_size:
@@ -174,52 +151,176 @@ class AsyncioConnection(Connection):
             # avoid races/hangs by just scheduling this, not using threadsafe
             self._loop.create_task(self._push_msg(chunks))
 
-    @asyncio.coroutine
+    @abc.abstractmethod
+    def _close(self):
+        pass
+
+    @abc.abstractmethod
     def _push_msg(self, chunks):
-        # This lock ensures all chunks of a message are sequential in the Queue
-        with (yield from self._write_queue_lock):
-            for chunk in chunks:
-                self._write_queue.put_nowait(chunk)
+        pass
 
-
-    @asyncio.coroutine
+    @abc.abstractmethod
     def handle_write(self):
-        while True:
-            try:
-                next_msg = yield from self._write_queue.get()
-                if next_msg:
-                    yield from self._loop.sock_sendall(self._socket, next_msg)
-            except socket.error as err:
-                log.debug("Exception in send for %s: %s", self, err)
-                self.defunct(err)
-                return
-            except asyncio.CancelledError:
-                return
+        pass
 
-    @asyncio.coroutine
+    @abc.abstractmethod
     def handle_read(self):
-        while True:
-            try:
-                buf = yield from self._loop.sock_recv(self._socket, self.in_buffer_size)
-                self._iobuf.write(buf)
-            # sock_recv expects EWOULDBLOCK if socket provides no data, but
-            # nonblocking ssl sockets raise these instead, so we handle them
-            # ourselves by yielding to the event loop, where the socket will
-            # get the reading/writing it "wants" before retrying
-            except (ssl.SSLWantWriteError, ssl.SSLWantReadError):
-                yield
-                continue
-            except socket.error as err:
-                log.debug("Exception during socket recv for %s: %s",
-                          self, err)
-                self.defunct(err)
-                return  # leave the read loop
-            except asyncio.CancelledError:
-                return
+        pass
 
-            if buf and self._iobuf.tell():
-                self.process_io_buffer()
-            else:
-                log.debug("Connection %s closed by server", self)
-                self.close()
-                return
+
+if is_at_least_python_version_3_5:
+    class AsyncioTimer(BaseAsyncioTimer):
+        @staticmethod
+        async def _call_delayed_coro(timeout, callback, loop):
+            await asyncio.sleep(timeout, loop=loop)
+            return callback()
+
+    class AsyncioConnection(BaseAsyncioConnection):
+        async def _close(self):
+            log.debug("Closing connection (%s) to %s" % (id(self), self.endpoint))
+            if self._write_watcher:
+                self._write_watcher.cancel()
+            if self._read_watcher:
+                self._read_watcher.cancel()
+            if self._socket:
+                self._loop.remove_writer(self._socket.fileno())
+                self._loop.remove_reader(self._socket.fileno())
+                self._socket.close()
+
+            log.debug("Closed socket to %s" % (self.endpoint,))
+
+            if not self.is_defunct:
+                self.error_all_requests(
+                    ConnectionShutdown("Connection to %s was closed" % self.endpoint))
+                # don't leave in-progress operations hanging
+                self.connected_event.set()
+
+        async def _push_msg(self, chunks):
+            # This lock ensures all chunks of a message are sequential in the Queue
+            async with self._write_queue_lock:
+                for chunk in chunks:
+                    self._write_queue.put_nowait(chunk)
+
+        async def handle_write(self):
+            while True:
+                try:
+                    next_msg = await self._write_queue.get()
+                    if next_msg:
+                        await self._loop.sock_sendall(self._socket, next_msg)
+                except socket.error as err:
+                    log.debug("Exception in send for %s: %s", self, err)
+                    self.defunct(err)
+                    return
+                except asyncio.CancelledError:
+                    return
+
+        async def handle_read(self):
+            while True:
+                try:
+                    buf = await self._loop.sock_recv(self._socket, self.in_buffer_size)
+                    self._iobuf.write(buf)
+                # sock_recv expects EWOULDBLOCK if socket provides no data, but
+                # nonblocking ssl sockets raise these instead, so we handle them
+                # ourselves by yielding to the event loop, where the socket will
+                # get the reading/writing it "wants" before retrying
+                except (ssl.SSLWantWriteError, ssl.SSLWantReadError):
+                    pass
+                except socket.error as err:
+                    log.debug("Exception during socket recv for %s: %s",
+                              self, err)
+                    self.defunct(err)
+                    return  # leave the read loop
+                except asyncio.CancelledError:
+                    return
+
+                if buf and self._iobuf.tell():
+                    self.process_io_buffer()
+                else:
+                    log.debug("Connection %s closed by server", self)
+                    self.close()
+                    return
+else:
+    class AsyncioTimer(BaseAsyncioTimer):
+        @staticmethod
+        @asyncio.coroutine
+        def _call_delayed_coro(timeout, callback, loop):
+            yield from asyncio.sleep(timeout, loop=loop)
+            return callback()
+
+    class AsyncioConnection(BaseAsyncioConnection):
+        @asyncio.coroutine
+        def _close(self):
+            log.debug("Closing connection (%s) to %s" % (id(self), self.endpoint))
+            if self._write_watcher:
+                self._write_watcher.cancel()
+            if self._read_watcher:
+                self._read_watcher.cancel()
+            if self._socket:
+                self._loop.remove_writer(self._socket.fileno())
+                self._loop.remove_reader(self._socket.fileno())
+                self._socket.close()
+
+            log.debug("Closed socket to %s" % (self.endpoint,))
+
+            if not self.is_defunct:
+                self.error_all_requests(
+                    ConnectionShutdown("Connection to %s was closed" % self.endpoint))
+                # don't leave in-progress operations hanging
+                self.connected_event.set()
+
+            log.debug("Closed socket to %s" % (self.endpoint,))
+
+            if not self.is_defunct:
+                self.error_all_requests(
+                    ConnectionShutdown("Connection to %s was closed" % self.endpoint))
+                # don't leave in-progress operations hanging
+                self.connected_event.set()
+
+        @asyncio.coroutine
+        def _push_msg(self, chunks):
+            # This lock ensures all chunks of a message are sequential in the Queue
+            with (yield from self._write_queue_lock):
+                for chunk in chunks:
+                    self._write_queue.put_nowait(chunk)
+
+        @asyncio.coroutine
+        def handle_write(self):
+            while True:
+                try:
+                    next_msg = yield from self._write_queue.get()
+                    if next_msg:
+                        yield from self._loop.sock_sendall(self._socket, next_msg)
+                except socket.error as err:
+                    log.debug("Exception in send for %s: %s", self, err)
+                    self.defunct(err)
+                    return
+                except asyncio.CancelledError:
+                    return
+
+        @asyncio.coroutine
+        def handle_read(self):
+            while True:
+                try:
+                    buf = yield from self._loop.sock_recv(self._socket, self.in_buffer_size)
+                    self._iobuf.write(buf)
+                # sock_recv expects EWOULDBLOCK if socket provides no data, but
+                # nonblocking ssl sockets raise these instead, so we handle them
+                # ourselves by yielding to the event loop, where the socket will
+                # get the reading/writing it "wants" before retrying
+                except (ssl.SSLWantWriteError, ssl.SSLWantReadError):
+                    yield
+                    continue
+                except socket.error as err:
+                    log.debug("Exception during socket recv for %s: %s",
+                              self, err)
+                    self.defunct(err)
+                    return  # leave the read loop
+                except asyncio.CancelledError:
+                    return
+
+                if buf and self._iobuf.tell():
+                    self.process_io_buffer()
+                else:
+                    log.debug("Connection %s closed by server", self)
+                    self.close()
+                    return
