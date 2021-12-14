@@ -26,7 +26,7 @@ from cassandra.cqlengine.columns import Column
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
-from tests.integration import greaterthanorequalcass3_10, TestCluster
+from tests.integration import greaterthanorequalcass3_10, IntegrationTestCluster
 
 from cassandra.cqlengine.connection import execute
 
@@ -112,7 +112,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
 
         @test_category data_types:object_mapper
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
 

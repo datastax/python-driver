@@ -13,7 +13,7 @@ from cassandra.protocol import ProtocolHandler, LazyProtocolHandler, NumpyProtoc
 from cassandra.query import tuple_factory
 from tests import VERIFY_CYTHON
 from tests.integration import use_singledc, notprotocolv1, \
-    drop_keyspace_shutdown_cluster, BasicSharedKeyspaceUnitTestCase, greaterthancass21, TestCluster
+    drop_keyspace_shutdown_cluster, BasicSharedKeyspaceUnitTestCase, greaterthancass21, IntegrationTestCluster
 from tests.integration.datatype_utils import update_datatypes
 from tests.integration.standard.utils import (
     create_table_with_all_types, get_all_primitive_params, get_primitive_datatypes)
@@ -31,7 +31,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE testspace WITH replication = "
                             "{ 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
@@ -62,7 +62,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         Test Cython-based parser that returns an iterator, over multiple pages
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
-        cluster = TestCluster(
+        cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)}
         )
         session = cluster.connect(keyspace="testspace")
@@ -96,7 +96,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         Test Numpy-based parser that returns a NumPy array
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
-        cluster = TestCluster(
+        cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)}
         )
         session = cluster.connect(keyspace="testspace")
@@ -179,7 +179,7 @@ def get_data(protocol_handler):
     """
     Get data from the test table.
     """
-    cluster = TestCluster(
+    cluster = IntegrationTestCluster(
         execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)}
     )
     session = cluster.connect(keyspace="testspace")

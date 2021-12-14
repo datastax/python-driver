@@ -22,7 +22,7 @@ from cassandra.concurrent import execute_concurrent, execute_concurrent_with_arg
 from cassandra.policies import HostDistance
 from cassandra.query import tuple_factory, SimpleStatement
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, IntegrationTestCluster
 
 from six import next
 
@@ -39,7 +39,7 @@ class ClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = TestCluster(
+        cls.cluster = IntegrationTestCluster(
             execution_profiles = {
                 EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)
             }

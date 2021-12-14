@@ -22,7 +22,7 @@ from cassandra import ProtocolVersion, ConsistencyLevel
 
 from tests.integration import use_singledc, drop_keyspace_shutdown_cluster, \
     greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51, greaterthanorequalcass3_10, \
-    TestCluster, greaterthanorequalcass40, requirecassandra
+    IntegrationTestCluster, greaterthanorequalcass40, requirecassandra
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
@@ -40,7 +40,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE custserdes WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}")
         cls.session.set_keyspace("custserdes")
@@ -65,7 +65,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         """
 
         # Ensure that we get normal uuid back first
-        cluster = TestCluster(
+        cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)}
         )
         session = cluster.connect(keyspace="custserdes")
@@ -103,7 +103,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         @test_category data_types:serialization
         """
         # Connect using a custom protocol handler that tracks the various types the result message is used with.
-        cluster = TestCluster(
+        cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)}
         )
         session = cluster.connect(keyspace="custserdes")
@@ -133,7 +133,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
         @test_category connection
         """
-        cluster = TestCluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        cluster = IntegrationTestCluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
         session = cluster.connect()
 
         max_pages = 4
@@ -230,7 +230,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         return future
 
     def _protocol_divergence_fail_by_flag_uses_int(self, version, uses_int_query_flag, int_flag = True, beta=False):
-        cluster = TestCluster(protocol_version=version, allow_beta_protocol_version=beta)
+        cluster = IntegrationTestCluster(protocol_version=version, allow_beta_protocol_version=beta)
         session = cluster.connect()
 
         query_one = SimpleStatement("INSERT INTO test3rf.test (k, v) VALUES (1, 1)")

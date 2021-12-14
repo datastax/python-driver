@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cassandra.cluster import NoHostAvailable
-from tests.integration import use_singledc, get_cluster, remove_cluster, local, TestCluster
+from tests.integration import use_singledc, get_cluster, remove_cluster, local, IntegrationTestCluster
 from tests.util import wait_until, wait_until_not_raised
 
 import unittest
@@ -28,9 +28,9 @@ def setup_module():
     # can't use wait_for_binary_proto cause ccm tries on port 9042
     ccm_cluster.start(wait_for_binary_proto=False)
     # wait until all nodes are up
-    wait_until_not_raised(lambda: TestCluster(contact_points=['127.0.0.1'], port=9046).connect().shutdown(), 1, 20)
-    wait_until_not_raised(lambda: TestCluster(contact_points=['127.0.0.2'], port=9046).connect().shutdown(), 1, 20)
-    wait_until_not_raised(lambda: TestCluster(contact_points=['127.0.0.3'], port=9046).connect().shutdown(), 1, 20)
+    wait_until_not_raised(lambda: IntegrationTestCluster(contact_points=['127.0.0.1'], port=9046).connect().shutdown(), 1, 20)
+    wait_until_not_raised(lambda: IntegrationTestCluster(contact_points=['127.0.0.2'], port=9046).connect().shutdown(), 1, 20)
+    wait_until_not_raised(lambda: IntegrationTestCluster(contact_points=['127.0.0.3'], port=9046).connect().shutdown(), 1, 20)
 
 
 def teardown_module():
@@ -47,11 +47,11 @@ class CustomClusterTests(unittest.TestCase):
 
         All hosts should be marked as up and we should be able to execute queries on it.
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         with self.assertRaises(NoHostAvailable):
             cluster.connect()  # should fail on port 9042
 
-        cluster = TestCluster(port=9046)
+        cluster = IntegrationTestCluster(port=9046)
         session = cluster.connect(wait_for_all_pools=True)
 
         wait_until(lambda: len(cluster.metadata.all_hosts()) == 3, 1, 5)

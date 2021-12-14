@@ -160,7 +160,7 @@ class BasicGraphUnitTestCase(BasicKeyspaceUnitTestCase):
             )
         )
 
-        self.cluster = TestCluster(execution_profiles={
+        self.cluster = IntegrationTestCluster(execution_profiles={
             EXEC_PROFILE_GRAPH_DEFAULT: ep_graphson1,
             EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT: ep_analytics,
             "graphson1": ep_graphson1,
@@ -275,7 +275,7 @@ class GraphUnitTestCase(BasicKeyspaceUnitTestCase):
             )
         )
 
-        self.cluster = TestCluster(execution_profiles={
+        self.cluster = IntegrationTestCluster(execution_profiles={
             EXEC_PROFILE_GRAPH_DEFAULT: ep_graphson1,
             EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT: ep_analytics,
             "graphson1": ep_graphson1,
@@ -360,7 +360,7 @@ class BasicSharedGraphUnitTestCase(BasicKeyspaceUnitTestCase):
 
     @classmethod
     def session_setup(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect()
         cls.ks_name = cls.__name__.lower()
         cls.cass_version, cls.cql_version = get_server_versions()

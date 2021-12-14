@@ -18,7 +18,7 @@ from tests.integration import (BasicExistingKeyspaceUnitTestCase, BasicSharedKey
                                BasicSharedKeyspaceUnitTestCaseRF1,
                                greaterthanorequaldse51, greaterthanorequaldse60,
                                greaterthanorequaldse68, use_single_node,
-                               DSE_VERSION, requiredse, TestCluster)
+                               DSE_VERSION, requiredse, IntegrationTestCluster)
 
 import unittest
 
@@ -389,4 +389,4 @@ class GraphMetadataSchemaErrorTests(BasicExistingKeyspaceUnitTestCase):
         """ % (self.ks_name,))
 
         self.session.execute('TRUNCATE system_schema.vertices')
-        TestCluster().connect().shutdown()
+        IntegrationTestCluster().connect().shutdown()
