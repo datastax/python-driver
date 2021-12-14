@@ -19,7 +19,7 @@ from cassandra.cluster import NoHostAvailable
 from cassandra.io.asyncorereactor import AsyncoreConnection
 
 from tests import is_monkey_patched
-from tests.integration import use_cluster, remove_cluster, TestCluster
+from tests.integration import use_cluster, remove_cluster, IntegrationTestCluster
 
 if is_monkey_patched():
     LibevConnection = -1
@@ -75,7 +75,7 @@ class IPV6ConnectionTest(object):
     connection_class = None
 
     def test_connect(self):
-        cluster = TestCluster(connection_class=self.connection_class, contact_points=['::1'], connect_timeout=10)
+        cluster = IntegrationTestCluster(connection_class=self.connection_class, contact_points=['::1'], connect_timeout=10)
         session = cluster.connect()
         future = session.execute_async("SELECT * FROM system.local")
         future.result()
@@ -83,16 +83,16 @@ class IPV6ConnectionTest(object):
         cluster.shutdown()
 
     def test_error(self):
-        cluster = TestCluster(connection_class=self.connection_class, contact_points=['::1'], port=9043,
-                              connect_timeout=10)
+        cluster = IntegrationTestCluster(connection_class=self.connection_class, contact_points=['::1'], port=9043,
+                                         connect_timeout=10)
         self.assertRaisesRegexp(NoHostAvailable, '\(\'Unable to connect.*%s.*::1\', 9043.*Connection refused.*'
                                 % errno.ECONNREFUSED, cluster.connect)
 
     def test_error_multiple(self):
         if len(socket.getaddrinfo('localhost', 9043, socket.AF_UNSPEC, socket.SOCK_STREAM)) < 2:
             raise unittest.SkipTest('localhost only resolves one address')
-        cluster = TestCluster(connection_class=self.connection_class, contact_points=['localhost'], port=9043,
-                              connect_timeout=10)
+        cluster = IntegrationTestCluster(connection_class=self.connection_class, contact_points=['localhost'], port=9043,
+                                         connect_timeout=10)
         self.assertRaisesRegexp(NoHostAvailable, '\(\'Unable to connect.*Tried connecting to \[\(.*\(.*\].*Last error',
                                 cluster.connect)
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, IntegrationTestCluster
 
 try:
     import unittest2 as unittest
@@ -43,7 +43,7 @@ class PreparedStatementTests(unittest.TestCase):
         cls.cass_version = get_server_versions()
 
     def setUp(self):
-        self.cluster = TestCluster(metrics_enabled=True, allow_beta_protocol_version=True)
+        self.cluster = IntegrationTestCluster(metrics_enabled=True, allow_beta_protocol_version=True)
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -515,7 +515,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @since 3.12
         @jira_ticket PYTHON-808
         """
-        one_cluster = TestCluster(metrics_enabled=True)
+        one_cluster = IntegrationTestCluster(metrics_enabled=True)
         one_session = one_cluster.connect()
         self.addCleanup(one_cluster.shutdown)
 
@@ -555,7 +555,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @since 3.13
         @jira_ticket PYTHON-847
         """
-        cluster = TestCluster(protocol_version=ProtocolVersion.V4)
+        cluster = IntegrationTestCluster(protocol_version=ProtocolVersion.V4)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 9)
@@ -569,7 +569,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @since 3.13
         @jira_ticket PYTHON-847
         """
-        cluster = TestCluster(protocol_version=ProtocolVersion.V5)
+        cluster = IntegrationTestCluster(protocol_version=ProtocolVersion.V5)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 10)
@@ -584,7 +584,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @since 3.13
         @jira_ticket PYTHON-847
         """
-        cluster = TestCluster(protocol_version=ProtocolVersion.DSE_V1)
+        cluster = IntegrationTestCluster(protocol_version=ProtocolVersion.DSE_V1)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 10)
@@ -599,7 +599,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @since 3.13
         @jira_ticket PYTHON-847
         """
-        cluster = TestCluster(protocol_version=ProtocolVersion.DSE_V2)
+        cluster = IntegrationTestCluster(protocol_version=ProtocolVersion.DSE_V2)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 10)

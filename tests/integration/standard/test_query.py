@@ -28,7 +28,7 @@ from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DE
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
-    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, TestCluster, requirecassandra
+    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, IntegrationTestCluster, requirecassandra
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
@@ -122,7 +122,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
     def test_trace_ignores_row_factory(self):
-        with TestCluster(
+        with IntegrationTestCluster(
                 execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
         ) as cluster:
             s = cluster.connect()
@@ -367,7 +367,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 class PreparedStatementTests(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -523,7 +523,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         @jira_ticket PYTHON-556
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         """
-        clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
+        clus = IntegrationTestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         session = clus.connect(wait_for_all_pools=True)
@@ -543,7 +543,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         and the batch statement will be sent.
         """
         policy = ForcedHostIndexPolicy()
-        clus = TestCluster(
+        clus = IntegrationTestCluster(
             execution_profiles={
                 EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
             },
@@ -587,7 +587,7 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
+        clus = IntegrationTestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
         self.addCleanup(clus.shutdown)
 
         table = "test3rf.%s" % self._testMethodName.lower()
@@ -646,7 +646,7 @@ class PrintStatementTests(unittest.TestCase):
         Highlight the difference between Prepared and Bound statements
         """
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
 
         prepared = session.prepare('INSERT INTO test3rf.test (k, v) VALUES (?, ?)')
@@ -670,7 +670,7 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
                 "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect(wait_for_all_pools=True)
@@ -801,7 +801,7 @@ class SerialConsistencyTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Serial Consistency, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         if PROTOCOL_VERSION < 3:
             self.cluster.set_core_connections_per_host(HostDistance.LOCAL, 1)
         self.session = self.cluster.connect()
@@ -893,7 +893,7 @@ class LightweightTransactionTests(unittest.TestCase):
                 % (PROTOCOL_VERSION,))
 
         serial_profile = ExecutionProfile(consistency_level=ConsistencyLevel.SERIAL)
-        self.cluster = TestCluster(execution_profiles={'serial': serial_profile})
+        self.cluster = IntegrationTestCluster(execution_profiles={'serial': serial_profile})
         self.session = self.cluster.connect()
 
         ddl = '''
@@ -1078,7 +1078,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Protocol 2.0+ is required for BATCH operations, currently testing against %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         self.session = self.cluster.connect()
         query = """
                 INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
@@ -1353,7 +1353,7 @@ class UnicodeQueryTest(BasicSharedKeyspaceUnitTestCase):
 class BaseKeyspaceTests():
     @classmethod
     def setUpClass(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
 
@@ -1421,7 +1421,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = TestCluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
+        cluster = IntegrationTestCluster(protocol_version=ProtocolVersion.V5, allow_beta_protocol_version=True)
         session = cluster.connect(self.alternative_ks)
         self.addCleanup(cluster.shutdown)
 
@@ -1438,7 +1438,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
 
@@ -1456,7 +1456,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 
         @test_category query
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect(self.ks_name)
         self.addCleanup(cluster.shutdown)
 
@@ -1467,7 +1467,7 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
 class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
     @unittest.skip
     def test_lower_protocol(self):
-        cluster = TestCluster(protocol_version=ProtocolVersion.V4)
+        cluster = IntegrationTestCluster(protocol_version=ProtocolVersion.V4)
         session = cluster.connect(self.ks_name)
         self.addCleanup(cluster.shutdown)
 
@@ -1521,7 +1521,7 @@ class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
 class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
     def setUp(self):
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -1597,7 +1597,7 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
         @test_category query
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = self.cluster.connect("system")
         self.addCleanup(cluster.shutdown)
 
@@ -1619,7 +1619,7 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
         @test_category query
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = self.cluster.connect()
         self.addCleanup(cluster.shutdown)
 

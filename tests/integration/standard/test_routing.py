@@ -21,7 +21,7 @@ from uuid import uuid1
 import logging
 log = logging.getLogger(__name__)
 
-from tests.integration import use_singledc, TestCluster
+from tests.integration import use_singledc, IntegrationTestCluster
 
 
 def setup_module():
@@ -36,7 +36,7 @@ class RoutingTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect('test1rf')
 
     @classmethod

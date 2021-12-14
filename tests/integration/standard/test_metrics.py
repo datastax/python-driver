@@ -27,7 +27,7 @@ from cassandra import ConsistencyLevel, WriteTimeout, Unavailable, ReadTimeout
 from cassandra.protocol import SyntaxException
 
 from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT
-from tests.integration import get_cluster, get_node, use_singledc, execute_until_pass, TestCluster
+from tests.integration import get_cluster, get_node, use_singledc, execute_until_pass, IntegrationTestCluster
 from greplin import scales
 from tests.integration import BasicSharedKeyspaceUnitTestCaseRF3WM, BasicExistingKeyspaceUnitTestCase, local
 
@@ -42,8 +42,8 @@ class MetricsTests(unittest.TestCase):
 
     def setUp(self):
         contact_point = ['127.0.0.2']
-        self.cluster = TestCluster(contact_points=contact_point, metrics_enabled=True,
-                                   execution_profiles=
+        self.cluster = IntegrationTestCluster(contact_points=contact_point, metrics_enabled=True,
+                                              execution_profiles=
                                    {EXEC_PROFILE_DEFAULT:
                                        ExecutionProfile(
                                            load_balancing_policy=HostFilterPolicy(
@@ -51,7 +51,7 @@ class MetricsTests(unittest.TestCase):
                                            retry_policy=FallthroughRetryPolicy()
                                        )
                                    }
-                                   )
+                                              )
         self.session = self.cluster.connect("test3rf", wait_for_all_pools=True)
 
     def tearDown(self):
@@ -203,7 +203,7 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         @test_category metrics
         """
 
-        cluster2 = TestCluster(
+        cluster2 = IntegrationTestCluster(
             metrics_enabled=True,
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=FallthroughRetryPolicy())}
         )
@@ -257,13 +257,13 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
 
         @test_category metrics
         """
-        cluster2 = TestCluster(
+        cluster2 = IntegrationTestCluster(
             metrics_enabled=True,
             monitor_reporting_enabled=False,
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=FallthroughRetryPolicy())}
         )
 
-        cluster3 = TestCluster(
+        cluster3 = IntegrationTestCluster(
             metrics_enabled=True,
             monitor_reporting_enabled=False,
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(retry_policy=FallthroughRetryPolicy())}

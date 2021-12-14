@@ -23,7 +23,7 @@ except ImportError:
 
 
 from cassandra.protocol import ConfigurationException
-from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster, greaterthanorequalcass40, notdse
+from tests.integration import use_singledc, PROTOCOL_VERSION, IntegrationTestCluster, greaterthanorequalcass40, notdse
 from tests.integration.datatype_utils import update_datatypes
 
 
@@ -38,7 +38,7 @@ class ControlConnectionTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Native protocol 3,0+ is required for UDTs using %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
 
     def tearDown(self):
         try:
@@ -112,7 +112,7 @@ class ControlConnectionTests(unittest.TestCase):
         Unit tests already validate that the port can be picked up (or not) from the query. This validates
         it picks up the correct port from a real server and is able to connect.
         """
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
 
         host = self.cluster.get_control_connection_host()
         self.assertEqual(host, None)

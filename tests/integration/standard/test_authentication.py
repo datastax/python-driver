@@ -19,7 +19,7 @@ from cassandra.cluster import NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
 from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
-    USE_CASS_EXTERNAL, start_cluster_wait_for_up, TestCluster
+    USE_CASS_EXTERNAL, start_cluster_wait_for_up, IntegrationTestCluster
 from tests.integration.util import assert_quiescent_pool_state
 
 try:
@@ -75,12 +75,12 @@ class AuthenticationTests(unittest.TestCase):
         # to ensure the role manager is setup
         for _ in range(5):
             try:
-                cluster = TestCluster(
+                cluster = IntegrationTestCluster(
                     idle_heartbeat_interval=0,
                     auth_provider=self.get_authentication_provider(username='cassandra', password='cassandra'))
                 cluster.connect(wait_for_all_pools=True)
 
-                return TestCluster(
+                return IntegrationTestCluster(
                     idle_heartbeat_interval=0,
                     auth_provider=self.get_authentication_provider(username=usr, password=pwd))
             except Exception as e:
@@ -143,7 +143,7 @@ class AuthenticationTests(unittest.TestCase):
             cluster.shutdown()
 
     def test_connect_no_auth_provider(self):
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         try:
             self.assertRaisesRegexp(NoHostAvailable,
                                     '.*AuthenticationFailed.*',

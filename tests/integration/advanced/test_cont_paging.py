@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from tests.integration import use_singledc, greaterthanorequaldse51, BasicSharedKeyspaceUnitTestCaseRF3WM, \
-    DSE_VERSION, ProtocolVersion, greaterthanorequaldse60, requiredse, TestCluster
+    DSE_VERSION, ProtocolVersion, greaterthanorequaldse60, requiredse, IntegrationTestCluster
 
 import logging
 log = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class BaseContPagingTests():
     @classmethod
     def create_cluster(cls):
 
-        cls.cluster_with_profiles = TestCluster(protocol_version=cls.protocol_version, execution_profiles=cls.execution_profiles)
+        cls.cluster_with_profiles = IntegrationTestCluster(protocol_version=cls.protocol_version, execution_profiles=cls.execution_profiles)
 
         cls.session_with_profiles = cls.cluster_with_profiles.connect(wait_for_all_pools=True)
         statements_and_params = zip(

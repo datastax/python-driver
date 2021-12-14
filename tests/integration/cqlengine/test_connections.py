@@ -22,7 +22,7 @@ from cassandra.cqlengine.query import ContextQuery, BatchQuery, ModelQuerySet
 from tests.integration.cqlengine import setup_connection, DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query import test_queryset
-from tests.integration import local, CASSANDRA_IP, TestCluster
+from tests.integration import local, CASSANDRA_IP, IntegrationTestCluster
 
 
 class TestModel(Model):
@@ -226,7 +226,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
         connection_name = 'from_session'
         conn.register_connection(connection_name, session=session)
@@ -257,7 +257,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
         with self.assertRaises(CQLEngineException):
             conn.register_connection("bad_coonection1", session=session, consistency="not_null")

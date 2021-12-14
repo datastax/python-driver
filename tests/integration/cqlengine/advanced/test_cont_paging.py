@@ -27,7 +27,7 @@ from cassandra.cluster import (EXEC_PROFILE_DEFAULT,
 from cassandra.cqlengine import columns, connection, models
 from cassandra.cqlengine.management import drop_table, sync_table
 from tests.integration import (DSE_VERSION, greaterthanorequaldse51,
-                               greaterthanorequaldse60, requiredse, TestCluster)
+                               greaterthanorequaldse60, requiredse, IntegrationTestCluster)
 
 
 class TestMultiKeyModel(models.Model):
@@ -76,8 +76,8 @@ class BasicConcurrentTests():
     def _create_cluster_with_cp_options(cls, name, cp_options):
         execution_profiles = {EXEC_PROFILE_DEFAULT:
                                   ExecutionProfile(continuous_paging_options=cp_options)}
-        cls.cluster_default = TestCluster(protocol_version=cls.protocol_version,
-                                          execution_profiles=execution_profiles)
+        cls.cluster_default = IntegrationTestCluster(protocol_version=cls.protocol_version,
+                                                     execution_profiles=execution_profiles)
         cls.session_default = cls.cluster_default.connect(wait_for_all_pools=True)
         connection.register_connection(name, default=True, session=cls.session_default)
         cls.connections.add(name)

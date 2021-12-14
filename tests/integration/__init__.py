@@ -75,7 +75,7 @@ def get_server_versions():
     if cass_version is not None:
         return (cass_version, cql_version)
 
-    c = TestCluster()
+    c = IntegrationTestCluster()
     s = c.connect()
     row = s.execute('SELECT cql_version, release_version FROM system.local')[0]
 
@@ -706,9 +706,9 @@ def setup_keyspace(ipformat=None, wait=True, protocol_version=None):
         _protocol_version = PROTOCOL_VERSION
 
     if not ipformat:
-        cluster = TestCluster(protocol_version=_protocol_version)
+        cluster = IntegrationTestCluster(protocol_version=_protocol_version)
     else:
-        cluster = TestCluster(contact_points=["::1"], protocol_version=_protocol_version)
+        cluster = IntegrationTestCluster(contact_points=["::1"], protocol_version=_protocol_version)
     session = cluster.connect()
 
     try:
@@ -802,7 +802,7 @@ class BasicKeyspaceUnitTestCase(unittest.TestCase):
 
     @classmethod
     def common_setup(cls, rf, keyspace_creation=True, create_class_table=False, **cluster_kwargs):
-        cls.cluster = TestCluster(**cluster_kwargs)
+        cls.cluster = IntegrationTestCluster(**cluster_kwargs)
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
         cls.ks_name = cls.__name__.lower()
         if keyspace_creation:
@@ -990,7 +990,7 @@ def assert_startswith(s, prefix):
         )
 
 
-class TestCluster(object):
+class IntegrationTestCluster(object):
     DEFAULT_PROTOCOL_VERSION = default_protocol_version
     DEFAULT_CASSANDRA_IP = CASSANDRA_IP
     DEFAULT_ALLOW_BETA = ALLOW_BETA_PROTOCOL

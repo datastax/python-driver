@@ -19,7 +19,7 @@ from packaging.version import Version
 from tests import notwindows
 from tests.unit.cython.utils import notcython
 from tests.integration import (execute_until_pass,
-                               execute_with_long_wait_retry, use_cluster, TestCluster)
+                               execute_with_long_wait_retry, use_cluster, IntegrationTestCluster)
 
 try:
     import unittest2 as unittest
@@ -59,7 +59,7 @@ class DseCCMClusterTest(unittest.TestCase):
         )
         use_cluster(cluster_name=cluster_name, nodes=[3], dse_options={})
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
         result = execute_until_pass(
             session,

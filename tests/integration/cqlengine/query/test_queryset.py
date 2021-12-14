@@ -42,7 +42,7 @@ from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
 from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21, \
-    greaterthanorequalcass30, TestCluster
+    greaterthanorequalcass30, IntegrationTestCluster
 from tests.integration.cqlengine import execute_count, DEFAULT_KEYSPACE
 
 
@@ -775,7 +775,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         with self.assertRaises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(description__gte='test'))
 
-        with TestCluster().connect() as session:
+        with IntegrationTestCluster().connect() as session:
             session.execute("CREATE INDEX custom_index_cqlengine ON {}.{} (description)".
                             format(DEFAULT_KEYSPACE, CustomIndexedTestModel._table_name))
 

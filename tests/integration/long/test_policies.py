@@ -20,7 +20,7 @@ except ImportError:
 from cassandra import ConsistencyLevel, Unavailable
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 
-from tests.integration import use_cluster, get_cluster, get_node, TestCluster
+from tests.integration import use_cluster, get_cluster, get_node, IntegrationTestCluster
 
 
 def setup_module():
@@ -47,7 +47,7 @@ class RetryPolicyTests(unittest.TestCase):
         ep = ExecutionProfile(consistency_level=ConsistencyLevel.ALL,
                               serial_consistency_level=ConsistencyLevel.SERIAL)
 
-        cluster = TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep})
+        cluster = IntegrationTestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: ep})
         session = cluster.connect()
 
         session.execute("CREATE KEYSPACE test_retry_policy_cas WITH replication = {'class':'SimpleStrategy','replication_factor': 3};")

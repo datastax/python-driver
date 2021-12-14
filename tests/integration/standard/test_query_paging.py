@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, IntegrationTestCluster
 
 import logging
 log = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class QueryPagingTests(unittest.TestCase):
                 "Protocol 2.0+ is required for Paging state, currently testing against %r"
                 % (PROTOCOL_VERSION,))
 
-        self.cluster = TestCluster(
+        self.cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(consistency_level=ConsistencyLevel.LOCAL_QUORUM)}
         )
         if PROTOCOL_VERSION < 3:

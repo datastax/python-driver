@@ -20,7 +20,7 @@ except ImportError:
 
 from cassandra.query import BatchStatement
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, local, TestCluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, local, IntegrationTestCluster
 
 
 def setup_module():
@@ -34,7 +34,7 @@ class ClientWarningTests(unittest.TestCase):
         if PROTOCOL_VERSION < 4:
             return
 
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect()
 
         cls.session.execute("CREATE TABLE IF NOT EXISTS test1rf.client_warning (k int, v0 int, v1 int, PRIMARY KEY (k, v0))")

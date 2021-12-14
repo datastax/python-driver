@@ -22,7 +22,7 @@ import six
 
 from cassandra.query import (SimpleStatement, BatchStatement, BatchType)
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, local, TestCluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, local, IntegrationTestCluster
 
 
 def setup_module():
@@ -38,7 +38,7 @@ class CustomPayloadTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         self.session = self.cluster.connect()
 
     def tearDown(self):

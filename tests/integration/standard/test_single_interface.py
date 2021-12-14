@@ -25,7 +25,7 @@ from cassandra.query import SimpleStatement
 from packaging.version import Version
 from tests.integration import use_singledc, PROTOCOL_VERSION, \
     remove_cluster, greaterthanorequalcass40, notdse, \
-    CASSANDRA_VERSION, DSE_VERSION, TestCluster
+    CASSANDRA_VERSION, DSE_VERSION, IntegrationTestCluster
 
 
 def setup_module():
@@ -42,7 +42,7 @@ def teardown_module():
 class SingleInterfaceTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         self.session = self.cluster.connect()
 
     def tearDown(self):

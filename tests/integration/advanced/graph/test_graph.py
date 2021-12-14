@@ -25,7 +25,7 @@ from cassandra.graph import single_object_row_factory, Vertex, graph_object_row_
 from cassandra.util import SortedSet
 
 from tests.integration import DSE_VERSION, greaterthanorequaldse51, greaterthanorequaldse68, \
-    requiredse, TestCluster
+    requiredse, IntegrationTestCluster
 from tests.integration.advanced.graph import BasicGraphUnitTestCase, GraphUnitTestCase, \
     GraphProtocol, ClassicGraphSchema, CoreGraphSchema, use_single_node_with_graph
 
@@ -150,7 +150,7 @@ class GraphProfileTests(BasicGraphUnitTestCase):
         exec_short_timeout.graph_options.graph_name = self.graph_name
 
         # Add a single execution policy on cluster creation
-        local_cluster = TestCluster(execution_profiles={"exec_dif_factory": exec_dif_factory})
+        local_cluster = IntegrationTestCluster(execution_profiles={"exec_dif_factory": exec_dif_factory})
         local_session = local_cluster.connect()
         self.addCleanup(local_cluster.shutdown)
 

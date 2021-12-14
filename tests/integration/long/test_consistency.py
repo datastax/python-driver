@@ -22,7 +22,7 @@ from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTim
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy
 from cassandra.query import SimpleStatement
-from tests.integration import use_singledc, execute_until_pass, TestCluster
+from tests.integration import use_singledc, execute_until_pass, IntegrationTestCluster
 
 from tests.integration.long.utils import (
     force_stop, create_schema, wait_for_down, wait_for_up, start, CoordinatorStats
@@ -129,7 +129,7 @@ class ConsistencyTests(unittest.TestCase):
                 pass
 
     def _test_tokenaware_one_node_down(self, keyspace, rf, accepted):
-        cluster = TestCluster(
+        cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()))}
         )
         session = cluster.connect(wait_for_all_pools=True)
@@ -181,7 +181,7 @@ class ConsistencyTests(unittest.TestCase):
 
     def test_rfthree_tokenaware_none_down(self):
         keyspace = 'test_rfthree_tokenaware_none_down'
-        cluster = TestCluster(
+        cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()))}
         )
         session = cluster.connect(wait_for_all_pools=True)
@@ -205,7 +205,7 @@ class ConsistencyTests(unittest.TestCase):
         cluster.shutdown()
 
     def _test_downgrading_cl(self, keyspace, rf, accepted):
-        cluster = TestCluster(execution_profiles={
+        cluster = IntegrationTestCluster(execution_profiles={
             EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()),
                                                    DowngradingConsistencyRetryPolicy())
         })
@@ -249,7 +249,7 @@ class ConsistencyTests(unittest.TestCase):
 
     def test_rfthree_roundrobin_downgradingcl(self):
         keyspace = 'test_rfthree_roundrobin_downgradingcl'
-        with TestCluster(execution_profiles={
+        with IntegrationTestCluster(execution_profiles={
             EXEC_PROFILE_DEFAULT: ExecutionProfile(RoundRobinPolicy(),
                                                    DowngradingConsistencyRetryPolicy())
         }) as cluster:
@@ -257,7 +257,7 @@ class ConsistencyTests(unittest.TestCase):
 
     def test_rfthree_tokenaware_downgradingcl(self):
         keyspace = 'test_rfthree_tokenaware_downgradingcl'
-        with TestCluster(execution_profiles={
+        with IntegrationTestCluster(execution_profiles={
             EXEC_PROFILE_DEFAULT: ExecutionProfile(TokenAwarePolicy(RoundRobinPolicy()),
                                                    DowngradingConsistencyRetryPolicy())
         }) as cluster:
@@ -339,7 +339,7 @@ class ConnectivityTest(unittest.TestCase):
         all_contact_points = ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
 
         # Connect up and find out which host will bet queries routed to to first
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         cluster.connect(wait_for_all_pools=True)
         hosts = cluster.metadata.all_hosts()
         address = hosts[0].address
@@ -349,13 +349,13 @@ class ConnectivityTest(unittest.TestCase):
         # We now register a cluster that has it's Control Connection NOT on the node that we are shutting down.
         # We do this so we don't miss the event
         contact_point = '127.0.0.{0}'.format(self.get_node_not_x(node_to_stop))
-        cluster = TestCluster(contact_points=[contact_point])
+        cluster = IntegrationTestCluster(contact_points=[contact_point])
         cluster.connect(wait_for_all_pools=True)
         try:
             force_stop(node_to_stop)
             wait_for_down(cluster, node_to_stop)
             # Attempt a query against that node. It should complete
-            cluster2 = TestCluster(contact_points=all_contact_points)
+            cluster2 = IntegrationTestCluster(contact_points=all_contact_points)
             session2 = cluster2.connect()
             session2.execute("SELECT * FROM system.local")
         finally:

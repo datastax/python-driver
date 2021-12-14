@@ -17,7 +17,7 @@ import logging
 from cassandra import ConsistencyLevel, AlreadyExists
 from cassandra.query import SimpleStatement
 
-from tests.integration import use_singledc, execute_until_pass, TestCluster
+from tests.integration import use_singledc, execute_until_pass, IntegrationTestCluster
 
 import time
 
@@ -37,7 +37,7 @@ class SchemaTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect(wait_for_all_pools=True)
 
     @classmethod
@@ -98,7 +98,7 @@ class SchemaTests(unittest.TestCase):
         Tests for any schema disagreements using the same keyspace multiple times
         """
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect(wait_for_all_pools=True)
 
         for i in range(30):
@@ -132,7 +132,7 @@ class SchemaTests(unittest.TestCase):
         @test_category schema
         """
         # This should yield a schema disagreement
-        cluster = TestCluster(max_schema_agreement_wait=0.001)
+        cluster = IntegrationTestCluster(max_schema_agreement_wait=0.001)
         session = cluster.connect(wait_for_all_pools=True)
 
         rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
@@ -145,7 +145,7 @@ class SchemaTests(unittest.TestCase):
         cluster.shutdown()
         
         # These should have schema agreement
-        cluster = TestCluster(max_schema_agreement_wait=100)
+        cluster = IntegrationTestCluster(max_schema_agreement_wait=100)
         session = cluster.connect()
         rs = session.execute("CREATE KEYSPACE test_schema_disagreement WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
         self.check_and_wait_for_agreement(session, rs, True)
