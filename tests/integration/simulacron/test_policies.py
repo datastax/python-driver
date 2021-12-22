@@ -184,7 +184,7 @@ class SpecExecTest(unittest.TestCase):
         spec = ExecutionProfile(load_balancing_policy=RoundRobinPolicy(),
                                 speculative_execution_policy=ConstantSpeculativeExecutionPolicy(0, number_of_requests))
 
-        cluster = Cluster(compression=False)
+        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
         cluster.add_execution_profile("spec", spec)
         session = cluster.connect(wait_for_all_pools=True)
         self.addCleanup(cluster.shutdown)

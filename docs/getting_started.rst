@@ -3,15 +3,18 @@ Getting Started
 
 First, make sure you have the driver properly :doc:`installed <installation>`.
 
-Connecting to Cassandra
+Connecting to a Cluster
 -----------------------
 Before we can start executing any queries against a Cassandra cluster we need to setup
 an instance of :class:`~.Cluster`. As the name suggests, you will typically have one
 instance of :class:`~.Cluster` for each Cassandra cluster you want to interact
 with.
 
-The simplest way to create a :class:`~.Cluster` is like this:
 First, make sure you have the Cassandra driver properly :doc:`installed <installation>`.
+
+Connecting to Cassandra
++++++++++++++++++++++++
+The simplest way to create a :class:`~.Cluster` is like this:
 
 .. code-block:: python
 
@@ -52,6 +55,8 @@ To establish connections and begin executing queries we need a
     cluster = Cluster()
     session = cluster.connect()
 
+Session Keyspace
+----------------
 The :meth:`~.Cluster.connect()` method takes an optional ``keyspace`` argument
 which sets the default keyspace for all queries made through that :class:`~.Session`:
 
@@ -59,7 +64,6 @@ which sets the default keyspace for all queries made through that :class:`~.Sess
 
     cluster = Cluster()
     session = cluster.connect('mykeyspace')
-
 
 You can always change a Session's keyspace using :meth:`~.Session.set_keyspace` or
 by executing a ``USE <keyspace>`` query:
@@ -70,6 +74,8 @@ by executing a ``USE <keyspace>`` query:
     # or you can do this instead
     session.execute('USE users')
 
+Execution Profiles
+------------------
 Profiles are passed in by ``execution_profiles`` dict.
 
 In this case we can construct the base ``ExecutionProfile`` passing all attributes:
@@ -181,7 +187,7 @@ is different than for simple, non-prepared statements (although future versions
 of the driver may use the same placeholders for both).
 
 Passing Parameters to CQL Queries
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------
 Althought it is not recommended, you can also pass parameters to non-prepared
 statements. The driver supports two forms of parameter place-holders: positional
 and named.
@@ -251,7 +257,7 @@ normal string formatting).
 .. _type-conversions:
 
 Type Conversions
-^^^^^^^^^^^^^^^^
+----------------
 For non-prepared statements, Python types are cast to CQL literals in the
 following way:
 
@@ -305,7 +311,7 @@ following way:
 
 
 Asynchronous Queries
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 The driver supports asynchronous query execution through
 :meth:`~.Session.execute_async()`.  Instead of waiting for the query to
 complete and returning rows directly, this method almost immediately
@@ -402,7 +408,7 @@ in a :class:`~.SimpleStatement`:
     session.execute(query, ('John', 42))
 
 Setting a Consistency Level with Prepared Statements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------------------------------
 To specify a consistency level for prepared statements, you have two options.
 
 The first is to set a default consistency level for every execution of the
@@ -433,7 +439,7 @@ level on that:
     user3 = session.execute(user3_lookup)
 
 Speculative Execution
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 Speculative execution is a way to minimize latency by preemptively executing several
 instances of the same query against different nodes. For more details about this

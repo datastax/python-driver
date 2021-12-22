@@ -25,7 +25,7 @@ from cassandra import ProtocolVersion, ConsistencyLevel
 
 from tests.integration import use_singledc, drop_keyspace_shutdown_cluster, \
     greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51, greaterthanorequalcass3_10, \
-    greaterthanorequalcass31, TestCluster
+    TestCluster, greaterthanorequalcass40, requirecassandra
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 from six import binary_type
@@ -124,8 +124,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self.assertEqual(len(CustomResultMessageTracked.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
         cluster.shutdown()
 
-    @greaterthanorequalcass31
     @unittest.expectedFailure
+    @requirecassandra
+    @greaterthanorequalcass40
     def test_protocol_divergence_v5_fail_by_continuous_paging(self):
         """
         Test to validate that V5 and DSE_V1 diverge. ContinuousPagingOptions is not supported by V5
@@ -171,8 +172,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V4, uses_int_query_flag=False,
                                                         int_flag=True)
 
-    @greaterthanorequalcass3_10
     @unittest.expectedFailure
+    @requirecassandra
+    @greaterthanorequalcass40
     def test_protocol_v5_uses_flag_int(self):
         """
         Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for V5
@@ -198,8 +200,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.DSE_V1, uses_int_query_flag=True,
                                                         int_flag=True)
 
-    @greaterthanorequalcass3_10
     @unittest.expectedFailure
+    @requirecassandra
+    @greaterthanorequalcass40
     def test_protocol_divergence_v5_fail_by_flag_uses_int(self):
         """
         Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for V5

@@ -1,3 +1,23 @@
+3.25.0
+======
+March 18, 2021
+
+Features
+--------
+* Ensure the driver can connect when invalid peer hosts are in system.peers (PYTHON-1260)
+* Implement protocol v5 checksumming (PYTHON-1258)
+* Fix the default cqlengine connection mechanism to work with Astra (PYTHON-1265)
+
+Bug Fixes
+---------
+* Asyncore race condition cause logging exception on shutdown (PYTHON-1266)
+* Update list of reserved keywords (PYTHON-1269)
+
+Others
+------
+* Drop Python 3.4 support (PYTHON-1220)
+* Update security documentation and examples to use PROTOCOL_TLS (PYTHON-1264)
+
 3.24.0
 ======
 June 18, 2020
