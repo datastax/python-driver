@@ -634,7 +634,7 @@ class HostConnection(object):
         with self._lock:
             if not self._excess_connections:
                 return
-            conns = self._excess_connections
+            conns = self._excess_connections.copy()
             self._excess_connections.clear()
 
         for c in conns:
