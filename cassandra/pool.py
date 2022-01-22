@@ -664,9 +664,9 @@ class HostConnection(object):
                 return
 
         conn = self._session.cluster.connection_factory(self.host.endpoint)
-        log.debug("Received a connection for shard_id=%i on host %s", conn.shard_id, self.host)
+        log.debug("Received a connection %s for shard_id=%i on host %s", id(conn), conn.shard_id, self.host)
         if self.is_shutdown:
-            log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", id(conn), self.host)
+            log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", self.host, id(conn))
             conn.close()
             return
         old_conn = self._connections.get(conn.shard_id)
@@ -734,14 +734,16 @@ class HostConnection(object):
                 self._close_excess_connections()
         elif self.host.sharding_info.shards_count == len(self._connections.keys()) and self.num_missing_or_needing_replacement == 0:
             log.debug(
-                "All shards are already covered, closing newly opened excess connection for host %s",
+                "All shards are already covered, closing newly opened excess connection %s for host %s",
+                id(self),
                 self.host
             )
             conn.close()
         else:
             if len(self._excess_connections) >= self._excess_connection_limit:
                 log.debug(
-                    "Excess connection pool size limit (%i) reached for host %s, closing all %i of them",
+                    "After connection %s is created excess connection pool size limit (%i) reached for host %s, closing all %i of them",
+                    id(conn),
                     self._excess_connection_limit,
                     self.host,
                     len(self._excess_connections)
@@ -749,7 +751,8 @@ class HostConnection(object):
                 self._close_excess_connections()
 
             log.debug(
-                "Putting a connection to shard %i to the excess pool of host %s",
+                "Putting a connection %s to shard %i to the excess pool of host %s",
+                id(conn),
                 conn.shard_id,
                 self.host
             )
