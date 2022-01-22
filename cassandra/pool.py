@@ -577,24 +577,24 @@ class HostConnection(object):
             if self.is_shutdown:
                 return
 
-        log.debug("Replacing connection (%s) to %s", id(connection), self.host)
-        try:
-            if connection.shard_id in self._connections.keys():
-                del self._connections[connection.shard_id]
-            if self.host.sharding_info:
-                self._connecting.add(connection.shard_id)
-                self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
+            log.debug("Replacing connection (%s) to %s", id(connection), self.host)
+            try:
+                if connection.shard_id in self._connections.keys():
+                    del self._connections[connection.shard_id]
+                if self.host.sharding_info:
+                    self._connecting.add(connection.shard_id)
+                    self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
+                else:
+                    connection = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+                    if self._keyspace:
+                        connection.set_keyspace_blocking(self._keyspace)
+                    self._connections[connection.shard_id] = connection
+            except Exception:
+                log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
+                self._session.submit(self._replace, connection)
             else:
-                connection = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
-                if self._keyspace:
-                    connection.set_keyspace_blocking(self._keyspace)
-                self._connections[connection.shard_id] = connection
-        except Exception:
-            log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
-            self._session.submit(self._replace, connection)
-        else:
-            self._is_replacing = False
-            self._stream_available_condition.notify()
+                self._is_replacing = False
+                self._stream_available_condition.notify()
 
     def shutdown(self):
         log.debug("Shutting down connections to %s", self.host)
