@@ -3,7 +3,7 @@ on: [push, pull_request]
 
 env:
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y libev libev-devel openssl openssl-devel"
- CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2"
+ CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
  CIBW_BUILD: "cp38* cp39* cp310*"
  CIBW_SKIP: "*musllinux*"
 jobs:
