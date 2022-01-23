@@ -394,7 +394,7 @@ class HostConnection(object):
         self._session = weakref.proxy(session)
         self._lock = Lock()
         # this is used in conjunction with the connection streams. Not using the connection lock because the connection can be replaced in the lifetime of the pool.
-        self._stream_available_condition = Condition(self._lock)
+        self._stream_available_condition = Condition(Lock())
         self._is_replacing = False
         self._connecting = set()
         self._connections = {}
