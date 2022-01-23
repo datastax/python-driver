@@ -594,7 +594,8 @@ class HostConnection(object):
                 self._session.submit(self._replace, connection)
             else:
                 self._is_replacing = False
-                self._stream_available_condition.notify()
+                with self._stream_available_condition:
+                    self._stream_available_condition.notify()
 
     def shutdown(self):
         log.debug("Shutting down connections to %s", self.host)
@@ -603,7 +604,8 @@ class HostConnection(object):
                 return
             else:
                 self.is_shutdown = True
-            self._stream_available_condition.notify_all()
+            with self._stream_available_condition:
+                self._stream_available_condition.notify_all()
 
             for future in self._shard_connections_futures:
                 future.cancel()
@@ -1132,11 +1134,16 @@ class HostConnectionPool(object):
                 self.is_shutdown = True
 
         self._signal_all_available_conn()
-        for conn in self._connections:
-            conn.close()
-            self.open_count -= 1
 
-        for conn in list(self._trash):
+        connections_to_close = []
+        with self._lock:
+            connections_to_close.extend(self._connections)
+            self.open_count -= len(self._connections)
+            self._connections.clear()
+            connections_to_close.extend(self._trash)
+            self._trash.clear()
+
+        for conn in connections_to_close:
             conn.close()
 
     def ensure_core_connections(self):
