@@ -4569,7 +4569,7 @@ class ResponseFuture(object):
     def _set_result(self, host, connection, pool, response):
         try:
             self.coordinator_host = host
-            if pool:
+            if pool and not pool.is_shutdown:
                 pool.return_connection(connection)
 
             trace_id = getattr(response, 'trace_id', None)

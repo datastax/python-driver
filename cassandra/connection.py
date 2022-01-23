@@ -906,6 +906,8 @@ class Connection(object):
                 self._socket.settimeout(self.connect_timeout)
                 self._initiate_connection(sockaddr)
                 self._socket.settimeout(None)
+                local_addr = self._socket.getsockname()
+                log.debug('Connection %s %s:%s -> %s:%s', id(self), local_addr[0], local_addr[1], sockaddr[0], sockaddr[1])
                 if self._check_hostname:
                     self._match_hostname()
                 sockerr = None

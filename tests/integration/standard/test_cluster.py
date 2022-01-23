@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncore
+import subprocess
 
 try:
     import unittest2 as unittest
@@ -1110,6 +1112,34 @@ class ClusterTests(unittest.TestCase):
                     self.assertAlmostEqual(start, end, 1)
         else:
             raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
+
+    def test_stale_connections_after_shutdown(self):
+        """
+        Check if any connection/socket left unclosed after cluster.shutdown
+        Originates from https://github.com/scylladb/python-driver/issues/120
+        """
+        for _ in range(10):
+            with TestCluster(protocol_version=3) as cluster:
+                cluster.connect().execute("SELECT * FROM system_schema.keyspaces")
+                time.sleep(1)
+
+            with TestCluster(protocol_version=3) as cluster:
+                session = cluster.connect()
+                for _ in range(5):
+                    session.execute("SELECT * FROM system_schema.keyspaces")
+
+            for _ in range(10):
+                with TestCluster(protocol_version=3) as cluster:
+                    cluster.connect().execute("SELECT * FROM system_schema.keyspaces")
+
+            for _ in range(10):
+                with TestCluster(protocol_version=3) as cluster:
+                    cluster.connect()
+
+            result = subprocess.run(["lsof -nP | awk '$3 ~ \":9042\" {print $0}' | grep ''"], shell=True, capture_output=True)
+            if result.returncode:
+                continue
+            assert False, f'Found stale connections: {result.stdout}'
 
     @notwindows
     def test_execute_query_timeout(self):

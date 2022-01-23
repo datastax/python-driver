@@ -394,7 +394,7 @@ class HostConnection(object):
         self._session = weakref.proxy(session)
         self._lock = Lock()
         # this is used in conjunction with the connection streams. Not using the connection lock because the connection can be replaced in the lifetime of the pool.
-        self._stream_available_condition = Condition(self._lock)
+        self._stream_available_condition = Condition(Lock())
         self._is_replacing = False
         self._connecting = set()
         self._connections = {}
@@ -548,6 +548,8 @@ class HostConnection(object):
             else:
                 connection.close()
                 with self._lock:
+                    if self.is_shutdown:
+                        return
                     self._connections.pop(connection.shard_id, None)
                     if self._is_replacing:
                         return
@@ -577,24 +579,25 @@ class HostConnection(object):
             if self.is_shutdown:
                 return
 
-        log.debug("Replacing connection (%s) to %s", id(connection), self.host)
-        try:
-            if connection.shard_id in self._connections.keys():
-                del self._connections[connection.shard_id]
-            if self.host.sharding_info:
-                self._connecting.add(connection.shard_id)
-                self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
+            log.debug("Replacing connection (%s) to %s", id(connection), self.host)
+            try:
+                if connection.shard_id in self._connections.keys():
+                    del self._connections[connection.shard_id]
+                if self.host.sharding_info:
+                    self._connecting.add(connection.shard_id)
+                    self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
+                else:
+                    connection = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+                    if self._keyspace:
+                        connection.set_keyspace_blocking(self._keyspace)
+                    self._connections[connection.shard_id] = connection
+            except Exception:
+                log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
+                self._session.submit(self._replace, connection)
             else:
-                connection = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
-                if self._keyspace:
-                    connection.set_keyspace_blocking(self._keyspace)
-                self._connections[connection.shard_id] = connection
-        except Exception:
-            log.warning("Failed reconnecting %s. Retrying." % (self.host.endpoint,))
-            self._session.submit(self._replace, connection)
-        else:
-            self._is_replacing = False
-            self._stream_available_condition.notify()
+                self._is_replacing = False
+                with self._stream_available_condition:
+                    self._stream_available_condition.notify()
 
     def shutdown(self):
         log.debug("Shutting down connections to %s", self.host)
@@ -603,7 +606,8 @@ class HostConnection(object):
                 return
             else:
                 self.is_shutdown = True
-            self._stream_available_condition.notify_all()
+            with self._stream_available_condition:
+                self._stream_available_condition.notify_all()
 
             for future in self._shard_connections_futures:
                 future.cancel()
@@ -634,7 +638,7 @@ class HostConnection(object):
         with self._lock:
             if not self._excess_connections:
                 return
-            conns = self._excess_connections
+            conns = self._excess_connections.copy()
             self._excess_connections.clear()
 
         for c in conns:
@@ -664,9 +668,9 @@ class HostConnection(object):
                 return
 
         conn = self._session.cluster.connection_factory(self.host.endpoint)
-        log.debug("Received a connection for shard_id=%i on host %s", conn.shard_id, self.host)
+        log.debug("Received a connection %s for shard_id=%i on host %s", id(conn), conn.shard_id, self.host)
         if self.is_shutdown:
-            log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", id(conn), self.host)
+            log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", self.host, id(conn))
             conn.close()
             return
         old_conn = self._connections.get(conn.shard_id)
@@ -679,6 +683,9 @@ class HostConnection(object):
             )
             old_conn = None
             with self._lock:
+                if self.is_shutdown:
+                    conn.close()
+                    return
                 if conn.shard_id in self._connections.keys():
                     # Move the current connection to the trash and use the new one from now on
                     old_conn = self._connections[conn.shard_id]
@@ -714,9 +721,12 @@ class HostConnection(object):
                         else:
                             self._trash.add(old_conn)
             if self._keyspace:
-                old_conn = self._connections.get(conn.shard_id)
-                if old_conn:
-                    old_conn.set_keyspace_blocking(self._keyspace)
+                with self._lock:
+                    if self.is_shutdown:
+                        conn.close()
+                    old_conn = self._connections.get(conn.shard_id)
+                    if old_conn:
+                        old_conn.set_keyspace_blocking(self._keyspace)
             num_missing_or_needing_replacement = self.num_missing_or_needing_replacement
             log.debug(
                 "Connected to %s/%i shards on host %s (%i missing or needs replacement)",
@@ -734,14 +744,16 @@ class HostConnection(object):
                 self._close_excess_connections()
         elif self.host.sharding_info.shards_count == len(self._connections.keys()) and self.num_missing_or_needing_replacement == 0:
             log.debug(
-                "All shards are already covered, closing newly opened excess connection for host %s",
+                "All shards are already covered, closing newly opened excess connection %s for host %s",
+                id(self),
                 self.host
             )
             conn.close()
         else:
             if len(self._excess_connections) >= self._excess_connection_limit:
                 log.debug(
-                    "Excess connection pool size limit (%i) reached for host %s, closing all %i of them",
+                    "After connection %s is created excess connection pool size limit (%i) reached for host %s, closing all %i of them",
+                    id(conn),
                     self._excess_connection_limit,
                     self.host,
                     len(self._excess_connections)
@@ -749,7 +761,8 @@ class HostConnection(object):
                 self._close_excess_connections()
 
             log.debug(
-                "Putting a connection to shard %i to the excess pool of host %s",
+                "Putting a connection %s to shard %i to the excess pool of host %s",
+                id(conn),
                 conn.shard_id,
                 self.host
             )
@@ -1129,11 +1142,16 @@ class HostConnectionPool(object):
                 self.is_shutdown = True
 
         self._signal_all_available_conn()
-        for conn in self._connections:
-            conn.close()
-            self.open_count -= 1
 
-        for conn in list(self._trash):
+        connections_to_close = []
+        with self._lock:
+            connections_to_close.extend(self._connections)
+            self.open_count -= len(self._connections)
+            self._connections.clear()
+            connections_to_close.extend(self._trash)
+            self._trash.clear()
+
+        for conn in connections_to_close:
             conn.close()
 
     def ensure_core_connections(self):
