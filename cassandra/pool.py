@@ -548,6 +548,8 @@ class HostConnection(object):
             else:
                 connection.close()
                 with self._lock:
+                    if self.is_shutdown:
+                        return
                     self._connections.pop(connection.shard_id, None)
                     if self._is_replacing:
                         return
@@ -681,6 +683,9 @@ class HostConnection(object):
             )
             old_conn = None
             with self._lock:
+                if self.is_shutdown:
+                    conn.close()
+                    return
                 if conn.shard_id in self._connections.keys():
                     # Move the current connection to the trash and use the new one from now on
                     old_conn = self._connections[conn.shard_id]
@@ -716,9 +721,12 @@ class HostConnection(object):
                         else:
                             self._trash.add(old_conn)
             if self._keyspace:
-                old_conn = self._connections.get(conn.shard_id)
-                if old_conn:
-                    old_conn.set_keyspace_blocking(self._keyspace)
+                with self._lock:
+                    if self.is_shutdown:
+                        conn.close()
+                    old_conn = self._connections.get(conn.shard_id)
+                    if old_conn:
+                        old_conn.set_keyspace_blocking(self._keyspace)
             num_missing_or_needing_replacement = self.num_missing_or_needing_replacement
             log.debug(
                 "Connected to %s/%i shards on host %s (%i missing or needs replacement)",
