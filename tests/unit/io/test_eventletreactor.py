@@ -13,10 +13,7 @@
 # limitations under the License.
 
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest # noqa
+import unittest
 
 from tests.unit.io.utils import TimerTestMixin
 from tests import notpypy, EVENT_LOOP_MANAGER

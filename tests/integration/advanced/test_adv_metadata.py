@@ -20,10 +20,7 @@ from tests.integration import (BasicExistingKeyspaceUnitTestCase, BasicSharedKey
                                greaterthanorequaldse68, use_single_node,
                                DSE_VERSION, requiredse, TestCluster)
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 import logging
 import time

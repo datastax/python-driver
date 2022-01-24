@@ -20,10 +20,7 @@ import warnings
 
 import sys
 
-try:
-    from unittest import TestCase
-except ImportError:
-    from unittest2 import TestCase
+from unittest import TestCase
 
 
 log = logging.getLogger(__name__)

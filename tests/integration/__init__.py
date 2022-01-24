@@ -18,10 +18,7 @@ from cassandra.cluster import Cluster
 from tests import connection_class, EVENT_LOOP_MANAGER
 Cluster.connection_class = connection_class
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from packaging.version import Version
 import logging

@@ -35,10 +35,7 @@ from tests.integration.advanced.graph import (
     VertexLabel)
 from tests.integration import requiredse
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 
 import ipaddress
