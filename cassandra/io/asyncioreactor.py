@@ -10,6 +10,13 @@ from threading import Lock, Thread, get_ident
 
 log = logging.getLogger(__name__)
 
+
+# This module uses ``yield from`` and ``@asyncio.coroutine`` over ``await`` and
+# ``async def`` for pre-Python-3.5 compatibility, so keep in mind that the
+# managed coroutines are generator-based, not native coroutines. See PEP 492:
+# https://www.python.org/dev/peps/pep-0492/#coroutine-objects
+
+
 try:
     asyncio.run_coroutine_threadsafe
 except AttributeError:
@@ -33,10 +40,9 @@ class AsyncioTimer(object):
                                   'does not implement .end()')
 
     def __init__(self, timeout, callback, loop):
-        delayed = asyncio.wait_for(self._call_delayed_coro(timeout=timeout,
+        delayed = self._call_delayed_coro(timeout=timeout,
                                           callback=callback,
-                                          loop=loop),
-                                    timeout=None)
+                                          loop=loop)
         self._handle = asyncio.run_coroutine_threadsafe(delayed, loop=loop)
 
     @staticmethod
@@ -90,10 +96,10 @@ class AsyncioConnection(Connection):
         # see initialize_reactor -- loop is running in a separate thread, so we
         # have to use a threadsafe call
         self._read_watcher = asyncio.run_coroutine_threadsafe(
-            asyncio.wait_for(self.handle_read(), timeout=None), loop=self._loop
+            self.handle_read(), loop=self._loop
         )
         self._write_watcher = asyncio.run_coroutine_threadsafe(
-            asyncio.wait_for(self.handle_write(), timeout=None), loop=self._loop
+            self.handle_write(), loop=self._loop
         )
         self._send_options_message()
 
@@ -126,7 +132,7 @@ class AsyncioConnection(Connection):
         # close from the loop thread to avoid races when removing file
         # descriptors
         asyncio.run_coroutine_threadsafe(
-            asyncio.wait_for(self._close(), timeout=None), loop=self._loop
+            self._close(), loop=self._loop
         )
 
     async def _close(self):
@@ -159,7 +165,7 @@ class AsyncioConnection(Connection):
 
         if self._loop_thread.ident != get_ident():
             asyncio.run_coroutine_threadsafe(
-                asyncio.wait_for(self._push_msg(chunks), timeout=None),
+                self._push_msg(chunks),
                 loop=self._loop
             )
         else:
