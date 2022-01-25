@@ -202,7 +202,9 @@ class AsyncioConnection(Connection):
             # ourselves by yielding to the event loop, where the socket will
             # get the reading/writing it "wants" before retrying
             except (ssl.SSLWantWriteError, ssl.SSLWantReadError):
-                yield
+                # Apparently the preferred way to yield to the event loop from within
+                # a native coroutine based on https://github.com/python/asyncio/issues/284
+                await asyncio.sleep(0)
                 continue
             except socket.error as err:
                 log.debug("Exception during socket recv for %s: %s",
