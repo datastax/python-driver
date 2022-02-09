@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-
-import cassandra
 import os
 import sys
-import warnings
 from datetime import date
 
 from sphinx_scylladb_theme.utils import multiversion_regex_builder
 
 sys.path.insert(0, os.path.abspath('..'))
+import cassandra
 
 # -- General configuration -----------------------------------------------------
 
