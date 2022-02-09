@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import cassandra
 import os
 import sys
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('..'))
-import cassandra
-import recommonmark
-from recommonmark.transform import AutoStructify
+import warnings
+from datetime import date
+
 from sphinx_scylladb_theme.utils import multiversion_regex_builder
 
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -22,10 +20,7 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.githubpages', 'sphinx.ext.viewco
 templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
-#
-source_suffix = ['.rst', '.md']
-autosectionlabel_prefix_document = True
+source_suffix = [".rst", ".md"]
 
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
@@ -36,7 +31,6 @@ master_doc = 'index'
 # General information about the project.
 project = u'Cassandra Driver'
 copyright = u'ScyllaDB 2021 and © DataStax 2013-2017'
-
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -56,47 +50,6 @@ exclude_patterns = ['_build', 'cloud.rst', 'core_graph.rst', 'classic_graph.rst'
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
-
-# Setup Sphinx
-def setup(sphinx):
-    sphinx.add_config_value('recommonmark_config', {
-        'enable_eval_rst': True,
-        'enable_auto_toc_tree': False,
-    }, True)
-    sphinx.add_transform(AutoStructify)
-
-# -- Options for HTML output ---------------------------------------------------
-
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-html_theme = 'sphinx_scylladb_theme'
-
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-html_theme_options = {
-    'conf_py_path': 'docs/',
-    'github_repository': 'scylladb/python-driver',
-    'github_issues_repository': 'scylladb/python-driver',
-    'hide_edit_this_page_button': 'false',
-    'hide_sidebar_index': 'false',
-    'hide_version_dropdown': ['master'],
-}
-
-# Custom sidebar templates, maps document names to template names.
-html_sidebars = {'**': ['side-nav.html']}
-
-# If false, no index is generated.
-html_use_index = False
-
-# Output file base name for HTML help builder.
-htmlhelp_basename = 'CassandraDriverdoc'
-
-# URL which points to the root of the HTML documentation. 
-html_baseurl = 'https://python-driver.docs.scylladb.com'
-
-# Dictionary of values to pass into the template engine’s context for all pages
-html_context = {'html_baseurl': html_baseurl}
 
 # -- Options for not found extension -------------------------------------------
 
@@ -128,3 +81,36 @@ smv_remote_whitelist = r"^origin$"
 smv_released_pattern = r'^tags/.*$'
 # Format for versioned output directories inside the build directory
 smv_outputdir_format = '{ref.name}'
+
+# -- Options for HTML output ---------------------------------------------------
+
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
+html_theme = 'sphinx_scylladb_theme'
+
+# Theme options are theme-specific and customize the look and feel of a theme
+# further.  For a list of options available for each theme, see the
+# documentation.
+html_theme_options = {
+    'conf_py_path': 'docs/',
+    'github_repository': 'scylladb/python-driver',
+    'github_issues_repository': 'scylladb/python-driver',
+    'hide_edit_this_page_button': 'false',
+    'hide_version_dropdown': ['master'],
+}
+
+# Custom sidebar templates, maps document names to template names.
+html_sidebars = {'**': ['side-nav.html']}
+
+# If false, no index is generated.
+html_use_index = False
+
+# Output file base name for HTML help builder.
+htmlhelp_basename = 'CassandraDriverdoc'
+
+# URL which points to the root of the HTML documentation. 
+html_baseurl = 'https://python-driver.docs.scylladb.com'
+
+# Dictionary of values to pass into the template engine’s context for all pages
+html_context = {'html_baseurl': html_baseurl}
+
