@@ -100,9 +100,6 @@ class MockCluster(object):
     def on_down(self, host, is_host_addition):
         self.down_host = host
 
-    def get_control_connection_host(self):
-        return self.added_hosts[0] if  self.added_hosts else None
-
 
 def _node_meta_results(local_results, peer_results):
     """

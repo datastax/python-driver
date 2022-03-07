@@ -26,7 +26,7 @@ except ImportError:
 from mock import Mock, NonCallableMagicMock, MagicMock
 from threading import Thread, Event, Lock
 
-from cassandra.cluster import Session
+from cassandra.cluster import Session, ShardAwareOptions
 from cassandra.connection import Connection
 from cassandra.pool import HostConnection, HostConnectionPool
 from cassandra.pool import Host, NoConnectionsAvailable
@@ -160,6 +160,7 @@ class _PoolTests(unittest.TestCase):
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False,
                                     max_request_id=100, signaled_error=False)
         session.cluster.connection_factory.return_value = conn
+        session.cluster.shard_aware_options = ShardAwareOptions()
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
         session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)

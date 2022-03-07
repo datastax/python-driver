@@ -21,6 +21,7 @@ import logging
 from unittest.mock import MagicMock
 from futures.thread import ThreadPoolExecutor
 
+from cassandra.cluster import ShardAwareOptions
 from cassandra.pool import HostConnection, HostDistance
 from cassandra.connection import ShardingInfo, DefaultEndPoint
 from cassandra.metadata import Murmur3Token
@@ -67,10 +68,11 @@ class TestShardAware(unittest.TestCase):
                     self.cluster.ssl_options = {'some_ssl_options': True}
                 else:
                     self.cluster.ssl_options = None
+                self.cluster.shard_aware_options = ShardAwareOptions()
                 self.cluster.executor = ThreadPoolExecutor(max_workers=2)
                 self.cluster.signal_connection_failure = lambda *args, **kwargs: False
                 self.cluster.connection_factory = self.mock_connection_factory
-                self.connection_counter = -1
+                self.connection_counter = 0
                 self.futures = []
 
             def submit(self, fn, *args, **kwargs):
@@ -87,7 +89,8 @@ class TestShardAware(unittest.TestCase):
                 connection.is_closed = False
                 connection.orphaned_threshold_reached = False
                 connection.endpoint = args[0]
-                connection.shard_id = kwargs.get('shard_id', 0)
+                connection.shard_id = kwargs.get('shard_id', self.connection_counter)
+                self.connection_counter += 1
                 connection.sharding_info = ShardingInfo(shard_id=1, shards_count=4,
                                                          partitioner="", sharding_algorithm="", sharding_ignore_msb=0,
                                                          shard_aware_port=19042, shard_aware_port_ssl=19045)

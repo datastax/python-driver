@@ -553,6 +553,20 @@ Selected using ``Session.execute_graph(execution_profile=EXEC_PROFILE_GRAPH_ANAL
 """
 
 
+class ShardAwareOptions:
+    disable = None
+    disable_shardaware_port = False
+
+    def __init__(self, opts=None, disable=None, disable_shardaware_port=None):
+        self.disable = disable
+        self.disable_shardaware_port = disable_shardaware_port
+        if opts:
+            if isinstance(opts, ShardAwareOptions):
+                self.__dict__.update(opts.__dict__)
+            elif isinstance(opts, dict):
+                self.__dict__.update(opts)
+
+
 class _ConfigMode(object):
     UNCOMMITTED = 0
     LEGACY = 1
@@ -1003,6 +1017,12 @@ class Cluster(object):
     load the configuration and certificates.
     """
 
+    shard_aware_options = None
+    """
+    Can be set with :class:`ShardAwareOptions` or with a dict, to disable the automatic shardaware,
+    or to disable the shardaware port (advanced shardaware)
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -1104,7 +1124,8 @@ class Cluster(object):
                  monitor_reporting_enabled=True,
                  monitor_reporting_interval=30,
                  client_id=None,
-                 cloud=None):
+                 cloud=None,
+                 shard_aware_options=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -1304,6 +1325,7 @@ class Cluster(object):
         self.reprepare_on_up = reprepare_on_up
         self.monitor_reporting_enabled = monitor_reporting_enabled
         self.monitor_reporting_interval = monitor_reporting_interval
+        self.shard_aware_options = ShardAwareOptions(opts=shard_aware_options)
 
         self._listeners = set()
         self._listener_lock = Lock()

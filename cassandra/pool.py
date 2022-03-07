@@ -430,8 +430,7 @@ class HostConnection(object):
 
         if self._keyspace:
             first_connection.set_keyspace_blocking(self._keyspace)
-
-        if first_connection.sharding_info:
+        if first_connection.sharding_info and not self._session.cluster.shard_aware_options.disable:
             self.host.sharding_info = first_connection.sharding_info
             self._open_connections_for_all_shards(first_connection.shard_id)
 
@@ -446,7 +445,7 @@ class HostConnection(object):
             raise NoConnectionsAvailable()
 
         shard_id = None
-        if self.host.sharding_info and routing_key:
+        if not self._session.cluster.shard_aware_options.disable and self.host.sharding_info and routing_key:
             t = self._session.cluster.metadata.token_map.token_class.from_key(routing_key)
             shard_id = self.host.sharding_info.shard_id_from_token(t.value)
 
@@ -585,7 +584,7 @@ class HostConnection(object):
             try:
                 if connection.shard_id in self._connections.keys():
                     del self._connections[connection.shard_id]
-                if self.host.sharding_info:
+                if self.host.sharding_info and not self._session.cluster.shard_aware_options.disable:
                     self._connecting.add(connection.shard_id)
                     self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
                 else:
@@ -652,7 +651,8 @@ class HostConnection(object):
         self.advanced_shardaware_block_until = max(time.time() + secs, self.advanced_shardaware_block_until)
 
     def _get_shard_aware_endpoint(self):
-        if self.advanced_shardaware_block_until and self.advanced_shardaware_block_until < time.time():
+        if (self.advanced_shardaware_block_until and self.advanced_shardaware_block_until < time.time()) or \
+           self._session.cluster.shard_aware_options.disable_shardaware_port:
             return None
 
         endpoint = None
@@ -820,7 +820,7 @@ class HostConnection(object):
                 return
 
             for shard_id in range(self.host.sharding_info.shards_count):
-                if skip_shard_id and skip_shard_id == shard_id:
+                if skip_shard_id is not None and skip_shard_id == shard_id:
                     continue
                 future = self._session.submit(self._open_connection_to_missing_shard, shard_id)
                 if isinstance(future, Future):

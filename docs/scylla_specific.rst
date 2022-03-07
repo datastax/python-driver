@@ -26,6 +26,25 @@ https://github.com/scylladb/scylla/blob/master/docs/design-notes/protocols.md#cq
 New Cluster Helpers
 -------------------
 
+* ``shard_aware_options``
+
+  Setting it to ``dict(disable=True)`` would disable the shard aware functionally, for cases favoring once connection per host (example, lots of processes connecting from one client host, generating a big load of connections
+
+  Other option is to configure scylla by setting ``enable_shard_aware_drivers: false`` on scylla.yaml.
+
+.. code:: python
+
+    from cassandra.cluster import Cluster
+
+    cluster = Cluster(shard_aware_options=dict(disable=True))
+    session = cluster.connect()
+
+    assert not cluster.is_shard_aware(), "Shard aware should be disabled"
+
+    # or just disable the shard aware port logic
+    cluster = Cluster(shard_aware_options=dict(disable_shardaware_port=True))
+    session = cluster.connect()
+
 * ``cluster.is_shard_aware()``
 
   New method available on ``Cluster`` allowing to check whether the remote cluster supports shard awareness (bool)
