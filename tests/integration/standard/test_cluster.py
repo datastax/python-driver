@@ -1573,9 +1573,11 @@ class DeprecationWarningTest(unittest.TestCase):
         """
         with warnings.catch_warnings(record=True) as w:
             TestCluster(load_balancing_policy=RoundRobinPolicy())
-            self.assertEqual(len(w), 1)
-            self.assertIn("Legacy execution parameters will be removed in 4.0. Consider using execution profiles.",
-                          str(w[0].message))
+            logging.info(w)
+            self.assertGreaterEqual(len(w), 1)
+            self.assertTrue(any(["Legacy execution parameters will be removed in 4.0. "
+                                 "Consider using execution profiles." in
+                            str(wa.message) for wa in w]))
 
     def test_deprecation_warnings_meta_refreshed(self):
         """
@@ -1591,11 +1593,11 @@ class DeprecationWarningTest(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             cluster = TestCluster()
             cluster.set_meta_refresh_enabled(True)
-            self.assertEqual(len(w), 1)
-            self.assertIn("Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0.",
-                          str(w[0].message))
+            logging.info(w)
+            self.assertGreaterEqual(len(w), 1)
+            self.assertTrue(any(["Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0." in
+                            str(wa.message) for wa in w]))
 
-    @unittest.expectedFailure
     def test_deprecation_warning_default_consistency_level(self):
         """
         Tests the deprecation warning has been added when enabling
@@ -1611,6 +1613,6 @@ class DeprecationWarningTest(unittest.TestCase):
             cluster = TestCluster()
             session = cluster.connect()
             session.default_consistency_level = ConsistencyLevel.ONE
-            self.assertEqual(len(w), 1)
-            self.assertIn("Setting the consistency level at the session level will be removed in 4.0",
-                          str(w[0].message))
+            self.assertGreaterEqual(len(w), 1)
+            self.assertTrue(any(["Setting the consistency level at the session level will be removed in 4.0" in
+                            str(wa.message) for wa in w]))
