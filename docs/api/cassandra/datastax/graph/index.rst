@@ -37,8 +37,10 @@
 
 .. autoclass:: GraphProtocol
    :members:
+   :noindex:
 
 .. autoclass:: GraphOptions
+   :noindex:
 
    .. autoattribute:: graph_name
 
@@ -65,29 +67,38 @@
 
 .. autoclass:: SimpleGraphStatement
    :members:
+   :noindex:
 
 .. autoclass:: Result
    :members:
+   :noindex:
 
 .. autoclass:: Vertex
    :members:
+   :noindex:
 
 .. autoclass:: VertexProperty
    :members:
+   :noindex:
 
 .. autoclass:: Edge
    :members:
+   :noindex:
 
 .. autoclass:: Path
    :members:
+   :noindex:
 
 .. autoclass:: T
    :members:
+   :noindex:
 
 .. autoclass:: GraphSON1Serializer
    :members:
+   :noindex:
 
 .. autoclass:: GraphSON1Deserializer
+   :noindex:
 
    .. automethod:: deserialize_date
 
@@ -119,3 +130,4 @@
 
 .. autoclass:: GraphSON2Reader
    :members:
+   :noindex:
