@@ -168,6 +168,12 @@ class ProtocolVersion(object):
     """
     v6, in beta from 4.0-beta5
     """
+    
+    V21 = 21
+    """"
+    Support Cassandra 4.0 ... many services are EOL the default of 3.0 in 3-4 months
+    This version of the driver does not support protocol version 21 ????
+    """"
 
     DSE_V1 = 0x41
     """
