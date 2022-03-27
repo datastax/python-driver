@@ -1047,6 +1047,16 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIn(Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
         self.assertIn(Ext1.after_table_cql(view_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
 
+    def test_metadata_pagination(self):
+        self.cluster.refresh_schema_metadata()
+        for i in range(10):
+            self.session.execute("CREATE TABLE %s.%s_%d (a int PRIMARY KEY, b map<text, text>)"
+                                 % (self.keyspace_name, self.function_table_name, i))
+
+        self.cluster.schema_metadata_page_size = 5
+        self.cluster.refresh_schema_metadata()
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].tables), 10)
+
 
 class TestCodeCoverage(unittest.TestCase):
 

@@ -1039,6 +1039,17 @@ class Cluster(object):
         self.control_connection._schema_meta_enabled = bool(enabled)
 
     @property
+    def schema_metadata_page_size(self):
+        """
+        Number controling page size when schema metadata is fetched.
+        """
+        return self.control_connection._schema_meta_page_size
+
+    @schema_metadata_page_size.setter
+    def schema_metadata_page_size(self, size):
+        self.control_connection._schema_meta_page_size = size
+
+    @property
     def token_metadata_enabled(self):
         """
         Flag indicating whether internal token metadata is updated.
@@ -1108,6 +1119,7 @@ class Cluster(object):
                  connect_timeout=5,
                  schema_metadata_enabled=True,
                  token_metadata_enabled=True,
+                 schema_metadata_page_size=1000,
                  address_translator=None,
                  status_event_refresh_window=2,
                  prepare_on_all_hosts=True,
@@ -1373,7 +1385,8 @@ class Cluster(object):
             self, self.control_connection_timeout,
             self.schema_event_refresh_window, self.topology_event_refresh_window,
             self.status_event_refresh_window,
-            schema_metadata_enabled, token_metadata_enabled)
+            schema_metadata_enabled, token_metadata_enabled,
+            schema_meta_page_size=schema_metadata_page_size)
 
         if client_id is None:
             self.client_id = uuid.uuid4()
@@ -3485,6 +3498,7 @@ class ControlConnection(object):
 
     _schema_meta_enabled = True
     _token_meta_enabled = True
+    _schema_meta_page_size = 1000
 
     _uses_peers_v2 = True
 
@@ -3496,7 +3510,8 @@ class ControlConnection(object):
                  topology_event_refresh_window,
                  status_event_refresh_window,
                  schema_meta_enabled=True,
-                 token_meta_enabled=True):
+                 token_meta_enabled=True,
+                 schema_meta_page_size=1000):
         # use a weak reference to allow the Cluster instance to be GC'ed (and
         # shutdown) since implementing __del__ disables the cycle detector
         self._cluster = weakref.proxy(cluster)
@@ -3508,6 +3523,7 @@ class ControlConnection(object):
         self._status_event_refresh_window = status_event_refresh_window
         self._schema_meta_enabled = schema_meta_enabled
         self._token_meta_enabled = token_meta_enabled
+        self._schema_meta_page_size = schema_meta_page_size
 
         self._lock = RLock()
         self._schema_agreement_lock = Lock()
@@ -3732,7 +3748,7 @@ class ControlConnection(object):
             log.debug("Skipping schema refresh due to lack of schema agreement")
             return False
 
-        self._cluster.metadata.refresh(connection, self._timeout, **kwargs)
+        self._cluster.metadata.refresh(connection, self._timeout, fetch_size=self._schema_meta_page_size, **kwargs)
 
         return True
 
