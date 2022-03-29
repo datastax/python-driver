@@ -1921,9 +1921,10 @@ class TriggerMetadata(object):
 
 class _SchemaParser(object):
 
-    def __init__(self, connection, timeout):
+    def __init__(self, connection, timeout, fetch_size):
         self.connection = connection
         self.timeout = timeout
+        self.fetch_size = fetch_size
 
     def _handle_results(self, success, result, expected_failures=tuple(), query_msg=None, timeout=None):
         """
@@ -1975,17 +1976,13 @@ class _SchemaParser(object):
         return result[0] if result else None
 
     def _query_build_rows(self, query_string, build_func):
-        query = QueryMessage(query=query_string, consistency_level=ConsistencyLevel.ONE)
+        query = QueryMessage(query=query_string, consistency_level=ConsistencyLevel.ONE, fetch_size=self.fetch_size)
         responses = self.connection.wait_for_responses((query), timeout=self.timeout, fail_on_error=False)
         (success, response) = responses[0]
-        if success:
-            result = dict_factory(response.column_names, response.parsed_rows)
-            return [build_func(row) for row in result]
-        elif isinstance(response, InvalidRequest):
+        results = self._handle_results(success, response, expected_failures=(InvalidRequest), query_msg=query)
+        if not results:
             log.debug("user types table not found")
-            return []
-        else:
-            raise response
+        return [build_func(row) for row in results]
 
 
 class SchemaParserV22(_SchemaParser):
@@ -2029,8 +2026,8 @@ class SchemaParserV22(_SchemaParser):
         "compression",
         "default_time_to_live")
 
-    def __init__(self, connection, timeout):
-        super(SchemaParserV22, self).__init__(connection, timeout)
+    def __init__(self, connection, timeout, fetch_size):
+        super(SchemaParserV22, self).__init__(connection, timeout, fetch_size)
         self.keyspaces_result = []
         self.tables_result = []
         self.columns_result = []
@@ -2551,8 +2548,7 @@ class SchemaParserV3(SchemaParserV22):
         'speculative_retry')
 
     def __init__(self, connection, timeout, fetch_size):
-        super(SchemaParserV3, self).__init__(connection, timeout)
-        self.fetch_size = fetch_size
+        super(SchemaParserV3, self).__init__(connection, timeout, fetch_size)
         self.indexes_result = []
         self.keyspace_table_index_rows = defaultdict(lambda: defaultdict(list))
         self.keyspace_view_rows = defaultdict(list)
@@ -2566,17 +2562,18 @@ class SchemaParserV3(SchemaParserV22):
 
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
+        fetch_size = self.fetch_size
         where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
-        cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl)
-        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-        indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl)
-        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
-        scylla_query = QueryMessage(query=self._SELECT_SCYLLA + where_clause, consistency_level=cl)
+        cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl, fetch_size=fetch_size)
+        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl, fetch_size=fetch_size)
+        indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl, fetch_size=fetch_size)
+        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl, fetch_size=fetch_size)
+        scylla_query = QueryMessage(query=self._SELECT_SCYLLA + where_clause, consistency_level=cl, fetch_size=fetch_size)
 
         # in protocol v4 we don't know if this event is a view or a table, so we look for both
         where_clause = bind_params(" WHERE keyspace_name = %s AND view_name = %s", (keyspace, table), _encoder)
         view_query = QueryMessage(query=self._SELECT_VIEWS + where_clause,
-                                  consistency_level=cl)
+                                  consistency_level=cl, fetch_size=fetch_size)
         ((cf_success, cf_result), (col_success, col_result),
          (indexes_sucess, indexes_result), (triggers_success, triggers_result),
          (view_success, view_result),
@@ -2585,14 +2582,15 @@ class SchemaParserV3(SchemaParserV22):
                  cf_query, col_query, indexes_query, triggers_query,
                  view_query, scylla_query, timeout=self.timeout, fail_on_error=False)
         )
-        table_result = self._handle_results(cf_success, cf_result)
-        col_result = self._handle_results(col_success, col_result)
+        table_result = self._handle_results(cf_success, cf_result, query_msg=cf_query)
+        col_result = self._handle_results(col_success, col_result, query_msg=col_query)
         if table_result:
-            indexes_result = self._handle_results(indexes_sucess, indexes_result)
-            triggers_result = self._handle_results(triggers_success, triggers_result)
+            indexes_result = self._handle_results(indexes_sucess, indexes_result, query_msg=indexes_query)
+            triggers_result = self._handle_results(triggers_success, triggers_result, query_msg=triggers_query)
             # in_memory property is stored in scylla private table
             # add it to table properties if enabled
-            scylla_result = self._handle_results(scylla_success, scylla_result, expected_failures=(InvalidRequest,))
+            scylla_result = self._handle_results(scylla_success, scylla_result, expected_failures=(InvalidRequest,),
+                                                 query_msg=scylla_query)
             try:
                 if scylla_result[0]["in_memory"] == True:
                     table_result[0]["in_memory"] = True
@@ -2600,7 +2598,7 @@ class SchemaParserV3(SchemaParserV22):
                 pass
             return self._build_table_metadata(table_result[0], col_result, triggers_result, indexes_result)
 
-        view_result = self._handle_results(view_success, view_result)
+        view_result = self._handle_results(view_success, view_result, query_msg=view_query)
         if view_result:
             return self._build_view_metadata(view_result[0], col_result)
 
@@ -3353,7 +3351,7 @@ def get_schema_parser(connection, server_version, dse_version, timeout, fetch_si
     else:
         # we could further specialize by version. Right now just refactoring the
         # multi-version parser we have as of C* 2.2.0rc1.
-        return SchemaParserV22(connection, timeout)
+        return SchemaParserV22(connection, timeout, fetch_size)
 
 
 def _cql_from_cass_type(cass_type):
