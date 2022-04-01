@@ -10,9 +10,29 @@ import cassandra
 
 # -- General configuration -----------------------------------------------------
 
+# Build documentation for the following tags and branches
+TAGS = ['3.21.0-scylla', '3.22.3-scylla', '3.24.8-scylla', '3.25.4-scylla']
+BRANCHES = ['master']
+# Set the latest version.
+LATEST_VERSION = '3.25.4-scylla'
+# Set which versions are not released yet.
+UNSTABLE_VERSIONS = ['master']
+# Set which versions are deprecated
+DEPRECATED_VERSIONS = ['']
+
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.githubpages', 'sphinx.ext.viewcode', 'sphinx_scylladb_theme', 'sphinx_multiversion', 'recommonmark']
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.todo',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.githubpages',
+    'sphinx.ext.extlinks',
+    'sphinx_sitemap',
+    'sphinx_scylladb_theme',
+    'sphinx_multiversion',  # optional
+    'recommonmark',  # optional
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -60,31 +80,34 @@ notfound_urls_prefix = ''
 # -- Options for redirect extension --------------------------------------------
 
 # Read a YAML dictionary of redirections and generate an HTML file for each
-redirects_file = "_utils/redirections.yaml"
+redirects_file = '_utils/redirections.yaml'
 
 # -- Options for multiversion --------------------------------------------------
-# Whitelist pattern for tags (set to None to ignore all tags)
-TAGS = ['3.21.0-scylla', '3.22.3-scylla', '3.24.8-scylla', '3.25.4-scylla']
+
+# Whitelist pattern for tags
 smv_tag_whitelist = multiversion_regex_builder(TAGS)
-# Whitelist pattern for branches (set to None to ignore all branches)
-BRANCHES = ['master']
+# Whitelist pattern for branches
 smv_branch_whitelist = multiversion_regex_builder(BRANCHES)
 # Defines which version is considered to be the latest stable version.
-# Must be listed in smv_tag_whitelist or smv_branch_whitelist.
-smv_latest_version = '3.25.4-scylla'
+smv_latest_version = LATEST_VERSION
+# Defines the new name for the latest version.
 smv_rename_latest_version = 'stable'
 # Whitelist pattern for remotes (set to None to use local branches only)
-smv_remote_whitelist = r"^origin$"
+smv_remote_whitelist = r'^origin$'
 # Pattern for released versions
 smv_released_pattern = r'^tags/.*$'
 # Format for versioned output directories inside the build directory
 smv_outputdir_format = '{ref.name}'
 
-# -- Options for HTML output ---------------------------------------------------
+# -- Options for HTML output --------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'sphinx_scylladb_theme'
+
+# -- Options for sitemap extension ---------------------------------------
+
+sitemap_url_scheme = 'stable/{link}'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -95,6 +118,8 @@ html_theme_options = {
     'github_issues_repository': 'scylladb/python-driver',
     'hide_edit_this_page_button': 'false',
     'hide_version_dropdown': ['master'],
+    'versions_unstable': UNSTABLE_VERSIONS,
+    'versions_deprecated': DEPRECATED_VERSIONS,
 }
 
 # Custom sidebar templates, maps document names to template names.
