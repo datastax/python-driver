@@ -2391,7 +2391,7 @@ class Session(object):
         *Deprecated:* use execution profiles instead
         """
         warn("Setting the consistency level at the session level will be removed in 4.0. Consider using "
-             "execution profiles and setting the desired consitency level to the EXEC_PROFILE_DEFAULT profile."
+             "execution profiles and setting the desired consistency level to the EXEC_PROFILE_DEFAULT profile."
              , DeprecationWarning)
         self._validate_set_legacy_config('default_consistency_level', cl)
 
