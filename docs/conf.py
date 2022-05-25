@@ -47,7 +47,7 @@ source_suffix = [".rst", ".md"]
 master_doc = 'index'
 
 # General information about the project.
-project = u'Cassandra Driver'
+project = u'Scylla Python Driver'
 copyright = u'ScyllaDB 2021 and © DataStax 2013-2017'
 
 # The version info for the project you're documenting, acts as replacement for
