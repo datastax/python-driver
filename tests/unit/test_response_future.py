@@ -191,7 +191,7 @@ class ResponseFutureTests(unittest.TestCase):
         # if the return value from add_failure() on the conviction poilcy is false so we can
         # create this linkage _using the actual impl in Cluster_ via a mock side_effect.
         def foo(*args, **kwargs):
-            Cluster.signal_connection_failure(None, *args, **kwargs)
+            Cluster.signal_connection_failure(Cluster(), *args, **kwargs)
         session.cluster.signal_connection_failure.side_effect = foo
 
         query = SimpleStatement("SELECT * FROM foo")
