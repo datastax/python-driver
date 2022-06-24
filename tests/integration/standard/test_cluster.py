@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+from unittest.mock import ANY
 
 from collections import deque
 from copy import copy
@@ -1478,7 +1479,18 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         # the length of mock_calls will vary, but all should use the unignored
         # address
         for c in cluster.connection_factory.mock_calls:
-            self.assertEqual(call(DefaultEndPoint(unignored_address)), c)
+            # PYTHON-1287
+            #
+            # Cluster._prepare_all_queries() will call connection_factory _without_ the
+            # on_orphaned_stream_released arg introduced in commit
+            # 387150acc365b6cf1daaee58c62db13e4929099a.  The reconnect handler for the
+            # downed node _will_ add this arg when it tries to rebuild it's conn pool, and
+            # whether this occurs while running this test amounts to a race condition.  So
+            # to cover this case we assert one of two call styles here... the key is that
+            # the _only_ address we should see is the unignored_address.
+            self.assertTrue( \
+                c == call(DefaultEndPoint(unignored_address)) or \
+                c == call(DefaultEndPoint(unignored_address), on_orphaned_stream_released=ANY))
         cluster.shutdown()
 
 
