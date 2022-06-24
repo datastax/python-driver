@@ -132,6 +132,12 @@ class ClusterTest(unittest.TestCase):
             cluster = Cluster(contact_points=['127.0.0.1'], port='string')
 
 
+    def test_port_range(self):
+        for invalid_port in [0, 65536, -1]:
+            with self.assertRaises(ValueError):
+                cluster = Cluster(contact_points=['127.0.0.1'], port=invalid_port)
+
+
 class SchedulerTest(unittest.TestCase):
     # TODO: this suite could be expanded; for now just adding a test covering a ticket
 

@@ -1151,6 +1151,9 @@ class Cluster(object):
                 raise ValueError("Only numeric values are supported for port (%s)" % port)
             port = int(port)
 
+        if port < 1 or port > 65535:
+            raise ValueError("Invalid port number (%s) (1-65535)" % port)
+
         if connection_class is not None:
             self.connection_class = connection_class
 
