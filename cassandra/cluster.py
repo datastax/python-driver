@@ -1144,6 +1144,13 @@ class Cluster(object):
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
+
+        # Handle port passed as string
+        if isinstance(port, str):
+            if not port.isdigit():
+                raise ValueError("Only numeric values are supported for port (%s)" % port)
+            port = int(port)
+
         if connection_class is not None:
             self.connection_class = connection_class
 

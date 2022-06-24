@@ -121,6 +121,16 @@ class ClusterTest(unittest.TestCase):
         for n in (0, mn, 128):
             self.assertRaises(ValueError, c.set_max_requests_per_connection, d, n)
 
+    def test_port_str(self):
+        """Check port passed as tring is converted and checked properly"""
+        cluster = Cluster(contact_points=['127.0.0.1'], port='1111')
+        for cp in cluster.endpoints_resolved:
+            if cp.address in ('::1', '127.0.0.1'):
+                self.assertEqual(cp.port, 1111)
+
+        with self.assertRaises(ValueError):
+            cluster = Cluster(contact_points=['127.0.0.1'], port='string')
+
 
 class SchedulerTest(unittest.TestCase):
     # TODO: this suite could be expanded; for now just adding a test covering a ticket
