@@ -404,7 +404,8 @@ def run_setup(extensions):
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
     dependencies = ['six >=1.9',
-                    'geomet>=0.1,<0.3']
+                    'geomet>=0.1,<0.3',
+                    'pyyaml > 5.0']
 
     if not PY3:
         dependencies.append('futures')
@@ -429,7 +430,7 @@ def run_setup(extensions):
         packages=[
             'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
             'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
-            'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud'
+            'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud', 'cassandra.scylla'
         ],
         keywords='cassandra,cql,orm,dse,graph',
         include_package_data=True,

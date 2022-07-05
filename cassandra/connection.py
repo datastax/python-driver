@@ -309,16 +309,17 @@ class SniEndPoint(EndPoint):
 
 class SniEndPointFactory(EndPointFactory):
 
-    def __init__(self, proxy_address, port):
+    def __init__(self, proxy_address, port, node_domain=None):
         self._proxy_address = proxy_address
         self._port = port
+        self._node_domain = node_domain
 
     def create(self, row):
         host_id = row.get("host_id")
         if host_id is None:
             raise ValueError("No host_id to create the SniEndPoint")
-
-        return SniEndPoint(self._proxy_address, str(host_id), self._port)
+        address = "{}.{}".format(host_id, self._node_domain) if self._node_domain else str(host_id)
+        return SniEndPoint(self._proxy_address, str(address), self._port)
 
     def create_from_sni(self, sni):
         return SniEndPoint(self._proxy_address, sni, self._port)

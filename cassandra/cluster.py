@@ -91,6 +91,7 @@ from cassandra.datastax.graph import (graph_object_row_factory, GraphOptions, Gr
                                       GraphSON3Serializer)
 from cassandra.datastax.graph.query import _request_timeout_key, _GraphSONContextRowFactory
 from cassandra.datastax import cloud as dscloud
+from cassandra.scylla.cloud import CloudConfiguration
 
 try:
     from cassandra.io.twistedreactor import TwistedConnection
@@ -1137,6 +1138,7 @@ class Cluster(object):
                  monitor_reporting_interval=30,
                  client_id=None,
                  cloud=None,
+                 scylla_cloud=None,
                  shard_aware_options=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
@@ -1156,6 +1158,21 @@ class Cluster(object):
 
         if connection_class is not None:
             self.connection_class = connection_class
+
+        if scylla_cloud is not None:
+            if contact_points is not _NOT_SET or endpoint_factory or ssl_context or ssl_options:
+                raise ValueError("contact_points, endpoint_factory, ssl_context, and ssl_options "
+                                 "cannot be specified with a scylla cloud configuration")
+
+            uses_twisted = TwistedConnection and issubclass(self.connection_class, TwistedConnection)
+            uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
+
+            scylla_cloud_config = CloudConfiguration.create(scylla_cloud, pyopenssl=uses_twisted or uses_eventlet)
+            ssl_context = scylla_cloud_config.ssl_context
+            endpoint_factory = scylla_cloud_config.endpoint_factory
+            contact_points = scylla_cloud_config.contact_points
+            ssl_options = scylla_cloud_config.ssl_options
+            auth_provider = scylla_cloud_config.auth_provider
 
         if cloud is not None:
             self.cloud = cloud
