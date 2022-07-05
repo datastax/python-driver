@@ -1160,14 +1160,15 @@ class Cluster(object):
             self.connection_class = connection_class
 
         if scylla_cloud is not None:
-            if contact_points is not _NOT_SET or endpoint_factory or ssl_context or ssl_options:
-                raise ValueError("contact_points, endpoint_factory, ssl_context, and ssl_options "
+            if contact_points is not _NOT_SET or ssl_context or ssl_options:
+                raise ValueError("contact_points, ssl_context, and ssl_options "
                                  "cannot be specified with a scylla cloud configuration")
 
             uses_twisted = TwistedConnection and issubclass(self.connection_class, TwistedConnection)
             uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
 
-            scylla_cloud_config = CloudConfiguration.create(scylla_cloud, pyopenssl=uses_twisted or uses_eventlet)
+            scylla_cloud_config = CloudConfiguration.create(scylla_cloud, pyopenssl=uses_twisted or uses_eventlet,
+                                                            endpoint_factory=endpoint_factory)
             ssl_context = scylla_cloud_config.ssl_context
             endpoint_factory = scylla_cloud_config.endpoint_factory
             contact_points = scylla_cloud_config.contact_points

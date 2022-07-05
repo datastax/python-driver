@@ -59,7 +59,7 @@ class CloudConfiguration:
     ssl_context: SSLContext
     skip_tls_verify: bool
 
-    def __init__(self, configuration_file, pyopenssl=False):
+    def __init__(self, configuration_file, pyopenssl=False, endpoint_factory=None):
         cloud_config = yaml.safe_load(open(configuration_file))
 
         self.current_context = cloud_config['contexts'][cloud_config['currentContext']]
@@ -69,9 +69,13 @@ class CloudConfiguration:
         self.skip_tls_verify = self.auth_info.get('insecureSkipTLSVerify', False)
         self.ssl_context = self.create_pyopenssl_context() if pyopenssl else self.create_ssl_context()
 
-        proxy_address, port, node_domain = self.get_server(self.data_centers[self.current_context['datacenterName']],
-                                                           keys_order=['testServer', 'server'])
-        self.endpoint_factory = SniEndPointFactory(proxy_address, port=int(port), node_domain=node_domain)
+        proxy_address, port, node_domain = self.get_server(self.data_centers[self.current_context['datacenterName']])
+
+        if not endpoint_factory:
+            endpoint_factory = SniEndPointFactory(proxy_address, port=int(port), node_domain=node_domain)
+        else:
+            assert isinstance(endpoint_factory, SniEndPointFactory)
+        self.endpoint_factory = endpoint_factory
 
         username, password = self.auth_info.get('username'), self.auth_info.get('password')
         if username and password:
@@ -86,17 +90,14 @@ class CloudConfiguration:
             _contact_points.append(self.endpoint_factory.create_from_sni(address))
         return _contact_points
 
-    def get_server(self, data_center, keys_order=None):
-        keys_order = keys_order or ['server']
-        for key in keys_order:
-            address = data_center.get(key, '')
-            if not address:
-                continue
-            address = address.split(":")
-            port = nth(address, 1, default=443)
-            address = nth(address, 0)
-            node_domain = data_center.get('nodeDomain')
-            return address, port, node_domain
+    def get_server(self, data_center):
+        address = data_center.get('server')
+        address = address.split(":")
+        port = nth(address, 1, default=443)
+        address = nth(address, 0)
+        node_domain = data_center.get('nodeDomain')
+        assert address and port and node_domain, "server or nodeDomain are missing"
+        return address, port, node_domain
 
     def create_ssl_context(self):
         ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_SSLv23)
@@ -138,5 +139,5 @@ class CloudConfiguration:
         return ssl_context
 
     @classmethod
-    def create(cls, configuration_file, pyopenssl=False):
-        return cls(configuration_file, pyopenssl)
+    def create(cls, configuration_file, pyopenssl=False, endpoint_factory=None):
+        return cls(configuration_file, pyopenssl=pyopenssl, endpoint_factory=endpoint_factory)
