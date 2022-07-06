@@ -22,6 +22,7 @@ import socket
 import time
 import random
 import copy
+import uuid
 from threading import Lock, RLock, Condition
 import weakref
 try:
@@ -174,6 +175,8 @@ class Host(object):
 
         self.endpoint = endpoint if isinstance(endpoint, EndPoint) else DefaultEndPoint(endpoint)
         self.conviction_policy = conviction_policy_factory(self)
+        if not host_id:
+            host_id = uuid.uuid4()
         self.host_id = host_id
         self.set_location_info(datacenter, rack)
         self.lock = RLock()

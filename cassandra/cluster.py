@@ -2130,7 +2130,7 @@ class Cluster(object):
             self.on_down(host, is_host_addition, expect_host_to_be_down)
         return is_down
 
-    def add_host(self, endpoint, datacenter=None, rack=None, signal=True, refresh_nodes=True):
+    def add_host(self, endpoint, datacenter=None, rack=None, signal=True, refresh_nodes=True, host_id=None):
         """
         Called when adding initial contact points and when the control
         connection subsequently discovers a new node.
@@ -2138,7 +2138,7 @@ class Cluster(object):
         the metadata.
         Intended for internal use only.
         """
-        host, new = self.metadata.add_or_return_host(Host(endpoint, self.conviction_policy_factory, datacenter, rack))
+        host, new = self.metadata.add_or_return_host(Host(endpoint, self.conviction_policy_factory, datacenter, rack, host_id=host_id))
         if new and signal:
             log.info("New Cassandra host %r discovered", host)
             self.on_add(host, refresh_nodes)
@@ -3817,9 +3817,8 @@ class ControlConnection(object):
         partitioner = None
         token_map = {}
 
-        found_hosts = set()
+        found_host_ids = set()
         if local_result.parsed_rows:
-            found_hosts.add(connection.endpoint)
             local_rows = dict_factory(local_result.column_names, local_result.parsed_rows)
             local_row = local_rows[0]
             cluster_name = local_row["cluster_name"]
@@ -3833,7 +3832,9 @@ class ControlConnection(object):
                 datacenter = local_row.get("data_center")
                 rack = local_row.get("rack")
                 self._update_location_info(host, datacenter, rack)
+                host.endpoint = self._cluster.endpoint_factory.create(local_row)
                 host.host_id = local_row.get("host_id")
+                found_host_ids.add(host.host_id)
                 host.listen_address = local_row.get("listen_address")
                 host.listen_port = local_row.get("listen_port")
                 host.broadcast_address = _NodeInfo.get_broadcast_address(local_row)
@@ -3872,6 +3873,8 @@ class ControlConnection(object):
                 if partitioner and tokens:
                     token_map[host] = tokens
 
+                self._cluster.metadata.update_host(host, old_endpoint=connection.endpoint)
+                connection.original_endpoint = connection.endpoint = host.endpoint
         # Check metadata.partitioner to see if we haven't built anything yet. If
         # every node in the cluster was in the contact points, we won't discover
         # any new nodes, so we need this additional check.  (See PYTHON-90)
@@ -3884,24 +3887,26 @@ class ControlConnection(object):
                 continue
 
             endpoint = self._cluster.endpoint_factory.create(row)
+            host_id = row.get("host_id")
 
-            if endpoint in found_hosts:
-                log.warning("Found multiple hosts with the same endpoint (%s). Excluding peer %s", endpoint, row.get("peer"))
+            if host_id in found_host_ids:
+                log.warning("Found multiple hosts with the same host_id (%s). Excluding peer %s", host_id, row.get("peer"))
                 continue
 
-            found_hosts.add(endpoint)
+            found_host_ids.add(host_id)
 
             host = self._cluster.metadata.get_host(endpoint)
             datacenter = row.get("data_center")
             rack = row.get("rack")
+
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", endpoint)
-                host, _ = self._cluster.add_host(endpoint, datacenter, rack, signal=True, refresh_nodes=False)
+                host, _ = self._cluster.add_host(endpoint, datacenter=datacenter, rack=rack, signal=True, refresh_nodes=False, host_id=host_id)
                 should_rebuild_token_map = True
             else:
                 should_rebuild_token_map |= self._update_location_info(host, datacenter, rack)
 
-            host.host_id = row.get("host_id")
+            host.host_id = host_id
             host.broadcast_address = _NodeInfo.get_broadcast_address(row)
             host.broadcast_port = _NodeInfo.get_broadcast_port(row)
             host.broadcast_rpc_address = _NodeInfo.get_broadcast_rpc_address(row)
@@ -3915,11 +3920,11 @@ class ControlConnection(object):
             if partitioner and tokens and self._token_meta_enabled:
                 token_map[host] = tokens
 
-        for old_host in self._cluster.metadata.all_hosts():
-            if old_host.endpoint.address != connection.endpoint and old_host.endpoint not in found_hosts:
+        for old_host_id, old_host in self._cluster.metadata.all_hosts_items():
+            if old_host_id not in found_host_ids:
                 should_rebuild_token_map = True
                 log.debug("[control connection] Removing host not found in peers metadata: %r", old_host)
-                self._cluster.remove_host(old_host)
+                self._cluster.metadata.remove_host_by_host_id(old_host_id)
 
         log.debug("[control connection] Finished fetching ring info")
         if partitioner and should_rebuild_token_map:

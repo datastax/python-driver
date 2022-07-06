@@ -124,6 +124,7 @@ class Metadata(object):
         self.keyspaces = {}
         self.dbaas = False
         self._hosts = {}
+        self._host_id_by_endpoint = {}
         self._hosts_lock = RLock()
 
     def export_schema_as_string(self):
@@ -330,14 +331,26 @@ class Metadata(object):
         """
         with self._hosts_lock:
             try:
-                return self._hosts[host.endpoint], False
+                return self._hosts[host.host_id], False
             except KeyError:
-                self._hosts[host.endpoint] = host
+                self._host_id_by_endpoint[host.endpoint] = host.host_id
+                self._hosts[host.host_id] = host
                 return host, True
 
     def remove_host(self, host):
         with self._hosts_lock:
-            return bool(self._hosts.pop(host.endpoint, False))
+            self._host_id_by_endpoint.pop(host.endpoint, False)
+            return bool(self._hosts.pop(host.host_id, False))
+
+    def remove_host_by_host_id(self, host_id):
+        with self._hosts_lock:
+            return bool(self._hosts.pop(host_id, False))
+
+    def update_host(self, host, old_endpoint):
+        host, created = self.add_or_return_host(host)
+        with self._hosts_lock:
+            self._host_id_by_endpoint.pop(old_endpoint, False)
+            self._host_id_by_endpoint[host.endpoint] = host.host_id
 
     def get_host(self, endpoint_or_address, port=None):
         """
@@ -345,10 +358,12 @@ class Metadata(object):
         iterate all hosts to match the :attr:`~.pool.Host.broadcast_rpc_address` and
         :attr:`~.pool.Host.broadcast_rpc_port` attributes.
         """
-        if not isinstance(endpoint_or_address, EndPoint):
-            return self._get_host_by_address(endpoint_or_address, port)
+        with self._hosts_lock:
+            if not isinstance(endpoint_or_address, EndPoint):
+                return self._get_host_by_address(endpoint_or_address, port)
 
-        return self._hosts.get(endpoint_or_address)
+            host_id = self._host_id_by_endpoint.get(endpoint_or_address)
+            return self._hosts.get(host_id)
 
     def _get_host_by_address(self, address, port=None):
         for host in six.itervalues(self._hosts):
@@ -364,6 +379,10 @@ class Metadata(object):
         """
         with self._hosts_lock:
             return list(self._hosts.values())
+
+    def all_hosts_items(self):
+        with self._hosts_lock:
+            return list(self._hosts.items())
 
 
 REPLICATION_STRATEGY_CLASS_PREFIX = "org.apache.cassandra.locator."
