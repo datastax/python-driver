@@ -3498,7 +3498,7 @@ class ControlConnection(object):
     _SELECT_PEERS = "SELECT * FROM system.peers"
     _SELECT_PEERS_NO_TOKENS_TEMPLATE = "SELECT host_id, peer, data_center, rack, rpc_address, {nt_col_name}, release_version, schema_version FROM system.peers"
     _SELECT_LOCAL = "SELECT * FROM system.local WHERE key='local'"
-    _SELECT_LOCAL_NO_TOKENS = "SELECT host_id, cluster_name, data_center, rack, partitioner, release_version, schema_version FROM system.local WHERE key='local'"
+    _SELECT_LOCAL_NO_TOKENS = "SELECT host_id, cluster_name, data_center, rack, partitioner, release_version, schema_version, rpc_address FROM system.local WHERE key='local'"
     # Used only when token_metadata_enabled is set to False
     _SELECT_LOCAL_NO_TOKENS_RPC_ADDRESS = "SELECT rpc_address FROM system.local WHERE key='local'"
 
@@ -3832,7 +3832,9 @@ class ControlConnection(object):
                 datacenter = local_row.get("data_center")
                 rack = local_row.get("rack")
                 self._update_location_info(host, datacenter, rack)
-                host.endpoint = self._cluster.endpoint_factory.create(local_row)
+                new_endpoint = self._cluster.endpoint_factory.create(local_row)
+                if new_endpoint.address:
+                    host.endpoint = new_endpoint
                 host.host_id = local_row.get("host_id")
                 found_host_ids.add(host.host_id)
                 host.listen_address = local_row.get("listen_address")
@@ -3919,7 +3921,6 @@ class ControlConnection(object):
             tokens = row.get("tokens", None)
             if partitioner and tokens and self._token_meta_enabled:
                 token_map[host] = tokens
-
         for old_host_id, old_host in self._cluster.metadata.all_hosts_items():
             if old_host_id not in found_host_ids:
                 should_rebuild_token_map = True
