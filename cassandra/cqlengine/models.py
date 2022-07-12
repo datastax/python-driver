@@ -593,7 +593,7 @@ class BaseModel(object):
 
     def _set_column_value(self, name, value):
         """Function to change a column value without changing the value manager states"""
-        self._values[name].value = value  # internal assignement, skip the main setter
+        self._values[name].value = value  # internal assignment, skip the main setter
 
     def validate(self):
         """

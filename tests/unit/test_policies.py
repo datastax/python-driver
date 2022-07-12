@@ -1199,7 +1199,7 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
                 query=None, consistency=ONE, write_type=write_type,
                 required_responses=1, received_responses=2, retry_num=0)
             self.assertEqual(retry, RetryPolicy.IGNORE)
-            # retrhow if we can't be sure we have a replica
+            # rethrow if we can't be sure we have a replica
             retry, consistency = policy.on_write_timeout(
                 query=None, consistency=ONE, write_type=write_type,
                 required_responses=1, received_responses=0, retry_num=0)

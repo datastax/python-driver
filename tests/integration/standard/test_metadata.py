@@ -670,11 +670,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         """
         test for synchronously refreshing table metadata
 
-        test_refresh_table_metatadata tests that table metadata is refreshed when calling test_refresh_table_metatadata().
+        test_refresh_table_metadata tests that table metadata is refreshed when calling test_refresh_table_metadata().
         It creates a second cluster object with schema_event_refresh_window=-1 such that schema refreshes are disabled
         for schema change push events. It then alters the table, adding a new column, using the first cluster
         object, and verifies that the table metadata has not changed in the second cluster object. Finally, it calls
-        test_refresh_table_metatadata() and verifies that the table metadata is updated in the second cluster object.
+        test_refresh_table_metadata() and verifies that the table metadata is updated in the second cluster object.
 
         @since 2.6.0
         @jira_ticket PYTHON-291
@@ -704,10 +704,10 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         test for synchronously refreshing materialized view metadata
 
         test_refresh_table_metadata_for_materialized_views tests that materialized view metadata is refreshed when calling
-        test_refresh_table_metatadata() with the materialized view name as the table. It creates a second cluster object
+        test_refresh_table_metadata() with the materialized view name as the table. It creates a second cluster object
         with schema_event_refresh_window=-1 such that schema refreshes are disabled for schema change push events.
         It then creates a new materialized view , using the first cluster object, and verifies that the materialized view
-        metadata has not changed in the second cluster object. Finally, it calls test_refresh_table_metatadata() with the
+        metadata has not changed in the second cluster object. Finally, it calls test_refresh_table_metadata() with the
         materialized view name as the table name, and verifies that the materialized view metadata is updated in the
         second cluster object.
 

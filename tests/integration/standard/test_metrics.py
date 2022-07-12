@@ -276,7 +276,7 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         session2 = cluster2.connect(self.ks_name, wait_for_all_pools=True)
         session3 = cluster3.connect(self.ks_name, wait_for_all_pools=True)
 
-        # Basic validation that naming metrics doesn't impact their segration or accuracy
+        # Basic validation that naming metrics doesn't impact their segregation or accuracy
         for i in range(10):
             query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
             session2.execute(query)

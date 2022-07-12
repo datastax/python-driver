@@ -458,7 +458,7 @@ class UsingDescriptorTests(BaseCassEngTestCase):
 
         @since 3.7
         @jira_ticket PYTHON-613
-        @expected_result Keyspace segration is honored
+        @expected_result Keyspace segregation is honored
 
         @test_category object_mapper
         """
