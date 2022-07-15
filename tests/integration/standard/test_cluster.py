@@ -13,11 +13,10 @@
 # limitations under the License.
 
 import unittest
-from unittest.mock import ANY
 
 from collections import deque
 from copy import copy
-from mock import Mock, call, patch
+from mock import Mock, call, patch, ANY
 import time
 from uuid import uuid4
 import logging
