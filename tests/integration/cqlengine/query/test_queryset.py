@@ -13,10 +13,7 @@
 # limitations under the License.
 from __future__ import absolute_import
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from datetime import datetime
 from uuid import uuid4

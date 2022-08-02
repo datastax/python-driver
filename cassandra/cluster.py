@@ -2451,7 +2451,7 @@ class Session(object):
         *Deprecated:* use execution profiles instead
         """
         warn("Setting the consistency level at the session level will be removed in 4.0. Consider using "
-             "execution profiles and setting the desired consitency level to the EXEC_PROFILE_DEFAULT profile."
+             "execution profiles and setting the desired consistency level to the EXEC_PROFILE_DEFAULT profile."
              , DeprecationWarning)
         self._validate_set_legacy_config('default_consistency_level', cl)
 
@@ -5210,6 +5210,12 @@ class ResultSet(object):
         if not self.response_future._continuous_paging_session:
             self.fetch_next_page()
             self._page_iter = iter(self._current_rows)
+            return self.next()
+
+            # Some servers can return empty pages in this case; Scylla is known to do
+            # so in some circumstances.  Guard against this by recursing to handle
+            # the next(iter) call.  If we have an empty page in that case it will
+            # get handled by the StopIteration handler when we recurse.
             return self.next()
 
         return next(self._page_iter)

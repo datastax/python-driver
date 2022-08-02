@@ -22,10 +22,7 @@ from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCO
     USE_CASS_EXTERNAL, start_cluster_wait_for_up, TestCluster
 from tests.integration.util import assert_quiescent_pool_state
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
+import unittest
 
 log = logging.getLogger(__name__)
 

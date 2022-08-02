@@ -769,6 +769,8 @@ class Connection(object):
 
     _is_checksumming_enabled = False
 
+    _on_orphaned_stream_released = None
+
     @property
     def _iobuf(self):
         # backward compatibility, to avoid any change in the reactors
@@ -778,8 +780,8 @@ class Connection(object):
                  ssl_options=None, sockopts=None, compression=True,
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
                  user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False,
-                 ssl_context=None, owning_pool=None, shard_id=None, total_shards=None):
-
+                 ssl_context=None, owning_pool=None, shard_id=None, total_shards=None,
+                 on_orphaned_stream_released=None):
         # TODO next major rename host to endpoint and remove port kwarg.
         self.endpoint = host if isinstance(host, EndPoint) else DefaultEndPoint(host, port)
 
@@ -801,7 +803,7 @@ class Connection(object):
         self._continuous_paging_sessions = {}
         self._socket_writable = True
         self.orphaned_request_ids = set()
-        self._owning_pool = owning_pool
+        self._on_orphaned_stream_released = on_orphaned_stream_released
 
         if ssl_options:
             self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
@@ -1247,8 +1249,8 @@ class Connection(object):
                         self.in_flight -= 1
                         self.orphaned_request_ids.remove(stream_id)
                         need_notify_of_release = True
-                if need_notify_of_release and self._owning_pool:
-                    self._owning_pool.on_orphaned_stream_released()
+                if need_notify_of_release and self._on_orphaned_stream_released:
+                    self._on_orphaned_stream_released()
 
                 try:
                     callback, decoder, result_metadata = self._requests.pop(stream_id)

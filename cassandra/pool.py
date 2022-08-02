@@ -423,7 +423,7 @@ class HostConnection(object):
             return
 
         log.debug("Initializing connection for host %s", self.host)
-        first_connection = session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+        first_connection = session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
         log.debug("First connection created to %s for shard_id=%i", self.host, first_connection.shard_id)
         self._connections[first_connection.shard_id] = first_connection
         self._keyspace = session.keyspace
@@ -517,7 +517,10 @@ class HostConnection(object):
                     last_retry = True
                     continue
             with self._stream_available_condition:
-                self._stream_available_condition.wait(remaining)
+                if conn.orphaned_threshold_reached and conn.is_closed:
+                    conn = self._get_connection()
+                else:
+                    self._stream_available_condition.wait(remaining)
 
         raise NoConnectionsAvailable("All request IDs are currently in use")
 
@@ -563,8 +566,8 @@ class HostConnection(object):
                         with self._lock:
                             if connection in self._trash:
                                 self._trash.remove(connection)
-                        log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
-                        connection.close()
+                                log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
+                                connection.close()
                 return
 
     def on_orphaned_stream_released(self):
@@ -588,7 +591,8 @@ class HostConnection(object):
                     self._connecting.add(connection.shard_id)
                     self._session.submit(self._open_connection_to_missing_shard, connection.shard_id)
                 else:
-                    connection = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+                    connection = self._session.cluster.connection_factory(self.host.endpoint,
+                                                                          on_orphaned_stream_released=self.on_orphaned_stream_released)
                     if self._keyspace:
                         connection.set_keyspace_blocking(self._keyspace)
                     self._connections[connection.shard_id] = connection
@@ -690,12 +694,12 @@ class HostConnection(object):
         log.debug("shard_aware_endpoint=%r", shard_aware_endpoint)
 
         if shard_aware_endpoint:
-            conn = self._session.cluster.connection_factory(shard_aware_endpoint, owning_pool=self,
+            conn = self._session.cluster.connection_factory(shard_aware_endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released,
                                                             shard_id=shard_id,
                                                             total_shards=self.host.sharding_info.shards_count)
             conn.original_endpoint = self.host.endpoint
         else:
-            conn = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+            conn = self._session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
 
         log.debug("Received a connection %s for shard_id=%i on host %s", id(conn), conn.shard_id, self.host)
         if self.is_shutdown:
@@ -827,6 +831,16 @@ class HostConnection(object):
                     self._connecting.add(shard_id)
                     self._shard_connections_futures.append(future)
 
+        trash_conns = None
+        with self._lock:
+            if self._trash:
+                trash_conns = self._trash
+                self._trash = set()
+
+        if trash_conns is not None:
+            for conn in self._trash:
+                conn.close()
+
     def _set_keyspace_for_all_conns(self, keyspace, callback):
         """
         Asynchronously sets the keyspace for all connections.  When all
@@ -905,7 +919,7 @@ class HostConnectionPool(object):
 
         log.debug("Initializing new connection pool for host %s", self.host)
         core_conns = session.cluster.get_core_connections_per_host(host_distance)
-        self._connections = [session.cluster.connection_factory(host.endpoint, owning_pool=self)
+        self._connections = [session.cluster.connection_factory(host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
                              for i in range(core_conns)]
 
         self._keyspace = session.keyspace
@@ -1009,7 +1023,7 @@ class HostConnectionPool(object):
 
         log.debug("Going to open new connection to host %s", self.host)
         try:
-            conn = self._session.cluster.connection_factory(self.host.endpoint, owning_pool=self)
+            conn = self._session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
             if self._keyspace:
                 conn.set_keyspace_blocking(self._session.keyspace)
             self._next_trash_allowed_at = time.time() + _MIN_TRASH_INTERVAL

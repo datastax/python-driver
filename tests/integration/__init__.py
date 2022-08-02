@@ -20,10 +20,7 @@ from tests import connection_class, EVENT_LOOP_MANAGER
 if connection_class is not None:
     Cluster.connection_class = connection_class
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from packaging.version import Version
 import logging
@@ -405,15 +402,15 @@ def get_node(node_id):
     return CCM_CLUSTER.nodes['node%s' % node_id]
 
 
-def use_multidc(dc_list, workloads=[]):
+def use_multidc(dc_list, workloads=None):
     use_cluster(MULTIDC_CLUSTER_NAME, dc_list, start=True, workloads=workloads)
 
 
-def use_singledc(start=True, workloads=[], use_single_interface=USE_SINGLE_INTERFACE):
+def use_singledc(start=True, workloads=None, use_single_interface=USE_SINGLE_INTERFACE):
     use_cluster(CLUSTER_NAME, [3], start=start, workloads=workloads, use_single_interface=use_single_interface)
 
 
-def use_single_node(start=True, workloads=[], configuration_options={}, dse_options={}):
+def use_single_node(start=True, workloads=None, configuration_options=None, dse_options=None):
     use_cluster(SINGLE_NODE_CLUSTER_NAME, [1], start=start, workloads=workloads,
                 configuration_options=configuration_options, dse_options=dse_options)
 
@@ -475,10 +472,11 @@ def start_cluster_wait_for_up(cluster):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, set_keyspace=True, ccm_options=None,
-                configuration_options={}, dse_options={}, use_single_interface=USE_SINGLE_INTERFACE):
+                configuration_options=None, dse_options=None, use_single_interface=USE_SINGLE_INTERFACE):
+    configuration_options = configuration_options or {}
+    dse_options = dse_options or {}
+    workloads = workloads or []
     dse_cluster = True if DSE_VERSION else False
-    if not workloads:
-        workloads = []
 
     if ccm_options is None and DSE_VERSION:
         ccm_options = {"version": CCM_VERSION}

@@ -797,7 +797,7 @@ class OrderedMap(Mapping):
     '''
     An ordered map that accepts non-hashable types for keys. It also maintains the
     insertion order of items, behaving as OrderedDict in that regard. These maps
-    are constructed and read just as normal mapping types, exept that they may
+    are constructed and read just as normal mapping types, except that they may
     contain arbitrary collections and other non-hashable items as keys::
 
         >>> od = OrderedMap([({'one': 1, 'two': 2}, 'value'),

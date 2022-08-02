@@ -20,16 +20,13 @@ from cassandra import InvalidRequest, ConsistencyLevel, ReadTimeout, WriteTimeou
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args, ExecutionResult
 from cassandra.policies import HostDistance
-from cassandra.query import tuple_factory, SimpleStatement
+from cassandra.query import dict_factory, tuple_factory, SimpleStatement
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 
 from six import next
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 log = logging.getLogger(__name__)
 
@@ -38,13 +35,16 @@ def setup_module():
     use_singledc()
 
 
+EXEC_PROFILE_DICT = "dict"
+
 class ClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         cls.cluster = TestCluster(
             execution_profiles = {
-                EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory)
+                EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=tuple_factory),
+                EXEC_PROFILE_DICT: ExecutionProfile(row_factory=dict_factory)
             }
         )
         if PROTOCOL_VERSION < 3:
@@ -55,11 +55,11 @@ class ClusterTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.cluster.shutdown()
 
-    def execute_concurrent_helper(self, session, query, results_generator=False):
+    def execute_concurrent_helper(self, session, query, **kwargs):
         count = 0
         while count < 100:
             try:
-                return execute_concurrent(session, query, results_generator=False)
+                return execute_concurrent(session, query, results_generator=False, **kwargs)
             except (ReadTimeout, WriteTimeout, OperationTimedOut, ReadFailure, WriteFailure):
                 ex_type, ex, tb = sys.exc_info()
                 log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
@@ -68,11 +68,11 @@ class ClusterTests(unittest.TestCase):
 
         raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
 
-    def execute_concurrent_args_helper(self, session, query, params, results_generator=False):
+    def execute_concurrent_args_helper(self, session, query, params, results_generator=False, **kwargs):
         count = 0
         while count < 100:
             try:
-                return execute_concurrent_with_args(session, query, params, results_generator=results_generator)
+                return execute_concurrent_with_args(session, query, params, results_generator=results_generator, **kwargs)
             except (ReadTimeout, WriteTimeout, OperationTimedOut, ReadFailure, WriteFailure):
                 ex_type, ex, tb = sys.exc_info()
                 log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
@@ -80,7 +80,7 @@ class ClusterTests(unittest.TestCase):
 
         raise RuntimeError("Failed to execute query after 100 attempts: {0}".format(query))
 
-    def test_execute_concurrent(self):
+    def execute_concurrent_base(self, test_fn, validate_fn, zip_args=True):
         for num_statements in (0, 1, 2, 7, 10, 99, 100, 101, 199, 200, 201):
             # write
             statement = SimpleStatement(
@@ -89,7 +89,9 @@ class ClusterTests(unittest.TestCase):
             statements = cycle((statement, ))
             parameters = [(i, i) for i in range(num_statements)]
 
-            results = self.execute_concurrent_helper(self.session, list(zip(statements, parameters)))
+            results = \
+                test_fn(self.session, list(zip(statements, parameters))) if zip_args else \
+                    test_fn(self.session, statement, parameters)
             self.assertEqual(num_statements, len(results))
             for success, result in results:
                 self.assertTrue(success)
@@ -102,32 +104,37 @@ class ClusterTests(unittest.TestCase):
             statements = cycle((statement, ))
             parameters = [(i, ) for i in range(num_statements)]
 
-            results = self.execute_concurrent_helper(self.session, list(zip(statements, parameters)))
+            results = \
+                test_fn(self.session, list(zip(statements, parameters))) if zip_args else \
+                    test_fn(self.session, statement, parameters)
+            validate_fn(num_statements, results)
+
+    def execute_concurrent_valiate_tuple(self, num_statements, results):
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
+
+    def execute_concurrent_valiate_dict(self, num_statements, results):
+            self.assertEqual(num_statements, len(results))
+            self.assertEqual([(True, [{"v":i}]) for i in range(num_statements)], results)
+
+    def test_execute_concurrent(self):
+        self.execute_concurrent_base(self.execute_concurrent_helper, \
+            self.execute_concurrent_valiate_tuple)
 
     def test_execute_concurrent_with_args(self):
-        for num_statements in (0, 1, 2, 7, 10, 99, 100, 101, 199, 200, 201):
-            statement = SimpleStatement(
-                "INSERT INTO test3rf.test (k, v) VALUES (%s, %s)",
-                consistency_level=ConsistencyLevel.QUORUM)
-            parameters = [(i, i) for i in range(num_statements)]
+        self.execute_concurrent_base(self.execute_concurrent_args_helper, \
+            self.execute_concurrent_valiate_tuple, \
+                zip_args=False)
 
-            results = self.execute_concurrent_args_helper(self.session, statement, parameters)
-            self.assertEqual(num_statements, len(results))
-            for success, result in results:
-                self.assertTrue(success)
-                self.assertFalse(result)
+    def test_execute_concurrent_with_execution_profile(self):
+        def run_fn(*args, **kwargs):
+            return self.execute_concurrent_helper(*args, execution_profile=EXEC_PROFILE_DICT, **kwargs)
+        self.execute_concurrent_base(run_fn, self.execute_concurrent_valiate_dict)
 
-            # read
-            statement = SimpleStatement(
-                "SELECT v FROM test3rf.test WHERE k=%s",
-                consistency_level=ConsistencyLevel.QUORUM)
-            parameters = [(i, ) for i in range(num_statements)]
-
-            results = self.execute_concurrent_args_helper(self.session, statement, parameters)
-            self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
+    def test_execute_concurrent_with_args_and_execution_profile(self):
+        def run_fn(*args, **kwargs):
+            return self.execute_concurrent_args_helper(*args, execution_profile=EXEC_PROFILE_DICT, **kwargs)
+        self.execute_concurrent_base(run_fn, self.execute_concurrent_valiate_dict, zip_args=False)
 
     def test_execute_concurrent_with_args_generator(self):
         """
