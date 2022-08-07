@@ -17,11 +17,7 @@ import time
 
 from cassandra.shard_info import _ShardingInfo
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
-    import unittest.mock as mock
+import unittest
 
 from mock import Mock, NonCallableMagicMock, MagicMock
 from threading import Thread, Event, Lock
@@ -54,7 +50,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         c, request_id = pool.borrow_connection(timeout=0.01)
         self.assertIs(c, conn)
@@ -73,7 +69,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -92,7 +88,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -120,7 +116,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.get_max_connections_per_host.return_value = 2
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
         self.assertEqual(1, conn.in_flight)
@@ -143,7 +139,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
@@ -158,12 +154,13 @@ class _PoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=False,
-                                    max_request_id=100, signaled_error=False)
+                                    max_request_id=100, signaled_error=False,
+                                    orphaned_threshold_reached=False)
         session.cluster.connection_factory.return_value = conn
         session.cluster.shard_aware_options = ShardAwareOptions()
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
@@ -184,11 +181,11 @@ class _PoolTests(unittest.TestCase):
         host = Mock(spec=Host, address='ip1')
         session = self.make_session()
         conn = NonCallableMagicMock(spec=Connection, in_flight=0, is_defunct=False, is_closed=True, max_request_id=100,
-                                    signaled_error=False)
+                                    signaled_error=False, orphaned_threshold_reached=False)
         session.cluster.connection_factory.return_value = conn
 
         pool = self.PoolImpl(host, HostDistance.LOCAL, session)
-        session.cluster.connection_factory.assert_called_once_with(host.endpoint, owning_pool=pool)
+        session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True

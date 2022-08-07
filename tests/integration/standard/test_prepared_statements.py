@@ -15,10 +15,7 @@
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 from cassandra import InvalidRequest, DriverException
 
 from cassandra import ConsistencyLevel, ProtocolVersion

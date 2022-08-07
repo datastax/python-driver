@@ -11,10 +11,7 @@ import os
 import shutil
 import six
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from cassandra import DriverException
 from cassandra.datastax import cloud

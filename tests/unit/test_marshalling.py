@@ -15,10 +15,7 @@ import sys
 
 from cassandra import ProtocolVersion
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 import platform
 from datetime import datetime, date

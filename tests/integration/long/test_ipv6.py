@@ -30,10 +30,7 @@ else:
     except ImportError:
         LibevConnection = None
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 
 # If more modules do IPV6 testing, this can be moved down to integration.__init__.

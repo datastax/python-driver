@@ -36,10 +36,7 @@ from tests.integration.long.utils import (wait_for_up, create_schema,
                                           wait_for_down, decommission, start,
                                           bootstrap, stop, IP_FORMAT)
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 log = logging.getLogger(__name__)
 

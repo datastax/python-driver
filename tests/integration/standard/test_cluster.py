@@ -14,10 +14,7 @@
 import asyncore
 import subprocess
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from collections import deque
 from copy import copy

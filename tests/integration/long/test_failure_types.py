@@ -34,10 +34,7 @@ from tests.integration import (
     local, CASSANDRA_VERSION, TestCluster)
 
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
+import unittest
 
 log = logging.getLogger(__name__)
 

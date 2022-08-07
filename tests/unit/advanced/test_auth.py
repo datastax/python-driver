@@ -15,10 +15,7 @@
 import os
 from puresasl import QOP
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 
 from cassandra.auth import DSEGSSAPIAuthProvider
 

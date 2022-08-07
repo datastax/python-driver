@@ -18,10 +18,7 @@ from tests.integration.advanced import BasicGeometricUnitTestCase, use_single_no
 from cassandra.util import OrderedMap, sortedset
 from collections import namedtuple
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest  # noqa
+import unittest
 from uuid import uuid1
 from cassandra.util import Point, LineString, Polygon
 from cassandra.cqltypes import LineStringType, PointType, PolygonType
