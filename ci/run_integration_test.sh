@@ -1,5 +1,7 @@
 #! /bin/bash -e
 
+sudo apt-get install gcc python3-dev libev4 libev-dev
+
 aio_max_nr_recommended_value=1048576
 aio_max_nr=$(cat /proc/sys/fs/aio-max-nr)
 echo "The current aio-max-nr value is $aio_max_nr"
@@ -13,7 +15,7 @@ if (( aio_max_nr !=  aio_max_nr_recommended_value  )); then
    fi
 fi
 
-BRANCH='branch-4.5'
+BRANCH='branch-5.0'
 
 python3 -m venv .test-venv
 source .test-venv/bin/activate
@@ -30,7 +32,7 @@ pip install awscli
 pip install https://github.com/scylladb/scylla-ccm/archive/master.zip
 
 # download version
-LATEST_MASTER_JOB_ID=`aws --no-sign-request s3 ls downloads.scylladb.com/unstable/scylla/${BRANCH}/relocatable/ | grep '2021-' | tr -s ' ' | cut -d ' ' -f 3 | tr -d '\/'  | sort -g | tail -n 1`
+LATEST_MASTER_JOB_ID=`aws --no-sign-request s3 ls downloads.scylladb.com/unstable/scylla/${BRANCH}/relocatable/ | tr -s ' ' | cut -d ' ' -f 3 | tr -d '\/'  | sort -g | tail -n 1`
 AWS_BASE=s3://downloads.scylladb.com/unstable/scylla/${BRANCH}/relocatable/${LATEST_MASTER_JOB_ID}
 
 aws s3 --no-sign-request cp ${AWS_BASE}/scylla-package.tar.gz . &
