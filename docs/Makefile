@@ -1,7 +1,7 @@
 # Global variables
 # You can set these variables from the command line.
 POETRY        = poetry
-SPHINXOPTS    =
+SPHINXOPTS    = 
 SPHINXBUILD   = $(POETRY) run sphinx-build
 PAPER         =
 BUILDDIR      = _build
@@ -72,6 +72,12 @@ multiversion: setup
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
 
+.PHONY: redirects
+redirects: setup
+	$(POETRY) run redirects-cli fromfile --yaml-file _utils/redirects.yaml --output-dir $(BUILDDIR)/dirhtml
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
+
 # Preview commands
 .PHONY: preview
 preview: setup
@@ -91,3 +97,4 @@ test: setup
 .PHONY: linkcheck
 linkcheck: setup
 	$(SPHINXBUILD) -b linkcheck $(SOURCEDIR) $(BUILDDIR)/linkcheck
+

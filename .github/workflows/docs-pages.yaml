@@ -29,6 +29,8 @@ jobs:
         run: python setup.py develop
       - name: Build docs
         run: make -C docs multiversion
+      - name: Build redirects
+        run: make -C docs redirects
       - name: Deploy docs to GitHub Pages
         run: ./docs/_utils/deploy.sh
         env:

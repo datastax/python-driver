@@ -77,11 +77,6 @@ notfound_template =  '404.html'
 # Prefix added to all the URLs generated in the 404 page.
 notfound_urls_prefix = ''
 
-# -- Options for redirect extension --------------------------------------------
-
-# Read a YAML dictionary of redirections and generate an HTML file for each
-redirects_file = '_utils/redirections.yaml'
-
 # -- Options for multiversion --------------------------------------------------
 
 # Whitelist pattern for tags
