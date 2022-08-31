@@ -3921,6 +3921,8 @@ class ControlConnection(object):
             tokens = row.get("tokens", None)
             if partitioner and tokens and self._token_meta_enabled:
                 token_map[host] = tokens
+            self._cluster.metadata.update_host(host, old_endpoint=endpoint)
+
         for old_host_id, old_host in self._cluster.metadata.all_hosts_items():
             if old_host_id not in found_host_ids:
                 should_rebuild_token_map = True

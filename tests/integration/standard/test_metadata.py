@@ -41,6 +41,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                greaterthanorequaldse67, lessthancass40,
                                TestCluster, DSE_VERSION)
 
+from tests.util import wait_until
 
 log = logging.getLogger(__name__)
 
@@ -124,7 +125,12 @@ class MetaDataRemovalTest(unittest.TestCase):
 
         @test_category metadata
         """
-        self.assertEqual(len(self.cluster.metadata.all_hosts()), 3)
+        # wait until we have only 3 hosts
+        wait_until(condition=lambda: len(self.cluster.metadata.all_hosts()) == 3, delay=0.5, max_attempts=5)
+
+        # verify the un-existing host was filtered
+        for host in self.cluster.metadata.all_hosts():
+            self.assertNotEquals(host.endpoint.address, '126.0.0.186')
 
 
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
