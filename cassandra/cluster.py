@@ -3818,6 +3818,8 @@ class ControlConnection(object):
         token_map = {}
 
         found_host_ids = set()
+        found_endpoints = set()
+
         if local_result.parsed_rows:
             local_rows = dict_factory(local_result.column_names, local_result.parsed_rows)
             local_row = local_rows[0]
@@ -3836,7 +3838,10 @@ class ControlConnection(object):
                 if new_endpoint.address:
                     host.endpoint = new_endpoint
                 host.host_id = local_row.get("host_id")
+
                 found_host_ids.add(host.host_id)
+                found_endpoints.add(host.endpoint)
+
                 host.listen_address = local_row.get("listen_address")
                 host.listen_port = local_row.get("listen_port")
                 host.broadcast_address = _NodeInfo.get_broadcast_address(local_row)
@@ -3891,12 +3896,16 @@ class ControlConnection(object):
             endpoint = self._cluster.endpoint_factory.create(row)
             host_id = row.get("host_id")
 
+            if endpoint in found_endpoints:
+                log.warning("Found multiple hosts with the same endpoint(%s). Excluding peer %s - %s", endpoint, row.get("peer"), host_id)
+                continue
+
             if host_id in found_host_ids:
                 log.warning("Found multiple hosts with the same host_id (%s). Excluding peer %s", host_id, row.get("peer"))
                 continue
 
             found_host_ids.add(host_id)
-
+            found_endpoints.add(endpoint)
             host = self._cluster.metadata.get_host(endpoint)
             datacenter = row.get("data_center")
             rack = row.get("rack")
