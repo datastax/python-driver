@@ -542,8 +542,9 @@ class HostConnection(object):
             if not connection.signaled_error:
                 log.debug("Defunct or closed connection (%s) returned to pool, potentially "
                           "marking host %s as down", id(connection), self.host)
-                is_down = self._session.cluster.signal_connection_failure(
-                    self.host, connection.last_error, is_host_addition=False)
+                is_down = self.host.signal_connection_failure(connection.last_error)
+                if is_down:
+                     self._session.cluster.on_down(self.host, False, False)
                 connection.signaled_error = True
 
             if self.shutdown_on_error and not is_down:
