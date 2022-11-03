@@ -3,7 +3,7 @@ try:
     from cassandra.io.asyncioreactor import AsyncioConnection
     import asynctest
     ASYNCIO_AVAILABLE = True
-except (ImportError, SyntaxError):
+except (ImportError, SyntaxError, AttributeError):
     AsyncioConnection = None
     ASYNCIO_AVAILABLE = False
 
