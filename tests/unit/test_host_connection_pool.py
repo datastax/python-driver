@@ -144,6 +144,7 @@ class _PoolTests(unittest.TestCase):
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
         session.cluster.signal_connection_failure.return_value = False
+        host.signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
@@ -165,16 +166,18 @@ class _PoolTests(unittest.TestCase):
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
         session.cluster.signal_connection_failure.return_value = True
+        host.signal_connection_failure.return_value = True
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
-        self.assertTrue(session.cluster.signal_connection_failure.call_args)
         self.assertTrue(conn.close.call_args)
         if self.PoolImpl is HostConnection:
             # on shard aware implementation we use submit function regardless
+            self.assertTrue(host.signal_connection_failure.call_args)
             self.assertTrue(session.submit.called)
         else:
             self.assertFalse(session.submit.called)
+            self.assertTrue(session.cluster.signal_connection_failure.call_args)
         self.assertTrue(pool.is_shutdown)
 
     def test_return_closed_connection(self):
@@ -190,6 +193,7 @@ class _PoolTests(unittest.TestCase):
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True
         session.cluster.signal_connection_failure.return_value = False
+        host.signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # a new creation should be scheduled
