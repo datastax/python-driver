@@ -19,8 +19,8 @@ cdef extern from *:
 
 cdef class ShardingInfo():
     cdef readonly int shards_count
-    cdef readonly str partitioner
-    cdef readonly str sharding_algorithm
+    cdef readonly unicode partitioner
+    cdef readonly unicode sharding_algorithm
     cdef readonly int sharding_ignore_msb
     cdef readonly int shard_aware_port
     cdef readonly int shard_aware_port_ssl

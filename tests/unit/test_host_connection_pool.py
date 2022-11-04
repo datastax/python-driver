@@ -283,7 +283,7 @@ class HostConnectionTests(_PoolTests):
             keyspace = "reprospace"
 
             def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
+                super(MockSession, self).__init__(*args, **kwargs)
                 self.cluster = MagicMock()
                 self.cluster.executor = ThreadPoolExecutor(max_workers=2, initializer=self.executor_init)
                 self.cluster.signal_connection_failure = lambda *args, **kwargs: False

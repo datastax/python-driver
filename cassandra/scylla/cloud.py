@@ -52,12 +52,14 @@ def nth(iterable, n, default=None):
 
 
 class CloudConfiguration:
-    endpoint_factory: SniEndPointFactory
-    contact_points: list
-    auth_provider: AuthProvider = None
-    ssl_options: dict
-    ssl_context: SSLContext
-    skip_tls_verify: bool
+    # Commented out because this syntax doesn't work with Python2
+    # Can be restores after dropping support for Python2
+    # endpoint_factory: SniEndPointFactory
+    # contact_points: list
+    # auth_provider: AuthProvider = None
+    # ssl_options: dict
+    # ssl_context: SSLContext
+    # skip_tls_verify: bool
 
     def __init__(self, configuration_file, pyopenssl=False, endpoint_factory=None):
         cloud_config = yaml.safe_load(open(configuration_file))

@@ -18,8 +18,8 @@ except ImportError:
     import unittest  # noqa
 
 import logging
-from unittest.mock import MagicMock
-from futures.thread import ThreadPoolExecutor
+from mock import MagicMock
+from concurrent.futures import ThreadPoolExecutor
 
 from cassandra.cluster import ShardAwareOptions
 from cassandra.pool import HostConnection, HostDistance
@@ -62,7 +62,7 @@ class TestShardAware(unittest.TestCase):
             keyspace = "ks1"
 
             def __init__(self, is_ssl=False, *args, **kwargs):
-                super().__init__(*args, **kwargs)
+                super(MockSession, self).__init__(*args, **kwargs)
                 self.cluster = MagicMock()
                 if is_ssl:
                     self.cluster.ssl_options = {'some_ssl_options': True}

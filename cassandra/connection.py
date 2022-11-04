@@ -903,7 +903,7 @@ class Connection(object):
                     break
                 except Exception as ex:
                     log.debug("port=%d couldn't bind cause: %s", port, str(ex))
-            log.debug(f'connection (%r) port=%d should be shard_id=%d', id(self), port, port % self.total_shards)
+            log.debug('connection (%r) port=%d should be shard_id=%d', id(self), port, port % self.total_shards)
 
         self._socket.connect(sockaddr)
 
