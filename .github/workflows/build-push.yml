@@ -7,7 +7,7 @@ env:
  CIBW_TEST_COMMAND_LINUX: "pytest --import-mode append {project}/tests/unit -k 'not (test_connection_initialization or test_cloud)' && EVENT_LOOP_MANAGER=gevent pytest --import-mode append {project}/tests/unit/io/test_geventreactor.py && EVENT_LOOP_MANAGER=eventlet pytest --import-mode append {project}/tests/unit/io/test_eventletreactor.py "
  CIBW_TEST_COMMAND_MACOS: "pytest --import-mode append {project}/tests/unit -k 'not (test_multi_timer_validation or test_empty_connections or test_connection_initialization or test_timer_cancellation or test_cloud)' "
  CIBW_TEST_COMMAND_WINDOWS: "pytest --import-mode append {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor or test_connection_initialization or test_cloud)\" "
- CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt pytest"
+ CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
  CIBW_SKIP: cp35* cp36* *musllinux*
