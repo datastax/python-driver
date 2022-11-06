@@ -1,0 +1,59 @@
+name: Build and test python2
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test on python2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        name: Install Python2.7
+        with:
+          python-version: '2.7'
+      - name: Run unittests
+        run: |-
+          pip install -r ./test-requirements.txt
+          pytest --import-mode append ./tests/unit -k 'not (test_connection_initialization or test_cloud)'
+          EVENT_LOOP_MANAGER=gevent pytest --import-mode append ./tests/unit/io/test_geventreactor.py
+          EVENT_LOOP_MANAGER=eventlet pytest --import-mode append ./tests/unit/io/test_eventletreactor.py
+
+  build:
+    name: Build source/wheel distribution for python2
+    if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        name: Install Python2.7
+        with:
+          python-version: '2.7'
+
+      - name: Build sdist
+        run: python setup.py sdist
+
+      - uses: actions/upload-artifact@v2
+        with:
+          path: dist/*.tar.gz
+
+  upload_pypi:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    # upload to PyPI on every tag starting with 'v'
+    if: github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
+    # alternatively, to publish when a GitHub Release is created, use the following rule:
+    # if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: artifact
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
