@@ -15,7 +15,7 @@ env:
 jobs:
   build_wheels:
     name: Build wheels ${{ matrix.os }} (${{ matrix.platform }})
-    if: contains(github.event.pull_request.labels.*.name, 'test-build') || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
+    if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build')) || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -121,7 +121,7 @@ jobs:
 
   build_sdist:
     name: Build source distribution
-    if: contains(github.event.pull_request.labels.*.name, 'test-build') || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
+    if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

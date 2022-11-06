@@ -9,7 +9,7 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-20.04
-    if: contains(github.event.pull_request.labels.*.name, 'integration-tests')
+    if: "!contains(github.event.pull_request.labels.*.name, 'disable-integration-tests')"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
