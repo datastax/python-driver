@@ -1295,7 +1295,7 @@ class HostFilterPolicyInitTest(unittest.TestCase):
         ))
 
     def test_immutable_predicate(self):
-        expected_message_regex = "can't set attribute"
+        expected_message_regex = "can't set attribute|object has no setter"
         hfp = HostFilterPolicy(child_policy=Mock(name='child_policy'),
                                predicate=Mock(name='predicate'))
         with self.assertRaisesRegexp(AttributeError, expected_message_regex):
