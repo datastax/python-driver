@@ -83,13 +83,12 @@ class CloudConfiguration:
         if username and password:
             self.auth_provider = PlainTextAuthProvider(username, password)
 
-
     @property
     def contact_points(self):
         _contact_points = []
         for data_center in self.data_centers.values():
-            address, _, _ = self.get_server(data_center)
-            _contact_points.append(self.endpoint_factory.create_from_sni(address))
+            _, _, node_domain = self.get_server(data_center)
+            _contact_points.append(self.endpoint_factory.create_from_sni(node_domain))
         return _contact_points
 
     def get_server(self, data_center):

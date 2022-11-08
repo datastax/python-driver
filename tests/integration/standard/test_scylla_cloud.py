@@ -5,7 +5,6 @@ from ccmlib.utils.sni_proxy import refresh_certs, get_cluster_info, start_sni_pr
 
 from tests.integration import use_cluster
 from cassandra.cluster import Cluster, TwistedConnection
-from cassandra.connection import SniEndPointFactory
 from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.io.libevreactor import LibevConnection
 from cassandra.io.geventreactor import GeventConnection
@@ -45,21 +44,17 @@ class ScyllaCloudConfigTests(TestCase):
         ccm_cluster.sni_proxy_listen_port = listen_port
         ccm_cluster._update_config()
 
-        config_data_yaml, config_path_yaml = create_cloud_config(ccm_cluster.get_path(), listen_port)
-
-        endpoint_factory = SniEndPointFactory(listen_address, port=int(listen_port),
-                                              node_domain="cluster-id.scylla.com")
-
-        return config_data_yaml, config_path_yaml, endpoint_factory
+        config_data_yaml, config_path_yaml = create_cloud_config(ccm_cluster.get_path(),
+                                                                 port=listen_port, address=listen_address)
+        return config_data_yaml, config_path_yaml
 
     def test_1_node_cluster(self):
         self.ccm_cluster = use_cluster("sni_proxy", [1], start=False)
-        config_data_yaml, config_path_yaml, endpoint_factory = self.start_cluster_with_proxy()
+        config_data_yaml, config_path_yaml = self.start_cluster_with_proxy()
 
         for config in [config_path_yaml, config_data_yaml]:
             for connection_class in supported_connection_classes:
-                cluster = Cluster(scylla_cloud=config, connection_class=connection_class,
-                                  endpoint_factory=endpoint_factory)
+                cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
                 with cluster.connect() as session:
                     res = session.execute("SELECT * FROM system.local")
                     assert res.all()
@@ -69,12 +64,11 @@ class ScyllaCloudConfigTests(TestCase):
 
     def test_3_node_cluster(self):
         self.ccm_cluster = use_cluster("sni_proxy", [3], start=False)
-        config_data_yaml, config_path_yaml, endpoint_factory = self.start_cluster_with_proxy()
+        config_data_yaml, config_path_yaml = self.start_cluster_with_proxy()
 
         for config in [config_path_yaml, config_data_yaml]:
             for connection_class in supported_connection_classes:
-                cluster = Cluster(scylla_cloud=config, connection_class=connection_class,
-                                  endpoint_factory=endpoint_factory)
+                cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
                 with cluster.connect() as session:
                     res = session.execute("SELECT * FROM system.local")
                     assert res.all()
