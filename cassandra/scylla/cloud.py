@@ -68,7 +68,7 @@ class CloudConfiguration:
         self.data_centers = cloud_config['datacenters']
         self.auth_info = cloud_config['authInfos'][self.current_context['authInfoName']]
         self.ssl_options = {}
-        self.skip_tls_verify = self.auth_info.get('insecureSkipTLSVerify', False)
+        self.skip_tls_verify = self.auth_info.get('insecureSkipTlsVerify', False)
         self.ssl_context = self.create_pyopenssl_context() if pyopenssl else self.create_ssl_context()
 
         proxy_address, port, node_domain = self.get_server(self.data_centers[self.current_context['datacenterName']])
