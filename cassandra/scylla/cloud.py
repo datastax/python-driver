@@ -94,7 +94,7 @@ class CloudConfiguration:
     def get_server(self, data_center):
         address = data_center.get('server')
         address = address.split(":")
-        port = nth(address, 1, default=443)
+        port = nth(address, 1, default=9142)
         address = nth(address, 0)
         node_domain = data_center.get('nodeDomain')
         assert address and port and node_domain, "server or nodeDomain are missing"
