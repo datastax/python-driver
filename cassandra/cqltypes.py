@@ -444,7 +444,7 @@ class DecimalType(_CassandraType):
 
     @staticmethod
     def serialize(dec, protocol_version):
-        if (dec.is_nan()):
+        if (Decimal(dec).is_nan()):
             raise Exception("NaN is not a valid Decimal value")
         try:
             sign, digits, exponent = dec.as_tuple()
