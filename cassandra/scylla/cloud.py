@@ -34,7 +34,7 @@ def file_or_memory(path=None, data=None):
     # so we use temporary file to load the key
     if data:
         with tempfile.NamedTemporaryFile(mode="wb") as f:
-            d = base64.decodebytes(bytes(data, encoding='utf-8'))
+            d = base64.b64decode(data)
             f.write(d)
             if not d.endswith(b"\n"):
                 f.write(b"\n")
@@ -102,11 +102,11 @@ class CloudConfiguration:
 
     def create_ssl_context(self):
         ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_SSLv23)
-        ssl_context.verify_mode = ssl.VerifyMode.CERT_NONE if self.skip_tls_verify else ssl.VerifyMode.CERT_REQUIRED
+        ssl_context.verify_mode = ssl.CERT_NONE if self.skip_tls_verify else ssl.CERT_REQUIRED
         for data_center in self.data_centers.values():
             with file_or_memory(path=data_center.get('certificateAuthorityPath'),
                                 data=data_center.get('certificateAuthorityData')) as cafile:
-                ssl_context.load_verify_locations(cadata=open(cafile).read())
+                ssl_context.load_verify_locations(cadata=six.text_type(open(cafile).read()))
         with file_or_memory(path=self.auth_info.get('clientCertificatePath'),
                             data=self.auth_info.get('clientCertificateData')) as certfile, \
                 file_or_memory(path=self.auth_info.get('clientKeyPath'), data=self.auth_info.get('clientKeyData')) as keyfile:
