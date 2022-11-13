@@ -1052,13 +1052,38 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
     def test_metadata_pagination(self):
         self.cluster.refresh_schema_metadata()
-        for i in range(10):
+        for i in range(12):
             self.session.execute("CREATE TABLE %s.%s_%d (a int PRIMARY KEY, b map<text, text>)"
                                  % (self.keyspace_name, self.function_table_name, i))
 
         self.cluster.schema_metadata_page_size = 5
         self.cluster.refresh_schema_metadata()
-        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].tables), 10)
+        self.assertEqual(len(self.cluster.metadata.keyspaces[self.keyspace_name].tables), 12)
+
+    def test_metadata_pagination_keyspaces(self):
+        """
+        test for covering
+        https://github.com/scylladb/python-driver/issues/174
+        """
+        
+        self.cluster.refresh_schema_metadata()
+        keyspaces = [f"keyspace{idx}" for idx in range(15)]
+
+        for ks in keyspaces:
+            self.session.execute(
+                f"CREATE KEYSPACE IF NOT EXISTS {ks} WITH REPLICATION = {{ 'class' : 'SimpleStrategy', 'replication_factor' : 3 }}"
+            )
+
+        self.cluster.schema_metadata_page_size = 2000
+        self.cluster.refresh_schema_metadata()
+        before_ks_num = len(self.cluster.metadata.keyspaces)
+
+        self.cluster.schema_metadata_page_size = 10
+        self.cluster.refresh_schema_metadata()
+
+        after_ks_num = len(self.cluster.metadata.keyspaces)
+
+        self.assertEqual(before_ks_num, after_ks_num)
 
 
 class TestCodeCoverage(unittest.TestCase):

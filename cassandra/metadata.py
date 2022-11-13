@@ -1982,6 +1982,8 @@ class _SchemaParser(object):
                         elif not next_success:
                             raise next_result
                         if not next_result.paging_state:
+                            if next_result.parsed_rows:
+                                yield next_result.parsed_rows
                             break
                         yield next_result.parsed_rows
 
