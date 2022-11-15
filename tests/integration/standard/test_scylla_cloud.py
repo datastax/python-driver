@@ -1,3 +1,4 @@
+import logging
 import os.path
 from unittest import TestCase
 from ccmlib.utils.ssl_utils import generate_ssl_stores
@@ -54,6 +55,7 @@ class ScyllaCloudConfigTests(TestCase):
 
         for config in [config_path_yaml, config_data_yaml]:
             for connection_class in supported_connection_classes:
+                logging.warning('testing with class: %s', connection_class.__name__)
                 cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
                 with cluster.connect() as session:
                     res = session.execute("SELECT * FROM system.local")
@@ -68,6 +70,7 @@ class ScyllaCloudConfigTests(TestCase):
 
         for config in [config_path_yaml, config_data_yaml]:
             for connection_class in supported_connection_classes:
+                logging.warning('testing with class: %s', connection_class.__name__)
                 cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
                 with cluster.connect() as session:
                     res = session.execute("SELECT * FROM system.local")
