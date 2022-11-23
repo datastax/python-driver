@@ -1163,7 +1163,9 @@ class Cluster(object):
             if contact_points is not _NOT_SET or ssl_context or ssl_options:
                 raise ValueError("contact_points, ssl_context, and ssl_options "
                                  "cannot be specified with a scylla cloud configuration")
-
+            if shard_aware_options and not shard_aware_options.disable_shardaware_port:
+                raise ValueError("shard_aware_options.disable_shardaware_port=False "
+                                 "cannot be specified with a scylla cloud configuration")
             uses_twisted = TwistedConnection and issubclass(self.connection_class, TwistedConnection)
             uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
 
@@ -1174,6 +1176,7 @@ class Cluster(object):
             contact_points = scylla_cloud_config.contact_points
             ssl_options = scylla_cloud_config.ssl_options
             auth_provider = scylla_cloud_config.auth_provider
+            shard_aware_options = ShardAwareOptions(shard_aware_options, disable_shardaware_port=True)
 
         if cloud is not None:
             self.cloud = cloud
