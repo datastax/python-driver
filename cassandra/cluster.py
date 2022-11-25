@@ -3837,9 +3837,14 @@ class ControlConnection(object):
                 datacenter = local_row.get("data_center")
                 rack = local_row.get("rack")
                 self._update_location_info(host, datacenter, rack)
-                new_endpoint = self._cluster.endpoint_factory.create(local_row)
-                if new_endpoint.address:
-                    host.endpoint = new_endpoint
+
+                # support the use case of connecting only with public address
+                if isinstance(self._cluster.endpoint_factory, SniEndPointFactory):
+                    new_endpoint = self._cluster.endpoint_factory.create(local_row)
+
+                    if new_endpoint.address:
+                        host.endpoint = new_endpoint
+
                 host.host_id = local_row.get("host_id")
 
                 found_host_ids.add(host.host_id)
