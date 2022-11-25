@@ -66,12 +66,13 @@ class CloudConfiguration:
 
         self.current_context = cloud_config['contexts'][cloud_config['currentContext']]
         self.data_centers = cloud_config['datacenters']
+        self.current_data_center = self.data_centers[self.current_context['datacenterName']]
         self.auth_info = cloud_config['authInfos'][self.current_context['authInfoName']]
         self.ssl_options = {}
-        self.skip_tls_verify = self.auth_info.get('insecureSkipTlsVerify', False)
+        self.skip_tls_verify = self.current_data_center.get('insecureSkipTlsVerify', False)
         self.ssl_context = self.create_pyopenssl_context() if pyopenssl else self.create_ssl_context()
 
-        proxy_address, port, node_domain = self.get_server(self.data_centers[self.current_context['datacenterName']])
+        proxy_address, port, node_domain = self.get_server(self.current_data_center)
 
         if not endpoint_factory:
             endpoint_factory = SniEndPointFactory(proxy_address, port=int(port), node_domain=node_domain)
