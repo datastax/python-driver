@@ -92,14 +92,3 @@ Reporting Issues
 ----------------
 
 Please report any bugs and make any feature requests on the `Github project issues <https://github.com/scylladb/python-driver/issues>`_
-
-
-Copyright
----------
-
-© 2013-2017 DataStax
-
-© 2016, The Apache Software Foundation.
-Apache®, Apache Cassandra®, Cassandra®, the Apache feather logo and the Apache Cassandra® Eye logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries. No endorsement by The Apache Software Foundation is implied by the use of these marks.
-
-
