@@ -739,6 +739,9 @@ class HostConnection(object):
                         conn.shard_id,
                         self.host
                     )
+                if self._keyspace:
+                    conn.set_keyspace_blocking(self._keyspace)
+
                 self._connections[conn.shard_id] = conn
             if old_conn is not None:
                 remaining = old_conn.in_flight - len(old_conn.orphaned_request_ids)
@@ -763,13 +766,6 @@ class HostConnection(object):
                             old_conn.close()
                         else:
                             self._trash.add(old_conn)
-            if self._keyspace:
-                with self._lock:
-                    if self.is_shutdown:
-                        conn.close()
-                    old_conn = self._connections.get(conn.shard_id)
-                    if old_conn:
-                        old_conn.set_keyspace_blocking(self._keyspace)
             num_missing_or_needing_replacement = self.num_missing_or_needing_replacement
             log.debug(
                 "Connected to %s/%i shards on host %s (%i missing or needs replacement)",
