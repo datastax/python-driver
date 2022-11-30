@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   test:
     name: Test on python2
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
 
@@ -23,7 +23,7 @@ jobs:
   build:
     name: Build source/wheel distribution for python2
     if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
 
@@ -41,7 +41,7 @@ jobs:
 
   upload_pypi:
     needs: [build, test]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     # upload to PyPI on every tag starting with 'v'
     if: github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
     # alternatively, to publish when a GitHub Release is created, use the following rule:
