@@ -25,7 +25,7 @@ all: dirhtml
 .PHONY: setupenv
 setupenv:
 	pip install -q poetry
-	sudo apt-get install gcc python-dev libev4 libev-dev
+	sudo apt-get install gcc python3-dev libev4 libev-dev
 
 .PHONY: setup
 setup:
