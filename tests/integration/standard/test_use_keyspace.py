@@ -1,13 +1,6 @@
 import os
 import time
-import random
-from subprocess import run
 import logging
-
-try:
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-except ImportError:
-    from futures import ThreadPoolExecutor, as_completed  # noqa
 
 try:
     import unittest2 as unittest
@@ -19,18 +12,18 @@ from mock import patch
 from cassandra.connection import Connection
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, ConstantReconnectionPolicy
-from cassandra import OperationTimedOut, ConsistencyLevel
 
-from tests.integration import use_cluster, get_node, PROTOCOL_VERSION
+from tests.integration import use_cluster, PROTOCOL_VERSION, local
 
 LOGGER = logging.getLogger(__name__)
+
 
 def setup_module():
     os.environ['SCYLLA_EXT_OPTS'] = "--smp 2 --memory 2048M"
     use_cluster('shared_aware', [3], start=True)
 
 
-
+@local
 class TestUseKeyspace(unittest.TestCase):
     @classmethod
     def setup_class(cls):
@@ -40,6 +33,7 @@ class TestUseKeyspace(unittest.TestCase):
         cls.session = cls.cluster.connect()
         LOGGER.info(cls.cluster.is_shard_aware())
         LOGGER.info(cls.cluster.shard_aware_stats())
+
     @classmethod
     def teardown_class(cls):
         cls.cluster.shutdown()
@@ -57,6 +51,7 @@ class TestUseKeyspace(unittest.TestCase):
         # connections.
 
         original_set_keyspace_blocking = Connection.set_keyspace_blocking
+
         def patched_set_keyspace_blocking(*args, **kwargs):
             time.sleep(1)
             return original_set_keyspace_blocking(*args, **kwargs)
