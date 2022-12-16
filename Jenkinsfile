@@ -608,7 +608,7 @@ pipeline {
   }
 
   triggers {
-    parameterizedCron((scheduleTriggerJobName == env.JOB_NAME) ? """
+    parameterizedCron((scheduleTriggerJobName() == env.JOB_NAME) ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python v2.7.18 and v3.5.9
       H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18 3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
