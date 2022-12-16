@@ -357,26 +357,6 @@ def getDriverMetricType() {
   return metric_type
 }
 
-def submitCIMetrics(buildType) {
-  long durationMs = currentBuild.duration
-  long durationSec = durationMs / 1000
-  long nowSec = (currentBuild.startTimeInMillis + durationMs) / 1000
-  def branchNameNoPeriods = env.BRANCH_NAME.replaceAll('\\.', '_')
-  metric_type = getDriverMetricType()
-  def durationMetric = "okr.ci.python.${metric_type}.${buildType}.${branchNameNoPeriods} ${durationSec} ${nowSec}"
-
-  timeout(time: 1, unit: 'MINUTES') {
-    withCredentials([string(credentialsId: 'lab-grafana-address', variable: 'LAB_GRAFANA_ADDRESS'),
-                     string(credentialsId: 'lab-grafana-port', variable: 'LAB_GRAFANA_PORT')]) {
-      withEnv(["DURATION_METRIC=${durationMetric}"]) {
-        sh label: 'Send runtime metrics to labgrafana', script: '''#!/bin/bash -lex
-          echo "${DURATION_METRIC}" | nc -q 5 ${LAB_GRAFANA_ADDRESS} ${LAB_GRAFANA_PORT}
-        '''
-      }
-    }
-  }
-}
-
 def describeBuild(buildContext) {
   script {
     def runtimes = buildContext.matrix["RUNTIME"]
@@ -387,7 +367,9 @@ def describeBuild(buildContext) {
   }
 }
 
-def scheduleTriggerJobName = "drivers/python/oss/master/disabled"
+def scheduleTriggerJobName() {
+  "drivers/python/oss/master/disabled"
+}
 
 pipeline {
   agent none
@@ -663,8 +645,6 @@ pipeline {
             // build and test all builds
             parallel getMatrixBuilds(context)
 
-            // send the metrics
-            submitCIMetrics('commit')
             slack.notifyChannel(currentBuild.currentResult)
           }
         }
