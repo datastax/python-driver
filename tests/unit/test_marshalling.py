@@ -143,3 +143,5 @@ class UnmarshalTest(unittest.TestCase):
             for n in converted_types:
                 expected = Decimal(n)
                 self.assertEqual(DecimalType.from_binary(DecimalType.to_binary(n, proto_ver), proto_ver), expected)
+        with self.assertRaises(ValueError):
+            DecimalType.to_binary(Decimal('NaN'), proto_ver)

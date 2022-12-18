@@ -450,6 +450,8 @@ class DecimalType(_CassandraType):
             try:
                 sign, digits, exponent = Decimal(dec).as_tuple()
             except Exception:
+                if (Decimal(dec).is_nan()):
+                    raise ValueError("NaN is not a valid Cassandra Decimal value")
                 raise TypeError("Invalid type for Decimal value: %r", dec)
         unscaled = int(''.join([str(digit) for digit in digits]))
         if sign:
