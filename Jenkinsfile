@@ -413,7 +413,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'PROFILE',
-      choices: ['SMOKE', 'STANDARD', 'FULL', 'DSE-SMOKE-TEST', 'EVENT_LOOP'],
+      choices: ['STANDARD', 'FULL', 'DSE-SMOKE-TEST', 'EVENT_LOOP'],
       description: '''<p>Profile to utilize for scheduled or adhoc builds</p>
                       <table style="width:100%">
                         <col width="25%">
@@ -421,10 +421,6 @@ pipeline {
                         <tr>
                           <th align="left">Choice</th>
                           <th align="left">Description</th>
-                        </tr>
-                        <tr>
-                          <td><strong>SMOKE</strong></td>
-                          <td>Basic smoke tests for current Python runtimes + C*/DSE versions</td>
                         </tr>
                         <tr>
                           <td><strong>STANDARD</strong></td>
@@ -445,7 +441,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'MATRIX',
-      choices: ['DEFAULT', 'FULL', 'DEVELOP', 'CASSANDRA', 'DSE'],
+      choices: ['DEFAULT', 'SMOKE', 'FULL', 'DEVELOP', 'CASSANDRA', 'DSE'],
       description: '''<p>The matrix for the build.</p>
                       <table style="width:100%">
                         <col width="25%">
@@ -457,6 +453,10 @@ pipeline {
                         <tr>
                           <td><strong>DEFAULT</strong></td>
                           <td>Default to the build context.</td>
+                        </tr>
+                        <tr>
+                          <td><strong>SMOKE</strong></td>
+                          <td>Basic smoke tests for current Python runtimes + C*/DSE versions, no Cython</td>
                         </tr>
                         <tr>
                           <td><strong>FULL</strong></td>
