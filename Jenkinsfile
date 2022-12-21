@@ -50,6 +50,15 @@ matrices = [
     "SERVER": ['dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
     "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
+  ],
+  /*
+  CI-friendly test configuration.  Currently-supported Python version + modern C*/DSE instances.
+  We also avoid cython since it's tested as part of the nightlies.
+  */
+  "SMOKE": [
+    "SERVER": ['3.11', '4.0', 'dse-6.8'],
+    "RUNTIME": ['3.7.7', '3.8.3'],
+    "CYTHON": ["False"]
   ]
 ]
 
@@ -72,7 +81,7 @@ def getBuildContext() {
 
   def profile = "${params.PROFILE}"
   def EVENT_LOOP = "${params.EVENT_LOOP.toLowerCase()}"
-  matrixType = "FULL"
+  matrixType = "SMOKE"
   developBranchPattern = ~"((dev|long)-)?python-.*"
 
   if (developBranchPattern.matcher(env.BRANCH_NAME).matches()) {
@@ -404,7 +413,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'PROFILE',
-      choices: ['STANDARD', 'FULL', 'DSE-SMOKE-TEST', 'EVENT_LOOP'],
+      choices: ['SMOKE', 'STANDARD', 'FULL', 'DSE-SMOKE-TEST', 'EVENT_LOOP'],
       description: '''<p>Profile to utilize for scheduled or adhoc builds</p>
                       <table style="width:100%">
                         <col width="25%">
@@ -412,6 +421,10 @@ pipeline {
                         <tr>
                           <th align="left">Choice</th>
                           <th align="left">Description</th>
+                        </tr>
+                        <tr>
+                          <td><strong>SMOKE</strong></td>
+                          <td>Basic smoke tests for current Python runtimes + C*/DSE versions</td>
                         </tr>
                         <tr>
                           <td><strong>STANDARD</strong></td>
