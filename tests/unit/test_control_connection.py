@@ -62,6 +62,9 @@ class MockMetadata(object):
             host_id = self._host_id_by_endpoint.get(endpoint_or_address)
             return self.hosts.get(host_id)
 
+    def get_host_by_host_id(self, host_id):
+        return self.hosts.get(host_id)
+
     def all_hosts(self):
         return self.hosts.values()
 
@@ -121,7 +124,7 @@ class MockCluster(object):
     def on_up(self, host):
         pass
 
-    def on_down(self, host, is_host_addition):
+    def on_down(self, host, is_host_addition, expect_host_to_be_down=False):
         self.down_host = host
 
 
@@ -327,7 +330,7 @@ class ControlConnectionTest(unittest.TestCase):
         del self.connection.peer_results[:]
         self.connection.peer_results.extend([
             ["native_address", "native_port", "peer", "peer_port", "schema_version", "data_center", "rack", "tokens", "host_id"],
-            [["192.168.1.4", 9042, "10.0.0.1", 7042, "a", "dc1", "rack1", ["1", "101", "201"], "uuid6"],
+            [["192.168.1.4", 9042, "10.0.0.1", 7042, "a", "dc1", "rack1", ["1", "101", "201"], "uuid7"],
              # all others are invalid
              [None, 9042, None, 7040, "a", "dc1", "rack1", ["2", "102", "202"], "uuid2"],
              ["192.168.1.5", 9042, "10.0.0.2", 7040, "a", None, "rack1", ["2", "102", "202"], "uuid2"],
@@ -335,6 +338,32 @@ class ControlConnectionTest(unittest.TestCase):
              ["192.168.1.5", 9042, "10.0.0.2", 7040, "a", "dc1", "rack1", None, "uuid2"],
              ["192.168.1.5", 9042, "10.0.0.2", 7040, "a", "dc1", "rack1", ["2", "102", "202"], None]]])
         refresh_and_validate_added_hosts()
+
+    def test_change_ip(self):
+        """
+        Tests node IPs are updated while the nodes themselves are not
+        removed or added when their IPs change (the node look up is based on
+        host id).
+        """
+        del self.cluster.added_hosts[:]
+        del self.connection.peer_results[:]
+
+        self.connection.peer_results.extend([
+            ["rpc_address", "peer", "schema_version", "data_center", "rack", "tokens", "host_id"],
+            [["192.168.1.5", "10.0.0.5", "a", "dc1", "rack1", ["2", "102", "202"], 'uuid2'],
+             ["192.168.1.6", "10.0.0.6", "a", "dc1", "rack1", ["3", "103", "203"], 'uuid3']]])
+        self.connection.wait_for_responses = Mock(
+            return_value=_node_meta_results(
+                self.connection.local_results, self.connection.peer_results))
+        self.control_connection.refresh_node_list_and_token_map()
+        # all peers are updated
+        self.assertEqual(0, len(self.cluster.added_hosts))
+
+        assert self.cluster.metadata.get_host('192.168.1.5')
+        assert self.cluster.metadata.get_host('192.168.1.6')
+
+        self.assertEqual(3, len(self.cluster.metadata.all_hosts()))
+
 
     def test_refresh_nodes_and_tokens_uses_preloaded_results_if_given(self):
         """

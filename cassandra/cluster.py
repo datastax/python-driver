@@ -2114,7 +2114,7 @@ class Cluster(object):
         if self.is_shutdown:
             return
 
-        log.debug("Removing host %s", host)
+        log.debug("[cluster] Removing host %s", host)
         host.set_down()
         self.profile_manager.on_remove(host)
         for session in tuple(self.sessions):
@@ -3917,6 +3917,15 @@ class ControlConnection(object):
             host = self._cluster.metadata.get_host(endpoint)
             datacenter = row.get("data_center")
             rack = row.get("rack")
+
+            if host is None:
+                host = self._cluster.metadata.get_host_by_host_id(host_id)
+                if host and host.endpoint != endpoint:
+                    log.debug("[control connection] Updating host ip from %s to %s for (%s)", host.endpoint, endpoint, host_id)
+                    old_endpoint = host.endpoint
+                    host.endpoint = endpoint
+                    self._cluster.metadata.update_host(host, old_endpoint)
+                    self._cluster.on_down(host, is_host_addition=False, expect_host_to_be_down=True)
 
             if host is None:
                 log.debug("[control connection] Found new host to connect to: %s", endpoint)

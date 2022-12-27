@@ -365,6 +365,13 @@ class Metadata(object):
             host_id = self._host_id_by_endpoint.get(endpoint_or_address)
             return self._hosts.get(host_id)
 
+    def get_host_by_host_id(self, host_id):
+        """
+        Same as get_host() but use host_id for lookup.
+        """
+        with self._hosts_lock:
+            return self._hosts.get(host_id)
+
     def _get_host_by_address(self, address, port=None):
         for host in six.itervalues(self._hosts):
             if (host.broadcast_rpc_address == address and
