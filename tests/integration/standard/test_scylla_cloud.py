@@ -57,12 +57,15 @@ class ScyllaCloudConfigTests(TestCase):
             for connection_class in supported_connection_classes:
                 logging.warning('testing with class: %s', connection_class.__name__)
                 cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
-                with cluster.connect() as session:
-                    res = session.execute("SELECT * FROM system.local")
-                    assert res.all()
+                try:
+                    with cluster.connect() as session:
+                        res = session.execute("SELECT * FROM system.local")
+                        assert res.all()
 
-                    assert len(cluster.metadata._hosts) == 1
-                    assert len(cluster.metadata._host_id_by_endpoint) == 1
+                        assert len(cluster.metadata._hosts) == 1
+                        assert len(cluster.metadata._host_id_by_endpoint) == 1
+                finally:
+                    cluster.shutdown()
 
     def test_3_node_cluster(self):
         self.ccm_cluster = use_cluster("sni_proxy", [3], start=False)
@@ -72,8 +75,11 @@ class ScyllaCloudConfigTests(TestCase):
             for connection_class in supported_connection_classes:
                 logging.warning('testing with class: %s', connection_class.__name__)
                 cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
-                with cluster.connect() as session:
-                    res = session.execute("SELECT * FROM system.local")
-                    assert res.all()
-                    assert len(cluster.metadata._hosts) == 3
-                    assert len(cluster.metadata._host_id_by_endpoint) == 3
+                try:
+                    with cluster.connect() as session:
+                        res = session.execute("SELECT * FROM system.local")
+                        assert res.all()
+                        assert len(cluster.metadata._hosts) == 3
+                        assert len(cluster.metadata._host_id_by_endpoint) == 3
+                finally:
+                    cluster.shutdown()

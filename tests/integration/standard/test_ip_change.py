@@ -3,7 +3,7 @@ import logging
 import unittest
 
 from cassandra.cluster import ExecutionProfile
-from cassandra.policies import WhiteListRoundRobinPolicy, ConstantReconnectionPolicy
+from cassandra.policies import WhiteListRoundRobinPolicy
 
 from tests.integration import use_cluster, get_node, get_cluster, local, TestCluster
 from tests.util import wait_until_not_raised
@@ -15,12 +15,11 @@ def setup_module():
     os.environ['SCYLLA_EXT_OPTS'] = "--smp 2 --memory 2048M"
     use_cluster('test_ip_change', [3], start=True)
 
-
 @local
 class TestIpAddressChange(unittest.TestCase):
     @classmethod
     def setup_class(cls):
-        cls.cluster = TestCluster(reconnection_policy=ConstantReconnectionPolicy(1))
+        cls.cluster = TestCluster()
         cls.session = cls.cluster.connect()
 
     @classmethod
@@ -42,7 +41,7 @@ class TestIpAddressChange(unittest.TestCase):
         node3.start(wait_for_binary_proto=True)
 
         def new_address_found():
-            addresses = [host.endpoint.address for host in self.cluster.metadata.all_hosts()]
+            addresses = [str(host.endpoint.address) for host in self.cluster.metadata.all_hosts()]
             LOGGER.debug(addresses)
             assert new_ip in addresses
 
@@ -50,6 +49,11 @@ class TestIpAddressChange(unittest.TestCase):
 
         new_node_only = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy([new_ip]))
         self.cluster.add_execution_profile("new_node", new_node_only)
-        local_info = self.session.execute("SELECT * FROM system.local", execution_profile="new_node").one()
-        LOGGER.debug(local_info._asdict())
-        assert local_info.broadcast_address == new_ip
+
+        def new_node_connectable():
+            LOGGER.info(self.cluster.shard_aware_stats())
+            local_info = self.session.execute("SELECT * FROM system.local", execution_profile="new_node").one()
+            LOGGER.debug(local_info._asdict())
+            assert local_info.broadcast_address == new_ip
+
+        wait_until_not_raised(new_node_connectable, 0.5, 100)
