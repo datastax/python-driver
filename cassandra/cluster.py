@@ -3925,6 +3925,9 @@ class ControlConnection(object):
                     old_endpoint = host.endpoint
                     host.endpoint = endpoint
                     self._cluster.metadata.update_host(host, old_endpoint)
+                    reconnector = host.get_and_set_reconnection_handler(None)
+                    if reconnector:
+                        reconnector.cancel()
                     self._cluster.on_down(host, is_host_addition=False, expect_host_to_be_down=True)
 
             if host is None:
