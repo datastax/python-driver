@@ -38,22 +38,3 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           path: dist/*.tar.gz
-
-  upload_pypi:
-    needs: [build, test]
-    runs-on: ubuntu-20.04
-    # upload to PyPI on every tag starting with 'v'
-    if: github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
-    # alternatively, to publish when a GitHub Release is created, use the following rule:
-    # if: github.event_name == 'release' && github.event.action == 'published'
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: artifact
-          path: dist
-
-      - uses: pypa/gh-action-pypi-publish@master
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-
