@@ -259,7 +259,13 @@ class AsyncoreLoop(object):
                     break
             self._started = False
 
-        log.debug("Asyncore event loop ended")
+        try:
+            log.debug("Asyncore event loop ended")
+        except Exception:
+            # TODO: Remove when Python 2 support is removed
+            # PYTHON-1266. If our logger has disappeared, there's nothing we
+            # can do, so just log nothing.
+            pass            
 
     def add_timer(self, timer):
         self._timers.add_timer(timer)
