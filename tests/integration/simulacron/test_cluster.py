@@ -88,23 +88,20 @@ class DuplicateRpcTest(SimulacronCluster):
     connect = False
 
     def test_duplicate(self):
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cassandra.cluster.__name__)
-        logger.addHandler(mock_handler)
-        address_column = "native_transport_address" if DSE_VERSION and DSE_VERSION > Version("6.0") else "rpc_address"
-        rows = [
-            {"peer": "127.0.0.1", "data_center": "dc", "host_id": "dontcare1", "rack": "rack1",
-             "release_version": "3.11.4", address_column: "127.0.0.1", "schema_version": "dontcare", "tokens": "1"},
-            {"peer": "127.0.0.2", "data_center": "dc", "host_id": "dontcare2", "rack": "rack1",
-             "release_version": "3.11.4", address_column: "127.0.0.2", "schema_version": "dontcare", "tokens": "2"},
-        ]
-        prime_query(ControlConnection._SELECT_PEERS, rows=rows)
+        with MockLoggingHandler().set_module_name(cassandra.cluster.__name__) as mock_handler:
+            address_column = "native_transport_address" if DSE_VERSION and DSE_VERSION > Version("6.0") else "rpc_address"
+            rows = [
+                {"peer": "127.0.0.1", "data_center": "dc", "host_id": "dontcare1", "rack": "rack1",
+                "release_version": "3.11.4", address_column: "127.0.0.1", "schema_version": "dontcare", "tokens": "1"},
+                {"peer": "127.0.0.2", "data_center": "dc", "host_id": "dontcare2", "rack": "rack1",
+                "release_version": "3.11.4", address_column: "127.0.0.2", "schema_version": "dontcare", "tokens": "2"},
+            ]
+            prime_query(ControlConnection._SELECT_PEERS, rows=rows)
 
-        cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
-        session = cluster.connect(wait_for_all_pools=True)
+            cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
+            session = cluster.connect(wait_for_all_pools=True)
 
-        warnings = mock_handler.messages.get("warning")
-        self.assertEqual(len(warnings), 1)
-        self.assertTrue('multiple hosts with the same endpoint' in warnings[0])
-        logger.removeHandler(mock_handler)
-        cluster.shutdown()
+            warnings = mock_handler.messages.get("warning")
+            self.assertEqual(len(warnings), 1)
+            self.assertTrue('multiple hosts with the same endpoint' in warnings[0])
+            cluster.shutdown()

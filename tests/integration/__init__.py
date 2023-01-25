@@ -896,7 +896,7 @@ class MockLoggingHandler(logging.Handler):
         return self
 
     def __exit__(self, *args):
-        pass
+        self.logger.removeHandler(self)
 
 
 class BasicExistingKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):

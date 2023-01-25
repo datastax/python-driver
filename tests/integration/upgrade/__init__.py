@@ -78,6 +78,10 @@ class UpgradeBase(unittest.TestCase):
         cls.logger_handler = MockLoggingHandler()
         logger = logging.getLogger(cluster.__name__)
         logger.addHandler(cls.logger_handler)
+    
+    @classmethod
+    def tearDownClass(cls):
+        logger.removeHandler(cls.logger_handler)
 
     def _upgrade_step_setup(self):
         """

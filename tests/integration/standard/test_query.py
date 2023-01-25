@@ -508,6 +508,9 @@ class PreparedStatementArgTest(unittest.TestCase):
         self.mock_handler = MockLoggingHandler()
         logger = logging.getLogger(cluster.__name__)
         logger.addHandler(self.mock_handler)
+    
+    def tearDown(self):
+        logger.removeHandler(self.mock_handler)
 
     def test_prepare_on_all_hosts(self):
         """
@@ -1562,28 +1565,27 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
         @test_category query
         """
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cluster.__name__)
-        logger.addHandler(mock_handler)
-        get_node(1).stop(wait=True, gently=True, wait_other_notice=True)
+        with MockLoggingHandler().set_module_name(cluster.__name__) as mock_handler:
+            get_node(1).stop(wait=True, gently=True, wait_other_notice=True)
 
-        only_first = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(["127.0.0.1"]))
-        self.cluster.add_execution_profile("only_first", only_first)
+            only_first = ExecutionProfile(load_balancing_policy=WhiteListRoundRobinPolicy(["127.0.0.1"]))
+            self.cluster.add_execution_profile("only_first", only_first)
 
-        query = "SELECT v from {} WHERE k = ?".format(self.table_name)
-        prepared_statement = self.session.prepare(query, keyspace=self.ks_name)
-        prepared_statement_alternative = self.session.prepare(query, keyspace=self.alternative_ks)
+            query = "SELECT v from {} WHERE k = ?".format(self.table_name)
+            prepared_statement = self.session.prepare(query, keyspace=self.ks_name)
+            prepared_statement_alternative = self.session.prepare(query, keyspace=self.alternative_ks)
 
-        get_node(1).start(wait_for_binary_proto=True, wait_other_notice=True)
+            get_node(1).start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        # We wait for cluster._prepare_all_queries to be called
-        time.sleep(5)
-        self.assertEqual(1, mock_handler.get_message_count('debug', 'Preparing all known prepared statements'))
-        results = self.session.execute(prepared_statement, (1,), execution_profile="only_first")
-        self.assertEqual(results[0], (1, ))
+            # We wait for cluster._prepare_all_queries to be called
+            time.sleep(5)
+            self.assertEqual(1, mock_handler.get_message_count('debug', 'Preparing all known prepared statements'))
+            
+            results = self.session.execute(prepared_statement, (1,), execution_profile="only_first")
+            self.assertEqual(results[0], (1, ))
 
-        results = self.session.execute(prepared_statement_alternative, (2,), execution_profile="only_first")
-        self.assertEqual(results[0], (2, ))
+            results = self.session.execute(prepared_statement_alternative, (2,), execution_profile="only_first")
+            self.assertEqual(results[0], (2, ))
 
     def test_prepared_not_found(self):
         """

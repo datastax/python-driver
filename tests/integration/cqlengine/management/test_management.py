@@ -360,18 +360,15 @@ class InconsistentTable(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(management.__name__)
-        logger.addHandler(mock_handler)
-        sync_table(BaseInconsistent)
-        sync_table(ChangedInconsistent)
-        self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
-        if CASSANDRA_VERSION >= Version('2.1'):
-            sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
-            mock_handler.reset()
-            sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)
-            self.assertTrue('differing from the model user type' in mock_handler.messages.get('warning')[0])
-        logger.removeHandler(mock_handler)
+        with MockLoggingHandler().set_module_name(management.__name__) as mock_handler:
+            sync_table(BaseInconsistent)
+            sync_table(ChangedInconsistent)
+            self.assertTrue('differing from the model type' in mock_handler.messages.get('warning')[0])
+            if CASSANDRA_VERSION >= Version('2.1'):
+                sync_type(DEFAULT_KEYSPACE, BaseInconsistentType)
+                mock_handler.reset()
+                sync_type(DEFAULT_KEYSPACE, ChangedInconsistentType)
+                self.assertTrue('differing from the model user type' in mock_handler.messages.get('warning')[0])
 
 
 class TestIndexSetModel(Model):
