@@ -18,6 +18,7 @@ docs/poetry.lock
 tests/integration/ccm
 setuptools*.tar.gz
 setuptools*.egg
+venv/
 
 cassandra/*.c
 !cassandra/cmurmur3.c
