@@ -29,6 +29,7 @@ import json
 import logging
 from warnings import warn
 from random import random
+import re
 import six
 from six.moves import filter, range, queue as Queue
 import socket
@@ -5349,6 +5350,8 @@ class ResultSet(object):
         except AttributeError:
             raise DriverException("Attempted to cancel paging with no active session. This is only for requests with ContinuousdPagingOptions.")
 
+    batch_regex = re.compile('^\s*BEGIN\s+[a-zA-Z]*\s*BATCH')
+
     @property
     def was_applied(self):
         """
@@ -5363,7 +5366,8 @@ class ResultSet(object):
         if self.response_future.row_factory not in (named_tuple_factory, dict_factory, tuple_factory):
             raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factory,))
 
-        is_batch_statement = isinstance(self.response_future.query, BatchStatement)
+        is_batch_statement = isinstance(self.response_future.query, BatchStatement) \
+                            or (isinstance(self.response_future.query, SimpleStatement) and self.batch_regex.match(self.response_future.query.query_string))
         if is_batch_statement and (not self.column_names or self.column_names[0] != "[applied]"):
             raise RuntimeError("No LWT were present in the BatchStatement")
 
