@@ -483,9 +483,17 @@ def _update_options(model, connection=None):
         else:
             try:
                 for k, v in value.items():
-                    if existing_value[k] != v:
-                        update_options[name] = value
-                        break
+                    # When creating table with compaction 'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy' in Scylla,
+                    # it will be silently changed to 'class': 'LeveledCompactionStrategy' - same for at least SizeTieredCompactionStrategy,
+                    # probably others too. We need to handle this case here.
+                    if k == 'class' and name == 'compaction':
+                        if existing_value[k] != v and existing_value[k] != v.split('.')[-1]:
+                            update_options[name] = value
+                            break
+                    else:
+                        if existing_value[k] != v:
+                            update_options[name] = value
+                            break
             except KeyError:
                 update_options[name] = value
 
