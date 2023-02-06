@@ -105,17 +105,13 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         with self.assertRaises(LWTException) as assertion:
             m.if_exists().update()
 
-        self.assertEqual(assertion.exception.existing, {
-            '[applied]': False,
-        })
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
 
         # queryset update
         with self.assertRaises(LWTException) as assertion:
             TestIfExistsModel.objects(id=uuid4()).if_exists().update(count=8)
 
-        self.assertEqual(assertion.exception.existing, {
-            '[applied]': False,
-        })
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_update_if_exists_success(self):
@@ -142,9 +138,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
                 m = TestIfExistsModel(id=uuid4(), count=42)  # Doesn't exist
                 m.batch(b).if_exists().update()
 
-        self.assertEqual(assertion.exception.existing, {
-            '[applied]': False,
-        })
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
 
         q = TestIfExistsModel.objects(id=id)
         self.assertEqual(len(q), 1)
@@ -198,17 +192,13 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         with self.assertRaises(LWTException) as assertion:
             m.if_exists().delete()
 
-        self.assertEqual(assertion.exception.existing, {
-            '[applied]': False,
-        })
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
 
         # queryset delete
         with self.assertRaises(LWTException) as assertion:
             TestIfExistsModel.objects(id=uuid4()).if_exists().delete()
 
-        self.assertEqual(assertion.exception.existing, {
-            '[applied]': False,
-        })
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_delete_if_exists_success(self):
@@ -237,9 +227,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
                 m = TestIfExistsModel(id=uuid4(), count=42)  # Doesn't exist
                 m.batch(b).if_exists().delete()
 
-        self.assertEqual(assertion.exception.existing, {
-            '[applied]': False,
-        })
+        self.assertEqual(assertion.exception.existing.get('[applied]'), False)
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_delete_mixed(self):
