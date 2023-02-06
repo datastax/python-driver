@@ -39,7 +39,7 @@ from cassandra.cqlengine import operators
 from cassandra.util import uuid_from_time
 from cassandra.cqlengine.connection import get_session
 from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21, \
-    greaterthanorequalcass30, TestCluster
+    greaterthanorequalcass30, TestCluster, requirescollectionindexes
 from tests.integration.cqlengine import execute_count, DEFAULT_KEYSPACE
 
 
@@ -384,7 +384,7 @@ class BaseQuerySetUsage(BaseCassEngTestCase):
         drop_table(CustomIndexedTestModel)
         drop_table(TestMultiClusteringModel)
 
-
+@requirescollectionindexes
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
     @execute_count(2)
@@ -558,7 +558,7 @@ def test_non_quality_filtering():
     num = qa.count()
     assert num == 1, num
 
-
+@requirescollectionindexes
 class TestQuerySetDistinct(BaseQuerySetUsage):
 
     @execute_count(1)
@@ -597,6 +597,7 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
         self.assertEqual(q.count(), 2)
 
 
+@requirescollectionindexes
 class TestQuerySetOrdering(BaseQuerySetUsage):
     @execute_count(2)
     def test_order_by_success_case(self):
@@ -645,6 +646,7 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
         assert [r.three for r in results] == [1, 2, 3, 4, 5]
 
 
+@requirescollectionindexes
 class TestQuerySetSlicing(BaseQuerySetUsage):
 
     @execute_count(1)
@@ -699,6 +701,7 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
             self.assertEqual(model.attempt_id, expect)
 
 
+@requirescollectionindexes
 class TestQuerySetValidation(BaseQuerySetUsage):
 
     def test_primary_key_or_index_must_be_specified(self):
@@ -780,6 +783,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         list(CustomIndexedTestModel.objects.filter(test_id=1, description='test'))
 
 
+@requirescollectionindexes
 class TestQuerySetDelete(BaseQuerySetUsage):
 
     @execute_count(9)
@@ -938,6 +942,7 @@ class TestMinMaxTimeUUIDFunctions(BaseCassEngTestCase):
         assert '4' in datas
 
 
+@requirescollectionindexes
 class TestInOperator(BaseQuerySetUsage):
     @execute_count(1)
     def test_kwarg_success_case(self):
@@ -998,6 +1003,7 @@ class TestInOperator(BaseQuerySetUsage):
 
 
 @greaterthancass20
+@requirescollectionindexes
 class TestContainsOperator(BaseQuerySetUsage):
 
     @execute_count(6)
@@ -1063,6 +1069,7 @@ class TestContainsOperator(BaseQuerySetUsage):
             self.assertEqual(q.count(), 0)
 
 
+@requirescollectionindexes
 class TestValuesList(BaseQuerySetUsage):
 
     @execute_count(2)
@@ -1075,6 +1082,7 @@ class TestValuesList(BaseQuerySetUsage):
         assert item == 10
 
 
+@requirescollectionindexes
 class TestObjectsProperty(BaseQuerySetUsage):
     @execute_count(1)
     def test_objects_property_returns_fresh_queryset(self):
@@ -1105,6 +1113,7 @@ class PageQueryTests(BaseCassEngTestCase):
         assert len(results) == 2
 
 
+@requirescollectionindexes
 class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
     def test_default_timeout(self):
         with mock.patch.object(Session, 'execute') as mock_execute:
@@ -1122,6 +1131,7 @@ class ModelQuerySetTimeoutTestCase(BaseQuerySetUsage):
             self.assertEqual(mock_execute.call_args[-1]['timeout'], None)
 
 
+@requirescollectionindexes
 class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
     def setUp(self):
         self.model = TestModel(test_id=1, attempt_id=1, description='timeout test')

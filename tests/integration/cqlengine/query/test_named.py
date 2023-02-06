@@ -27,7 +27,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
 
-from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthanorequalcass30
+from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthanorequalcass30, requirescollectionindexes
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -118,7 +118,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         self.assertIsInstance(where.operator, GreaterThanOrEqualOperator)
         self.assertEqual(where.value, 1)
 
-
+@requirescollectionindexes
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
 
     @classmethod
