@@ -118,8 +118,16 @@ class OptionsTest(BaseCassEngTestCase):
                 for subname, subvalue in value.items():
                     attr = "'%s': '%s'" % (subname, subvalue)
                     found_at = cql.find(attr, start)
-                    self.assertTrue(found_at > start)
-                    self.assertTrue(found_at < end)
+                    # When creating table with compaction 'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy' in Scylla,
+                    # it will be silently changed to 'class': 'LeveledCompactionStrategy' - same for at least SizeTieredCompactionStrategy,
+                    # probably others too. We need to handle this case here.
+                    if found_at == -1 and name == 'compaction' and subname == 'class':
+                        attr = "'%s': '%s'" % (subname, subvalue.split('.')[-1])
+                        found_at = cql.find(attr, start)
+                    else:
+                        
+                        self.assertTrue(found_at > start)
+                        self.assertTrue(found_at < end)
 
     def test_all_size_tiered_options(self):
         class AllSizeTieredOptionsModel(Model):

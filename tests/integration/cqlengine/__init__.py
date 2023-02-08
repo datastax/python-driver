@@ -13,34 +13,18 @@
 # limitations under the License.
 
 import os
-import warnings
 import unittest
 from cassandra import ConsistencyLevel
 
 from cassandra.cqlengine import connection
-from cassandra.cqlengine.management import create_keyspace_simple, drop_keyspace, CQLENG_ALLOW_SCHEMA_MANAGEMENT
 import cassandra
 
-from tests.integration import get_server_versions, use_single_node, PROTOCOL_VERSION, CASSANDRA_IP, ALLOW_BETA_PROTOCOL
+from tests.integration import get_server_versions, PROTOCOL_VERSION, CASSANDRA_IP, ALLOW_BETA_PROTOCOL
 
 DEFAULT_KEYSPACE = 'cqlengine_test'
 
 
 CQL_SKIP_EXECUTE = bool(os.getenv('CQL_SKIP_EXECUTE', False))
-
-
-def setup_package():
-    warnings.simplefilter('always')  # for testing warnings, make sure all are let through
-    os.environ[CQLENG_ALLOW_SCHEMA_MANAGEMENT] = '1'
-
-    use_single_node()
-
-    setup_connection(DEFAULT_KEYSPACE)
-    create_keyspace_simple(DEFAULT_KEYSPACE, 1)
-
-
-def teardown_package():
-    connection.unregister_connection("default")
 
 def is_prepend_reversed():
     # do we have https://issues.apache.org/jira/browse/CASSANDRA-8733 ?

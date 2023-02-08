@@ -26,7 +26,7 @@ from cassandra.cqlengine.columns import Column
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
-from tests.integration import greaterthanorequalcass3_10, TestCluster
+from tests.integration import greaterthanorequalcass3_10, requirescustomindexes, TestCluster
 
 from cassandra.cqlengine.connection import execute
 
@@ -102,6 +102,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         self.assertEqual(TestQueryUpdateModel.objects.count(), 0)
 
     @greaterthanorequalcass3_10
+    @requirescustomindexes
     def test_like_operator(self):
         """
         Test to verify the like operator works appropriately
