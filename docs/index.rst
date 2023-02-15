@@ -51,7 +51,10 @@ Contents
     Some discussion on the driver's approach to working with timestamp, date, time types
 
 :doc:`scylla_cloud`
-    Connect to Scylla Cloud
+    Connect to ScyllaDB Cloud
+
+:doc:`scylla_cloud_serverless`
+    Connect to ScyllaDB Cloud Serverless
 
 :doc:`CHANGELOG`
     Log of changes to the driver, organized by version.
@@ -79,6 +82,7 @@ Contents
    object_mapper
    dates_and_times
    scylla_cloud
+   scylla_cloud_serverless
    faq
 
 Getting Help

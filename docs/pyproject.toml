@@ -5,6 +5,7 @@ description = "ScyllaDB Python Driver Docs"
 authors = ["Python Driver Contributors"]
 
 [tool.poetry.dependencies]
+dnspython = "2.2.1"
 eventlet = "0.25.2"
 futures = "2.2.0"
 geomet = "0.1.2"
