@@ -67,9 +67,9 @@ def initializeSlackContext() {
   */
 
   def driver_display_name = 'Cassandra Python Driver'
-  if (env.GIT_URL.contains('riptano/python-driver')) {
+  if (GIT_URL.contains('riptano/python-driver')) {
     driver_display_name = 'private ' + driver_display_name
-  } else if (env.GIT_URL.contains('python-dse-driver')) {
+  } else if (GIT_URL.contains('python-dse-driver')) {
     driver_display_name = 'DSE Python Driver'
   }
   env.DRIVER_DISPLAY_NAME = driver_display_name
@@ -156,7 +156,6 @@ def getMatrixBuilds(buildContext) {
           def cythonDesc = cythonFlag == "True" ? ", Cython": ""
           tasks["${serverVersion}, py${runtimeVersion}${cythonDesc}"] = {
             node("${OS_VERSION}") {
-              checkout scm
 
               initializeSlackContext()
 
