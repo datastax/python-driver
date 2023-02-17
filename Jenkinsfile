@@ -156,6 +156,7 @@ def getMatrixBuilds(buildContext) {
           def cythonDesc = cythonFlag == "True" ? ", Cython": ""
           tasks["${serverVersion}, py${runtimeVersion}${cythonDesc}"] = {
             node("${OS_VERSION}") {
+              checkout scm
 
               initializeSlackContext()
 
