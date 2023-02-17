@@ -35,12 +35,12 @@ slack = new Slack()
 // We also avoid cython since it's tested as part of the nightlies.
 matrices = [
   "FULL": [
-    "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0', 'dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
+    "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0', 'dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30'],
     "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
   ],
   "DEVELOP": [
-    "SERVER": ['2.1', '3.11', 'dse-6.8'],
+    "SERVER": ['2.1', '3.11', 'dse-6.8.30'],
     "RUNTIME": ['2.7.18', '3.6.10'],
     "CYTHON": ["True", "False"]
   ],
@@ -50,12 +50,12 @@ matrices = [
     "CYTHON": ["True", "False"]
   ],
   "DSE": [
-    "SERVER": ['dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
+    "SERVER": ['dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30'],
     "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
   ],
   "SMOKE": [
-    "SERVER": ['3.11', '4.0', 'dse-6.8'],
+    "SERVER": ['3.11', '4.0', 'dse-6.8.30'],
     "RUNTIME": ['3.7.7', '3.8.3'],
     "CYTHON": ["False"]
   ]
@@ -214,6 +214,21 @@ def initializeEnvironment() {
   sh label: 'Download Apache CassandraⓇ or DataStax Enterprise', script: '''#!/bin/bash -lex
     . ${CCM_ENVIRONMENT_SHELL} ${CASSANDRA_VERSION}
   '''
+
+  if (env.CASSANDRA_VERSION.split('-')[0] == 'dse') {
+    env.DSE_FIXED_VERSION = env.CASSANDRA_VERSION.split('-')[1]
+    sh label: 'Update environment for DataStax Enterprise', script: '''#!/bin/bash -le
+        cat >> ${HOME}/environment.txt << ENVIRONMENT_EOF
+CCM_CASSANDRA_VERSION=${DSE_FIXED_VERSION} # maintain for backwards compatibility
+CCM_VERSION=${DSE_FIXED_VERSION}
+CCM_SERVER_TYPE=dse
+DSE_VERSION=${DSE_FIXED_VERSION}
+CCM_IS_DSE=true
+CCM_BRANCH=${DSE_FIXED_VERSION}
+DSE_BRANCH=${DSE_FIXED_VERSION}
+ENVIRONMENT_EOF
+      '''
+  }
 
   sh label: 'Display Python and environment information', script: '''#!/bin/bash -le
     # Load CCM environment variables
@@ -499,11 +514,11 @@ pipeline {
                 '3.0',       // Previous Apache CassandraⓇ
                 '3.11',      // Current Apache CassandraⓇ
                 '4.0',       // Development Apache CassandraⓇ
-                'dse-5.0',   // Long Term Support DataStax Enterprise
-                'dse-5.1',   // Legacy DataStax Enterprise
-                'dse-6.0',   // Previous DataStax Enterprise
-                'dse-6.7',   // Previous DataStax Enterprise
-                'dse-6.8',   // Current DataStax Enterprise
+                'dse-5.0.15',   // Long Term Support DataStax Enterprise
+                'dse-5.1.35',   // Legacy DataStax Enterprise
+                'dse-6.0.18',   // Previous DataStax Enterprise
+                'dse-6.7.17',   // Previous DataStax Enterprise
+                'dse-6.8.30',   // Current DataStax Enterprise
                 ],
       description: '''Apache CassandraⓇ and DataStax Enterprise server version to use for adhoc <b>BUILD-AND-EXECUTE-TESTS</b> <strong>ONLY!</strong>
                       <table style="width:100%">
@@ -538,23 +553,23 @@ pipeline {
                           <td>Apache CassandraⓇ v4.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-5.0</strong></td>
+                          <td><strong>dse-5.0.15</strong></td>
                           <td>DataStax Enterprise v5.0.x (<b>Long Term Support</b>)</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-5.1</strong></td>
+                          <td><strong>dse-5.1.35</strong></td>
                           <td>DataStax Enterprise v5.1.x</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-6.0</strong></td>
+                          <td><strong>dse-6.0.18</strong></td>
                           <td>DataStax Enterprise v6.0.x</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-6.7</strong></td>
+                          <td><strong>dse-6.7.17</strong></td>
                           <td>DataStax Enterprise v6.7.x</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-6.8</strong></td>
+                          <td><strong>dse-6.8.30</strong></td>
                           <td>DataStax Enterprise v6.8.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
                         </tr>
                       </table>''')
@@ -636,7 +651,7 @@ pipeline {
     parameterizedCron((scheduleTriggerJobName() == env.JOB_NAME) ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python v2.7.18 and v3.5.9
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18 3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18 3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
     """ : "")
   }
 
