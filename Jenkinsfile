@@ -62,15 +62,8 @@ matrices = [
 ]
 
 def initializeSlackContext() {
-  env.GIT_SHA = "${env.GIT_COMMIT.take(7)}"
-  env.GITHUB_PROJECT_URL = "https://${GIT_URL.replaceFirst(/(git@|http:\/\/|https:\/\/)/, '').replace(':', '/').replace('.git', '')}"
-  env.GITHUB_BRANCH_URL = "${env.GITHUB_PROJECT_URL}/tree/${env.BRANCH_NAME}"
-  env.GITHUB_COMMIT_URL = "${env.GITHUB_PROJECT_URL}/commit/${env.GIT_COMMIT}"
-}
-
-def getBuildContext() {
   /*
-  Based on schedule, parameters and branch name, configure the build context and env vars.
+  Based on git branch/commit, configure the build context and env vars.
   */
 
   def driver_display_name = 'Cassandra Python Driver'
@@ -79,6 +72,17 @@ def getBuildContext() {
   } else if (env.GIT_URL.contains('python-dse-driver')) {
     driver_display_name = 'DSE Python Driver'
   }
+  env.DRIVER_DISPLAY_NAME = driver_display_name
+  env.GIT_SHA = "${env.GIT_COMMIT.take(7)}"
+  env.GITHUB_PROJECT_URL = "https://${GIT_URL.replaceFirst(/(git@|http:\/\/|https:\/\/)/, '').replace(':', '/').replace('.git', '')}"
+  env.GITHUB_BRANCH_URL = "${env.GITHUB_PROJECT_URL}/tree/${env.BRANCH_NAME}"
+  env.GITHUB_COMMIT_URL = "${env.GITHUB_PROJECT_URL}/commit/${env.GIT_COMMIT}"
+}
+
+def getBuildContext() {
+  /*
+  Based on schedule and parameters, configure the build context and env vars.
+  */
 
   def profile = "${params.PROFILE}"
   def EVENT_LOOP = "${params.EVENT_LOOP.toLowerCase()}"
