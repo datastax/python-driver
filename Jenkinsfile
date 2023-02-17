@@ -61,6 +61,13 @@ matrices = [
   ]
 ]
 
+def initializeSlackContext() {
+  env.GIT_SHA = "${env.GIT_COMMIT.take(7)}"
+  env.GITHUB_PROJECT_URL = "https://${GIT_URL.replaceFirst(/(git@|http:\/\/|https:\/\/)/, '').replace(':', '/').replace('.git', '')}"
+  env.GITHUB_BRANCH_URL = "${env.GITHUB_PROJECT_URL}/tree/${env.BRANCH_NAME}"
+  env.GITHUB_COMMIT_URL = "${env.GITHUB_PROJECT_URL}/commit/${env.GIT_COMMIT}"
+}
+
 def getBuildContext() {
   /*
   Based on schedule, parameters and branch name, configure the build context and env vars.
@@ -72,11 +79,6 @@ def getBuildContext() {
   } else if (env.GIT_URL.contains('python-dse-driver')) {
     driver_display_name = 'DSE Python Driver'
   }
-
-  def git_sha = "${env.GIT_COMMIT.take(7)}"
-  def github_project_url = "https://${GIT_URL.replaceFirst(/(git@|http:\/\/|https:\/\/)/, '').replace(':', '/').replace('.git', '')}"
-  def github_branch_url = "${github_project_url}/tree/${env.BRANCH_NAME}"
-  def github_commit_url = "${github_project_url}/commit/${env.GIT_COMMIT}"
 
   def profile = "${params.PROFILE}"
   def EVENT_LOOP = "${params.EVENT_LOOP.toLowerCase()}"
@@ -116,9 +118,7 @@ def getBuildContext() {
   context = [
     vars: [
       "PROFILE=${profile}",
-      "EVENT_LOOP=${EVENT_LOOP}",
-      "DRIVER_DISPLAY_NAME=${driver_display_name}", "GIT_SHA=${git_sha}", "GITHUB_PROJECT_URL=${github_project_url}",
-      "GITHUB_BRANCH_URL=${github_branch_url}", "GITHUB_COMMIT_URL=${github_commit_url}"
+      "EVENT_LOOP=${EVENT_LOOP}"
     ],
     matrix: matrix
   ]
@@ -153,6 +153,12 @@ def getMatrixBuilds(buildContext) {
           tasks["${serverVersion}, py${runtimeVersion}${cythonDesc}"] = {
             node("${OS_VERSION}") {
               checkout scm
+
+              initializeSlackContext()
+
+              if (env.BUILD_STATED_SLACK_NOTIFIED != 'true') {
+                slack.notifyChannel()
+              }
 
               withEnv(taskVars) {
                 buildAndTest(context)
@@ -635,11 +641,6 @@ pipeline {
 
   stages {
     stage ('Build and Test') {
-      agent {
-      //   // If I removed this agent block, GIT_URL and GIT_COMMIT aren't set.
-      //   // However, this trigger an additional checkout
-        label "master"
-      }
       when {
         beforeAgent true
         allOf {
@@ -651,8 +652,7 @@ pipeline {
         script {
           context = getBuildContext()
           withEnv(context.vars) {
-            describeBuild(context)
-            slack.notifyChannel()
+            describeBuild(context)            
 
             // build and test all builds
             parallel getMatrixBuilds(context)
