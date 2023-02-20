@@ -159,7 +159,6 @@ def getMatrixBuilds(buildContext) {
               scm_variables = checkout scm
               env.GIT_COMMIT = scm_variables.get('GIT_COMMIT')
               env.GIT_URL = scm_variables.get('GIT_URL')
-              env.GIT_COMMIT = scm_variables.get('GIT_COMMIT')
               initializeSlackContext()
 
               if (env.BUILD_STATED_SLACK_NOTIFIED != 'true') {
