@@ -224,6 +224,10 @@ class TypeTests(unittest.TestCase):
         expected = 2177403010.123
         self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2038, 12, 31, 10, 10, 10, 123000))
 
+    def test_decimalType(self):
+        self.assertEqual(DecimalType.serialize(1.5, 3), b'\x00\x00\x00\x01\x0f')
+        self.assertRaises(ValueError, DecimalType.serialize, float("NaN"), 3)
+
     def test_collection_null_support(self):
         """
         Test that null values in collection are decoded properly.
