@@ -270,7 +270,6 @@ def executeStandardTests() {
       exit $failure
     '''
   } catch (err) {
-    echo err.getMessage()
     currentBuild.result = 'UNSTABLE'
   }
 
@@ -293,7 +292,6 @@ def executeStandardTests() {
       exit $failure
     '''
   } catch (err) {
-    echo err.getMessage()
     currentBuild.result = 'UNSTABLE'
   }
 
@@ -307,7 +305,6 @@ def executeStandardTests() {
       EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=cqle_results.xml tests/integration/cqlengine/
     '''
   } catch (err) {
-    echo err.getMessage()
     currentBuild.result = 'UNSTABLE'
   }
 
@@ -321,7 +318,6 @@ def executeStandardTests() {
       EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml tests/integration/standard/
     '''
   } catch (err) {
-    echo err.getMessage()
     currentBuild.result = 'UNSTABLE'
   }
 
@@ -336,7 +332,6 @@ def executeStandardTests() {
         EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} DSE_VERSION=${DSE_VERSION} ADS_HOME="${HOME}/" VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=dse_results.xml tests/integration/advanced/
       '''
       } catch (err) {
-        echo err.getMessage()
         currentBuild.result = 'UNSTABLE'
     }
   }
@@ -351,7 +346,6 @@ def executeStandardTests() {
       EVENT_LOOP=${EVENT_LOOP} CLOUD_PROXY_PATH="${HOME}/proxy/" CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=advanced_results.xml tests/integration/cloud/
     '''
   } catch (err) {
-    echo err.getMessage()
     currentBuild.result = 'UNSTABLE'
   }
 
@@ -366,7 +360,6 @@ def executeStandardTests() {
         EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} nosetests -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --exclude-dir=tests/integration/long/upgrade --with-ignore-docstrings --with-xunit --xunit-file=long_results.xml tests/integration/long/
       '''
     } catch (err) {
-      echo err.getMessage()
       currentBuild.result = 'UNSTABLE'
     }
   }
