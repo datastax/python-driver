@@ -447,10 +447,11 @@ class DecimalType(_CassandraType):
         try:
             sign, digits, exponent = dec.as_tuple()
         except AttributeError:
+            local_dec = Decimal(dec)
             try:
-                sign, digits, exponent = Decimal(dec).as_tuple()
+                sign, digits, exponent = local_dec.as_tuple()
             except Exception:
-                if Decimal(dec).is_nan():
+                if local_dec.is_nan():
                     raise ValueError("NaN values are not accepted values because they can't be serialized.")
                 raise TypeError("Invalid type for Decimal value: %r", dec)
         unscaled = int(''.join([str(digit) for digit in digits]))
