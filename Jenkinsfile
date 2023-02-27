@@ -35,12 +35,12 @@ slack = new Slack()
 // We also avoid cython since it's tested as part of the nightlies.
 matrices = [
   "FULL": [
-    "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0', 'dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
+    "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0', 'dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30'],
     "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
   ],
   "DEVELOP": [
-    "SERVER": ['2.1', '3.11', 'dse-6.8'],
+    "SERVER": ['2.1', '3.11', 'dse-6.8.30'],
     "RUNTIME": ['2.7.18', '3.6.10'],
     "CYTHON": ["True", "False"]
   ],
@@ -50,20 +50,20 @@ matrices = [
     "CYTHON": ["True", "False"]
   ],
   "DSE": [
-    "SERVER": ['dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
+    "SERVER": ['dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30'],
     "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
   ],
   "SMOKE": [
-    "SERVER": ['3.11', '4.0', 'dse-6.8'],
+    "SERVER": ['3.11', '4.0', 'dse-6.8.30'],
     "RUNTIME": ['3.7.7', '3.8.3'],
     "CYTHON": ["False"]
   ]
 ]
 
-def getBuildContext() {
+def initializeSlackContext() {
   /*
-  Based on schedule, parameters and branch name, configure the build context and env vars.
+  Based on git branch/commit, configure the build context and env vars.
   */
 
   def driver_display_name = 'Cassandra Python Driver'
@@ -72,11 +72,17 @@ def getBuildContext() {
   } else if (env.GIT_URL.contains('python-dse-driver')) {
     driver_display_name = 'DSE Python Driver'
   }
+  env.DRIVER_DISPLAY_NAME = driver_display_name
+  env.GIT_SHA = "${env.GIT_COMMIT.take(7)}"
+  env.GITHUB_PROJECT_URL = "https://${GIT_URL.replaceFirst(/(git@|http:\/\/|https:\/\/)/, '').replace(':', '/').replace('.git', '')}"
+  env.GITHUB_BRANCH_URL = "${env.GITHUB_PROJECT_URL}/tree/${env.BRANCH_NAME}"
+  env.GITHUB_COMMIT_URL = "${env.GITHUB_PROJECT_URL}/commit/${env.GIT_COMMIT}"
+}
 
-  def git_sha = "${env.GIT_COMMIT.take(7)}"
-  def github_project_url = "https://${GIT_URL.replaceFirst(/(git@|http:\/\/|https:\/\/)/, '').replace(':', '/').replace('.git', '')}"
-  def github_branch_url = "${github_project_url}/tree/${env.BRANCH_NAME}"
-  def github_commit_url = "${github_project_url}/commit/${env.GIT_COMMIT}"
+def getBuildContext() {
+  /*
+  Based on schedule and parameters, configure the build context and env vars.
+  */
 
   def profile = "${params.PROFILE}"
   def EVENT_LOOP = "${params.EVENT_LOOP.toLowerCase()}"
@@ -116,9 +122,7 @@ def getBuildContext() {
   context = [
     vars: [
       "PROFILE=${profile}",
-      "EVENT_LOOP=${EVENT_LOOP}",
-      "DRIVER_DISPLAY_NAME=${driver_display_name}", "GIT_SHA=${git_sha}", "GITHUB_PROJECT_URL=${github_project_url}",
-      "GITHUB_BRANCH_URL=${github_branch_url}", "GITHUB_COMMIT_URL=${github_commit_url}"
+      "EVENT_LOOP=${EVENT_LOOP}"
     ],
     matrix: matrix
   ]
@@ -152,7 +156,14 @@ def getMatrixBuilds(buildContext) {
           def cythonDesc = cythonFlag == "True" ? ", Cython": ""
           tasks["${serverVersion}, py${runtimeVersion}${cythonDesc}"] = {
             node("${OS_VERSION}") {
-              checkout scm
+              scm_variables = checkout scm
+              env.GIT_COMMIT = scm_variables.get('GIT_COMMIT')
+              env.GIT_URL = scm_variables.get('GIT_URL')
+              initializeSlackContext()
+
+              if (env.BUILD_STATED_SLACK_NOTIFIED != 'true') {
+                slack.notifyChannel()
+              }
 
               withEnv(taskVars) {
                 buildAndTest(context)
@@ -202,6 +213,21 @@ def initializeEnvironment() {
   sh label: 'Download Apache CassandraⓇ or DataStax Enterprise', script: '''#!/bin/bash -lex
     . ${CCM_ENVIRONMENT_SHELL} ${CASSANDRA_VERSION}
   '''
+
+  if (env.CASSANDRA_VERSION.split('-')[0] == 'dse') {
+    env.DSE_FIXED_VERSION = env.CASSANDRA_VERSION.split('-')[1]
+    sh label: 'Update environment for DataStax Enterprise', script: '''#!/bin/bash -le
+        cat >> ${HOME}/environment.txt << ENVIRONMENT_EOF
+CCM_CASSANDRA_VERSION=${DSE_FIXED_VERSION} # maintain for backwards compatibility
+CCM_VERSION=${DSE_FIXED_VERSION}
+CCM_SERVER_TYPE=dse
+DSE_VERSION=${DSE_FIXED_VERSION}
+CCM_IS_DSE=true
+CCM_BRANCH=${DSE_FIXED_VERSION}
+DSE_BRANCH=${DSE_FIXED_VERSION}
+ENVIRONMENT_EOF
+      '''
+  }
 
   sh label: 'Display Python and environment information', script: '''#!/bin/bash -le
     # Load CCM environment variables
@@ -384,6 +410,7 @@ pipeline {
 
   // Global pipeline timeout
   options {
+    disableConcurrentBuilds()
     timeout(time: 10, unit: 'HOURS') // TODO timeout should be per build
     buildDiscarder(logRotator(artifactNumToKeepStr: '10', // Keep only the last 10 artifacts
                               numToKeepStr: '50'))        // Keep only the last 50 build records
@@ -486,11 +513,11 @@ pipeline {
                 '3.0',       // Previous Apache CassandraⓇ
                 '3.11',      // Current Apache CassandraⓇ
                 '4.0',       // Development Apache CassandraⓇ
-                'dse-5.0',   // Long Term Support DataStax Enterprise
-                'dse-5.1',   // Legacy DataStax Enterprise
-                'dse-6.0',   // Previous DataStax Enterprise
-                'dse-6.7',   // Previous DataStax Enterprise
-                'dse-6.8',   // Current DataStax Enterprise
+                'dse-5.0.15',   // Long Term Support DataStax Enterprise
+                'dse-5.1.35',   // Legacy DataStax Enterprise
+                'dse-6.0.18',   // Previous DataStax Enterprise
+                'dse-6.7.17',   // Previous DataStax Enterprise
+                'dse-6.8.30',   // Current DataStax Enterprise
                 ],
       description: '''Apache CassandraⓇ and DataStax Enterprise server version to use for adhoc <b>BUILD-AND-EXECUTE-TESTS</b> <strong>ONLY!</strong>
                       <table style="width:100%">
@@ -525,23 +552,23 @@ pipeline {
                           <td>Apache CassandraⓇ v4.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-5.0</strong></td>
+                          <td><strong>dse-5.0.15</strong></td>
                           <td>DataStax Enterprise v5.0.x (<b>Long Term Support</b>)</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-5.1</strong></td>
+                          <td><strong>dse-5.1.35</strong></td>
                           <td>DataStax Enterprise v5.1.x</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-6.0</strong></td>
+                          <td><strong>dse-6.0.18</strong></td>
                           <td>DataStax Enterprise v6.0.x</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-6.7</strong></td>
+                          <td><strong>dse-6.7.17</strong></td>
                           <td>DataStax Enterprise v6.7.x</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-6.8</strong></td>
+                          <td><strong>dse-6.8.30</strong></td>
                           <td>DataStax Enterprise v6.8.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
                         </tr>
                       </table>''')
@@ -623,7 +650,7 @@ pipeline {
     parameterizedCron((scheduleTriggerJobName() == env.JOB_NAME) ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python v2.7.18 and v3.5.9
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18 3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18 3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
     """ : "")
   }
 
@@ -635,11 +662,6 @@ pipeline {
 
   stages {
     stage ('Build and Test') {
-      agent {
-      //   // If I removed this agent block, GIT_URL and GIT_COMMIT aren't set.
-      //   // However, this trigger an additional checkout
-        label "master"
-      }
       when {
         beforeAgent true
         allOf {
@@ -651,8 +673,7 @@ pipeline {
         script {
           context = getBuildContext()
           withEnv(context.vars) {
-            describeBuild(context)
-            slack.notifyChannel()
+            describeBuild(context)            
 
             // build and test all builds
             parallel getMatrixBuilds(context)
