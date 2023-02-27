@@ -35,7 +35,7 @@ from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
 from tests.integration import use_singledc, get_node, CASSANDRA_IP, local, \
-    requiresmallclockgranularity, greaterthancass20, TestCluster
+    requiresmallclockgranularity, greaterthancass20, IntegrationTestCluster
 
 try:
     from cassandra.io.libevreactor import LibevConnection
@@ -54,7 +54,7 @@ def setup_module():
 class ConnectionTimeoutTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = TestCluster(execution_profiles={
+        self.cluster = IntegrationTestCluster(execution_profiles={
             EXEC_PROFILE_DEFAULT: ExecutionProfile(
                 load_balancing_policy=HostFilterPolicy(
                     RoundRobinPolicy(), predicate=lambda host: host.address == CASSANDRA_IP
@@ -114,7 +114,7 @@ class HeartbeatTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.cluster = TestCluster(idle_heartbeat_interval=1)
+        self.cluster = IntegrationTestCluster(idle_heartbeat_interval=1)
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
     def tearDown(self):
@@ -216,8 +216,8 @@ class ConnectionTests(object):
                 conn = self.klass.factory(
                     endpoint=contact_point,
                     timeout=timeout,
-                    protocol_version=TestCluster.DEFAULT_PROTOCOL_VERSION,
-                    allow_beta_protocol_version=TestCluster.DEFAULT_ALLOW_BETA
+                    protocol_version=IntegrationTestCluster.DEFAULT_PROTOCOL_VERSION,
+                    allow_beta_protocol_version=IntegrationTestCluster.DEFAULT_ALLOW_BETA
                 )
                 break
             except (OperationTimedOut, NoHostAvailable, ConnectionShutdown) as e:
@@ -413,10 +413,10 @@ class ConnectionTests(object):
         class C2(self.klass):
             pass
 
-        clusterC1 = TestCluster(connection_class=C1)
+        clusterC1 = IntegrationTestCluster(connection_class=C1)
         clusterC1.connect(wait_for_all_pools=True)
 
-        clusterC2 = TestCluster(connection_class=C2)
+        clusterC2 = IntegrationTestCluster(connection_class=C2)
         clusterC2.connect(wait_for_all_pools=True)
         self.addCleanup(clusterC1.shutdown)
         self.addCleanup(clusterC2.shutdown)

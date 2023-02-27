@@ -22,7 +22,7 @@ from cassandra.connection import UnixSocketEndPoint
 from cassandra.policies import WhiteListRoundRobinPolicy, RoundRobinPolicy
 
 from tests import notwindows
-from tests.integration import use_single_node, TestCluster
+from tests.integration import use_single_node, IntegrationTestCluster
 
 log = logging.getLogger()
 log.setLevel('DEBUG')
@@ -62,7 +62,7 @@ class UnixSocketTest(unittest.TestCase):
         lbp = UnixSocketWhiteListRoundRobinPolicy([UNIX_SOCKET_PATH])
         ep = ExecutionProfile(load_balancing_policy=lbp)
         endpoint = UnixSocketEndPoint(UNIX_SOCKET_PATH)
-        cls.cluster = TestCluster(contact_points=[endpoint], execution_profiles={EXEC_PROFILE_DEFAULT: ep})
+        cls.cluster = IntegrationTestCluster(contact_points=[endpoint], execution_profiles={EXEC_PROFILE_DEFAULT: ep})
 
     @classmethod
     def tearDownClass(cls):

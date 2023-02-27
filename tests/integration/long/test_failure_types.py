@@ -31,7 +31,7 @@ from cassandra.query import SimpleStatement
 from tests.integration import (
     use_singledc, PROTOCOL_VERSION, get_cluster, setup_keyspace, remove_cluster,
     get_node, start_cluster_wait_for_up, requiresmallclockgranularity,
-    local, CASSANDRA_VERSION, TestCluster)
+    local, CASSANDRA_VERSION, IntegrationTestCluster)
 
 
 import unittest
@@ -80,7 +80,7 @@ class ClientExceptionTests(unittest.TestCase):
             raise unittest.SkipTest(
                 "Native protocol 4,0+ is required for custom payloads, currently using %r"
                 % (PROTOCOL_VERSION,))
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         self.session = self.cluster.connect()
         self.nodes_currently_failing = []
         self.node1, self.node2, self.node3 = get_cluster().nodes.values()
@@ -329,7 +329,7 @@ class TimeoutTimerTest(unittest.TestCase):
         """
         Setup sessions and pause node1
         """
-        self.cluster = TestCluster(
+        self.cluster = IntegrationTestCluster(
             execution_profiles={
                 EXEC_PROFILE_DEFAULT: ExecutionProfile(
                     load_balancing_policy=HostFilterPolicy(

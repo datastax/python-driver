@@ -14,7 +14,7 @@
 
 import unittest
 
-from tests.integration import USE_CASS_EXTERNAL, use_cluster, TestCluster
+from tests.integration import USE_CASS_EXTERNAL, use_cluster, IntegrationTestCluster
 
 
 class MisconfiguredAuthenticationTests(unittest.TestCase):
@@ -33,7 +33,7 @@ class MisconfiguredAuthenticationTests(unittest.TestCase):
             cls.ccm_cluster = ccm_cluster
 
     def test_connect_no_auth_provider(self):
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         cluster.connect()
         cluster.refresh_nodes()
         down_hosts = [host for host in cluster.metadata.all_hosts() if not host.is_up]

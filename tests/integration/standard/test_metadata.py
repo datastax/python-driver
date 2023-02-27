@@ -39,7 +39,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                get_supported_protocol_versions, greaterthancass20,
                                greaterthancass21, assert_startswith, greaterthanorequalcass40,
                                greaterthanorequaldse67, lessthancass40,
-                               TestCluster, DSE_VERSION)
+                               IntegrationTestCluster, DSE_VERSION)
 
 
 log = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ class HostMetaDataTests(BasicExistingKeyspaceUnitTestCase):
 class MetaDataRemovalTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = TestCluster(contact_points=['127.0.0.1', '127.0.0.2', '127.0.0.3', '126.0.0.186'])
+        self.cluster = IntegrationTestCluster(contact_points=['127.0.0.1', '127.0.0.2', '127.0.0.3', '126.0.0.186'])
         self.cluster.connect()
 
     def tearDown(self):
@@ -140,11 +140,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
         # Validate metadata is missing where appropriate
-        no_schema = TestCluster(schema_metadata_enabled=False)
+        no_schema = IntegrationTestCluster(schema_metadata_enabled=False)
         no_schema_session = no_schema.connect()
         self.assertEqual(len(no_schema.metadata.keyspaces), 0)
         self.assertEqual(no_schema.metadata.export_schema_as_string(), '')
-        no_token = TestCluster(token_metadata_enabled=False)
+        no_token = IntegrationTestCluster(token_metadata_enabled=False)
         no_token_session = no_token.connect()
         self.assertEqual(len(no_token.metadata.token_map.token_to_host_owner), 0)
 
@@ -572,7 +572,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        cluster2 = TestCluster(schema_event_refresh_window=-1)
+        cluster2 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
@@ -655,7 +655,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         @test_category metadata
         """
 
-        cluster2 = TestCluster(schema_event_refresh_window=-1)
+        cluster2 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
@@ -686,7 +686,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         table_name = "test"
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, table_name))
 
-        cluster2 = TestCluster(schema_event_refresh_window=-1)
+        cluster2 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
@@ -720,7 +720,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         self.session.execute("CREATE TABLE {0}.{1} (a int PRIMARY KEY, b text)".format(self.keyspace_name, self.function_table_name))
 
-        cluster2 = TestCluster(schema_event_refresh_window=-1)
+        cluster2 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         try:
@@ -744,7 +744,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNot(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
         self.assertEqual(original_meta.as_cql_query(), current_meta.as_cql_query())
 
-        cluster3 = TestCluster(schema_event_refresh_window=-1)
+        cluster3 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster3.connect()
         try:
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
@@ -779,7 +779,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 3:
             raise unittest.SkipTest("Protocol 3+ is required for UDTs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = TestCluster(schema_event_refresh_window=-1)
+        cluster2 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].user_types, {})
@@ -807,7 +807,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
                 raise unittest.SkipTest("Protocol versions 1 and 2 are not supported in Cassandra version ".format(CASSANDRA_VERSION))
 
         for protocol_version in (1, 2):
-            cluster = TestCluster()
+            cluster = IntegrationTestCluster()
             session = cluster.connect()
             self.assertEqual(cluster.metadata.keyspaces[self.keyspace_name].user_types, {})
 
@@ -847,7 +847,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol 4+ is required for UDFs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = TestCluster(schema_event_refresh_window=-1)
+        cluster2 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].functions, {})
@@ -883,7 +883,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         if PROTOCOL_VERSION < 4:
             raise unittest.SkipTest("Protocol 4+ is required for UDAs, currently testing against {0}".format(PROTOCOL_VERSION))
 
-        cluster2 = TestCluster(schema_event_refresh_window=-1)
+        cluster2 = IntegrationTestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
         self.assertEqual(cluster2.metadata.keyspaces[self.keyspace_name].aggregates, {})
@@ -1043,7 +1043,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test export schema functionality
         """
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         cluster.connect()
 
         self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
@@ -1054,7 +1054,7 @@ class TestCodeCoverage(unittest.TestCase):
         Test export keyspace schema functionality
         """
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         cluster.connect()
 
         for keyspace in cluster.metadata.keyspaces:
@@ -1094,7 +1094,7 @@ class TestCodeCoverage(unittest.TestCase):
         if sys.version_info[0:2] != (2, 7):
             raise unittest.SkipTest('This test compares static strings generated from dict items, which may change orders. Test with 2.7.')
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
 
         session.execute("""
@@ -1162,7 +1162,7 @@ CREATE TABLE export_udts.users (
         Test that names that need to be escaped in CREATE statements are
         """
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
 
         ksname = 'AnInterestingKeyspace'
@@ -1207,7 +1207,7 @@ CREATE TABLE export_udts.users (
         Ensure AlreadyExists exception is thrown when hit
         """
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         session = cluster.connect()
 
         ksname = 'test3rf'
@@ -1233,7 +1233,7 @@ CREATE TABLE export_udts.users (
         if murmur3 is None:
             raise unittest.SkipTest('the murmur3 extension is not available')
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         self.assertEqual(cluster.metadata.get_replicas('test3rf', 'key'), [])
 
         cluster.connect('test3rf')
@@ -1249,7 +1249,7 @@ CREATE TABLE export_udts.users (
         Test token mappings
         """
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         cluster.connect('test3rf')
         ring = cluster.metadata.token_map.ring
         owners = list(cluster.metadata.token_map.token_to_host_owner[token] for token in ring)
@@ -1273,7 +1273,7 @@ class TokenMetadataTest(unittest.TestCase):
     def test_token(self):
         expected_node_count = len(get_cluster().nodes)
 
-        cluster = TestCluster()
+        cluster = IntegrationTestCluster()
         cluster.connect()
         tmap = cluster.metadata.token_map
         self.assertTrue(issubclass(tmap.token_class, Token))
@@ -1286,7 +1286,7 @@ class KeyspaceAlterMetadata(unittest.TestCase):
     Test verifies that table metadata is preserved on keyspace alter
     """
     def setUp(self):
-        self.cluster = TestCluster()
+        self.cluster = IntegrationTestCluster()
         self.session = self.cluster.connect()
         name = self._testMethodName.lower()
         crt_ks = '''
@@ -1331,7 +1331,7 @@ class IndexMapTests(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect()
         try:
             if cls.keyspace_name in cls.cluster.metadata.keyspaces:
@@ -1440,7 +1440,7 @@ class FunctionTest(unittest.TestCase):
     @classmethod
     def setup_class(cls):
         if PROTOCOL_VERSION >= 4:
-            cls.cluster = TestCluster()
+            cls.cluster = IntegrationTestCluster()
             cls.keyspace_name = cls.__name__.lower()
             cls.session = cls.cluster.connect()
             cls.session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)
@@ -1722,7 +1722,7 @@ class AggregateMetadata(FunctionTest):
         """
 
         # This is required until the java driver bundled with C* is updated to support v4
-        c = TestCluster(protocol_version=3)
+        c = IntegrationTestCluster(protocol_version=3)
         s = c.connect(self.keyspace_name)
 
         encoder = Encoder()
@@ -1906,7 +1906,7 @@ class BadMetaTest(unittest.TestCase):
 
     @classmethod
     def setup_class(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.keyspace_name = cls.__name__.lower()
         cls.session = cls.cluster.connect()
         cls.session.execute("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}" % cls.keyspace_name)

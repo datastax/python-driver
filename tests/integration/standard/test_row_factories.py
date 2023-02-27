@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from tests.integration import get_server_versions, use_singledc, \
-    BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass, TestCluster
+    BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass, IntegrationTestCluster
 
 import unittest
 
@@ -84,7 +84,7 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         cls.select = "SELECT * FROM {0}.{1}".format(cls.ks_name, cls.ks_name)
 
     def _results_from_row_factory(self, row_factory):
-        cluster = TestCluster(
+        cluster = IntegrationTestCluster(
             execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=row_factory)}
         )
         with cluster:
@@ -173,7 +173,7 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
     """
     @classmethod
     def setup_class(cls):
-        cls.cluster = TestCluster()
+        cls.cluster = IntegrationTestCluster()
         cls.session = cls.cluster.connect()
         cls._cass_version, cls._cql_version = get_server_versions()
         ddl = '''
@@ -210,7 +210,7 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
         """
         can SELECT numeric column  using  dict_factory
         """
-        with TestCluster(
+        with IntegrationTestCluster(
                 execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
         ) as cluster:
             try:
