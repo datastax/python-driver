@@ -55,7 +55,7 @@ class ConsistencyLevel(object):
 
     QUORUM = 4
     """
-    ``ceil(RF/2)`` replicas must respond to consider the operation a success
+    ``ceil(RF/2) + 1`` replicas must respond to consider the operation a success
     """
 
     ALL = 5

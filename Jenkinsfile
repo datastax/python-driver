@@ -30,6 +30,9 @@ import com.datastax.jenkins.drivers.python.Slack
 slack = new Slack()
 
 // Define our predefined matrices
+//
+// Smoke tests are CI-friendly test configuration.  Currently-supported Python version + modern C*/DSE instances.
+// We also avoid cython since it's tested as part of the nightlies.
 matrices = [
   "FULL": [
     "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0', 'dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
@@ -50,6 +53,11 @@ matrices = [
     "SERVER": ['dse-5.0', 'dse-5.1', 'dse-6.0', 'dse-6.7', 'dse-6.8'],
     "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
     "CYTHON": ["True", "False"]
+  ],
+  "SMOKE": [
+    "SERVER": ['3.11', '4.0', 'dse-6.8'],
+    "RUNTIME": ['3.7.7', '3.8.3'],
+    "CYTHON": ["False"]
   ]
 ]
 
@@ -72,7 +80,7 @@ def getBuildContext() {
 
   def profile = "${params.PROFILE}"
   def EVENT_LOOP = "${params.EVENT_LOOP.toLowerCase()}"
-  matrixType = "FULL"
+  matrixType = "SMOKE"
   developBranchPattern = ~"((dev|long)-)?python-.*"
 
   if (developBranchPattern.matcher(env.BRANCH_NAME).matches()) {
@@ -357,26 +365,6 @@ def getDriverMetricType() {
   return metric_type
 }
 
-def submitCIMetrics(buildType) {
-  long durationMs = currentBuild.duration
-  long durationSec = durationMs / 1000
-  long nowSec = (currentBuild.startTimeInMillis + durationMs) / 1000
-  def branchNameNoPeriods = env.BRANCH_NAME.replaceAll('\\.', '_')
-  metric_type = getDriverMetricType()
-  def durationMetric = "okr.ci.python.${metric_type}.${buildType}.${branchNameNoPeriods} ${durationSec} ${nowSec}"
-
-  timeout(time: 1, unit: 'MINUTES') {
-    withCredentials([string(credentialsId: 'lab-grafana-address', variable: 'LAB_GRAFANA_ADDRESS'),
-                     string(credentialsId: 'lab-grafana-port', variable: 'LAB_GRAFANA_PORT')]) {
-      withEnv(["DURATION_METRIC=${durationMetric}"]) {
-        sh label: 'Send runtime metrics to labgrafana', script: '''#!/bin/bash -lex
-          echo "${DURATION_METRIC}" | nc -q 5 ${LAB_GRAFANA_ADDRESS} ${LAB_GRAFANA_PORT}
-        '''
-      }
-    }
-  }
-}
-
 def describeBuild(buildContext) {
   script {
     def runtimes = buildContext.matrix["RUNTIME"]
@@ -387,7 +375,9 @@ def describeBuild(buildContext) {
   }
 }
 
-def scheduleTriggerJobName = "drivers/python/oss/master/disabled"
+def scheduleTriggerJobName() {
+  "drivers/python/oss/master/disabled"
+}
 
 pipeline {
   agent none
@@ -450,7 +440,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'MATRIX',
-      choices: ['DEFAULT', 'FULL', 'DEVELOP', 'CASSANDRA', 'DSE'],
+      choices: ['DEFAULT', 'SMOKE', 'FULL', 'DEVELOP', 'CASSANDRA', 'DSE'],
       description: '''<p>The matrix for the build.</p>
                       <table style="width:100%">
                         <col width="25%">
@@ -462,6 +452,10 @@ pipeline {
                         <tr>
                           <td><strong>DEFAULT</strong></td>
                           <td>Default to the build context.</td>
+                        </tr>
+                        <tr>
+                          <td><strong>SMOKE</strong></td>
+                          <td>Basic smoke tests for current Python runtimes + C*/DSE versions, no Cython</td>
                         </tr>
                         <tr>
                           <td><strong>FULL</strong></td>
@@ -626,7 +620,7 @@ pipeline {
   }
 
   triggers {
-    parameterizedCron((scheduleTriggerJobName == env.JOB_NAME) ? """
+    parameterizedCron((scheduleTriggerJobName() == env.JOB_NAME) ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python v2.7.18 and v3.5.9
       H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18 3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1 dse-6.0 dse-6.7
@@ -663,8 +657,6 @@ pipeline {
             // build and test all builds
             parallel getMatrixBuilds(context)
 
-            // send the metrics
-            submitCIMetrics('commit')
             slack.notifyChannel(currentBuild.currentResult)
           }
         }
