@@ -87,13 +87,9 @@ def getBuildContext() {
   def profile = "${params.PROFILE}"
   def EVENT_LOOP = "${params.EVENT_LOOP.toLowerCase()}"
   matrixType = "SMOKE"
-  developBranchPattern = ~"((dev|long)-)?python-.*"
 
-  if (developBranchPattern.matcher(env.BRANCH_NAME).matches()) {
-    matrixType = "DEVELOP"
-    if (env.BRANCH_NAME.contains("long")) {
-      profile = "FULL"
-    }
+  if (env.BRANCH_NAME.contains("long")) {
+    profile = "FULL"
   }
 
   // Check if parameters were set explicitly
