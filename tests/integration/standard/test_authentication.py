@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from packaging.version import Version
 import logging
 import time
 
 from cassandra.cluster import NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 
-from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, CASSANDRA_IP, \
-    USE_CASS_EXTERNAL, start_cluster_wait_for_up, TestCluster
+from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCOL_VERSION, \
+    CASSANDRA_IP, CASSANDRA_VERSION, USE_CASS_EXTERNAL, start_cluster_wait_for_up, TestCluster
 from tests.integration.util import assert_quiescent_pool_state
 
 import unittest
@@ -42,12 +43,19 @@ def setup_module():
         log.debug("Starting ccm test cluster with %s", config_options)
         start_cluster_wait_for_up(ccm_cluster)
 
+    # PYTHON-1328
+    #
+    # Give the cluster enough time to startup (and perform necessary initialization)
+    # before executing the test.
+    if CASSANDRA_VERSION > Version('4.0-a'):
+        time.sleep(10)
 
 def teardown_module():
     remove_cluster()  # this test messes with config
 
 
 class AuthenticationTests(unittest.TestCase):
+
     """
     Tests to cover basic authentication functionality
     """
@@ -86,12 +94,6 @@ class AuthenticationTests(unittest.TestCase):
         raise Exception('Unable to connect with creds: {}/{}'.format(usr, pwd))
 
     def test_auth_connect(self):
-
-        # PYTHON-1328
-        #
-        # Give the cluster enough time to startup (and perform necessary initialization)
-        # before executing the test.
-        time.sleep(10)
 
         user = 'u'
         passwd = 'password'
