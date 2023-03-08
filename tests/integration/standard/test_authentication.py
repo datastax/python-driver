@@ -86,6 +86,13 @@ class AuthenticationTests(unittest.TestCase):
         raise Exception('Unable to connect with creds: {}/{}'.format(usr, pwd))
 
     def test_auth_connect(self):
+
+        # PYTHON-1328
+        #
+        # Give the cluster enough time to startup (and perform necessary initialization)
+        # before executing the test.
+        time.sleep(10)
+
         user = 'u'
         passwd = 'password'
 
