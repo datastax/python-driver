@@ -71,4 +71,4 @@ class SingleInterfaceTest(unittest.TestCase):
                                                  consistency_level=ConsistencyLevel.ALL))
 
         for pool in self.session.get_pools():
-            self.assertEquals(1, pool.get_state()['open_count'])
+            self.assertEqual(1, pool.get_state()['open_count'])

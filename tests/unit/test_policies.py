@@ -1301,7 +1301,7 @@ class HostFilterPolicyInitTest(unittest.TestCase):
             expected_message_regex = "can't set attribute"
         hfp = HostFilterPolicy(child_policy=Mock(name='child_policy'),
                                predicate=Mock(name='predicate'))
-        with self.assertRaisesRegexp(AttributeError, expected_message_regex):
+        with six.assertRaisesRegex(self, AttributeError, expected_message_regex):
             hfp.predicate = object()
 
 
