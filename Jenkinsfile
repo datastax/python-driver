@@ -84,20 +84,13 @@ def getBuildContext() {
   Based on schedule and parameters, configure the build context and env vars.
   */
 
-  def profile = "${params.PROFILE}"
+  def PROFILE = "${params.PROFILE}"
   def EVENT_LOOP = "${params.EVENT_LOOP.toLowerCase()}"
-  matrixType = "SMOKE"
 
-  if (env.BRANCH_NAME.contains("long")) {
-    profile = "FULL"
-  }
+  matrixType = params.MATRIX != "DEFAULT" ? params.MATRIX : "SMOKE"
+  matrix = matrices[matrixType].clone()
 
   // Check if parameters were set explicitly
-  if (params.MATRIX != "DEFAULT") {
-    matrixType = params.MATRIX
-  }
-
-  matrix = matrices[matrixType].clone()
   if (params.CYTHON != "DEFAULT") {
     matrix["CYTHON"] = [params.CYTHON]
   }
@@ -117,7 +110,7 @@ def getBuildContext() {
 
   context = [
     vars: [
-      "PROFILE=${profile}",
+      "PROFILE=${PROFILE}",
       "EVENT_LOOP=${EVENT_LOOP}"
     ],
     matrix: matrix
