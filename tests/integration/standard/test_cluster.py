@@ -148,7 +148,7 @@ class ClusterTests(unittest.TestCase):
         get_node(1).pause()
         cluster = TestCluster(contact_points=['127.0.0.1'], connect_timeout=1)
 
-        with six.assertRaisesRegex(self, NoHostAvailable, "OperationTimedOut\('errors=Timed out creating connection \(1 seconds\)"):
+        with self.assertRaisesRegex(NoHostAvailable, "OperationTimedOut\('errors=Timed out creating connection \(1 seconds\)"):
             cluster.connect()
         cluster.shutdown()
 
@@ -536,7 +536,7 @@ class ClusterTests(unittest.TestCase):
             # cluster agreement wait used for refresh
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            six.assertRaisesRegex(self, Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
+            self.assertRaisesRegex(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)
             self.assertIs(original_meta, c.metadata.keyspaces)
@@ -573,7 +573,7 @@ class ClusterTests(unittest.TestCase):
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            six.assertRaisesRegex(self, Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata,
+            self.assertRaisesRegex(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata,
                                     max_schema_agreement_wait=agreement_timeout)
             end_time = time.time()
             self.assertGreaterEqual(end_time - start_time, agreement_timeout)

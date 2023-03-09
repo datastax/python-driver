@@ -83,7 +83,7 @@ class IPV6ConnectionTest(object):
     def test_error(self):
         cluster = TestCluster(connection_class=self.connection_class, contact_points=['::1'], port=9043,
                               connect_timeout=10)
-        six.assertRaisesRegex(self, NoHostAvailable, '\(\'Unable to connect.*%s.*::1\', 9043.*Connection refused.*'
+        self.assertRaisesRegex(NoHostAvailable, '\(\'Unable to connect.*%s.*::1\', 9043.*Connection refused.*'
                                 % errno.ECONNREFUSED, cluster.connect)
 
     def test_error_multiple(self):
@@ -91,7 +91,7 @@ class IPV6ConnectionTest(object):
             raise unittest.SkipTest('localhost only resolves one address')
         cluster = TestCluster(connection_class=self.connection_class, contact_points=['localhost'], port=9043,
                               connect_timeout=10)
-        six.assertRaisesRegex(self, NoHostAvailable, '\(\'Unable to connect.*Tried connecting to \[\(.*\(.*\].*Last error',
+        self.assertRaisesRegex(NoHostAvailable, '\(\'Unable to connect.*Tried connecting to \[\(.*\(.*\].*Last error',
                                 cluster.connect)
 
 

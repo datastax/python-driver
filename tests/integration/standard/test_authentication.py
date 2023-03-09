@@ -122,7 +122,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
         try:
-            six.assertRaisesRegex(self, NoHostAvailable,
+            self.assertRaisesRegex(NoHostAvailable,
                                     '.*AuthenticationFailed.',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)
@@ -132,7 +132,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_wrong_username(self):
         cluster = self.cluster_as('wrong_user', 'cassandra')
         try:
-            six.assertRaisesRegex(self, NoHostAvailable,
+            self.assertRaisesRegex(NoHostAvailable,
                                     '.*AuthenticationFailed.*',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)
@@ -142,7 +142,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_empty_pwd(self):
         cluster = self.cluster_as('Cassandra', '')
         try:
-            six.assertRaisesRegex(self, NoHostAvailable,
+            self.assertRaisesRegex(NoHostAvailable,
                                     '.*AuthenticationFailed.*',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)
@@ -152,7 +152,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_no_auth_provider(self):
         cluster = TestCluster()
         try:
-            six.assertRaisesRegex(self, NoHostAvailable,
+            self.assertRaisesRegex(NoHostAvailable,
                                     '.*AuthenticationFailed.*',
                                     cluster.connect)
             assert_quiescent_pool_state(self, cluster)

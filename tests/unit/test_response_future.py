@@ -160,7 +160,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         # Simulate ResponseFuture timing out
         rf._on_timeout()
-        six.assertRaisesRegex(self, OperationTimedOut, "Connection defunct by heartbeat", rf.result)
+        self.assertRaisesRegex(OperationTimedOut, "Connection defunct by heartbeat", rf.result)
 
     def test_read_timeout_error_message(self):
         session = self.make_session()

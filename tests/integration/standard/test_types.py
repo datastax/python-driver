@@ -69,7 +69,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                 msg = r'.*Invalid STRING constant \(.*?\) for "b" of type blob.*'
             else:
                 msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
-            six.assertRaisesRegex(self, InvalidRequest, msg, s.execute, query, params)
+            self.assertRaisesRegex(InvalidRequest, msg, s.execute, query, params)
             return
 
         # In python2, with Cassandra < 2.0, we can manually encode the 'byte str' type as hex for insertion in a blob.
