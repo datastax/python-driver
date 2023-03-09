@@ -33,30 +33,34 @@ slack = new Slack()
 //
 // Smoke tests are CI-friendly test configuration.  Currently-supported Python version + modern C*/DSE instances.
 // We also avoid cython since it's tested as part of the nightlies.
+DEFAULT_CASSANDRA = ['2.1', '2.2', '3.0', '3.11', '4.0']
+DEFAULT_DSE = ['dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30']
+DEFAULT_RUNTIME = ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3']
+DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
-    "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0', 'dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30'],
-    "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
-    "CYTHON": ["True", "False"]
+    "SERVER": DEFAULT_CASSANDRA + DEFAULT_DSE,
+    "RUNTIME": DEFAULT_RUNTIME,
+    "CYTHON": DEFAULT_CYTHON
   ],
   "DEVELOP": [
     "SERVER": ['2.1', '3.11', 'dse-6.8.30'],
     "RUNTIME": ['2.7.18', '3.6.10'],
-    "CYTHON": ["True", "False"]
+    "CYTHON": DEFAULT_CYTHON
   ],
   "CASSANDRA": [
-    "SERVER": ['2.1', '2.2', '3.0', '3.11', '4.0'],
-    "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
-    "CYTHON": ["True", "False"]
+    "SERVER": DEFAULT_CASSANDRA,
+    "RUNTIME": DEFAULT_RUNTIME,
+    "CYTHON": DEFAULT_CYTHON
   ],
   "DSE": [
-    "SERVER": ['dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30'],
-    "RUNTIME": ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
-    "CYTHON": ["True", "False"]
+    "SERVER": DEFAULT_DSE,
+    "RUNTIME": DEFAULT_RUNTIME,
+    "CYTHON": DEFAULT_CYTHON
   ],
   "SMOKE": [
-    "SERVER": ['3.11', '4.0', 'dse-6.8.30'],
-    "RUNTIME": ['3.7.7', '3.8.3'],
+    "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(1),
+    "RUNTIME": DEFAULT_RUNTIME.takeRight(2),
     "CYTHON": ["False"]
   ]
 ]
@@ -492,22 +496,11 @@ pipeline {
                       </table>''')
     choice(
       name: 'PYTHON_VERSION',
-      choices: ['DEFAULT', '2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3'],
+      choices: ['DEFAULT'] + DEFAULT_RUNTIME,
       description: 'Python runtime version. Default to the build context.')
     choice(
       name: 'SERVER_VERSION',
-      choices: ['DEFAULT',
-                '2.1',       // Legacy Apache CassandraⓇ
-                '2.2',       // Legacy Apache CassandraⓇ
-                '3.0',       // Previous Apache CassandraⓇ
-                '3.11',      // Current Apache CassandraⓇ
-                '4.0',       // Development Apache CassandraⓇ
-                'dse-5.0.15',   // Long Term Support DataStax Enterprise
-                'dse-5.1.35',   // Legacy DataStax Enterprise
-                'dse-6.0.18',   // Previous DataStax Enterprise
-                'dse-6.7.17',   // Previous DataStax Enterprise
-                'dse-6.8.30',   // Current DataStax Enterprise
-                ],
+      choices: ['DEFAULT'] + DEFAULT_CASSANDRA + DEFAULT_DSE,
       description: '''Apache CassandraⓇ and DataStax Enterprise server version to use for adhoc <b>BUILD-AND-EXECUTE-TESTS</b> <strong>ONLY!</strong>
                       <table style="width:100%">
                         <col width="15%">
@@ -538,7 +531,7 @@ pipeline {
                         </tr>
                         <tr>
                           <td><strong>4.0</strong></td>
-                          <td>Apache CassandraⓇ v4.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
+                          <td>Apache CassandraⓇ v4.0.x</td>
                         </tr>
                         <tr>
                           <td><strong>dse-5.0.15</strong></td>
@@ -563,7 +556,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'CYTHON',
-      choices: ['DEFAULT', 'True', 'False'],
+      choices: ['DEFAULT'] + DEFAULT_CYTHON,
       description: '''<p>Flag to determine if Cython should be enabled</p>
                       <table style="width:100%">
                         <col width="25%">
