@@ -503,15 +503,6 @@ class PreparedStatementMetdataTest(unittest.TestCase):
 
 
 class PreparedStatementArgTest(unittest.TestCase):
-
-    def setUp(self):
-        self.mock_handler = MockLoggingHandler()
-        self.logger = logging.getLogger(cluster.__name__)
-        self.logger.addHandler(self.mock_handler)
-    
-    def tearDown(self):
-        self.logger.removeHandler(self.mock_handler)
-
     def test_prepare_on_all_hosts(self):
         """
         Test to validate prepare_on_all_hosts flag is honored.
@@ -523,14 +514,15 @@ class PreparedStatementArgTest(unittest.TestCase):
         @jira_ticket PYTHON-556
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         """
-        clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
-        self.addCleanup(clus.shutdown)
+        with MockLoggingHandler().set_module_name(cluster.__name__) as mock_handler:
+            clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
+            self.addCleanup(clus.shutdown)
 
-        session = clus.connect(wait_for_all_pools=True)
-        select_statement = session.prepare("SELECT k FROM test3rf.test WHERE k = ?")
-        for host in clus.metadata.all_hosts():
-            session.execute(select_statement, (1, ), host=host)
-        self.assertEqual(2, self.mock_handler.get_message_count('debug', "Re-preparing"))
+            session = clus.connect(wait_for_all_pools=True)
+            select_statement = session.prepare("SELECT k FROM test3rf.test WHERE k = ?")
+            for host in clus.metadata.all_hosts():
+                session.execute(select_statement, (1, ), host=host)
+            self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
 
     def test_prepare_batch_statement(self):
         """
@@ -542,39 +534,40 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        policy = ForcedHostIndexPolicy()
-        clus = TestCluster(
-            execution_profiles={
-                EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
-            },
-            prepare_on_all_hosts=False,
-            reprepare_on_up=False,
-        )
-        self.addCleanup(clus.shutdown)
+        with MockLoggingHandler().set_module_name(cluster.__name__) as mock_handler:
+            policy = ForcedHostIndexPolicy()
+            clus = TestCluster(
+                execution_profiles={
+                    EXEC_PROFILE_DEFAULT: ExecutionProfile(load_balancing_policy=policy),
+                },
+                prepare_on_all_hosts=False,
+                reprepare_on_up=False,
+            )
+            self.addCleanup(clus.shutdown)
 
-        table = "test3rf.%s" % self._testMethodName.lower()
+            table = "test3rf.%s" % self._testMethodName.lower()
 
-        session = clus.connect(wait_for_all_pools=True)
+            session = clus.connect(wait_for_all_pools=True)
 
-        session.execute("DROP TABLE IF EXISTS %s" % table)
-        session.execute("CREATE TABLE %s (k int PRIMARY KEY, v int )" % table)
+            session.execute("DROP TABLE IF EXISTS %s" % table)
+            session.execute("CREATE TABLE %s (k int PRIMARY KEY, v int )" % table)
 
-        insert_statement = session.prepare("INSERT INTO %s (k, v) VALUES  (?, ?)" % table)
+            insert_statement = session.prepare("INSERT INTO %s (k, v) VALUES  (?, ?)" % table)
 
-        # This is going to query a host where the query
-        # is not prepared
-        policy.set_host(1)
-        batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
-        batch_statement.add(insert_statement, (1, 2))
-        session.execute(batch_statement)
+            # This is going to query a host where the query
+            # is not prepared
+            policy.set_host(1)
+            batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
+            batch_statement.add(insert_statement, (1, 2))
+            session.execute(batch_statement)
 
-        # To verify our test assumption that queries are getting re-prepared properly
-        self.assertEqual(1, self.mock_handler.get_message_count('debug', "Re-preparing"))
+            # To verify our test assumption that queries are getting re-prepared properly
+            self.assertEqual(1, mock_handler.get_message_count('debug', "Re-preparing"))
 
-        select_results = session.execute(SimpleStatement("SELECT * FROM %s WHERE k = 1" % table,
-                                                         consistency_level=ConsistencyLevel.ALL))
-        first_row = select_results[0][:2]
-        self.assertEqual((1, 2), first_row)
+            select_results = session.execute(SimpleStatement("SELECT * FROM %s WHERE k = 1" % table,
+                                                            consistency_level=ConsistencyLevel.ALL))
+            first_row = select_results[0][:2]
+            self.assertEqual((1, 2), first_row)
 
     def test_prepare_batch_statement_after_alter(self):
         """
@@ -587,44 +580,45 @@ class PreparedStatementArgTest(unittest.TestCase):
         @expected_result queries will have to re-prepared on hosts that aren't the control connection
         and the batch statement will be sent.
         """
-        clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
-        self.addCleanup(clus.shutdown)
+        with MockLoggingHandler().set_module_name(cluster.__name__) as mock_handler:
+            clus = TestCluster(prepare_on_all_hosts=False, reprepare_on_up=False)
+            self.addCleanup(clus.shutdown)
 
-        table = "test3rf.%s" % self._testMethodName.lower()
+            table = "test3rf.%s" % self._testMethodName.lower()
 
-        session = clus.connect(wait_for_all_pools=True)
+            session = clus.connect(wait_for_all_pools=True)
 
-        session.execute("DROP TABLE IF EXISTS %s" % table)
-        session.execute("CREATE TABLE %s (k int PRIMARY KEY, a int, b int, d int)" % table)
-        insert_statement = session.prepare("INSERT INTO %s (k, b, d) VALUES  (?, ?, ?)" % table)
+            session.execute("DROP TABLE IF EXISTS %s" % table)
+            session.execute("CREATE TABLE %s (k int PRIMARY KEY, a int, b int, d int)" % table)
+            insert_statement = session.prepare("INSERT INTO %s (k, b, d) VALUES  (?, ?, ?)" % table)
 
-        # Altering the table might trigger an update in the insert metadata
-        session.execute("ALTER TABLE %s ADD c int" % table)
+            # Altering the table might trigger an update in the insert metadata
+            session.execute("ALTER TABLE %s ADD c int" % table)
 
-        values_to_insert = [(1, 2, 3), (2, 3, 4), (3, 4, 5), (4, 5, 6)]
+            values_to_insert = [(1, 2, 3), (2, 3, 4), (3, 4, 5), (4, 5, 6)]
 
-        # We query the three hosts in order (due to the ForcedHostIndexPolicy)
-        # the first three queries will have to be repreapred and the rest should
-        # work as normal batch prepared statements
-        hosts = clus.metadata.all_hosts()
-        for i in range(10):
-            value_to_insert = values_to_insert[i % len(values_to_insert)]
-            batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
-            batch_statement.add(insert_statement, value_to_insert)
-            session.execute(batch_statement, host=hosts[i % len(hosts)])
+            # We query the three hosts in order (due to the ForcedHostIndexPolicy)
+            # the first three queries will have to be repreapred and the rest should
+            # work as normal batch prepared statements
+            hosts = clus.metadata.all_hosts()
+            for i in range(10):
+                value_to_insert = values_to_insert[i % len(values_to_insert)]
+                batch_statement = BatchStatement(consistency_level=ConsistencyLevel.ONE)
+                batch_statement.add(insert_statement, value_to_insert)
+                session.execute(batch_statement, host=hosts[i % len(hosts)])
 
-        select_results = session.execute("SELECT * FROM %s" % table)
-        expected_results = [
-            (1, None, 2, None, 3),
-            (2, None, 3, None, 4),
-            (3, None, 4, None, 5),
-            (4, None, 5, None, 6)
-        ]
+            select_results = session.execute("SELECT * FROM %s" % table)
+            expected_results = [
+                (1, None, 2, None, 3),
+                (2, None, 3, None, 4),
+                (3, None, 4, None, 5),
+                (4, None, 5, None, 6)
+            ]
 
-        self.assertEqual(set(expected_results), set(select_results._current_rows))
+            self.assertEqual(set(expected_results), set(select_results._current_rows))
 
-        # To verify our test assumption that queries are getting re-prepared properly
-        self.assertEqual(3, self.mock_handler.get_message_count('debug', "Re-preparing"))
+            # To verify our test assumption that queries are getting re-prepared properly
+            self.assertEqual(3, mock_handler.get_message_count('debug', "Re-preparing"))
 
 
 class PrintStatementTests(unittest.TestCase):
