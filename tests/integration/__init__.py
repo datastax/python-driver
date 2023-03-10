@@ -34,6 +34,7 @@ from subprocess import call
 from itertools import groupby
 import six
 import shutil
+import pytest
 
 
 from cassandra import OperationTimedOut, ReadTimeout, ReadFailure, WriteTimeout, WriteFailure, AlreadyExists,\
@@ -366,8 +367,14 @@ greaterthanorequaldse50 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Ver
 lessthandse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('5.1'), "DSE version less than 5.1 required")
 lessthandse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('6.0'), "DSE version less than 6.0 required")
 
-requires_collection_indexes = unittest.skipUnless(SCYLLA_VERSION is None or Version(SCYLLA_VERSION.split(':')[1]) >= Version('5.2'), 'Test requires Scylla >= 5.2 or Cassandra')
-requires_custom_indexes = unittest.skipUnless(SCYLLA_VERSION is None, 'Currently, Scylla does not support SASI or any other CUSTOM INDEX class.')
+# pytest.mark.xfail instead of unittest.expectedFailure because
+# 1. unittest doesn't skip setUpClass when used on class and we need it sometimes
+# 2. unittest doesn't have conditional xfail, and I prefer to use pytest than custom decorator
+# 3. unittest doesn't have a reason argument, so you don't see the reason in pytest report
+requires_collection_indexes = pytest.mark.xfail(SCYLLA_VERSION is not None and Version(SCYLLA_VERSION.split(':')[1]) < Version('5.2'),
+                                              reason='Scylla supports collection indexes from 5.2 onwards') 
+requires_custom_indexes = pytest.mark.xfail(SCYLLA_VERSION is not None, 
+                                          reason='Scylla does not support SASI or any other CUSTOM INDEX class')
 
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
