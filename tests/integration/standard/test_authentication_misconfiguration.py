@@ -19,12 +19,6 @@ from tests.integration import USE_CASS_EXTERNAL, use_cluster, TestCluster
 
 class MisconfiguredAuthenticationTests(unittest.TestCase):
     """ One node (not the contact point) has password auth. The rest of the nodes have no auth """
-    # TODO: 	Fix ccm to apply following options to scylla.yaml
-    # 	node3.set_configuration_options(values={
-    # 	'authenticator': 'PasswordAuthenticator',
-    # 	'authorizer': 'CassandraAuthorizer',
-    # 	})
-    # To make it working for scylla
     @classmethod
     def setUpClass(cls):
         if not USE_CASS_EXTERNAL:
@@ -38,7 +32,6 @@ class MisconfiguredAuthenticationTests(unittest.TestCase):
 
             cls.ccm_cluster = ccm_cluster
 
-    @unittest.expectedFailure
     def test_connect_no_auth_provider(self):
         cluster = TestCluster()
         cluster.connect()
