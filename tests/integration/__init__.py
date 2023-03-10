@@ -366,8 +366,8 @@ greaterthanorequaldse50 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Ver
 lessthandse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('5.1'), "DSE version less than 5.1 required")
 lessthandse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('6.0'), "DSE version less than 6.0 required")
 
-requirescollectionindexes = unittest.skipUnless(SCYLLA_VERSION is None or Version(SCYLLA_VERSION.split(':')[1]) >= Version('5.2'), 'Test requires Scylla >= 5.2 or Cassandra')
-requirescustomindexes = unittest.skipUnless(SCYLLA_VERSION is None, 'Currently, Scylla does not support SASI or any other CUSTOM INDEX class.')
+requires_collection_indexes = unittest.skipUnless(SCYLLA_VERSION is None or Version(SCYLLA_VERSION.split(':')[1]) >= Version('5.2'), 'Test requires Scylla >= 5.2 or Cassandra')
+requires_custom_indexes = unittest.skipUnless(SCYLLA_VERSION is None, 'Currently, Scylla does not support SASI or any other CUSTOM INDEX class.')
 
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
