@@ -18,7 +18,8 @@ import unittest
 import six
 from cassandra.query import BatchStatement
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, local, TestCluster
+from tests.integration import (use_singledc, PROTOCOL_VERSION, local, TestCluster,
+                               requires_custom_payload, xfail_scylla)
 
 
 def setup_module():
@@ -27,7 +28,7 @@ def setup_module():
 
 # Failing with scylla because there is no warning message when changing the value of 'batch_size_warn_threshold_in_kb'
 # config")
-@unittest.expectedFailure
+@xfail_scylla('Empty warnings: TypeError: object of type \'NoneType\' has no len()')
 class ClientWarningTests(unittest.TestCase):
 
     @classmethod
@@ -94,6 +95,7 @@ class ClientWarningTests(unittest.TestCase):
         self.assertIsNotNone(future.get_query_trace())
 
     @local
+    @requires_custom_payload
     def test_warning_with_custom_payload(self):
         """
         Test to validate client warning with custom payload
@@ -113,6 +115,7 @@ class ClientWarningTests(unittest.TestCase):
         self.assertDictEqual(future.custom_payload, payload)
 
     @local
+    @requires_custom_payload
     def test_warning_with_trace_and_custom_payload(self):
         """
         Test to validate client warning with tracing and client warning

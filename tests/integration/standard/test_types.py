@@ -31,7 +31,7 @@ from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, execute_until_pass, notprotocolv1, \
     BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequaldse51, \
-    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster
+    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster, requires_composite_type
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_all_samples, get_collection_sample
 
@@ -731,7 +731,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         s.execute(u"SELECT * FROM system.local WHERE key = 'ef\u2052ef'")
         s.execute(u"SELECT * FROM system.local WHERE key = %s", (u"fe\u2051fe",))
 
-    @unittest.expectedFailure
+    @requires_composite_type
     def test_can_read_composite_type(self):
         """
         Test to ensure that CompositeTypes can be used in a query

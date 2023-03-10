@@ -25,7 +25,7 @@ from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DE
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
-    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, TestCluster, requirecassandra
+    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, TestCluster, requirecassandra, xfail_scylla
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
@@ -950,8 +950,7 @@ class LightweightTransactionTests(unittest.TestCase):
         # Make sure test passed
         self.assertTrue(received_timeout)
 
-    # Failed on Scylla because error `SERIAL/LOCAL_SERIAL consistency may only be requested for one partition at a time`
-    @unittest.expectedFailure
+    @xfail_scylla('Fails on Scylla with error `SERIAL/LOCAL_SERIAL consistency may only be requested for one partition at a time`')
     def test_was_applied_batch_stmt(self):
         """
         Test to ensure `:attr:cassandra.cluster.ResultSet.was_applied` works as expected

@@ -344,6 +344,7 @@ def local_decorator_creator():
 local = local_decorator_creator()
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
+lessthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION < 3, 'Protocol versions 3 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
 protocolv6 = unittest.skipUnless(6 in get_supported_protocol_versions(), 'Protocol versions less than 6 are not supported')
 
@@ -375,6 +376,14 @@ requires_collection_indexes = pytest.mark.xfail(SCYLLA_VERSION is not None and V
                                               reason='Scylla supports collection indexes from 5.2 onwards') 
 requires_custom_indexes = pytest.mark.xfail(SCYLLA_VERSION is not None, 
                                           reason='Scylla does not support SASI or any other CUSTOM INDEX class')
+requires_java_udf = pytest.mark.xfail(SCYLLA_VERSION is not None,
+                                    reason='Scylla does not support UDFs written in Java')
+requires_composite_type = pytest.mark.xfail(SCYLLA_VERSION is not None,
+                                            reason='Scylla does not support composite types')
+requires_custom_payload = pytest.mark.xfail(SCYLLA_VERSION is not None or PROTOCOL_VERSION < 4,
+                                            reason='Scylla does not support custom payloads. Cassandra requires native protocol v4.0+')
+xfail_scylla = lambda reason, *args, **kwargs: pytest.mark.xfail(SCYLLA_VERSION is not None, reason=reason, *args, **kwargs)
+incorrect_test = lambda reason='This test seems to be incorrect and should be fixed', *args, **kwargs: pytest.mark.xfail(reason=reason, *args, **kwargs)
 
 pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is skipped unless it's on PyPy")
 notpy3 = unittest.skipIf(sys.version_info >= (3, 0), "Test not applicable for Python 3.x runtime")
