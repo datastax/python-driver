@@ -3,13 +3,9 @@ sudo: false
 
 language: python
 python:
-  - "2.7"
-  - "3.5"
-  - "3.6"
   - "3.7"
   - "3.8"
-  - "pypy2.7-6.0"
-  - "pypy3.5"
+  - "pypy3.7"
 
 env:
   - CASS_DRIVER_NO_CYTHON=1
