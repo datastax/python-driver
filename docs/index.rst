@@ -17,25 +17,25 @@ Contents
 :doc:`installation`
     How to install the driver.
 
-:doc:`getting_started`
+:doc:`getting-started`
     A guide through the first steps of connecting to Scylla and executing queries
 
-:doc:`scylla_specific`
+:doc:`scylla-specific`
     A list of feature available only on ``scylla-driver``
 
-:doc:`execution_profiles`
+:doc:`execution-profiles`
     An introduction to a more flexible way of configuring request execution
 
 :doc:`lwt`
     Working with results of conditional requests
 
-:doc:`object_mapper`
+:doc:`object-mapper`
     Introduction to the integrated object mapper, cqlengine
 
 :doc:`performance`
     Tips for getting good performance.
 
-:doc:`query_paging`
+:doc:`query-paging`
     Notes on paging large query results
 
 :doc:`security`
@@ -44,16 +44,16 @@ Contents
 :doc:`upgrading`
     A guide to upgrading versions of the driver
 
-:doc:`user_defined_types`
+:doc:`user-defined-types`
     Working with Scylla's user-defined types (UDT)
 
-:doc:`dates_and_times`
+:doc:`dates-and-times`
     Some discussion on the driver's approach to working with timestamp, date, time types
 
-:doc:`scylla_cloud`
+:doc:`scylla-cloud`
     Connect to ScyllaDB Cloud
 
-:doc:`scylla_cloud_serverless`
+:doc:`scylla-cloud-serverless`
     Connect to ScyllaDB Cloud Serverless
 
 :doc:`CHANGELOG`
@@ -70,19 +70,19 @@ Contents
 
    api/index
    installation
-   getting_started
-   scylla_specific
+   getting-started
+   scylla-specific
    upgrading
-   execution_profiles
+   execution-profiles
    performance
-   query_paging
+   query-paging
    lwt
    security
-   user_defined_types
-   object_mapper
-   dates_and_times
-   scylla_cloud
-   scylla_cloud_serverless
+   user-defined-types
+   object-mapper
+   dates-and-times
+   scylla-cloud
+   scylla-cloud-serverless
    faq
 
 Getting Help

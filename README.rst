@@ -24,8 +24,8 @@ Features
 * `Automatic reconnection <http://python-driver.docs.scylladb.com/stable/api/cassandra/policies.html#reconnecting-to-dead-hosts>`_
 * Configurable `load balancing <http://python-driver.docs.scylladb.com/stable/api/cassandra/policies.html#load-balancing>`_ and `retry policies <http://python-driver.docs.scylladb.com/stable/api/cassandra/policies.html#retrying-failed-operations>`_
 * `Concurrent execution utilities <http://python-driver.docs.scylladb.com/stable/api/cassandra/concurrent.html>`_
-* `Object mapper <http://python-driver.docs.scylladb.com/stable/object_mapper.html>`_
-* `Shard awareness <http://python-driver.docs.scylladb.com/stable/scylla_specific.html#shard-awareness>`_
+* `Object mapper <http://python-driver.docs.scylladb.com/stable/object-mapper.html>`_
+* `Shard awareness <http://python-driver.docs.scylladb.com/stable/scylla-specific.html#shard-awareness>`_
 
 Installation
 ------------
@@ -43,7 +43,7 @@ The documentation can be found online `here <http://python-driver.docs.scylladb.
 Information includes: 
 
 * `Installation <http://python-driver.docs.scylladb.com/stable/installation.html>`_
-* `Getting started guide <http://python-driver.docs.scylladb.com/stable/getting_started.html>`_
+* `Getting started guide <http://python-driver.docs.scylladb.com/stable/getting-started.html>`_
 * `API docs <http://python-driver.docs.scylladb.com/stable/api/index.html>`_
 * `Performance tips <http://python-driver.docs.scylladb.com/stable/performance.html>`_
 
@@ -59,7 +59,7 @@ Object Mapper
 -------------
 cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contributions from the
 community) is now maintained as an integral part of this package. Refer to
-`documentation here <http://python-driver.docs.scylladb.com/stable/object_mapper.html>`_.
+`documentation here <http://python-driver.docs.scylladb.com/stable/object-mapper.html>`_.
 
 Contributing
 ------------

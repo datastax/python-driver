@@ -7,7 +7,7 @@ cqlengine is the Cassandra CQL 3 Object Mapper packaged with this driver
 
 Contents
 --------
-:doc:`cqlengine/upgrade_guide`
+:doc:`cqlengine/upgrade-guide`
     For migrating projects from legacy cqlengine, to the integrated product
 
 :doc:`cqlengine/models`
@@ -25,7 +25,7 @@ Contents
 :ref:`API Documentation <om_api>`
     Index of API documentation
 
-:doc:`cqlengine/third_party`
+:doc:`cqlengine/third-party`
     High-level examples in Celery and uWSGI
 
 :doc:`cqlengine/faq`
@@ -33,12 +33,12 @@ Contents
 .. toctree::
     :hidden:
 
-    cqlengine/upgrade_guide
+    cqlengine/upgrade-guide
     cqlengine/models
     cqlengine/queryset
     cqlengine/batches
     cqlengine/connections
-    cqlengine/third_party
+    cqlengine/third-party
     cqlengine/faq
 
 .. _getting-started:

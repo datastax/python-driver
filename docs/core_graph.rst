@@ -13,7 +13,7 @@ The driver defines three Execution Profiles suitable for graph execution:
 * :data:`~.cluster.EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT`
 * :data:`~.cluster.EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT`
 
-See :doc:`getting_started` and :doc:`execution_profiles`
+See :doc:`getting-started` and :doc:`execution-profiles`
 for more detail on working with profiles.
 
 In DSE 6.8.0, the Core graph engine has been introduced and is now the default. It
