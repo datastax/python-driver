@@ -1512,7 +1512,26 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         self.assertEqual(bytes, policy.decrypt(coldesc, encrypted_bytes))
 
     def test_no_padding_necessary(self):
-        self._test_round_trip(b"a secret message")
+        from cassandra.policies import AES256_BLOCK_SIZE_BYTES
+        bytes = os.urandom(AES256_BLOCK_SIZE_BYTES)
+        self._test_round_trip(bytes)
 
     def test_some_padding_required(self):
-        self._test_round_trip(b"the quick brown fox jumped over the lazy dog")
+        from cassandra.policies import AES256_BLOCK_SIZE_BYTES
+        for byte_size in range(1,AES256_BLOCK_SIZE_BYTES - 1):
+            bytes = os.urandom(byte_size)
+            self._test_round_trip(bytes)
+        for byte_size in range(AES256_BLOCK_SIZE_BYTES + 1,(2 * AES256_BLOCK_SIZE_BYTES) - 1):
+            bytes = os.urandom(byte_size)
+            self._test_round_trip(bytes)
+
+    def test_invalid_key_size_raises(self):
+        from cassandra.policies import AES256_KEY_SIZE_BYTES
+        coldesc = ColDesc('ks1','table1','col1')
+        policy = AES256ColumnEncryptionPolicy()
+        for key_size in range(1,AES256_KEY_SIZE_BYTES - 1):
+            with self.assertRaises(ValueError):
+                policy.add_column(coldesc, os.urandom(key_size))
+        for key_size in range(AES256_KEY_SIZE_BYTES + 1,(2 * AES256_KEY_SIZE_BYTES) - 1):
+            with self.assertRaises(ValueError):
+                policy.add_column(coldesc, os.urandom(key_size))

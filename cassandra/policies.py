@@ -22,6 +22,7 @@ from threading import Lock
 import socket
 import warnings
 
+from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from cassandra import WriteType as WT
@@ -1190,7 +1191,6 @@ class NeverRetryPolicy(RetryPolicy):
 
 
 ColDesc = namedtuple('ColDesc', ['ks', 'table', 'col'])
-Cryptors = namedtuple('Cryptors', ['cipher', 'encryptor', 'decryptor'])
 
 class ColumnEncryptionPolicy(object):
     def encrypt(self, coldesc, obj_bytes):
@@ -1202,57 +1202,76 @@ class ColumnEncryptionPolicy(object):
     def add_column(self, coldesc, key):
         raise NotImplementedError()
 
+# Both sizes below in
+AES256_BLOCK_SIZE = 128
+AES256_BLOCK_SIZE_BYTES = int(AES256_BLOCK_SIZE / 8)
+AES256_KEY_SIZE = 256
+AES256_KEY_SIZE_BYTES = int(AES256_KEY_SIZE / 8)
 
 class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
-    # Cipher-specific initialization values (such as block
-    # chaining mode and/or IV for AES) are set in the
-    # impl-specific constructor.  Implication is that all
-    # columns will share a common cipher configuration even
-    # if they don't have to share a common key.
+    # CBC uses an IV that's the same size as the block size
     #
     # TODO: Need to find some way to expose mode options
     # (CBC etc.) without leaking classes from the underlying
     # impl here
-    def __init__(self, mode = modes.CBC, iv = os.urandom(16)):
+    def __init__(self, mode = modes.CBC, iv = os.urandom(AES256_BLOCK_SIZE_BYTES)):
 
         self.mode = mode
         self.iv = iv
 
-        # ColDesc -> keys
+        # Keys for a given ColDesc are always preserved.  We only create a Cipher
+        # when there's an actual need to for a given ColDesc
         self.keys = {}
-
-        # ColDesc -> Ciphers
-        self.cryptors = {}
+        self.ciphers = {}
 
     def encrypt(self, coldesc, obj_bytes):
 
         # AES256 has a 128-bit block size so if the input bytes don't align perfectly on
-        # those blocks we have to pad them
-        cryptor = self._get_cryptor(coldesc)
-        encryptor = cryptor.encryptor
-        return encryptor.update(obj_bytes) + encryptor.finalize()
+        # those blocks we have to pad them.  There's plenty of room for optimization here:
+        #
+        # * Instances of the PKCS7 padder should be managed in a bounded pool
+        # * It would be nice if we could get a flag from encrypted data to indicate
+        #   whether it was padded or not
+        #   * Might be able to make this happen with a leading block of flags in encrypted data
+        padder = padding.PKCS7(AES256_BLOCK_SIZE).padder()
+        padded_bytes = padder.update(obj_bytes) + padder.finalize()
+
+        cipher = self._get_cipher(coldesc)
+        encryptor = cipher.encryptor()
+        return encryptor.update(padded_bytes) + encryptor.finalize()
 
     def decrypt(self, coldesc, encrypted_bytes):
 
-        cryptor = self._get_cryptor(coldesc)
-        decryptor = cryptor.decryptor
-        return decryptor.update(encrypted_bytes) + decryptor.finalize()
+        cipher = self._get_cipher(coldesc)
+        decryptor = cipher.decryptor()
+        padded_bytes = decryptor.update(encrypted_bytes) + decryptor.finalize()
+
+        unpadder = padding.PKCS7(AES256_BLOCK_SIZE).unpadder()
+        return unpadder.update(padded_bytes) + unpadder.finalize()
 
     def add_column(self, coldesc, key):
 
-        # TODO: Validate key length here?  We're expecting a 256-bit key
+        AES256ColumnEncryptionPolicy._validate_key(key)
         self.keys[coldesc] = key
 
-    def _get_cryptor(self, coldesc):
+    def _get_cipher(self, coldesc):
+        """
+        Access relevant state from this instance necessary to create a Cipher and then get one,
+        hopefully returning a cached instance if we've already done so (and it hasn't been evicted)
+        """
 
         key = self.keys[coldesc]
-        cryptor = AES256ColumnEncryptionPolicy._build_cryptor(key, self.mode, self.iv)
-        self.cryptors[coldesc] = cryptor
-        return cryptor
+        return AES256ColumnEncryptionPolicy._build_cipher(key, self.mode, self.iv)
+
+    def _validate_key(key):
+        if not len(key) == AES256_KEY_SIZE_BYTES:
+            raise ValueError("AES256 column encryption policy expects a 256-bit encryption key")
 
     @lru_cache
-    def _build_cryptor(key, mode, iv):
+    def _build_cipher(key, mode, iv):
+        """
+        Explicitly use a class method here to avoid caching self
+        """
 
-        cipher = Cipher(algorithms.AES256(key), mode(iv))
-        return Cryptors(cipher, cipher.encryptor(), cipher.decryptor())
+        return Cipher(algorithms.AES256(key), mode(iv))
