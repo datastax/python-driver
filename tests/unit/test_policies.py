@@ -16,6 +16,7 @@ import unittest
 
 from itertools import islice, cycle
 from mock import Mock, patch, call
+import os
 from random import randint
 import six
 from six.moves._thread import LockType
@@ -32,7 +33,8 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 RetryPolicy, WriteType,
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
-                                IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy)
+                                IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy,
+                                AES256ColumnEncryptionPolicy, ColDesc)
 from cassandra.pool import Host
 from cassandra.connection import DefaultEndPoint
 from cassandra.query import Statement
@@ -1500,3 +1502,17 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
         self.assertEqual(set(query_plan), {Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy),
                                            Host(DefaultEndPoint("127.0.0.4"), SimpleConvictionPolicy)})
 
+class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
+
+    def _test_round_trip(self, bytes):
+        coldesc = ColDesc('ks1','table1','col1')
+        policy = AES256ColumnEncryptionPolicy()
+        policy.add_column(coldesc, os.urandom(32))
+        encrypted_bytes = policy.encrypt(coldesc, bytes)
+        self.assertEqual(bytes, policy.decrypt(coldesc, encrypted_bytes))
+
+    def test_no_padding_necessary(self):
+        self._test_round_trip(b"a secret message")
+
+    def test_some_padding_required(self):
+        self._test_round_trip(b"the quick brown fox jumped over the lazy dog")

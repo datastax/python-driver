@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import namedtuple
+from functools import lru_cache
 from itertools import islice, cycle, groupby, repeat
 import logging
+import os
 from random import randint, shuffle
 from threading import Lock
 import socket
 import warnings
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 from cassandra import WriteType as WT
 
 
@@ -1181,3 +1187,72 @@ class NeverRetryPolicy(RetryPolicy):
     on_read_timeout = _rethrow
     on_write_timeout = _rethrow
     on_unavailable = _rethrow
+
+
+ColDesc = namedtuple('ColDesc', ['ks', 'table', 'col'])
+Cryptors = namedtuple('Cryptors', ['cipher', 'encryptor', 'decryptor'])
+
+class ColumnEncryptionPolicy(object):
+    def encrypt(self, coldesc, obj_bytes):
+        raise NotImplementedError()
+
+    def decrypt(self, coldesc, encrypted_bytes):
+        raise NotImplementedError()
+
+    def add_column(self, coldesc, key):
+        raise NotImplementedError()
+
+
+class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
+
+    # Cipher-specific initialization values (such as block
+    # chaining mode and/or IV for AES) are set in the
+    # impl-specific constructor.  Implication is that all
+    # columns will share a common cipher configuration even
+    # if they don't have to share a common key.
+    #
+    # TODO: Need to find some way to expose mode options
+    # (CBC etc.) without leaking classes from the underlying
+    # impl here
+    def __init__(self, mode = modes.CBC, iv = os.urandom(16)):
+
+        self.mode = mode
+        self.iv = iv
+
+        # ColDesc -> keys
+        self.keys = {}
+
+        # ColDesc -> Ciphers
+        self.cryptors = {}
+
+    def encrypt(self, coldesc, obj_bytes):
+
+        # AES256 has a 128-bit block size so if the input bytes don't align perfectly on
+        # those blocks we have to pad them
+        cryptor = self._get_cryptor(coldesc)
+        encryptor = cryptor.encryptor
+        return encryptor.update(obj_bytes) + encryptor.finalize()
+
+    def decrypt(self, coldesc, encrypted_bytes):
+
+        cryptor = self._get_cryptor(coldesc)
+        decryptor = cryptor.decryptor
+        return decryptor.update(encrypted_bytes) + decryptor.finalize()
+
+    def add_column(self, coldesc, key):
+
+        # TODO: Validate key length here?  We're expecting a 256-bit key
+        self.keys[coldesc] = key
+
+    def _get_cryptor(self, coldesc):
+
+        key = self.keys[coldesc]
+        cryptor = AES256ColumnEncryptionPolicy._build_cryptor(key, self.mode, self.iv)
+        self.cryptors[coldesc] = cryptor
+        return cryptor
+
+    @lru_cache
+    def _build_cryptor(key, mode, iv):
+
+        cipher = Cipher(algorithms.AES256(key), mode(iv))
+        return Cryptors(cipher, cipher.encryptor(), cipher.decryptor())
