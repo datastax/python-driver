@@ -1202,6 +1202,9 @@ class ColumnEncryptionPolicy(object):
     def add_column(self, coldesc, key):
         raise NotImplementedError()
 
+    def contains_column(self, coldesc):
+        raise NotImplementedError()
+
 # Both sizes below in
 AES256_BLOCK_SIZE = 128
 AES256_BLOCK_SIZE_BYTES = int(AES256_BLOCK_SIZE / 8)
@@ -1254,6 +1257,12 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
         AES256ColumnEncryptionPolicy._validate_key(key)
         self.keys[coldesc] = key
+
+    def contains_column(self, coldesc):
+        return coldesc in self.keys
+
+    def cache_info(self):
+        return AES256ColumnEncryptionPolicy._build_cipher.cache_info()
 
     def _get_cipher(self, coldesc):
         """
