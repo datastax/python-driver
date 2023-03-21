@@ -46,7 +46,8 @@ class ScyllaCloudConfigTests(TestCase):
         ccm_cluster._update_config()
 
         config_data_yaml, config_path_yaml = create_cloud_config(ccm_cluster.get_path(),
-                                                                 port=listen_port, address=listen_address)
+                                                                 port=listen_port, address=listen_address,
+                                                                 nodes_info=nodes_info)
         return config_data_yaml, config_path_yaml
 
     def test_1_node_cluster(self):
