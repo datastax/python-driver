@@ -15,8 +15,6 @@
 """
 Connection pooling and host management.
 """
-from __future__ import absolute_import
-
 from concurrent.futures import Future
 from functools import total_ordering
 import logging
@@ -1198,9 +1196,7 @@ class HostConnectionPool(object):
         with self._lock:
             connections_to_close.extend(self._connections)
             self.open_count -= len(self._connections)
-            # After dropping support for Python 2 we can again use list.clear()
-            # self._connections.clear()
-            del self._connections[:]
+            self._connections.clear()
             connections_to_close.extend(self._trash)
             self._trash.clear()
 

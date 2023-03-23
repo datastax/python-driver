@@ -10,7 +10,7 @@ Scylla Enterprise (2018.1.x+) using exclusively Cassandra's binary protocol and 
 .. image:: https://github.com/scylladb/python-driver/workflows/CI%20Docs/badge.svg?tag=*-scylla
    :target: https://github.com/scylladb/python-driver/actions?query=workflow%3A%22CI+Docs%22+event%3Apush+branch%3A*-scylla
 
-The driver supports Python versions 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8.
+The driver supports Python versions 3.6-3.11.
 
 .. **Note:** This driver does not support big-endian systems.
 
