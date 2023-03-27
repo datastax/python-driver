@@ -24,6 +24,7 @@ from uuid import uuid4
 import logging
 import warnings
 from packaging.version import Version
+import os
 
 import cassandra
 from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT, ControlConnection, Cluster
@@ -50,6 +51,7 @@ log = logging.getLogger(__name__)
 
 
 def setup_module():
+    os.environ['SCYLLA_EXT_OPTS'] = "--smp 1"
     use_singledc()
     warnings.simplefilter("always")
 
