@@ -29,6 +29,7 @@ import warnings
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.util import unix_time_from_uuid1
+from cassandra.cqltypes import BytesType
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.protocol import _UNSET_VALUE
@@ -442,12 +443,14 @@ class PreparedStatement(object):
     query_string = None
     result_metadata = None
     result_metadata_id = None
+    column_encryption_policy = None
     routing_key_indexes = None
     _routing_key_index_set = None
     serial_consistency_level = None  # TODO never used?
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
-                 keyspace, protocol_version, result_metadata, result_metadata_id):
+                 keyspace, protocol_version, result_metadata, result_metadata_id,
+                 column_encryption_policy):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
@@ -456,14 +459,17 @@ class PreparedStatement(object):
         self.protocol_version = protocol_version
         self.result_metadata = result_metadata
         self.result_metadata_id = result_metadata_id
+        self.column_encryption_policy = column_encryption_policy
         self.is_idempotent = False
 
     @classmethod
     def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata,
                      query, prepared_keyspace, protocol_version, result_metadata,
-                     result_metadata_id):
+                     result_metadata_id, column_encryption_policy):
         if not column_metadata:
-            return PreparedStatement(column_metadata, query_id, None, query, prepared_keyspace, protocol_version, result_metadata, result_metadata_id)
+            return PreparedStatement(column_metadata, query_id, None,
+                                     query, prepared_keyspace, protocol_version, result_metadata,
+                                     result_metadata_id, column_encryption_policy)
 
         if pk_indexes:
             routing_key_indexes = pk_indexes
@@ -489,7 +495,7 @@ class PreparedStatement(object):
 
         return PreparedStatement(column_metadata, query_id, routing_key_indexes,
                                  query, prepared_keyspace, protocol_version, result_metadata,
-                                 result_metadata_id)
+                                 result_metadata_id, column_encryption_policy)
 
     def bind(self, values):
         """
@@ -623,7 +629,15 @@ class BoundStatement(Statement):
                     raise ValueError("Attempt to bind UNSET_VALUE while using unsuitable protocol version (%d < 4)" % proto_version)
             else:
                 try:
-                    self.values.append(col_spec.type.serialize(value, proto_version))
+                    col_type = col_spec.type
+                    # TODO: Need to extract keyspace/table/column data from col_spec and create a CodDesc here
+                    if self.prepared_statement.column_encryption_policy and \
+                        self.prepared_statement.column_encryption_policy.contains_column():
+                        col_type = BytesType
+                        # TODO: Also need to encrypt the value using the relevant key and populate.  Prolly don't
+                        # need to worry about actually overriding col_type here... can prolly just get away with
+                        # BytesType.serialize() or something similar.
+                    self.values.append(col_type.serialize(value, proto_version))
                 except (TypeError, struct.error) as exc:
                     actual_type = type(value)
                     message = ('Received an argument of invalid type for column "%s". '

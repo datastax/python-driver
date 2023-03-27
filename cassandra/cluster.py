@@ -1003,6 +1003,12 @@ class Cluster(object):
     load the configuration and certificates.
     """
 
+    column_encryption_policy = None
+    """
+    An instance of :class:`cassandra.policies.ColumnEncryptionPolicy` specifying encryption materials to be
+    used for columns in this cluster.
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -1104,7 +1110,8 @@ class Cluster(object):
                  monitor_reporting_enabled=True,
                  monitor_reporting_interval=30,
                  client_id=None,
-                 cloud=None):
+                 cloud=None,
+                 column_encryption_policy=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -1151,6 +1158,9 @@ class Cluster(object):
             self.contact_points = contact_points
 
         self.port = port
+
+        if column_encryption_policy is not None:
+            self.column_encryption_policy = column_encryption_policy
 
         self.endpoint_factory = endpoint_factory or DefaultEndPointFactory(port=self.port)
         self.endpoint_factory.configure(self)
