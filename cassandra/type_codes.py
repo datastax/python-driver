@@ -36,6 +36,9 @@ Type codes are repeated here from the Cassandra binary protocol specification:
                            keys and values of the map
             0x0022    Set: the value is an [option], representing the type
                             of the elements of the set
+
+See https://issues.apache.org/jira/browse/CASSANDRA-18369
+PYTEST_DONT_REWRITE
 """
 
 CUSTOM_TYPE = 0x0000
