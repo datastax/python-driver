@@ -26,6 +26,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+import pytest
 
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, ConstantReconnectionPolicy
@@ -188,7 +189,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         time.sleep(10)
         self.query_data(self.session)
 
-    @unittest.expectedFailure
+    @pytest.mark.skip
     def test_blocking_connections(self):
         """
         Verify that reconnection is working as expected, when connection are being blocked.
