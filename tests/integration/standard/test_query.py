@@ -17,6 +17,7 @@ from cassandra import DriverException
 
 import unittest
 import logging
+import pytest
 from cassandra import ProtocolVersion
 from cassandra import ConsistencyLevel, Unavailable, InvalidRequest, cluster
 from cassandra.query import (PreparedStatement, BoundStatement, SimpleStatement,
@@ -1036,8 +1037,7 @@ class LightweightTransactionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             results.was_applied
 
-    # Skipping until PYTHON-943 is resolved
-    @unittest.expectedFailure
+    @pytest.mark.xfail(reason='Skipping until PYTHON-943 is resolved')
     def test_was_applied_batch_string(self):
         batch_statement = BatchStatement(BatchType.LOGGED)
         batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",

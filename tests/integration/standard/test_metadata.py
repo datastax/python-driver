@@ -23,6 +23,7 @@ import time
 import os
 from packaging.version import Version
 from mock import Mock, patch
+import pytest
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 
@@ -1209,7 +1210,7 @@ CREATE TABLE export_udts.users (
         cluster.shutdown()
 
     @greaterthancass21
-    @unittest.expectedFailure
+    @pytest.mark.xfail(reason='Column name in CREATE INDEX is not quoted. It\'s a bug in driver or in Scylla')
     def test_case_sensitivity(self):
         """
         Test that names that need to be escaped in CREATE statements are
@@ -1279,7 +1280,7 @@ CREATE TABLE export_udts.users (
         cluster.shutdown()
 
     @local
-    @unittest.expectedFailure
+    @pytest.mark.xfail(reason='AssertionError: \'RAC1\' != \'r1\' - probably a bug in driver or in Scylla')
     def test_replicas(self):
         """
         Ensure cluster.metadata.get_replicas return correctly when not attached to keyspace
