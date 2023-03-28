@@ -39,7 +39,7 @@ LOGGER = logging.getLogger(__name__)
 
 def setup_module():
     os.environ['SCYLLA_EXT_OPTS'] = "--smp 4 --memory 2048M"
-    use_cluster('shared_aware', [3], start=True)
+    use_cluster('shard_aware', [3], start=True)
 
 
 class TestShardAwareIntegration(unittest.TestCase):
