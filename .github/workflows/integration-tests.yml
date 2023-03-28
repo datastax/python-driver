@@ -21,5 +21,4 @@ jobs:
 
     - name: Test with pytest
       run: |
-        ./ci/run_integration_test.sh tests/integration/standard/test_authentication.py tests/integration/standard/test_cluster.py tests/integration/standard/test_concurrent.py tests/integration/standard/test_connection.py tests/integration/standard/test_control_connection.py tests/integration/standard/test_custom_payload.py tests/integration/standard/test_custom_protocol_handler.py tests/integration/standard/test_cython_protocol_handlers.py tests/integration/standard/test_scylla_cloud.py tests/integration/standard/test_use_keyspace.py tests/integration/standard/test_ip_change.py tests/integration/cqlengine/
-        # can't run this, cause only 2 cpus on github actions: tests/integration/standard/test_shard_aware.py
+        ./ci/run_integration_test.sh tests/integration/standard/ tests/integration/cqlengine/
