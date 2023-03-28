@@ -38,7 +38,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def setup_module():
-    os.environ['SCYLLA_EXT_OPTS'] = "--smp 4 --memory 2048M"
+    os.environ['SCYLLA_EXT_OPTS'] = "--smp 2"
     use_cluster('shard_aware', [3], start=True)
 
 
@@ -109,7 +109,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         session.execute(bound)
         bound = prepared.bind(('e', 'f', 'g'))
         session.execute(bound)
-        bound = prepared.bind(('100000', 'f', 'g'))
+        bound = prepared.bind(('100002', 'f', 'g'))
         session.execute(bound)
 
     def query_data(self, session, verify_in_tracing=True):
@@ -122,20 +122,20 @@ class TestShardAwareIntegration(unittest.TestCase):
         results = session.execute(bound, trace=True)
         self.assertEqual(results, [('a', 'b', 'c')])
         if verify_in_tracing:
-            self.verify_same_shard_in_tracing(results, "shard 1")
+            self.verify_same_shard_in_tracing(results, "shard 0")
 
-        bound = prepared.bind(('100000', 'f'))
+        bound = prepared.bind(('100002', 'f'))
         results = session.execute(bound, trace=True)
-        self.assertEqual(results, [('100000', 'f', 'g')])
+        self.assertEqual(results, [('100002', 'f', 'g')])
 
         if verify_in_tracing:
-            self.verify_same_shard_in_tracing(results, "shard 0")
+            self.verify_same_shard_in_tracing(results, "shard 1")
 
         bound = prepared.bind(('e', 'f'))
         results = session.execute(bound, trace=True)
 
         if verify_in_tracing:
-            self.verify_same_shard_in_tracing(results, "shard 1")
+            self.verify_same_shard_in_tracing(results, "shard 0")
 
     def test_all_tracing_coming_one_shard(self):
         """
