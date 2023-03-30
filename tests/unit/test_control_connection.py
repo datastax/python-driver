@@ -512,13 +512,13 @@ class ControlConnectionTest(unittest.TestCase):
             }
             self.cluster.scheduler.reset_mock()
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_schema, **event)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_schema_async, ANY, **event)
 
             self.cluster.scheduler.reset_mock()
             event['target_type'] = SchemaTargetType.KEYSPACE
             del event['table']
             self.control_connection._handle_schema_change(event)
-            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection.refresh_schema, **event)
+            self.cluster.scheduler.schedule_unique.assert_called_once_with(ANY, self.control_connection._refresh_schema_async, ANY, **event)
 
     def test_refresh_disabled(self):
         cluster = MockCluster()
@@ -566,7 +566,7 @@ class ControlConnectionTest(unittest.TestCase):
         cc_no_topo_refresh._handle_status_change(status_event)
         cc_no_topo_refresh._handle_schema_change(schema_event)
         cluster.scheduler.schedule_unique.assert_has_calls([call(ANY, cc_no_topo_refresh.refresh_node_list_and_token_map),
-                                                            call(0.0, cc_no_topo_refresh.refresh_schema,
+                                                            call(0.0, cc_no_topo_refresh._refresh_schema_async, ANY,
                                                                  **schema_event)])
 
     def test_refresh_nodes_and_tokens_add_host_detects_port(self):

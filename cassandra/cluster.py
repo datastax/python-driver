@@ -3783,6 +3783,138 @@ class ControlConnection(object):
         self._cluster.metadata.refresh(connection, self._timeout, fetch_size=self._schema_meta_page_size, **kwargs)
 
         return True
+    
+    # Three functions below (_refresh_schema_async, _refresh_schema_async_inner, _wait_for_schema_agreement_async) are async
+    # versions of the functions without _async in name - instead of blocking and returning result, their first argument
+    # is a callback that will receive either a result or an exception.
+    # Purpose of those functions is to avoid filling whole thread pool and deadlocking.
+    def _refresh_schema_async(self, callback, force=False, **kwargs):
+        def new_callback(e):
+            if isinstance(e, ReferenceError):
+                # our weak reference to the Cluster is no good
+                callback(False)
+                return
+            elif isinstance(e, Exception):
+                log.debug("[control connection] Error refreshing schema", exc_info=True)
+                self._signal_error()
+                callback(False)
+                return
+            else:
+                callback(e)
+        if self._connection:
+            self._refresh_schema_async_inner(new_callback, self._connection, force=force, **kwargs)
+        else:
+            callback(False)
+
+    def _refresh_schema_async_inner(self, callback, connection, preloaded_results=None, schema_agreement_wait=None, force=False, **kwargs):
+        if self._cluster.is_shutdown:
+            callback(False)
+            return
+        
+        def new_callback(e):
+            if not self._schema_meta_enabled and not force:
+                log.debug("[control connection] Skipping schema refresh because schema metadata is disabled")
+                callback(False)
+                return
+
+            if not e:
+                log.debug("Skipping schema refresh due to lack of schema agreement")
+                callback(False)
+                return
+            self._cluster.metadata.refresh(connection, self._timeout, fetch_size=self._schema_meta_page_size, **kwargs)
+        
+        self._wait_for_schema_agreement_async(new_callback,
+                                                connection=self._connection,
+                                                preloaded_results=preloaded_results,
+                                                wait_time=schema_agreement_wait)
+
+    # INTENDED ONLY FOR INTERNAL USE
+    def _wait_for_schema_agreement_async(self, callback, connection=None, preloaded_results=None, wait_time=None):
+        total_timeout = wait_time if wait_time is not None else self._cluster.max_schema_agreement_wait
+        if total_timeout <= 0:
+            callback(True)
+            return
+
+        # Each schema change typically generates two schema refreshes, one
+        # from the response type and one from the pushed notification. Holding
+        # a lock is just a simple way to cut down on the number of schema queries
+        # we'll make.
+        if not self._schema_agreement_lock.acquire(blocking=False):
+            self._cluster.scheduler.schedule_unique(0.2, self._wait_for_schema_agreement_async, callback, connection, preloaded_results, wait_time)
+            return
+        
+        try:
+            if self._is_shutdown:
+                self._schema_agreement_lock.release()
+                callback(None)
+                return
+
+            if not connection:
+                connection = self._connection
+
+            if preloaded_results:
+                log.debug("[control connection] Attempting to use preloaded results for schema agreement")
+
+                peers_result = preloaded_results[0]
+                local_result = preloaded_results[1]
+                schema_mismatches = self._get_schema_mismatches(peers_result, local_result, connection.endpoint)
+                if schema_mismatches is None:
+                    self._schema_agreement_lock.release()
+                    callback(True)
+                    return
+
+            log.debug("[control connection] Waiting for schema agreement")
+            start = self._time.time()
+            elapsed = 0
+            cl = ConsistencyLevel.ONE
+            schema_mismatches = None
+            select_peers_query = self._get_peers_query(self.PeersQueryType.PEERS_SCHEMA, connection)
+        except Exception as e:
+            self._schema_agreement_lock.release()
+            callback(e)
+            return
+
+        def inner(first_iter):
+            try:
+                elapsed = self._time.time() - start
+                if elapsed < total_timeout or first_iter:
+                    peers_query = QueryMessage(query=select_peers_query, consistency_level=cl)
+                    local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
+                    try:
+                        timeout = min(self._timeout, total_timeout - elapsed)
+                        peers_result, local_result = connection.wait_for_responses(
+                            peers_query, local_query, timeout=timeout)
+                    except OperationTimedOut as timeout:
+                        log.debug("[control connection] Timed out waiting for "
+                                    "response during schema agreement check: %s", timeout)
+                        self._cluster.scheduler.schedule_unique(0.2, inner, False)
+                        return
+                    except ConnectionShutdown as e:
+                        if self._is_shutdown:
+                            log.debug("[control connection] Aborting wait for schema match due to shutdown")
+                            self._schema_agreement_lock.release()
+                            callback(None)
+                            return
+                        else:
+                            raise
+
+                    schema_mismatches = self._get_schema_mismatches(peers_result, local_result, connection.endpoint)
+                    if schema_mismatches is None:
+                        self._schema_agreement_lock.release()
+                        callback(True)
+                        return
+
+                    log.debug("[control connection] Schemas mismatched, trying again")
+                    self._cluster.scheduler.schedule_unique(0.2, inner, False)
+                else:
+                    log.warning("Node %s is reporting a schema disagreement: %s",
+                                connection.endpoint, schema_mismatches)
+                    self._schema_agreement_lock.release()
+                    callback(False)
+            except Exception as e:
+                self._schema_agreement_lock.release()
+                callback(e)
+        inner(True)
 
     def refresh_node_list_and_token_map(self, force_token_rebuild=False):
         try:
@@ -4039,7 +4171,7 @@ class ControlConnection(object):
         if self._schema_event_refresh_window < 0:
             return
         delay = self._delay_for_event_type('schema_change', self._schema_event_refresh_window)
-        self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, **event)
+        self._cluster.scheduler.schedule_unique(delay, self._refresh_schema_async, lambda *a, **k: None, **event)
 
     def wait_for_schema_agreement(self, connection=None, preloaded_results=None, wait_time=None):
 
