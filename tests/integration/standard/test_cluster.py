@@ -40,7 +40,7 @@ from cassandra import connection
 from cassandra.connection import DefaultEndPoint
 
 from tests import notwindows
-from tests.integration import use_singledc, get_server_versions, CASSANDRA_VERSION, \
+from tests.integration import use_cluster, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
     get_unsupported_upper_protocol, lessthanprotocolv3, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, \
     lessthanorequalcass40, DSE_VERSION, TestCluster, PROTOCOL_VERSION, xfail_scylla, incorrect_test
@@ -52,7 +52,7 @@ log = logging.getLogger(__name__)
 
 def setup_module():
     os.environ['SCYLLA_EXT_OPTS'] = "--smp 1"
-    use_singledc()
+    use_cluster("cluster_tests", [3], start=True, workloads=None)
     warnings.simplefilter("always")
 
 
