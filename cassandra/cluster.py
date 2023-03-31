@@ -534,7 +534,7 @@ EXEC_PROFILE_GRAPH_DEFAULT = object()
 Key for the default graph execution profile, used when no other profile is selected in
 ``Session.execute_graph(execution_profile)``.
 
-Use this as the key in :doc:`Cluster(execution_profiles) </execution_profiles>`
+Use this as the key in :doc:`Cluster(execution_profiles) </execution-profiles>`
 to override the default graph profile.
 """
 
