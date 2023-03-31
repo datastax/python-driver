@@ -58,35 +58,11 @@ Releasing
 Building the Docs
 =================
 
-*Note*: The docs build instructions have been tested with Sphinx 2.4.4 and Fedora 32.
+To build and preview the documentation for the ScyllaDB Python driver locally, you must first manually install `python-driver`. 
+This is necessary for autogenerating the reference documentation of the driver.
+You can find detailed instructions on how to install the driver in the `Installation guide <https://python-driver.docs.scylladb.com/stable/installation.html#manual-installation>`_.
 
-To build and preview the theme locally, you will need to install the following software:
-
-- `Git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
-- `Python 3.7 <https://www.python.org/downloads/>`_
-- `pip <https://pip.pypa.io/en/stable/installing/>`_
-
-Run the following command to build the docs.
-
-.. code:: console
-
-    cd docs
-    make preview
-
-Once the command completes processing, open http://127.0.0.1:5500/ with your preferred browser.
-
-Building multiple documentation versions
-========================================
-
-Build docs for all the versions.
-
-```
-cd docs
-make multiversion
-```
- Then, open ``docs/_build/dirhtml/<version>/index.html`` with your preferred browser.
-
-**NOTE:** If you only can see docs generated for the master branch, try to run ``git fetch --tags`` to download the latest tags from remote.
+After installing the driver, you can build and preview the documentation by following the steps outlined in the `Quickstart guide <https://sphinx-theme.scylladb.com/stable/getting-started/quickstart.html>`_.
 
 Tests
 =====
