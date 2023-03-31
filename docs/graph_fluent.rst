@@ -90,7 +90,7 @@ to accomplish this configuration:
 Note that the execution profile created with :meth:`DseGraph.create_execution_profile <.datastax.graph.fluent.DseGraph.create_execution_profile>` cannot
 be used for any groovy string queries.
 
-If you want to change execution property defaults, please see the :doc:`Execution Profile documentation <execution_profiles>`
+If you want to change execution property defaults, please see the :doc:`Execution Profile documentation <execution-profiles>`
 for a more generalized discussion of the API. Graph traversal queries use the same execution profile defined for DSE graph. If you
 need to change the default properties, please refer to the :doc:`DSE Graph query documentation page <graph>`
 
