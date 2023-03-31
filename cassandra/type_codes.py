@@ -37,7 +37,8 @@ Type codes are repeated here from the Cassandra binary protocol specification:
             0x0022    Set: the value is an [option], representing the type
                             of the elements of the set
 
-See https://issues.apache.org/jira/browse/CASSANDRA-18369
+# This line is needed to workaround pytest issue https://github.com/pytest-dev/pytest/issues/10844
+# It can be safely removed when the issue is solved
 PYTEST_DONT_REWRITE
 """
 
