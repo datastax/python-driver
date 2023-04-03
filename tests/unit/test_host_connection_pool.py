@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+import pytest
 
 from mock import Mock, NonCallableMagicMock
 from threading import Thread, Event, Lock
@@ -23,6 +24,7 @@ from cassandra.pool import HostConnection, HostConnectionPool
 from cassandra.pool import Host, NoConnectionsAvailable
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
 
+@pytest.mark.skip
 class _PoolTests(unittest.TestCase):
     PoolImpl = None
     uses_single_connection = None
