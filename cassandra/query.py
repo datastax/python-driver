@@ -20,6 +20,7 @@ queries.
 
 from collections import namedtuple
 from datetime import datetime, timedelta
+import pickle
 import re
 import struct
 import time
@@ -32,6 +33,7 @@ from cassandra.util import unix_time_from_uuid1
 from cassandra.cqltypes import BytesType
 from cassandra.encoder import Encoder
 import cassandra.encoder
+from cassandra.policies import ColDesc
 from cassandra.protocol import _UNSET_VALUE
 from cassandra.util import OrderedDict, _sanitize_identifiers
 
@@ -450,7 +452,7 @@ class PreparedStatement(object):
 
     def __init__(self, column_metadata, query_id, routing_key_indexes, query,
                  keyspace, protocol_version, result_metadata, result_metadata_id,
-                 column_encryption_policy):
+                 column_encryption_policy=None):
         self.column_metadata = column_metadata
         self.query_id = query_id
         self.routing_key_indexes = routing_key_indexes
@@ -465,7 +467,7 @@ class PreparedStatement(object):
     @classmethod
     def from_message(cls, query_id, column_metadata, pk_indexes, cluster_metadata,
                      query, prepared_keyspace, protocol_version, result_metadata,
-                     result_metadata_id, column_encryption_policy):
+                     result_metadata_id, column_encryption_policy=None):
         if not column_metadata:
             return PreparedStatement(column_metadata, query_id, None,
                                      query, prepared_keyspace, protocol_version, result_metadata,
@@ -583,6 +585,7 @@ class BoundStatement(Statement):
             values = ()
         proto_version = self.prepared_statement.protocol_version
         col_meta = self.prepared_statement.column_metadata
+        ce_policy = self.prepared_statement.column_encryption_policy
 
         # special case for binding dicts
         if isinstance(values, dict):
@@ -629,15 +632,11 @@ class BoundStatement(Statement):
                     raise ValueError("Attempt to bind UNSET_VALUE while using unsuitable protocol version (%d < 4)" % proto_version)
             else:
                 try:
-                    col_type = col_spec.type
-                    # TODO: Need to extract keyspace/table/column data from col_spec and create a CodDesc here
-                    if self.prepared_statement.column_encryption_policy and \
-                        self.prepared_statement.column_encryption_policy.contains_column():
-                        col_type = BytesType
-                        # TODO: Also need to encrypt the value using the relevant key and populate.  Prolly don't
-                        # need to worry about actually overriding col_type here... can prolly just get away with
-                        # BytesType.serialize() or something similar.
-                    self.values.append(col_type.serialize(value, proto_version))
+                    col_desc = ColDesc(col_spec.keyspace_name, col_spec.table_name, col_spec.name)
+                    # TODO: Should we validate that the type specified in col_spec is BytesType?
+                    self.values.append(ce_policy.encrypt(col_desc, pickle.dumps(value, protocol=3)) \
+                        if ce_policy and ce_policy.contains_column(col_desc) \
+                            else col_spec.type.serialize(value, proto_version))
                 except (TypeError, struct.error) as exc:
                     actual_type = type(value)
                     message = ('Received an argument of invalid type for column "%s". '
