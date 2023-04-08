@@ -17,7 +17,7 @@ Others
 * Fix deprecation warning in query tracing (PR 1103)
 * Remove mutable default values from some tests (PR 1116)
 * Remove dependency on unittest2 (PYTHON-1289)
-* Fix deprecation warnings for asyncio.coroutine annotation in asyncioreactor (PYTTHON-1290)
+* Fix deprecation warnings for asyncio.coroutine annotation in asyncioreactor (PYTHON-1290)
 * Fix typos in source files (PR 1126)
 * HostFilterPolicyInitTest fix for Python 3.11 (PR 1131)
 * Fix for DontPrepareOnIgnoredHostsTest (PYTHON-1287)
