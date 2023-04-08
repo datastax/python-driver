@@ -26,6 +26,8 @@ from threading import Thread
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
+from cassandra.connection import DefaultEndPoint
+from cassandra.cqltypes import BytesType
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
@@ -34,9 +36,9 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
                                 IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy,
-                                AES256ColumnEncryptionPolicy, ColDesc)
+                                AES256ColumnEncryptionPolicy, ColDesc,
+                                AES256_BLOCK_SIZE_BYTES, AES256_KEY_SIZE_BYTES)
 from cassandra.pool import Host
-from cassandra.connection import DefaultEndPoint
 from cassandra.query import Statement
 
 from six.moves import xrange
@@ -1504,21 +1506,23 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
 
 class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
 
+    def _random_block(self):
+        return os.urandom(AES256_BLOCK_SIZE_BYTES)
+
+    def _random_key(self):
+        return os.urandom(AES256_KEY_SIZE_BYTES)
+
     def _test_round_trip(self, bytes):
-        from cassandra.policies import AES256_KEY_SIZE_BYTES
         coldesc = ColDesc('ks1','table1','col1')
         policy = AES256ColumnEncryptionPolicy()
-        policy.add_column(coldesc, os.urandom(AES256_KEY_SIZE_BYTES))
+        policy.add_column(coldesc, self._random_key(), BytesType)
         encrypted_bytes = policy.encrypt(coldesc, bytes)
         self.assertEqual(bytes, policy.decrypt(coldesc, encrypted_bytes))
 
     def test_no_padding_necessary(self):
-        from cassandra.policies import AES256_BLOCK_SIZE_BYTES
-        bytes = os.urandom(AES256_BLOCK_SIZE_BYTES)
-        self._test_round_trip(bytes)
+        self._test_round_trip(self._random_block())
 
     def test_some_padding_required(self):
-        from cassandra.policies import AES256_BLOCK_SIZE_BYTES
         for byte_size in range(1,AES256_BLOCK_SIZE_BYTES - 1):
             bytes = os.urandom(byte_size)
             self._test_round_trip(bytes)
@@ -1527,38 +1531,63 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
             self._test_round_trip(bytes)
 
     def test_invalid_key_size_raises(self):
-        from cassandra.policies import AES256_KEY_SIZE_BYTES
         coldesc = ColDesc('ks1','table1','col1')
         policy = AES256ColumnEncryptionPolicy()
         for key_size in range(1,AES256_KEY_SIZE_BYTES - 1):
             with self.assertRaises(ValueError):
-                policy.add_column(coldesc, os.urandom(key_size))
+                policy.add_column(coldesc, os.urandom(key_size), BytesType)
         for key_size in range(AES256_KEY_SIZE_BYTES + 1,(2 * AES256_KEY_SIZE_BYTES) - 1):
             with self.assertRaises(ValueError):
-                policy.add_column(coldesc, os.urandom(key_size))
+                policy.add_column(coldesc, os.urandom(key_size), BytesType)
+
+    def test_null_key_raises(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            coldesc = ColDesc('ks1','table1','col1')
+            policy.add_column(coldesc, None, BytesType)
+
+    def test_null_type_raises(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            coldesc = ColDesc('ks1','table1','col1')
+            policy.add_column(coldesc, self._random_block(), None)
 
     def test_contains_column(self):
         coldesc = ColDesc('ks1','table1','col1')
         policy = AES256ColumnEncryptionPolicy()
-        policy.add_column(coldesc, os.urandom(32))
+        policy.add_column(coldesc, self._random_key(), BytesType)
         self.assertTrue(policy.contains_column(coldesc))
         self.assertFalse(policy.contains_column(ColDesc('ks2','table1','col1')))
         self.assertFalse(policy.contains_column(ColDesc('ks1','table2','col1')))
         self.assertFalse(policy.contains_column(ColDesc('ks1','table1','col2')))
         self.assertFalse(policy.contains_column(ColDesc('ks2','table2','col2')))
 
+    def test_encrypt_unknown_column(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            coldesc = ColDesc('ks1','table1','col1')
+            policy.add_column(coldesc, self._random_key(), BytesType)
+            policy.encrypt(ColDesc('ks2','table2','col2'), self._random_block())
+
+    def test_decrypt_unknown_column(self):
+        policy = AES256ColumnEncryptionPolicy()
+        coldesc = ColDesc('ks1','table1','col1')
+        policy.add_column(coldesc, self._random_key(), BytesType)
+        encrypted_bytes = policy.encrypt(coldesc, self._random_block())
+        with self.assertRaises(ValueError):
+            policy.decrypt(ColDesc('ks2','table2','col2'), encrypted_bytes)
+
     def test_cache_info(self):
-        from cassandra.policies import AES256_BLOCK_SIZE_BYTES, AES256_KEY_SIZE_BYTES
         coldesc1 = ColDesc('ks1','table1','col1')
         coldesc2 = ColDesc('ks2','table2','col2')
         coldesc3 = ColDesc('ks3','table3','col3')
         policy = AES256ColumnEncryptionPolicy()
         for coldesc in [coldesc1, coldesc2, coldesc3]:
-            policy.add_column(coldesc, os.urandom(AES256_KEY_SIZE_BYTES))
+            policy.add_column(coldesc, self._random_key(), BytesType)
 
         # First run for this coldesc should be a miss, everything else should be a cache hit
         for _ in range(10):
-            policy.encrypt(coldesc1, os.urandom(AES256_BLOCK_SIZE_BYTES))
+            policy.encrypt(coldesc1, self._random_block())
         cache_info = policy.cache_info()
         self.assertEqual(cache_info.hits, 9)
         self.assertEqual(cache_info.misses, 1)
@@ -1567,7 +1596,7 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         # Important note: we're measuring the size of the cache of ciphers, NOT stored
         # keys.  We won't have a cipher here until we actually encrypt something
         self.assertEqual(cache_info.currsize, 1)
-        policy.encrypt(coldesc2, os.urandom(AES256_BLOCK_SIZE_BYTES))
+        policy.encrypt(coldesc2, self._random_block())
         self.assertEqual(policy.cache_info().currsize, 2)
-        policy.encrypt(coldesc3, os.urandom(AES256_BLOCK_SIZE_BYTES))
+        policy.encrypt(coldesc3, self._random_block())
         self.assertEqual(policy.cache_info().currsize, 3)

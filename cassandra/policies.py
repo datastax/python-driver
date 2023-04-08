@@ -1191,6 +1191,7 @@ class NeverRetryPolicy(RetryPolicy):
 
 
 ColDesc = namedtuple('ColDesc', ['ks', 'table', 'col'])
+ColData = namedtuple('ColData', ['key','type'])
 
 class ColumnEncryptionPolicy(object):
     def encrypt(self, coldesc, obj_bytes):
@@ -1223,9 +1224,9 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
         self.mode = mode
         self.iv = iv
 
-        # Keys for a given ColDesc are always preserved.  We only create a Cipher
+        # ColData for a given ColDesc is always preserved.  We only create a Cipher
         # when there's an actual need to for a given ColDesc
-        self.keys = {}
+        self.coldata = {}
         self.ciphers = {}
 
     def encrypt(self, coldesc, obj_bytes):
@@ -1253,16 +1254,24 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
         unpadder = padding.PKCS7(AES256_BLOCK_SIZE).unpadder()
         return unpadder.update(padded_bytes) + unpadder.finalize()
 
-    def add_column(self, coldesc, key):
+    def add_column(self, coldesc, key, type):
 
-        AES256ColumnEncryptionPolicy._validate_key(key)
-        self.keys[coldesc] = key
+        if not key:
+            raise ValueError("Key supplied to add_column cannot be None")
+        if not type:
+            raise ValueError("Type supplied to add_column cannot be None")
+        if not len(key) == AES256_KEY_SIZE_BYTES:
+            raise ValueError("AES256 column encryption policy expects a 256-bit encryption key")
+        self.coldata[coldesc] = ColData(key, type)
 
     def contains_column(self, coldesc):
-        return coldesc in self.keys
+        return coldesc in self.coldata
 
     def cache_info(self):
         return AES256ColumnEncryptionPolicy._build_cipher.cache_info()
+
+    def column_type(self, coldesc):
+        return self.coldata[coldesc].type
 
     def _get_cipher(self, coldesc):
         """
@@ -1270,12 +1279,11 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
         hopefully returning a cached instance if we've already done so (and it hasn't been evicted)
         """
 
-        key = self.keys[coldesc]
-        return AES256ColumnEncryptionPolicy._build_cipher(key, self.mode, self.iv)
-
-    def _validate_key(key):
-        if not len(key) == AES256_KEY_SIZE_BYTES:
-            raise ValueError("AES256 column encryption policy expects a 256-bit encryption key")
+        try:
+            coldata = self.coldata[coldesc]
+            return AES256ColumnEncryptionPolicy._build_cipher(coldata.key, self.mode, self.iv)
+        except KeyError:
+            raise ValueError("Could not find column {}".format(coldesc))
 
     @lru_cache
     def _build_cipher(key, mode, iv):

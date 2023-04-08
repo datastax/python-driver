@@ -633,10 +633,12 @@ class BoundStatement(Statement):
             else:
                 try:
                     col_desc = ColDesc(col_spec.keyspace_name, col_spec.table_name, col_spec.name)
-                    # TODO: Should we validate that the type specified in col_spec is BytesType?
-                    self.values.append(ce_policy.encrypt(col_desc, pickle.dumps(value, protocol=3)) \
-                        if ce_policy and ce_policy.contains_column(col_desc) \
-                            else col_spec.type.serialize(value, proto_version))
+                    uses_ce = ce_policy and ce_policy.contains_column(col_desc)
+                    col_type = ce_policy.column_type(col_desc) if uses_ce else col_spec.type
+                    col_bytes = col_type.serialize(value, proto_version)
+                    if uses_ce:
+                        col_bytes = ce_policy.encrypt(col_desc, col_bytes)
+                    self.values.append(col_bytes)
                 except (TypeError, struct.error) as exc:
                     actual_type = type(value)
                     message = ('Received an argument of invalid type for column "%s". '
