@@ -20,7 +20,6 @@ queries.
 
 from collections import namedtuple
 from datetime import datetime, timedelta
-import pickle
 import re
 import struct
 import time
@@ -30,7 +29,6 @@ import warnings
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.util import unix_time_from_uuid1
-from cassandra.cqltypes import BytesType
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.policies import ColDesc

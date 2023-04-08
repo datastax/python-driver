@@ -26,6 +26,7 @@ from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from cassandra import WriteType as WT
+from cassandra.cqltypes import _cqltypes
 
 
 # This is done this way because WriteType was originally
@@ -1262,7 +1263,7 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
             raise ValueError("Type supplied to add_column cannot be None")
         if not len(key) == AES256_KEY_SIZE_BYTES:
             raise ValueError("AES256 column encryption policy expects a 256-bit encryption key")
-        self.coldata[coldesc] = ColData(key, type)
+        self.coldata[coldesc] = ColData(key, _cqltypes[type])
 
     def contains_column(self, coldesc):
         return coldesc in self.coldata
