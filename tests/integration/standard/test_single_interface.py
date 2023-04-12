@@ -22,7 +22,7 @@ from cassandra.query import SimpleStatement
 from packaging.version import Version
 from tests.integration import use_singledc, PROTOCOL_VERSION, \
     remove_cluster, greaterthanorequalcass40, notdse, \
-    CASSANDRA_VERSION, DSE_VERSION, TestCluster
+    CASSANDRA_VERSION, DSE_VERSION, TestCluster, DEFAULT_SINGLE_INTERFACE_PORT
 
 
 def setup_module():
@@ -39,7 +39,7 @@ def teardown_module():
 class SingleInterfaceTest(unittest.TestCase):
 
     def setUp(self):
-        self.cluster = TestCluster()
+        self.cluster = TestCluster(port=DEFAULT_SINGLE_INTERFACE_PORT)
         self.session = self.cluster.connect()
 
     def tearDown(self):
@@ -73,4 +73,4 @@ class SingleInterfaceTest(unittest.TestCase):
                                                  consistency_level=ConsistencyLevel.ALL))
 
         for pool in self.session.get_pools():
-            self.assertEquals(1, pool.get_state()['open_count'])
+            self.assertEqual(1, pool.get_state()['open_count'])

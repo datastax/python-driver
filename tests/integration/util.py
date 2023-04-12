@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from itertools import chain
+
 from tests.integration import PROTOCOL_VERSION
 import time
 
@@ -38,14 +40,18 @@ def assert_quiescent_pool_state(test_case, cluster, wait=None):
         for state in pool_states:
             test_case.assertFalse(state['shutdown'])
             test_case.assertGreater(state['open_count'], 0)
-            test_case.assertTrue(all((i == 0 for i in state['in_flights'])))
+            no_in_flight = all((i == 0 for i in state['in_flights']))
+            orphans_and_inflights = zip(state['orphan_requests'],state['in_flights'])
+            all_orphaned = all((len(orphans) == inflight for (orphans,inflight) in orphans_and_inflights))
+            test_case.assertTrue(no_in_flight or all_orphaned)
 
     for holder in cluster.get_connection_holders():
         for connection in holder.get_connections():
             # all ids are unique
             req_ids = connection.request_ids
+            orphan_ids = connection.orphaned_request_ids
             test_case.assertEqual(len(req_ids), len(set(req_ids)))
-            test_case.assertEqual(connection.highest_request_id, len(req_ids) - 1)
-            test_case.assertEqual(connection.highest_request_id, max(req_ids))
+            test_case.assertEqual(connection.highest_request_id, len(req_ids) + len(orphan_ids) - 1)
+            test_case.assertEqual(connection.highest_request_id, max(chain(req_ids, orphan_ids)))
             if PROTOCOL_VERSION < 3:
                 test_case.assertEqual(connection.highest_request_id, connection.max_request_id)

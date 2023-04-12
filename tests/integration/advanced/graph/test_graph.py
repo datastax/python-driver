@@ -266,6 +266,6 @@ class GraphExecutionProfileOptionsResolveTest(GraphUnitTestCase):
         self.assertEqual(ep.row_factory, graph_object_row_factory)
 
         regex = re.compile(".*Variable.*is unknown.*", re.S)
-        with six.assertRaisesRegex(self, SyntaxException, regex):
+        with self.assertRaisesRegex(SyntaxException, regex):
             self.execute_graph_queries(CoreGraphSchema.fixtures.classic(),
                                        execution_profile=ep, verify_graphson=GraphProtocol.GRAPHSON_1_0)

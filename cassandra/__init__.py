@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 25, 11)
+__version_info__ = (3, 26, 0)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -55,7 +55,7 @@ class ConsistencyLevel(object):
 
     QUORUM = 4
     """
-    ``ceil(RF/2)`` replicas must respond to consider the operation a success
+    ``ceil(RF/2) + 1`` replicas must respond to consider the operation a success
     """
 
     ALL = 5

@@ -69,7 +69,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                 msg = r'.*Invalid STRING constant \(.*?\) for "b" of type blob.*'
             else:
                 msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
-            self.assertRaisesRegexp(InvalidRequest, msg, s.execute, query, params)
+            self.assertRaisesRegex(InvalidRequest, msg, s.execute, query, params)
             return
 
         # In python2, with Cassandra < 2.0, we can manually encode the 'byte str' type as hex for insertion in a blob.
@@ -1061,7 +1061,7 @@ class TestDateRangePrepared(AbstractDateRangeTest, BasicSharedKeyspaceUnitTestCa
             results =  self.session.execute(prep_sel)
 
         dr = results[0].dr
-        # sometimes this is truncated in the assertEquals output on failure;
+        # sometimes this is truncated in the assertEqual output on failure;
         if isinstance(expected, six.string_types):
             self.assertEqual(str(dr), expected)
         else:
@@ -1115,7 +1115,7 @@ class TestDateRangeSimple(AbstractDateRangeTest, BasicSharedKeyspaceUnitTestCase
         results= self.session.execute("SELECT * FROM tab WHERE dr = '{0}' ".format(to_insert))
 
         dr = results[0].dr
-        # sometimes this is truncated in the assertEquals output on failure;
+        # sometimes this is truncated in the assertEqual output on failure;
         if isinstance(expected, six.string_types):
             self.assertEqual(str(dr), expected)
         else:

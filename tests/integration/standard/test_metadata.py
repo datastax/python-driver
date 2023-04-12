@@ -1643,7 +1643,7 @@ class FunctionMetadata(FunctionTest):
 
         with self.VerifiedFunction(self, **kwargs) as vf:
             fn_meta = self.keyspace_function_meta[vf.signature]
-            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*%s\(\) .*" % kwargs['name'])
+            self.assertRegex(fn_meta.as_cql_query(), "CREATE FUNCTION.*%s\(\) .*" % kwargs['name'])
 
     def test_functions_follow_keyspace_alter(self):
         """
@@ -1691,12 +1691,12 @@ class FunctionMetadata(FunctionTest):
         kwargs['called_on_null_input'] = True
         with self.VerifiedFunction(self, **kwargs) as vf:
             fn_meta = self.keyspace_function_meta[vf.signature]
-            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) CALLED ON NULL INPUT RETURNS .*")
+            self.assertRegex(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) CALLED ON NULL INPUT RETURNS .*")
 
         kwargs['called_on_null_input'] = False
         with self.VerifiedFunction(self, **kwargs) as vf:
             fn_meta = self.keyspace_function_meta[vf.signature]
-            self.assertRegexpMatches(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) RETURNS NULL ON NULL INPUT RETURNS .*")
+            self.assertRegex(fn_meta.as_cql_query(), "CREATE FUNCTION.*\) RETURNS NULL ON NULL INPUT RETURNS .*")
 
 
 class AggregateMetadata(FunctionTest):

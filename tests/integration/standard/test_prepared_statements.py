@@ -13,9 +13,12 @@
 # limitations under the License.
 
 
-from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
+from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster, CASSANDRA_VERSION
 
 import unittest
+
+from packaging.version import Version
+
 from cassandra import InvalidRequest, DriverException
 
 from cassandra import ConsistencyLevel, ProtocolVersion
@@ -392,6 +395,9 @@ class PreparedStatementTests(unittest.TestCase):
         with self.assertRaises(InvalidRequest):
             self.session.execute(prepared, [0])
 
+    @unittest.skipIf((CASSANDRA_VERSION >= Version('3.11.12') and CASSANDRA_VERSION < Version('4.0')) or \
+        CASSANDRA_VERSION >= Version('4.0.2'),
+        "Fixed server-side in Cassandra 3.11.12, 4.0.2")
     def test_fail_if_different_query_id_on_reprepare(self):
         """ PYTHON-1124 and CASSANDRA-15252 """
         keyspace = "test_fail_if_different_query_id_on_reprepare"

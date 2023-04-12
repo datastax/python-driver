@@ -56,6 +56,14 @@ CLUSTER_NAME = 'test_cluster'
 SINGLE_NODE_CLUSTER_NAME = 'single_node'
 MULTIDC_CLUSTER_NAME = 'multidc_test_cluster'
 
+# When use_single_interface is specified ccm will assign distinct port numbers to each
+# node in the cluster.  This value specifies the default port value used for the first
+# node that comes up.
+#
+# TODO: In the future we may want to make this configurable, but this should only apply
+# if a non-standard port were specified when starting up the cluster.
+DEFAULT_SINGLE_INTERFACE_PORT=9046
+
 CCM_CLUSTER = None
 
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ccm')
@@ -628,7 +636,10 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 wait_for_node_socket(node, 300)
             log.debug("Binary ports are open")
             if set_keyspace:
-                setup_keyspace(ipformat=ipformat)
+                args = {"ipformat": ipformat}
+                if use_single_interface:
+                    args["port"] = DEFAULT_SINGLE_INTERFACE_PORT
+                setup_keyspace(**args)
     except Exception:
         log.exception("Failed to start CCM cluster; removing cluster.")
 
@@ -727,7 +738,7 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
         cluster.shutdown()
 
 
-def setup_keyspace(ipformat=None, wait=True, protocol_version=None):
+def setup_keyspace(ipformat=None, wait=True, protocol_version=None, port=9042):
     # wait for nodes to startup
     if wait:
         time.sleep(10)
@@ -738,9 +749,9 @@ def setup_keyspace(ipformat=None, wait=True, protocol_version=None):
         _protocol_version = PROTOCOL_VERSION
 
     if not ipformat:
-        cluster = TestCluster(protocol_version=_protocol_version)
+        cluster = TestCluster(protocol_version=_protocol_version, port=port)
     else:
-        cluster = TestCluster(contact_points=["::1"], protocol_version=_protocol_version)
+        cluster = TestCluster(contact_points=["::1"], protocol_version=_protocol_version, port=port)
     session = cluster.connect()
 
     try:

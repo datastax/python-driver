@@ -15,6 +15,7 @@
 
 import unittest
 
+import six
 from cassandra.query import BatchStatement
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, local, TestCluster
@@ -73,7 +74,7 @@ class ClientWarningTests(unittest.TestCase):
         future = self.session.execute_async(self.warn_batch)
         future.result()
         self.assertEqual(len(future.warnings), 1)
-        self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
+        self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
 
     def test_warning_with_trace(self):
         """
@@ -89,7 +90,7 @@ class ClientWarningTests(unittest.TestCase):
         future = self.session.execute_async(self.warn_batch, trace=True)
         future.result()
         self.assertEqual(len(future.warnings), 1)
-        self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
+        self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
         self.assertIsNotNone(future.get_query_trace())
 
     @local
@@ -108,7 +109,7 @@ class ClientWarningTests(unittest.TestCase):
         future = self.session.execute_async(self.warn_batch, custom_payload=payload)
         future.result()
         self.assertEqual(len(future.warnings), 1)
-        self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
+        self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
         self.assertDictEqual(future.custom_payload, payload)
 
     @local
@@ -127,6 +128,6 @@ class ClientWarningTests(unittest.TestCase):
         future = self.session.execute_async(self.warn_batch, trace=True, custom_payload=payload)
         future.result()
         self.assertEqual(len(future.warnings), 1)
-        self.assertRegexpMatches(future.warnings[0], 'Batch.*exceeding.*')
+        self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
         self.assertIsNotNone(future.get_query_trace())
         self.assertDictEqual(future.custom_payload, payload)

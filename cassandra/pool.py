@@ -873,7 +873,9 @@ class HostConnection(object):
 
     def get_state(self):
         in_flights = [c.in_flight for c in list(self._connections.values())]
-        return {'shutdown': self.is_shutdown, 'open_count': self.open_count, 'in_flights': in_flights}
+        orphan_requests = [c.orphaned_request_ids for c in list(self._connections.values())]
+        return {'shutdown': self.is_shutdown, 'open_count': self.open_count, \
+                'in_flights': in_flights, 'orphan_requests': orphan_requests}
 
     @property
     def num_missing_or_needing_replacement(self):
@@ -1245,4 +1247,6 @@ class HostConnectionPool(object):
 
     def get_state(self):
         in_flights = [c.in_flight for c in self._connections]
-        return {'shutdown': self.is_shutdown, 'open_count': self.open_count, 'in_flights': in_flights}
+        orphan_requests = [c.orphaned_request_ids for c in self._connections]
+        return {'shutdown': self.is_shutdown, 'open_count': self.open_count, \
+            'in_flights': in_flights, 'orphan_requests': orphan_requests}

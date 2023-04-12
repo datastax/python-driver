@@ -249,18 +249,21 @@ class AsyncoreLoop(object):
                 try:
                     self._loop_dispatcher.loop(self.timer_resolution)
                     self._timers.service_timeouts()
-                except Exception:
-                    try:
-                        log.debug("Asyncore event loop stopped unexpectedly", exc_info=True)
-                    except Exception:
-                        # TODO: Remove when Python 2 support is removed
-                        # PYTHON-1266. If our logger has disappeared, there's nothing we
-                        # can do, so just log nothing.
-                        pass
+                except Exception as exc:
+                    self._maybe_log_debug("Asyncore event loop stopped unexpectedly", exc_info=exc)
                     break
             self._started = False
 
-        log.debug("Asyncore event loop ended")
+        self._maybe_log_debug("Asyncore event loop ended")
+
+    def _maybe_log_debug(self, *args, **kwargs):
+        try:
+            log.debug(*args, **kwargs)
+        except Exception:
+            # TODO: Remove when Python 2 support is removed
+            # PYTHON-1266. If our logger has disappeared, there's nothing we
+            # can do, so just log nothing.
+            pass
 
     def add_timer(self, timer):
         self._timers.add_timer(timer)

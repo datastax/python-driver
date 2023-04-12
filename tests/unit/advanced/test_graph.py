@@ -259,7 +259,7 @@ class GraphOptionTests(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             GraphOptions(unknown_param=42)
         self.assertEqual(len(w), 1)
-        self.assertRegexpMatches(str(w[0].message), r"^Unknown keyword.*GraphOptions.*")
+        self.assertRegex(str(w[0].message), r"^Unknown keyword.*GraphOptions.*")
 
     def test_update(self):
         opts = GraphOptions(**self.api_params)

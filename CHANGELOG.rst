@@ -1,3 +1,36 @@
+3.26.0
+======
+March 13, 2023
+
+Features
+--------
+* Add support for execution profiles in execute_concurrent (PR 1122)
+
+Bug Fixes
+---------
+* Handle empty non-final result pages (PR 1110)
+* Do not re-use stream IDs for in-flight requests (PR 1114)
+* Asyncore race condition cause logging exception on shutdown (PYTHON-1266)
+
+Others
+------
+* Fix deprecation warning in query tracing (PR 1103)
+* Remove mutable default values from some tests (PR 1116)
+* Remove dependency on unittest2 (PYTHON-1289)
+* Fix deprecation warnings for asyncio.coroutine annotation in asyncioreactor (PYTTHON-1290)
+* Fix typos in source files (PR 1126)
+* HostFilterPolicyInitTest fix for Python 3.11 (PR 1131)
+* Fix for DontPrepareOnIgnoredHostsTest (PYTHON-1287)
+* tests.integration.simulacron.test_connection failures (PYTHON-1304)
+* tests.integration.standard.test_single_interface.py appears to be failing for C* 4.0 (PYTHON-1329)
+* Authentication tests appear to be failing fraudulently (PYTHON-1328)
+* PreparedStatementTests.test_fail_if_different_query_id_on_reprepare() failing unexpectedly (PTYHON-1327)
+* Refactor deprecated unittest aliases for Python 3.11 compatibility (PR 1112)
+
+Deprecations
+------------
+* This release removes support for Python 2.7.x as well as Python 3.5.x and 3.6.x
+
 3.25.0
 ======
 March 18, 2021

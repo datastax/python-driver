@@ -585,7 +585,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_address, "192.168.1.3")
         self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_port, 555)
         self.assertEqual(self.cluster.added_hosts[0].broadcast_address, "10.0.0.3")
-        self.assertEquals(self.cluster.added_hosts[0].broadcast_port, 666)
+        self.assertEqual(self.cluster.added_hosts[0].broadcast_port, 666)
         self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
         self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
 
@@ -605,7 +605,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_address, "192.168.1.3")
         self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_port, None)
         self.assertEqual(self.cluster.added_hosts[0].broadcast_address, "10.0.0.3")
-        self.assertEquals(self.cluster.added_hosts[0].broadcast_port, None)
+        self.assertEqual(self.cluster.added_hosts[0].broadcast_port, None)
         self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
         self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
 
