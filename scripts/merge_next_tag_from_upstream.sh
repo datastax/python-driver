@@ -46,7 +46,7 @@ case "$choice" in
 
       git merge --continue
       git tag ${new_scyla_tag}
-      git push --tags ${scylla_repo} ${new_scyla_tag}
+      git push --tags ${scylla_repo} master
 
    re-triggering a build of a tag in Travis:
 
