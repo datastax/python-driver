@@ -60,7 +60,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         traces = results.get_query_trace()
         events = traces.events
         for event in events:
-            LOGGER.info("%s %s", event.thread_name, event.description)
+            LOGGER.info("%s %s %s", event.source, event.thread_name, event.description)
         for event in events:
             self.assertEqual(event.thread_name, shard_name)
         self.assertIn('querying locally', "\n".join([event.description for event in events]))
