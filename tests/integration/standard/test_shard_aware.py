@@ -168,6 +168,7 @@ class TestShardAwareIntegration(unittest.TestCase):
             for result in as_completed(futures):
                 print(result)
 
+    @pytest.mark.skip(reason='https://github.com/scylladb/python-driver/issues/221')
     def test_closing_connections(self):
         """
         Verify that reconnection is working as expected, when connection are being closed.
