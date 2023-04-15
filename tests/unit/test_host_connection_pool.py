@@ -24,6 +24,7 @@ from cassandra.pool import Host, NoConnectionsAvailable
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
 
 class _PoolTests(unittest.TestCase):
+    __test__ = False
     PoolImpl = None
     uses_single_connection = None
 
