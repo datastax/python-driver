@@ -10,7 +10,7 @@ jobs:
   build_wheels:
     if: contains(github.event.pull_request.labels.*.name, 'test-build-experimental') || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
     # The host should always be linux
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     name: Build experimental ${{ matrix.archs }} wheels
     strategy:
       fail-fast: false
