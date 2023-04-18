@@ -2545,7 +2545,7 @@ class Session(object):
 
         self.encoder = Encoder()
 
-        if self.cluster.column_level_encryption is not None:
+        if self.cluster.column_encryption_policy is not None:
             try:
                 self.client_protocol_handler.column_encryption_policy = self.cluster.column_encryption_policy
             except AttributeError:

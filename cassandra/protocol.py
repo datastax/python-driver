@@ -752,13 +752,13 @@ class ResultMessage(_MessageType):
         rows = [self.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         self.column_names = [c[2] for c in column_metadata]
         self.column_types = [c[3] for c in column_metadata]
-        col_descs = [ColDesc(md.keyspace_name, md.table_name, md.name) for md in column_metadata]
+        col_descs = [ColDesc(md[0], md[1], md[2]) for md in column_metadata]
 
         def decode_val(val, col_md, col_desc):
             uses_ce = column_encryption_policy and column_encryption_policy.contains_column(col_desc)
-            col_type = column_encryption_policy.column_type(col_desc) if uses_ce else col_md.type
+            col_type = column_encryption_policy.column_type(col_desc) if uses_ce else col_md[3]
             raw_bytes = column_encryption_policy.decrypt(col_desc, val) if uses_ce else val
-            return col_type.type.from_binary(raw_bytes, protocol_version)
+            return col_type.from_binary(raw_bytes, protocol_version)
 
         def decode_row(row):
             return tuple(decode_val(val, col_md, col_desc) for val, col_md, col_desc in zip(row, column_metadata, col_descs))
@@ -771,8 +771,8 @@ class ResultMessage(_MessageType):
                     try:
                         decode_val(val, col_md, col_desc)
                     except Exception as e:
-                        raise DriverException('Failed decoding result column "%s" of type %s: %s' % (col_md.name,
-                                                                                                     col_md.type.cql_parameterized_type(),
+                        raise DriverException('Failed decoding result column "%s" of type %s: %s' % (col_md[2],
+                                                                                                     col_md[3].cql_parameterized_type(),
                                                                                                      str(e)))
 
     def recv_results_prepared(self, f, protocol_version, user_type_map):
