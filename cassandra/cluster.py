@@ -2545,6 +2545,12 @@ class Session(object):
 
         self.encoder = Encoder()
 
+        if self.cluster.column_level_encryption is not None:
+            try:
+                self.client_protocol_handler.column_encryption_policy = self.cluster.column_encryption_policy
+            except AttributeError:
+                log.info("Unable to set column encryption policy for session")
+
         # create connection pools in parallel
         self._initial_connect_futures = set()
         for host in hosts:
