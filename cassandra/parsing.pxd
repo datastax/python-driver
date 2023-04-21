@@ -18,6 +18,8 @@ from cassandra.deserializers cimport Deserializer
 cdef class ParseDesc:
     cdef public object colnames
     cdef public object coltypes
+    cdef public object column_encryption_policy
+    cdef public list coldescs
     cdef Deserializer[::1] deserializers
     cdef public int protocol_version
     cdef Py_ssize_t rowsize
