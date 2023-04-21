@@ -1026,7 +1026,7 @@ class UserType(TupleType):
             try:
                 item = val[i]
             except TypeError:
-                item = getattr(val, fieldname)
+                item = getattr(val, fieldname, None)
 
             if item is not None:
                 packed_item = subtype.to_binary(item, proto_version)
