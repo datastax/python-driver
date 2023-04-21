@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import warnings
-
+import pytest
 import sure
 
 from cassandra.cqlengine import columns
@@ -217,7 +217,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         def my_callback(*args, **kwargs):
             call_history.append(args)
 
-        with warnings.catch_warnings(record=True) as w:
+        with pytest.warns() as w:
             with BatchQuery() as batch:
                 batch.add_callback(my_callback)
                 batch.execute()
