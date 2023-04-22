@@ -1530,7 +1530,7 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
             bytes = os.urandom(byte_size)
             self._test_round_trip(bytes)
 
-    def test_invalid_key_size_raises(self):
+    def test_add_column_invalid_key_size_raises(self):
         coldesc = ColDesc('ks1','table1','col1')
         policy = AES256ColumnEncryptionPolicy()
         for key_size in range(1,AES256_KEY_SIZE_BYTES - 1):
@@ -1540,17 +1540,23 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 policy.add_column(coldesc, os.urandom(key_size), "blob")
 
-    def test_null_key_raises(self):
+    def test_add_column_null_key_raises(self):
         with self.assertRaises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, None, "blob")
 
-    def test_null_type_raises(self):
+    def test_add_column_null_type_raises(self):
         with self.assertRaises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_block(), None)
+
+    def test_add_column_unknown_type_raises(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            coldesc = ColDesc('ks1','table1','col1')
+            policy.add_column(coldesc, self._random_block(), "foobar")
 
     def test_contains_column(self):
         coldesc = ColDesc('ks1','table1','col1')

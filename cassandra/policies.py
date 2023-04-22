@@ -1261,6 +1261,8 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
             raise ValueError("Key supplied to add_column cannot be None")
         if not type:
             raise ValueError("Type supplied to add_column cannot be None")
+        if type not in _cqltypes.keys():
+            raise ValueError("Type %s is not a supported type".format(type))
         if not len(key) == AES256_KEY_SIZE_BYTES:
             raise ValueError("AES256 column encryption policy expects a 256-bit encryption key")
         self.coldata[coldesc] = ColData(key, _cqltypes[type])
