@@ -1288,7 +1288,7 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
         except KeyError:
             raise ValueError("Could not find column {}".format(coldesc))
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def _build_cipher(key, mode, iv):
         """
         Explicitly use a class method here to avoid caching self
