@@ -1195,19 +1195,54 @@ ColDesc = namedtuple('ColDesc', ['ks', 'table', 'col'])
 ColData = namedtuple('ColData', ['key','type'])
 
 class ColumnEncryptionPolicy(object):
+    """
+    A policy enabling (mostly) transparent encryption and decryption of data before it is
+    sent to the cluster.
+
+    Key materials and other configurations are specified on a per-column basis.  This policy can
+    then be used by driver structures which are aware of the underlying columns involved in their
+    work.  In practice this includes the following cases:
+
+    * Prepared statements - data for columns specified by the cluster's policy will be transparently
+      encrypted before they are sent
+    * Rows returned from any query - data for columns specified by the cluster's policy will be
+      transparently decrypted before they are returned to the user
+
+    To enable this functionality, create an instance of this class (or more likely a subclass)
+    before creating a cluster.  This policy should then be configured and supplied to the Cluster
+    at creation time via the :attr:`.Cluster.column_encryption_policy` attribute.
+    """
+
     def encrypt(self, coldesc, obj_bytes):
+        """
+        Encrypt the specified bytes using the cryptography materials for the specified column.
+        Largely used internally, although this could also be used to encrypt values supplied
+        to non-prepared statements in a way that is consistent with this policy.
+        """
         raise NotImplementedError()
 
     def decrypt(self, coldesc, encrypted_bytes):
+        """
+        Decrypt the specified (encrypted) bytes using the cryptography materials for the
+        specified column.  Used internally; could be used externally as well but there's
+        not currently an obvious use case.
+        """
         raise NotImplementedError()
 
     def add_column(self, coldesc, key):
+        """
+        Provide cryptography materials to be used when encrypted and/or decrypting data
+        for the specified column.
+        """
         raise NotImplementedError()
 
     def contains_column(self, coldesc):
+        """
+        Predicate to determine if a specific column is supported by this policy.
+        Currently only used interally.
+        """
         raise NotImplementedError()
 
-# Both sizes below in
 AES256_BLOCK_SIZE = 128
 AES256_BLOCK_SIZE_BYTES = int(AES256_BLOCK_SIZE / 8)
 AES256_KEY_SIZE = 256
@@ -1288,10 +1323,7 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
         except KeyError:
             raise ValueError("Could not find column {}".format(coldesc))
 
+    # Explicitly use a class method here to avoid caching self
     @lru_cache(maxsize=128)
     def _build_cipher(key, mode, iv):
-        """
-        Explicitly use a class method here to avoid caching self
-        """
-
         return Cipher(algorithms.AES256(key), mode(iv))
