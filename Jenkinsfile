@@ -57,7 +57,7 @@ matrices = [
   "SMOKE": [
     "SERVER": ['3.11', '4.0', 'dse-6.8.30'],
     "RUNTIME": ['3.7.7', '3.8.3'],
-    "CYTHON": ["False"]
+    "CYTHON": ["True", "False"]
   ]
 ]
 
