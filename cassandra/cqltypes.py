@@ -1027,6 +1027,8 @@ class UserType(TupleType):
                 item = val[i]
             except TypeError:
                 item = getattr(val, fieldname, None)
+                if item is None and not hasattr(val, fieldname):
+                    log.warning(f"field {fieldname} is part of the UDT {cls.typename} but is not present in the value {val}")
 
             if item is not None:
                 packed_item = subtype.to_binary(item, proto_version)
