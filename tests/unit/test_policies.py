@@ -1540,6 +1540,11 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 policy.add_column(coldesc, os.urandom(key_size), "blob")
 
+    def test_add_column_null_coldesc_raises(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            policy.add_column(None, self._random_block(), "blob")
+
     def test_add_column_null_key_raises(self):
         with self.assertRaises(ValueError):
             policy = AES256ColumnEncryptionPolicy()

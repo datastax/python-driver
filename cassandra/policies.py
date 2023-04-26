@@ -1292,6 +1292,8 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
     def add_column(self, coldesc, key, type):
 
+        if not coldesc:
+            raise ValueError("ColDesc supplied to add_column cannot be None")
         if not key:
             raise ValueError("Key supplied to add_column cannot be None")
         if not type:
