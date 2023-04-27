@@ -48,6 +48,9 @@ Cassandra server.
 
 Usage
 -----
+
+Encryption
+^^^^^^^^^^
 Client-side encryption shines most when used with prepared statements.  A prepared statement is aware of information 
 about the columns in the query it was built from and we can use this information to transparently encrypt any
 supplied parameters.  For example, we can create a prepared statement to insert a value into column1 (as defined above)
@@ -60,7 +63,19 @@ by executing the following code after creating a :class:`~.Cluster` in the manne
 
 Our encryption policy will detect that "column1" is an encrypted column and take appropriate action.
 
-Decryption of values returned from the server is also transparent.  Whether we're executing a simple or prepared
+As mentioned above client-side encryption can also be used with simple queries, although such use cases are
+certainly not transparent.  :class:`~.ColumnEncryptionPolicy` provides a helper named
+:func:`~.ColumnEncryptionPolicy.encode_and_encrypt` which will convert an input value into bytes using the
+standard serialization methods employed by the driver.  The result is then encrypted according to the configuration
+of the policy.  Using this approach the example above could be implemented along the lines of the following:
+
+.. code-block:: python
+    session = cluster.connect()
+    session.execute("insert into ks1.table1 (column1) values (%s)",(cl_policy.encode_and_encrypt(col_desc, 1000),))
+
+Decryption
+^^^^^^^^^^
+Decryption of values returned from the server is always transparent.  Whether we're executing a simple or prepared
 statement encrypted columns will be decrypted automatically and made available via rows just like any other
 result.
 

@@ -1244,6 +1244,10 @@ class ColumnEncryptionPolicy(object):
         raise NotImplementedError()
 
     def encode_and_encrypt(self, coldesc, obj):
+        """
+        Helper function to enable use of this policy on simple (i.e. non-prepared)
+        statements.
+        """
         raise NotImplementedError()
 
 AES256_BLOCK_SIZE = 128
