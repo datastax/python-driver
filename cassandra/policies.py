@@ -624,7 +624,7 @@ class ReconnectionPolicy(object):
     def new_schedule(self):
         """
         This should return a finite or infinite iterable of delays (each as a
-        floating point number of seconds) inbetween each failed reconnection
+        floating point number of seconds) in-between each failed reconnection
         attempt.  Note that if the iterable is finite, reconnection attempts
         will cease once the iterable is exhausted.
         """
@@ -634,12 +634,12 @@ class ReconnectionPolicy(object):
 class ConstantReconnectionPolicy(ReconnectionPolicy):
     """
     A :class:`.ReconnectionPolicy` subclass which sleeps for a fixed delay
-    inbetween each reconnection attempt.
+    in-between each reconnection attempt.
     """
 
     def __init__(self, delay, max_attempts=64):
         """
-        `delay` should be a floating point number of seconds to wait inbetween
+        `delay` should be a floating point number of seconds to wait in-between
         each attempt.
 
         `max_attempts` should be a total number of attempts to be made before
@@ -663,7 +663,7 @@ class ConstantReconnectionPolicy(ReconnectionPolicy):
 class ExponentialReconnectionPolicy(ReconnectionPolicy):
     """
     A :class:`.ReconnectionPolicy` subclass which exponentially increases
-    the length of the delay inbetween each reconnection attempt up to
+    the length of the delay in-between each reconnection attempt up to
     a set maximum delay.
 
     A random amount of jitter (+/- 15%) will be added to the pure exponential
@@ -723,7 +723,7 @@ class RetryPolicy(object):
     timeout and unavailable failures. These are failures reported from the
     server side. Timeouts are configured by
     `settings in cassandra.yaml <https://github.com/apache/cassandra/blob/cassandra-2.1.4/conf/cassandra.yaml#L568-L584>`_.
-    Unavailable failures occur when the coordinator cannot acheive the consistency
+    Unavailable failures occur when the coordinator cannot achieve the consistency
     level for a request. For further information see the method descriptions
     below.
 
@@ -1239,7 +1239,7 @@ class ColumnEncryptionPolicy(object):
     def contains_column(self, coldesc):
         """
         Predicate to determine if a specific column is supported by this policy.
-        Currently only used interally.
+        Currently only used internally.
         """
         raise NotImplementedError()
 

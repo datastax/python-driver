@@ -12,7 +12,7 @@ also available, although in this case values must be manually encrypted and/or d
 :class:`~.ColumnEncryptionPolicy` instance provides methods to assist with these operations.
 
 Client-side encryption and decryption should work against all versions of Cassandra and DSE.  It does not
-utilize any server-side functionality to do it's work.
+utilize any server-side functionality to do its work.
 
 Configuration
 -------------
