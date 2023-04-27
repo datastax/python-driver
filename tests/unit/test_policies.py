@@ -1563,6 +1563,27 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_block(), "foobar")
 
+    def test_encode_and_encrypt_null_coldesc_raises(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            coldesc = ColDesc('ks1','table1','col1')
+            policy.add_column(coldesc, self._random_key(), "blob")
+            policy.encode_and_encrypt(None, self._random_block())
+
+    def test_encode_and_encrypt_null_obj_raises(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            coldesc = ColDesc('ks1','table1','col1')
+            policy.add_column(coldesc, self._random_key(), "blob")
+            policy.encode_and_encrypt(coldesc, None)
+
+    def test_encode_and_encrypt_unknown_coldesc_raises(self):
+        with self.assertRaises(ValueError):
+            policy = AES256ColumnEncryptionPolicy()
+            coldesc = ColDesc('ks1','table1','col1')
+            policy.add_column(coldesc, self._random_key(), "blob")
+            policy.encode_and_encrypt(ColDesc('ks2','table2','col2'), self._random_block())
+
     def test_contains_column(self):
         coldesc = ColDesc('ks1','table1','col1')
         policy = AES256ColumnEncryptionPolicy()

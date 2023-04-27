@@ -1243,6 +1243,9 @@ class ColumnEncryptionPolicy(object):
         """
         raise NotImplementedError()
 
+    def encode_and_encrypt(self, coldesc, obj):
+        raise NotImplementedError()
+
 AES256_BLOCK_SIZE = 128
 AES256_BLOCK_SIZE_BYTES = int(AES256_BLOCK_SIZE / 8)
 AES256_KEY_SIZE = 256
@@ -1306,6 +1309,16 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
     def contains_column(self, coldesc):
         return coldesc in self.coldata
+
+    def encode_and_encrypt(self, coldesc, obj):
+        if not coldesc:
+            raise ValueError("ColDesc supplied to encode_and_encrypt cannot be None")
+        if not obj:
+            raise ValueError("Object supplied to encode_and_encrypt cannot be None")
+        coldata = self.coldata.get(coldesc)
+        if not coldata:
+            raise ValueError("Could not find ColData for ColDesc %s".format(coldesc))
+        return self.encrypt(coldesc, coldata.type.serialize(obj, None))
 
     def cache_info(self):
         return AES256ColumnEncryptionPolicy._build_cipher.cache_info()
