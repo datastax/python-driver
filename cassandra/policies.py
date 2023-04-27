@@ -463,7 +463,7 @@ class HostFilterPolicy(LoadBalancingPolicy):
     A :class:`.LoadBalancingPolicy` subclass configured with a child policy,
     and a single-argument predicate. This policy defers to the child policy for
     hosts where ``predicate(host)`` is truthy. Hosts for which
-    ``predicate(host)`` is falsey will be considered :attr:`.IGNORED`, and will
+    ``predicate(host)`` is falsy will be considered :attr:`.IGNORED`, and will
     not be used in a query plan.
 
     This can be used in the cases where you need a whitelist or blacklist
@@ -499,7 +499,7 @@ class HostFilterPolicy(LoadBalancingPolicy):
         :param child_policy: an instantiated :class:`.LoadBalancingPolicy`
                              that this one will defer to.
         :param predicate: a one-parameter function that takes a :class:`.Host`.
-                          If it returns a falsey value, the :class:`.Host` will
+                          If it returns a falsy value, the :class:`.Host` will
                           be :attr:`.IGNORED` and not returned in query plans.
         """
         super(HostFilterPolicy, self).__init__()
@@ -535,7 +535,7 @@ class HostFilterPolicy(LoadBalancingPolicy):
     def distance(self, host):
         """
         Checks if ``predicate(host)``, then returns
-        :attr:`~HostDistance.IGNORED` if falsey, and defers to the child policy
+        :attr:`~HostDistance.IGNORED` if falsy, and defers to the child policy
         otherwise.
         """
         if self.predicate(host):
