@@ -59,9 +59,6 @@ Contents
 :doc:`column_encryption`
     Transparent client-side per-column encryption and decryption
 
-:doc:`CHANGELOG`
-    Log of changes to the driver, organized by version.
-
 :doc:`faq`
     A collection of Frequently Asked Questions
 
