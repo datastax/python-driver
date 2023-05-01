@@ -463,7 +463,7 @@ class HostFilterPolicy(LoadBalancingPolicy):
     A :class:`.LoadBalancingPolicy` subclass configured with a child policy,
     and a single-argument predicate. This policy defers to the child policy for
     hosts where ``predicate(host)`` is truthy. Hosts for which
-    ``predicate(host)`` is falsey will be considered :attr:`.IGNORED`, and will
+    ``predicate(host)`` is falsy will be considered :attr:`.IGNORED`, and will
     not be used in a query plan.
 
     This can be used in the cases where you need a whitelist or blacklist
@@ -499,7 +499,7 @@ class HostFilterPolicy(LoadBalancingPolicy):
         :param child_policy: an instantiated :class:`.LoadBalancingPolicy`
                              that this one will defer to.
         :param predicate: a one-parameter function that takes a :class:`.Host`.
-                          If it returns a falsey value, the :class:`.Host` will
+                          If it returns a falsy value, the :class:`.Host` will
                           be :attr:`.IGNORED` and not returned in query plans.
         """
         super(HostFilterPolicy, self).__init__()
@@ -535,7 +535,7 @@ class HostFilterPolicy(LoadBalancingPolicy):
     def distance(self, host):
         """
         Checks if ``predicate(host)``, then returns
-        :attr:`~HostDistance.IGNORED` if falsey, and defers to the child policy
+        :attr:`~HostDistance.IGNORED` if falsy, and defers to the child policy
         otherwise.
         """
         if self.predicate(host):
@@ -624,7 +624,7 @@ class ReconnectionPolicy(object):
     def new_schedule(self):
         """
         This should return a finite or infinite iterable of delays (each as a
-        floating point number of seconds) inbetween each failed reconnection
+        floating point number of seconds) in-between each failed reconnection
         attempt.  Note that if the iterable is finite, reconnection attempts
         will cease once the iterable is exhausted.
         """
@@ -634,12 +634,12 @@ class ReconnectionPolicy(object):
 class ConstantReconnectionPolicy(ReconnectionPolicy):
     """
     A :class:`.ReconnectionPolicy` subclass which sleeps for a fixed delay
-    inbetween each reconnection attempt.
+    in-between each reconnection attempt.
     """
 
     def __init__(self, delay, max_attempts=64):
         """
-        `delay` should be a floating point number of seconds to wait inbetween
+        `delay` should be a floating point number of seconds to wait in-between
         each attempt.
 
         `max_attempts` should be a total number of attempts to be made before
@@ -663,7 +663,7 @@ class ConstantReconnectionPolicy(ReconnectionPolicy):
 class ExponentialReconnectionPolicy(ReconnectionPolicy):
     """
     A :class:`.ReconnectionPolicy` subclass which exponentially increases
-    the length of the delay inbetween each reconnection attempt up to
+    the length of the delay in-between each reconnection attempt up to
     a set maximum delay.
 
     A random amount of jitter (+/- 15%) will be added to the pure exponential
@@ -723,7 +723,7 @@ class RetryPolicy(object):
     timeout and unavailable failures. These are failures reported from the
     server side. Timeouts are configured by
     `settings in cassandra.yaml <https://github.com/apache/cassandra/blob/cassandra-2.1.4/conf/cassandra.yaml#L568-L584>`_.
-    Unavailable failures occur when the coordinator cannot acheive the consistency
+    Unavailable failures occur when the coordinator cannot achieve the consistency
     level for a request. For further information see the method descriptions
     below.
 
@@ -1195,22 +1195,61 @@ ColDesc = namedtuple('ColDesc', ['ks', 'table', 'col'])
 ColData = namedtuple('ColData', ['key','type'])
 
 class ColumnEncryptionPolicy(object):
+    """
+    A policy enabling (mostly) transparent encryption and decryption of data before it is
+    sent to the cluster.
+
+    Key materials and other configurations are specified on a per-column basis.  This policy can
+    then be used by driver structures which are aware of the underlying columns involved in their
+    work.  In practice this includes the following cases:
+
+    * Prepared statements - data for columns specified by the cluster's policy will be transparently
+      encrypted before they are sent
+    * Rows returned from any query - data for columns specified by the cluster's policy will be
+      transparently decrypted before they are returned to the user
+
+    To enable this functionality, create an instance of this class (or more likely a subclass)
+    before creating a cluster.  This policy should then be configured and supplied to the Cluster
+    at creation time via the :attr:`.Cluster.column_encryption_policy` attribute.
+    """
+
     def encrypt(self, coldesc, obj_bytes):
+        """
+        Encrypt the specified bytes using the cryptography materials for the specified column.
+        Largely used internally, although this could also be used to encrypt values supplied
+        to non-prepared statements in a way that is consistent with this policy.
+        """
         raise NotImplementedError()
 
     def decrypt(self, coldesc, encrypted_bytes):
+        """
+        Decrypt the specified (encrypted) bytes using the cryptography materials for the
+        specified column.  Used internally; could be used externally as well but there's
+        not currently an obvious use case.
+        """
         raise NotImplementedError()
 
     def add_column(self, coldesc, key):
+        """
+        Provide cryptography materials to be used when encrypted and/or decrypting data
+        for the specified column.
+        """
         raise NotImplementedError()
 
     def contains_column(self, coldesc):
+        """
+        Predicate to determine if a specific column is supported by this policy.
+        Currently only used internally.
+        """
         raise NotImplementedError()
 
     def encode_and_encrypt(self, coldesc, obj):
+        """
+        Helper function to enable use of this policy on simple (i.e. non-prepared)
+        statements.
+        """
         raise NotImplementedError()
 
-# Both sizes below in
 AES256_BLOCK_SIZE = 128
 AES256_BLOCK_SIZE_BYTES = int(AES256_BLOCK_SIZE / 8)
 AES256_KEY_SIZE = 256
@@ -1303,10 +1342,7 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
         except KeyError:
             raise ValueError("Could not find column {}".format(coldesc))
 
+    # Explicitly use a class method here to avoid caching self
     @lru_cache(maxsize=128)
     def _build_cipher(key, mode, iv):
-        """
-        Explicitly use a class method here to avoid caching self
-        """
-
         return Cipher(algorithms.AES256(key), mode(iv))

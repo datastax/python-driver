@@ -50,6 +50,9 @@ Contents
 :doc:`cloud`
     A guide to connecting to Datastax Astra
 
+:doc:`column_encryption`
+    Transparent client-side per-column encryption and decryption
+
 :doc:`geo_types`
     Working with DSE geometry types
 
