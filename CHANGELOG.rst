@@ -1,3 +1,11 @@
+3.27.0
+======
+May 1, 2023
+
+Features
+--------
+* Add support for client-side encryption (PYTHON-1341)
+
 3.26.0
 ======
 March 13, 2023
