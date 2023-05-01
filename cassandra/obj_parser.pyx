@@ -17,8 +17,11 @@ include "ioutils.pyx"
 from cassandra import DriverException
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.deserializers cimport Deserializer, from_binary
+from cassandra.deserializers import find_deserializer
 from cassandra.parsing cimport ParseDesc, ColumnParser, RowParser
 from cassandra.tuple cimport tuple_new, tuple_set
+
+from cpython.bytes cimport PyBytes_AsStringAndSize
 
 
 cdef class ListParser(ColumnParser):
@@ -58,18 +61,29 @@ cdef class TupleRowParser(RowParser):
         assert desc.rowsize >= 0
 
         cdef Buffer buf
+        cdef Buffer newbuf
         cdef Py_ssize_t i, rowsize = desc.rowsize
         cdef Deserializer deserializer
         cdef tuple res = tuple_new(desc.rowsize)
 
+        ce_policy = desc.column_encryption_policy
         for i in range(rowsize):
             # Read the next few bytes
             get_buf(reader, &buf)
 
             # Deserialize bytes to python object
             deserializer = desc.deserializers[i]
+            coldesc = desc.coldescs[i]
+            uses_ce = ce_policy and ce_policy.contains_column(coldesc)
             try:
-                val = from_binary(deserializer, &buf, desc.protocol_version)
+                if uses_ce:
+                    col_type = ce_policy.column_type(coldesc)
+                    decrypted_bytes = ce_policy.decrypt(coldesc, to_bytes(&buf))
+                    PyBytes_AsStringAndSize(decrypted_bytes, &newbuf.ptr, &newbuf.size)
+                    deserializer = find_deserializer(ce_policy.column_type(coldesc))
+                    val = from_binary(deserializer, &newbuf, desc.protocol_version)
+                else:
+                    val = from_binary(deserializer, &buf, desc.protocol_version)
             except Exception as e:
                 raise DriverException('Failed decoding result column "%s" of type %s: %s' % (desc.colnames[i],
                                                                                              desc.coltypes[i].cql_parameterized_type(),
