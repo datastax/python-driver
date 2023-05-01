@@ -19,9 +19,11 @@ Module containing the definitions and declarations (parsing.pxd) for parsers.
 cdef class ParseDesc:
     """Description of what structure to parse"""
 
-    def __init__(self, colnames, coltypes, deserializers, protocol_version):
+    def __init__(self, colnames, coltypes, column_encryption_policy, coldescs, deserializers, protocol_version):
         self.colnames = colnames
         self.coltypes = coltypes
+        self.column_encryption_policy = column_encryption_policy
+        self.coldescs = coldescs
         self.deserializers = deserializers
         self.protocol_version = protocol_version
         self.rowsize = len(colnames)
