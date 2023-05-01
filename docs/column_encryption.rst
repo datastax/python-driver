@@ -87,6 +87,5 @@ when deploying client-side encryption.  Note specifically that a Rust compiler i
 of the cryptography package, although wheels exist for many common platforms.
 
 Client-side encryption has been implemented for both the default Cython and pure Python row processing logic.
-This functionality has not yet been ported to the NumPy Cython implementation.  We have reason to believe the
-NumPy processing works reasonably well on Python 3.7 but fails for Python 3.8.  We hope to address this discrepancy
-in a future release.
+This functionality has not yet been ported to the NumPy Cython implementation.  During testing,
+the NumPy processing works on Python 3.7 but fails for Python 3.8.
