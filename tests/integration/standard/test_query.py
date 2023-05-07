@@ -506,11 +506,11 @@ class PreparedStatementArgTest(unittest.TestCase):
 
     def setUp(self):
         self.mock_handler = MockLoggingHandler()
-        logger = logging.getLogger(cluster.__name__)
-        logger.addHandler(self.mock_handler)
+        self.logger = logging.getLogger(cluster.__name__)
+        self.logger.addHandler(self.mock_handler)
     
     def tearDown(self):
-        logger.removeHandler(self.mock_handler)
+        self.logger.removeHandler(self.mock_handler)
 
     def test_prepare_on_all_hosts(self):
         """
