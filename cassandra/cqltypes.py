@@ -213,6 +213,7 @@ def lookup_casstype_simple(casstype):
 
 
 def parse_casstype_args(typestring):
+    log.debug("parse_casstype_args: %s" % typestring)
     tokens, remainder = casstype_scanner.scan(typestring)
     if remainder:
         raise ValueError("weird characters %r at end" % remainder)
@@ -235,7 +236,10 @@ def parse_casstype_args(typestring):
             else:
                 names.append(None)
 
-            ctype = lookup_casstype_simple(tok)
+            try:
+                ctype = int(tok)
+            except ValueError:
+                ctype = lookup_casstype_simple(tok)
             types.append(ctype)
 
     # return the first (outer) type, which will have all parameters applied
@@ -257,7 +261,9 @@ def lookup_casstype(casstype):
     if isinstance(casstype, (CassandraType, CassandraTypeType)):
         return casstype
     try:
-        return parse_casstype_args(casstype)
+        rv = parse_casstype_args(casstype)
+        #log.info("lookup_casstype rv: %s" % rv)
+        return rv
     except (ValueError, AssertionError, IndexError) as e:
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
@@ -1421,3 +1427,23 @@ class DateRangeType(CassandraType):
             buf.write(int8_pack(cls._encode_precision(bound.precision)))
 
         return buf.getvalue()
+
+class VectorType(_CassandraType):
+    typename = 'org.apache.cassandra.db.marshal.VectorType'
+
+    vector_size = 0
+
+    @classmethod
+    def apply_parameters(cls, subtypes, names):
+        cls.vector_size = subtypes
+
+    @classmethod
+    def deserialize(cls, byts, protocol_version):
+        return [float_unpack(float_bytes) for float_bytes in (byts[i:i+4] for i in range(cls.vector_size))]
+
+    @classmethod
+    def serialize(cls, v, protocol_version):
+        return None
+
+    def __repr__(self):
+        return '<%s( %r )>' % (self.cql_parameterized_type(), self.vector_size)
