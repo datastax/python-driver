@@ -14,6 +14,7 @@
 
 import unittest
 
+import six
 from mock import Mock
 
 from cassandra import ProtocolVersion, UnsupportedOperation
@@ -172,7 +173,7 @@ class MessageTest(unittest.TestCase):
         keyspace_message = QueryMessage('a', consistency_level=3, keyspace='ks')
         io = Mock(name='io')
 
-        with self.assertRaisesRegexp(UnsupportedOperation, 'Keyspaces.*set'):
+        with self.assertRaisesRegex(UnsupportedOperation, 'Keyspaces.*set'):
             keyspace_message.send_body(io, protocol_version=4)
         io.assert_not_called()
 

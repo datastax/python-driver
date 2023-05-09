@@ -14,6 +14,7 @@
 import unittest
 
 import logging
+import six
 import time
 
 from mock import Mock, patch
@@ -262,7 +263,7 @@ class ConnectionTests(SimulacronBase):
         prime_request(PrimeOptions(then={"result": "no_result", "delay_in_ms": never}))
         prime_request(RejectConnections("unbind"))
 
-        self.assertRaisesRegexp(OperationTimedOut, "Connection defunct by heartbeat", future.result)
+        self.assertRaisesRegex(OperationTimedOut, "Connection defunct by heartbeat", future.result)
 
     def test_close_when_query(self):
         """

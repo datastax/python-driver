@@ -16,6 +16,8 @@ import unittest
 
 from collections import deque
 from threading import RLock
+
+import six
 from mock import Mock, MagicMock, ANY
 
 from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType, OperationTimedOut
@@ -158,7 +160,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         # Simulate ResponseFuture timing out
         rf._on_timeout()
-        self.assertRaisesRegexp(OperationTimedOut, "Connection defunct by heartbeat", rf.result)
+        self.assertRaisesRegex(OperationTimedOut, "Connection defunct by heartbeat", rf.result)
 
     def test_read_timeout_error_message(self):
         session = self.make_session()

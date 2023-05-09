@@ -14,6 +14,8 @@
 
 import unittest
 
+import six
+
 from cassandra.cluster import _ConfigMode
 from cassandra.cqlengine import connection
 from cassandra.query import dict_factory
@@ -50,12 +52,12 @@ class ConnectionTest(unittest.TestCase):
         """
         Users can't get the default session without having a default connection set.
         """
-        with self.assertRaisesRegexp(connection.CQLEngineException, self.no_registered_connection_msg):
+        with self.assertRaisesRegex(connection.CQLEngineException, self.no_registered_connection_msg):
             connection.get_session(connection=None)
 
     def test_get_cluster_fails_without_existing_connection(self):
         """
         Users can't get the default cluster without having a default connection set.
         """
-        with self.assertRaisesRegexp(connection.CQLEngineException, self.no_registered_connection_msg):
+        with self.assertRaisesRegex(connection.CQLEngineException, self.no_registered_connection_msg):
             connection.get_cluster(connection=None)

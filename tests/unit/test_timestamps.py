@@ -15,6 +15,7 @@
 import unittest
 
 import mock
+import six
 
 from cassandra import timestamps
 from threading import Thread, Lock
@@ -105,7 +106,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         last_warn_args, last_warn_kwargs = call
         self.assertEqual(len(last_warn_args), 1)
         self.assertEqual(len(last_warn_kwargs), 0)
-        self.assertRegexpMatches(
+        six.assertRegex(self,
             last_warn_args[0],
             pattern,
         )

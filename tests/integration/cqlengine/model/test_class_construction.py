@@ -15,6 +15,7 @@
 from uuid import uuid4
 import warnings
 
+import six
 from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.models import Model, ModelException, ModelDefinitionException, ColumnQueryEvaluator
 from cassandra.cqlengine.query import ModelQuerySet, DMLQuery
@@ -91,7 +92,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that trying to create conflicting db column names will fail
         """
 
-        with self.assertRaisesRegexp(ModelException, r".*more than once$"):
+        with self.assertRaisesRegex(ModelException, r".*more than once$"):
             class BadNames(Model):
                 words = columns.Text(primary_key=True)
                 content = columns.Text(db_field='words')
