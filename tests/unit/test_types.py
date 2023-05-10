@@ -27,7 +27,7 @@ from cassandra.cqltypes import (
     EmptyValue, LongType, SetType, UTF8Type,
     cql_typename, int8_pack, int64_pack, lookup_casstype,
     lookup_casstype_simple, parse_casstype_args,
-    int32_pack, Int32Type, ListType, MapType
+    int32_pack, Int32Type, ListType, MapType, VectorType
 )
 from cassandra.encoder import cql_quote
 from cassandra.pool import Host
@@ -190,21 +190,10 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(UTF8Type, ctype.subtypes[2])
         self.assertEqual([b'city', None, b'zip'], ctype.names)
 
-    def test_parse_casstype_args_numeric(self):
-        class NumericParamType(CassandraType):
-            typename = 'org.apache.cassandra.db.marshal.NumericParamType'
-
-            def __init__(self, subtypes, names):
-                self.subtypes = subtypes
-                self.names = names
-
-            @classmethod
-            def apply_parameters(cls, subtypes, names):
-                return cls(subtypes, names)
-
-        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.NumericParamType(3)")
-        self.assertEqual(NumericParamType, ctype.__class__)
-        self.assertEqual(3, ctype.subtypes[0])
+    def test_parse_casstype_vector(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(3)")
+        self.assertTrue(issubclass(ctype, VectorType))
+        self.assertEqual(3, ctype.vector_size)
 
     def test_empty_value(self):
         self.assertEqual(str(EmptyValue()), 'EMPTY')

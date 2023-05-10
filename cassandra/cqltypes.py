@@ -215,12 +215,14 @@ def lookup_casstype_simple(casstype):
 def parse_casstype_args(typestring):
     log.debug("parse_casstype_args: %s" % typestring)
     tokens, remainder = casstype_scanner.scan(typestring)
+    log.debug("tokens: %s, remainder: %s" % (tokens, remainder))
     if remainder:
         raise ValueError("weird characters %r at end" % remainder)
 
     # use a stack of (types, names) lists
     args = [([], [])]
     for tok in tokens:
+        log.debug("Token: %s" % tok)
         if tok == '(':
             args.append(([], []))
         elif tok == ')':
@@ -240,10 +242,14 @@ def parse_casstype_args(typestring):
                 ctype = int(tok)
             except ValueError:
                 ctype = lookup_casstype_simple(tok)
+            log.debug("Appending %s to types" % ctype)
             types.append(ctype)
 
     # return the first (outer) type, which will have all parameters applied
-    return args[0][0][0]
+    log.info("args: %s" % args)
+    rv = args[0][0][0]
+    log.info("parse_casstype_args rv: %s" % rv)
+    return rv
 
 
 def lookup_casstype(casstype):
@@ -262,9 +268,10 @@ def lookup_casstype(casstype):
         return casstype
     try:
         rv = parse_casstype_args(casstype)
-        #log.info("lookup_casstype rv: %s" % rv)
+        log.info("lookup_casstype rv: %s" % rv)
         return rv
     except (ValueError, AssertionError, IndexError) as e:
+        log.debug("Exception in parse_casstype_args: %s" % e)
         raise ValueError("Don't know how to parse type string %r: %s" % (casstype, e))
 
 
@@ -302,7 +309,7 @@ class _CassandraType(object):
     """
 
     def __repr__(self):
-        return '<%s( %r )>' % (self.cql_parameterized_type(), self.val)
+        return '<%s>' % (self.cql_parameterized_type())
 
     @classmethod
     def from_binary(cls, byts, protocol_version):
@@ -1430,20 +1437,19 @@ class DateRangeType(CassandraType):
 
 class VectorType(_CassandraType):
     typename = 'org.apache.cassandra.db.marshal.VectorType'
-
     vector_size = 0
 
     @classmethod
-    def apply_parameters(cls, subtypes, names):
-        cls.vector_size = subtypes
+    def apply_parameters(cls, params, names):
+        log.debug("apply_paramters params: %s" % params)
+        assert len(params) == 1
+        vsize = params[0]
+        return type('%s(%s)' % (cls.cass_parameterized_type_with([]), vsize), (cls,), {'vector_size': vsize})
 
     @classmethod
     def deserialize(cls, byts, protocol_version):
-        return [float_unpack(float_bytes) for float_bytes in (byts[i:i+4] for i in range(cls.vector_size))]
+        return [float_unpack(bytes(float_bytes)) for float_bytes in (byts[i:i+4] for i in range(0, cls.vector_size, 4))]
 
     @classmethod
     def serialize(cls, v, protocol_version):
         return None
-
-    def __repr__(self):
-        return '<%s( %r )>' % (self.cql_parameterized_type(), self.vector_size)
