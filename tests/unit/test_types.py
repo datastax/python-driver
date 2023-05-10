@@ -308,6 +308,15 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cql_quote('test'), "'test'")
         self.assertEqual(cql_quote(0), '0')
 
+    def test_vector(self):
+        base = [3.4, 2.9, 41.6, 12.0]
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(4)")
+        base_bytes = ctype.serialize(base, 0)
+        self.assertEqual(16, len(base_bytes))
+        result = ctype.deserialize(base_bytes, 0)
+        self.assertEqual(len(base), len(result))
+        for idx in range(0,len(base)):
+            self.assertAlmostEqual(base[idx], result[idx], places=5)
 
 ZERO = datetime.timedelta(0)
 

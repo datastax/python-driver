@@ -1448,8 +1448,12 @@ class VectorType(_CassandraType):
 
     @classmethod
     def deserialize(cls, byts, protocol_version):
-        return [float_unpack(bytes(float_bytes)) for float_bytes in (byts[i:i+4] for i in range(0, cls.vector_size, 4))]
+        indexes = (4 * x for x in range(0, cls.vector_size))
+        return [float_unpack(byts[idx:idx + 4]) for idx in indexes]
 
     @classmethod
     def serialize(cls, v, protocol_version):
-        return None
+        buf = io.BytesIO()
+        for item in v:
+            buf.write(float_pack(item))
+        return buf.getvalue()
