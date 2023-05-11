@@ -855,7 +855,6 @@ class ResultMessage(_MessageType):
     @classmethod
     def read_type(cls, f, user_type_map):
         optid = read_short(f)
-        log.info("optid: %d" % optid)
         try:
             typeclass = cls.type_codes[optid]
         except KeyError:

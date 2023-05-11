@@ -220,7 +220,6 @@ def parse_casstype_args(typestring):
     # use a stack of (types, names) lists
     args = [([], [])]
     for tok in tokens:
-        log.debug("Token: %s" % tok)
         if tok == '(':
             args.append(([], []))
         elif tok == ')':
