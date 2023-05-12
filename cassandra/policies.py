@@ -1027,7 +1027,7 @@ class RetryPolicy(object):
         `retry_num` counts how many times the operation has been retried, so
         the first time this method is called, `retry_num` will be 0.
 
-        The default, it triggers a retry on the next host in the query plan
+        By default, it triggers a retry on the next host in the query plan
         with the same consistency level.
         """
         # TODO revisit this for the next major
