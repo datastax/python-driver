@@ -1446,3 +1446,7 @@ class VectorType(_CassandraType):
         for item in v:
             buf.write(float_pack(item))
         return buf.getvalue()
+
+    @classmethod
+    def cql_parameterized_type(cls):
+        return "%s<%s>" % (cls.typename,cls.vector_size)
