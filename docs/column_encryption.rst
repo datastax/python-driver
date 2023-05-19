@@ -21,6 +21,7 @@ and adding information about columns to be encrypted to it.  This policy is then
 when it's created.
 
 .. code-block:: python
+
     import os
 
     from cassandra.policies import ColDesc, AES256ColumnEncryptionPolicy, AES256_KEY_SIZE_BYTES
@@ -57,6 +58,7 @@ supplied parameters.  For example, we can create a prepared statement to insert 
 by executing the following code after creating a :class:`~.Cluster` in the manner described above:
 
 .. code-block:: python
+
     session = cluster.connect()
     prepared = session.prepare("insert into ks1.table1 (column1) values (?)")
     session.execute(prepared, (1000,))
@@ -70,6 +72,7 @@ standard serialization methods employed by the driver.  The result is then encry
 of the policy.  Using this approach the example above could be implemented along the lines of the following:
 
 .. code-block:: python
+
     session = cluster.connect()
     session.execute("insert into ks1.table1 (column1) values (%s)",(cl_policy.encode_and_encrypt(col_desc, 1000),))
 
