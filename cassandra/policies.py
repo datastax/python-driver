@@ -1262,10 +1262,13 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
     # TODO: Need to find some way to expose mode options
     # (CBC etc.) without leaking classes from the underlying
     # impl here
-    def __init__(self, mode = modes.CBC, iv = os.urandom(AES256_BLOCK_SIZE_BYTES)):
+    def __init__(self, mode = modes.CBC, iv = None):
 
         self.mode = mode
-        self.iv = iv
+
+        # Avoid defining IV with a default arg in order to stay away from
+        # any issues around the caching of default args
+        self.iv = iv or os.urandom(AES256_BLOCK_SIZE_BYTES)
 
         # ColData for a given ColDesc is always preserved.  We only create a Cipher
         # when there's an actual need to for a given ColDesc
