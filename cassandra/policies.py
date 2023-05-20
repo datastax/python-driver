@@ -1257,18 +1257,22 @@ AES256_KEY_SIZE_BYTES = int(AES256_KEY_SIZE / 8)
 
 class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
-    # CBC uses an IV that's the same size as the block size
-    #
-    # TODO: Need to find some way to expose mode options
-    # (CBC etc.) without leaking classes from the underlying
-    # impl here
-    def __init__(self, mode = modes.CBC, iv = None):
+    def __init__(self, iv = None):
 
-        self.mode = mode
+        # Fix block cipher mode for now.  IV size is a function of block cipher used
+        # so fixing this avoids (possibly unnecessary) validation logic here.
+        self.mode = modes.CBC
 
+        # CBC uses an IV that's the same size as the block size
+        #
         # Avoid defining IV with a default arg in order to stay away from
         # any issues around the caching of default args
-        self.iv = iv or os.urandom(AES256_BLOCK_SIZE_BYTES)
+        self.iv = iv
+        if self.iv:
+            if not len(self.iv) == AES256_BLOCK_SIZE_BYTES:
+                raise ValueError("AES256 column encryption policy uses CBC mode and therefore expects a 128-bit initialization vector")
+        else:
+            self.iv = os.urandom(AES256_BLOCK_SIZE_BYTES)
 
         # ColData for a given ColDesc is always preserved.  We only create a Cipher
         # when there's an actual need to for a given ColDesc
