@@ -1257,11 +1257,11 @@ AES256_KEY_SIZE_BYTES = int(AES256_KEY_SIZE / 8)
 
 class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
-    def __init__(self, iv = None):
+    # Fix block cipher mode for now.  IV size is a function of block cipher used
+    # so fixing this avoids (possibly unnecessary) validation logic here.
+    mode = modes.CBC
 
-        # Fix block cipher mode for now.  IV size is a function of block cipher used
-        # so fixing this avoids (possibly unnecessary) validation logic here.
-        self.mode = modes.CBC
+    def __init__(self, iv = None):
 
         # CBC uses an IV that's the same size as the block size
         #
@@ -1345,11 +1345,11 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
         try:
             coldata = self.coldata[coldesc]
-            return AES256ColumnEncryptionPolicy._build_cipher(coldata.key, self.mode, self.iv)
+            return AES256ColumnEncryptionPolicy._build_cipher(coldata.key, self.iv)
         except KeyError:
             raise ValueError("Could not find column {}".format(coldesc))
 
     # Explicitly use a class method here to avoid caching self
     @lru_cache(maxsize=128)
-    def _build_cipher(key, mode, iv):
-        return Cipher(algorithms.AES256(key), mode(iv))
+    def _build_cipher(key, iv):
+        return Cipher(algorithms.AES256(key), AES256ColumnEncryptionPolicy.mode(iv))
