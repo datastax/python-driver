@@ -1261,7 +1261,7 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
     # so fixing this avoids (possibly unnecessary) validation logic here.
     mode = modes.CBC
 
-    def __init__(self, iv = None):
+    def __init__(self, iv=None):
 
         # CBC uses an IV that's the same size as the block size
         #
@@ -1293,11 +1293,13 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
         cipher = self._get_cipher(coldesc)
         encryptor = cipher.encryptor()
-        return encryptor.update(padded_bytes) + encryptor.finalize()
+        return self.iv + encryptor.update(padded_bytes) + encryptor.finalize()
 
-    def decrypt(self, coldesc, encrypted_bytes):
+    def decrypt(self, coldesc, bytes):
 
-        cipher = self._get_cipher(coldesc)
+        iv = bytes[:AES256_BLOCK_SIZE_BYTES]
+        encrypted_bytes = bytes[AES256_BLOCK_SIZE_BYTES:]
+        cipher = self._get_cipher(coldesc, iv=iv)
         decryptor = cipher.decryptor()
         padded_bytes = decryptor.update(encrypted_bytes) + decryptor.finalize()
 
@@ -1337,15 +1339,14 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
     def column_type(self, coldesc):
         return self.coldata[coldesc].type
 
-    def _get_cipher(self, coldesc):
+    def _get_cipher(self, coldesc, iv=None):
         """
         Access relevant state from this instance necessary to create a Cipher and then get one,
         hopefully returning a cached instance if we've already done so (and it hasn't been evicted)
         """
-
         try:
             coldata = self.coldata[coldesc]
-            return AES256ColumnEncryptionPolicy._build_cipher(coldata.key, self.iv)
+            return AES256ColumnEncryptionPolicy._build_cipher(coldata.key, iv or self.iv)
         except KeyError:
             raise ValueError("Could not find column {}".format(coldesc))
 
