@@ -44,7 +44,7 @@ Since tracing is done asynchronously to the request, this method polls until the
     >>> result = future.result()
     >>> trace = future.get_query_trace()
     >>> for e in trace.events:
-    >>>     print e.source_elapsed, e.description
+    >>>     print(e.source_elapsed, e.description)
 
     0:00:00.000077 Parsing select * from system.local
     0:00:00.000153 Preparing statement
@@ -67,7 +67,7 @@ With prepared statements, the replicas are obtained by ``routing_key``, based on
     >>> bound = prepared.bind((1,))
     >>> replicas = cluster.metadata.get_replicas(bound.keyspace, bound.routing_key)
     >>> for h in replicas:
-    >>>   print h.address
+    >>>   print(h.address)
     127.0.0.1
     127.0.0.2
 

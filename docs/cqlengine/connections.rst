@@ -99,7 +99,7 @@ You can specify a default connection per model:
         year = columns.Integer(primary_key=True)
         model = columns.Text(primary_key=True)
 
-    print len(Automobile.objects.all())  # executed on the connection 'cluster2'
+    print(len(Automobile.objects.all()))  # executed on the connection 'cluster2'
 
 QuerySet and model instance
 ---------------------------
