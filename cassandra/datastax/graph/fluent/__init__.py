@@ -257,7 +257,7 @@ if HAVE_GREMLIN:
                 session = c.connect()
 
                 g = DseGraph.traversal_source(session, 'my_graph')
-                print g.V().valueMap().toList()
+                print(g.V().valueMap().toList())
 
             """
 

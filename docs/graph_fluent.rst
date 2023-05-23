@@ -83,7 +83,7 @@ to accomplish this configuration:
     session = cluster.connect()
 
     g = DseGraph.traversal_source(session)  # Build the GraphTraversalSource
-    print g.V().toList()  # Traverse the Graph
+    print(g.V().toList())  # Traverse the Graph
 
 Note that the execution profile created with :meth:`DseGraph.create_execution_profile <.datastax.graph.fluent.DseGraph.create_execution_profile>` cannot
 be used for any groovy string queries.
@@ -231,11 +231,11 @@ Batch Queries
 
 DSE Graph supports batch queries using a :class:`TraversalBatch <.datastax.graph.fluent.query.TraversalBatch>` object
 instantiated with :meth:`DseGraph.batch <.datastax.graph.fluent.DseGraph.batch>`. A :class:`TraversalBatch <.datastax.graph.fluent.query.TraversalBatch>` allows
-you to execute multiple graph traversals in a single atomic transaction. A 
-traversal batch is executed with :meth:`.Session.execute_graph` or using 
-:meth:`TraversalBatch.execute <.datastax.graph.fluent.query.TraversalBatch.execute>` if bounded to a DSE session. 
+you to execute multiple graph traversals in a single atomic transaction. A
+traversal batch is executed with :meth:`.Session.execute_graph` or using
+:meth:`TraversalBatch.execute <.datastax.graph.fluent.query.TraversalBatch.execute>` if bounded to a DSE session.
 
-Either way you choose to execute the traversal batch, you need to configure 
+Either way you choose to execute the traversal batch, you need to configure
 the execution profile accordingly. Here is a example::
 
     from cassandra.cluster import Cluster
