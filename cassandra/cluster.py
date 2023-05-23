@@ -16,7 +16,6 @@
 This module houses the main classes you will interact with,
 :class:`.Cluster` and :class:`.Session`.
 """
-from __future__ import absolute_import
 
 import atexit
 import datetime
