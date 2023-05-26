@@ -1428,25 +1428,27 @@ class DateRangeType(CassandraType):
 class VectorType(_CassandraType):
     typename = 'org.apache.cassandra.db.marshal.VectorType'
     vector_size = 0
+    subtype = None
 
     @classmethod
     def apply_parameters(cls, params, names):
-        assert len(params) == 1
-        vsize = params[0]
-        return type('%s(%s)' % (cls.cass_parameterized_type_with([]), vsize), (cls,), {'vector_size': vsize})
+        assert len(params) == 2
+        subtype = lookup_casstype(params[0])
+        vsize = params[1]
+        return type('%s(%s)' % (cls.cass_parameterized_type_with([]), vsize), (cls,), {'vector_size': vsize, 'subtype': subtype})
 
     @classmethod
     def deserialize(cls, byts, protocol_version):
         indexes = (4 * x for x in range(0, cls.vector_size))
-        return [float_unpack(byts[idx:idx + 4]) for idx in indexes]
+        return [cls.subtype.deserialize(byts[idx:idx + 4], protocol_version) for idx in indexes]
 
     @classmethod
     def serialize(cls, v, protocol_version):
         buf = io.BytesIO()
         for item in v:
-            buf.write(float_pack(item))
+            buf.write(cls.subtype.serialize(item, protocol_version))
         return buf.getvalue()
 
     @classmethod
     def cql_parameterized_type(cls):
-        return "%s<%s>" % (cls.typename,cls.vector_size)
+        return "%s<%s, %s>" % (cls.typename, cls.subtype.typename, cls.vector_size)
