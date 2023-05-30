@@ -424,7 +424,8 @@ def run_setup(extensions):
         packages=[
             'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
             'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
-            'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud'
+            'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud',
+            "cassandra.column_encryption"
         ],
         keywords='cassandra,cql,orm,dse,graph',
         include_package_data=True,
