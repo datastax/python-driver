@@ -15,11 +15,12 @@
 import os
 import unittest
 
+from cassandra.policies import ColDesc
+
 HAVE_CLE=True
 try:
     from cassandra.column_encryption import AES256ColumnEncryptionPolicy, \
         AES256_BLOCK_SIZE_BYTES, AES256_KEY_SIZE_BYTES
-    from cassandra.policies import ColDesc
 except ImportError:
     HAVE_CLE=False
 

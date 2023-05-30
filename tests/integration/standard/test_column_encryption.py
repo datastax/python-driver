@@ -17,11 +17,12 @@ import unittest
 
 from tests.integration import use_singledc, TestCluster
 
+from cassandra.policies import ColDesc
+
 HAVE_CLE=True
 try:
     from cassandra.column_encryption import AES256ColumnEncryptionPolicy, \
         AES256_KEY_SIZE_BYTES
-    from cassandra.policies import ColDesc
 except ImportError:
     HAVE_CLE=False
 
