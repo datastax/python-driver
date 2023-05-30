@@ -16,15 +16,9 @@ import os
 import unittest
 
 from cassandra.policies import ColDesc
+from cassandra.column_encryption.policies import AES256ColumnEncryptionPolicy, \
+    AES256_BLOCK_SIZE_BYTES, AES256_KEY_SIZE_BYTES
 
-HAVE_CLE=True
-try:
-    from cassandra.column_encryption import AES256ColumnEncryptionPolicy, \
-        AES256_BLOCK_SIZE_BYTES, AES256_KEY_SIZE_BYTES
-except ImportError:
-    HAVE_CLE=False
-
-@unittest.skipUnless(HAVE_CLE, "Skipping the CLE test because the column_encryption module is not available")
 class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
 
     def _random_block(self):

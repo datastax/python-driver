@@ -13,20 +13,18 @@
 # limitations under the License.
 
 from collections import namedtuple
+from functools import lru_cache
 
 import logging
 import os
 
 log = logging.getLogger(__name__)
 
-try:
-    from cryptography.hazmat.primitives import padding
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-except ImportError:
-    raise ImportError("cryptography module not installed, column-level encryption features will not be available")
-
 from cassandra.cqltypes import _cqltypes
 from cassandra.policies import ColumnEncryptionPolicy
+
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 AES256_BLOCK_SIZE = 128
 AES256_BLOCK_SIZE_BYTES = int(AES256_BLOCK_SIZE / 8)

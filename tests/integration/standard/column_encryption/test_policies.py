@@ -19,17 +19,12 @@ from tests.integration import use_singledc, TestCluster
 
 from cassandra.policies import ColDesc
 
-HAVE_CLE=True
-try:
-    from cassandra.column_encryption import AES256ColumnEncryptionPolicy, \
-        AES256_KEY_SIZE_BYTES
-except ImportError:
-    HAVE_CLE=False
+from cassandra.column_encryption.policies import AES256ColumnEncryptionPolicy, \
+    AES256_KEY_SIZE_BYTES
 
 def setup_module():
     use_singledc()
 
-@unittest.skipUnless(HAVE_CLE, "Skipping the CLE test because the column_encryption module is not available")
 class ColumnEncryptionPolicyTest(unittest.TestCase):
 
     def _recreate_keyspace(self, session):
