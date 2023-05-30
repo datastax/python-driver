@@ -386,8 +386,9 @@ def describeBuild(buildContext) {
   }
 }
 
-def scheduleTriggerJobName() {
-  "drivers/python/oss/master/disabled"
+// branch pattern for cron
+def branchPatternCron() {
+  ~"(master)"
 }
 
 pipeline {
@@ -617,7 +618,7 @@ pipeline {
   }
 
   triggers {
-    parameterizedCron((scheduleTriggerJobName() == env.JOB_NAME) ? """
+    parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python 3.7.7 and 3.8.3
       H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.7.7 3.8.3;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
