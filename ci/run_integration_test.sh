@@ -23,7 +23,7 @@ pip install -U pip wheel setuptools
 
 # install driver wheel
 pip install --ignore-installed -r test-requirements.txt pytest
-pip install .
+pip install -e .
 
 # download awscli
 pip install awscli

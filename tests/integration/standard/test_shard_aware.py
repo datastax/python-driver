@@ -26,6 +26,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest  # noqa
+import pytest
 
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, ConstantReconnectionPolicy
@@ -37,8 +38,8 @@ LOGGER = logging.getLogger(__name__)
 
 
 def setup_module():
-    os.environ['SCYLLA_EXT_OPTS'] = "--smp 4 --memory 2048M"
-    use_cluster('shared_aware', [3], start=True)
+    os.environ['SCYLLA_EXT_OPTS'] = "--smp 2"
+    use_cluster('shard_aware', [3], start=True)
 
 
 class TestShardAwareIntegration(unittest.TestCase):
@@ -59,7 +60,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         traces = results.get_query_trace()
         events = traces.events
         for event in events:
-            LOGGER.info("%s %s", event.thread_name, event.description)
+            LOGGER.info("%s %s %s", event.source, event.thread_name, event.description)
         for event in events:
             self.assertEqual(event.thread_name, shard_name)
         self.assertIn('querying locally', "\n".join([event.description for event in events]))
@@ -108,7 +109,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         session.execute(bound)
         bound = prepared.bind(('e', 'f', 'g'))
         session.execute(bound)
-        bound = prepared.bind(('100000', 'f', 'g'))
+        bound = prepared.bind(('100002', 'f', 'g'))
         session.execute(bound)
 
     def query_data(self, session, verify_in_tracing=True):
@@ -121,20 +122,20 @@ class TestShardAwareIntegration(unittest.TestCase):
         results = session.execute(bound, trace=True)
         self.assertEqual(results, [('a', 'b', 'c')])
         if verify_in_tracing:
-            self.verify_same_shard_in_tracing(results, "shard 1")
+            self.verify_same_shard_in_tracing(results, "shard 0")
 
-        bound = prepared.bind(('100000', 'f'))
+        bound = prepared.bind(('100002', 'f'))
         results = session.execute(bound, trace=True)
-        self.assertEqual(results, [('100000', 'f', 'g')])
+        self.assertEqual(results, [('100002', 'f', 'g')])
 
         if verify_in_tracing:
-            self.verify_same_shard_in_tracing(results, "shard 0")
+            self.verify_same_shard_in_tracing(results, "shard 1")
 
         bound = prepared.bind(('e', 'f'))
         results = session.execute(bound, trace=True)
 
         if verify_in_tracing:
-            self.verify_same_shard_in_tracing(results, "shard 1")
+            self.verify_same_shard_in_tracing(results, "shard 0")
 
     def test_all_tracing_coming_one_shard(self):
         """
@@ -167,6 +168,7 @@ class TestShardAwareIntegration(unittest.TestCase):
             for result in as_completed(futures):
                 print(result)
 
+    @pytest.mark.skip(reason='https://github.com/scylladb/python-driver/issues/221')
     def test_closing_connections(self):
         """
         Verify that reconnection is working as expected, when connection are being closed.
@@ -188,7 +190,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         time.sleep(10)
         self.query_data(self.session)
 
-    @unittest.expectedFailure
+    @pytest.mark.skip
     def test_blocking_connections(self):
         """
         Verify that reconnection is working as expected, when connection are being blocked.

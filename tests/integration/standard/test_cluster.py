@@ -40,10 +40,10 @@ from cassandra import connection
 from cassandra.connection import DefaultEndPoint
 
 from tests import notwindows
-from tests.integration import use_singledc, get_server_versions, CASSANDRA_VERSION, \
+from tests.integration import use_cluster, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
-    get_unsupported_upper_protocol, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, lessthanorequalcass40, \
-    DSE_VERSION, TestCluster, PROTOCOL_VERSION
+    get_unsupported_upper_protocol, lessthanprotocolv3, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, \
+    lessthanorequalcass40, DSE_VERSION, TestCluster, PROTOCOL_VERSION, xfail_scylla, incorrect_test
 from tests.integration.util import assert_quiescent_pool_state
 import sys
 
@@ -52,7 +52,7 @@ log = logging.getLogger(__name__)
 
 def setup_module():
     os.environ['SCYLLA_EXT_OPTS'] = "--smp 1"
-    use_singledc()
+    use_cluster("cluster_tests", [3], start=True, workloads=None)
     warnings.simplefilter("always")
 
 
@@ -289,8 +289,7 @@ class ClusterTests(unittest.TestCase):
 
         cluster.shutdown()
 
-    # "Failing with scylla because there is option to create a cluster with 'lower bound' protocol
-    @unittest.expectedFailure
+    @xfail_scylla("Failing with scylla because there is option to create a cluster with 'lower bound' protocol")
     def test_invalid_protocol_negotation(self):
         """
         Test for protocol negotiation when explicit versions are set
@@ -411,12 +410,11 @@ class ClusterTests(unittest.TestCase):
                               protocol_version=PROTOCOL_VERSION)
         self.assertRaises(NoHostAvailable, cluster.connect)
 
+    @lessthanprotocolv3
     def test_cluster_settings(self):
         """
         Test connection setting getters and setters
         """
-        if PROTOCOL_VERSION >= 3:
-            raise unittest.SkipTest("min/max requests and core/max conns aren't used with v3 protocol")
 
         cluster = TestCluster()
 
@@ -1228,8 +1226,7 @@ class ClusterTests(unittest.TestCase):
 
     @greaterthanorequalcass30
     @lessthanorequalcass40
-    # The scylla failed because 'Unknown identifier column1'
-    @unittest.expectedFailure
+    @incorrect_test()
     def test_compact_option(self):
         """
         Test the driver can connect with the no_compact option and the results
