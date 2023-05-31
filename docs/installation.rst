@@ -3,7 +3,7 @@ Installation
 
 Supported Platforms
 -------------------
-Python 2.7, 3.5, 3.6, 3.7 and 3.8 are supported. Both CPython (the standard Python
+Python 3.7 and 3.8 are supported.  Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.
@@ -26,7 +26,7 @@ To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print cassandra.__version__'
 
-It should print something like "3.22.0".
+It should print something like "3.27.0".
 
 .. _installation-datastax-graph:
 
@@ -67,6 +67,24 @@ support this::
 
     pip install scales
 
+(*Optional*) Column-Level Encryption (CLE) Support
+--------------------------------------------------
+The driver also now has built-in support for client-side encryption and
+decryption of data.  Please see :doc:`column_encryption` for more detail
+about this feature, including how to configure and use it.  Note that this
+feature relies on the `cryptography <https://cryptography.io/en/latest/>`_ module
+for it's implementation.  The initial release of CLE (in version 3.27.0 of the
+Python driver) explicitly listed cryptography as a required dependency; later
+versions treat this module as an optional requirement.
+
+If you wish to make use of the CLE feature you will need to install the cryptography
+module.  You can do so by installing the driver with the `cle` requirements::
+
+    pip install cassandra-driver[cle]
+
+You can also install the package directly via pip::
+
+    pip install cryptography
 
 Speeding Up Installation
 ^^^^^^^^^^^^^^^^^^^^^^^^
