@@ -34,7 +34,7 @@ It should print something like "3.27.0".
 ---------------------------
 The driver provides an optional fluent graph API that depends on Apache TinkerPop (gremlinpython). It is
 not installed by default. To be able to build Gremlin traversals, you need to install
-the `graph` requirements::
+the `graph` extra::
 
     pip install cassandra-driver[graph]
 
@@ -73,20 +73,23 @@ The driver has built-in support for client-side encryption and
 decryption of data. Please see :doc:`column_encryption` for more detail
 about this feature, including how to configure and use it.  This
 feature relies on the `cryptography <https://cryptography.io/en/latest/>`_ module
-for its implementation. The initial release of CLE (Python driver 3.27.0) explicitly 
-lists cryptography as a required dependency; later
-versions allow this module as an optional requirement.
+for its implementation. The initial release of the CLE feature in Python driver 3.27.0
+explicitly listed cryptography as a required dependency; as a result the module will be
+automatically downloaded and installed when that version of the driver is installed.
+Later versions of the driver do not specify this module as a requirement, so if you
+want to use the CLE feature with a version of the driver after 3.27.0 you will need
+to take additional steps to install the cryptography module.
 
-If you want to use the CLE feature, install the cryptography
-module.
-
-You can installing the driver with the `cle` requirements::
+You can install this module along with the driver by specifying the `cle` extra::
 
     pip install cassandra-driver[cle]
 
-Alternatively, you can also install the package directly via `pip`::
+Alternatively, you can also install the module directly via `pip`::
 
     pip install cryptography
+
+Any version of cryptography >= 35.0 will work for the CLE feature.  You can find additional
+details at `PYTHON-1351 <https://datastax-oss.atlassian.net/browse/PYTHON-1351>`_
 
 Speeding Up Installation
 ^^^^^^^^^^^^^^^^^^^^^^^^
