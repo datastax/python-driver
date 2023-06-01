@@ -13,9 +13,10 @@ Test Profiles:
 Matrix Types:
 
   Full: All server versions, python runtimes tested with and without Cython.
-  Develop: Smaller matrix for dev purpose.
   Cassandra: All cassandra server versions.
   Dse: All dse server versions.
+  Smoke: CI-friendly configurations. Currently-supported Python version + modern Cassandra/DSE instances.
+         We also avoid cython since it's tested as part of the nightlies
 
 Parameters: 
 
@@ -29,23 +30,14 @@ import com.datastax.jenkins.drivers.python.Slack
 
 slack = new Slack()
 
-// Define our predefined matrices
-//
-// Smoke tests are CI-friendly test configuration.  Currently-supported Python version + modern C*/DSE instances.
-// We also avoid cython since it's tested as part of the nightlies.
 DEFAULT_CASSANDRA = ['2.1', '2.2', '3.0', '3.11', '4.0']
 DEFAULT_DSE = ['dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30']
-DEFAULT_RUNTIME = ['2.7.18', '3.5.9', '3.6.10', '3.7.7', '3.8.3']
+DEFAULT_RUNTIME = ['3.7.7', '3.8.3']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
     "SERVER": DEFAULT_CASSANDRA + DEFAULT_DSE,
     "RUNTIME": DEFAULT_RUNTIME,
-    "CYTHON": DEFAULT_CYTHON
-  ],
-  "DEVELOP": [
-    "SERVER": ['2.1', '3.11', 'dse-6.8.30'],
-    "RUNTIME": ['2.7.18', '3.6.10'],
     "CYTHON": DEFAULT_CYTHON
   ],
   "CASSANDRA": [
@@ -61,7 +53,7 @@ matrices = [
   "SMOKE": [
     "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(1),
     "RUNTIME": DEFAULT_RUNTIME.takeRight(2),
-    "CYTHON": ["False"]
+    "CYTHON": ["True"]
   ]
 ]
 
@@ -394,8 +386,9 @@ def describeBuild(buildContext) {
   }
 }
 
-def scheduleTriggerJobName() {
-  "drivers/python/oss/master/disabled"
+// branch pattern for cron
+def branchPatternCron() {
+  ~"(master)"
 }
 
 pipeline {
@@ -460,7 +453,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'MATRIX',
-      choices: ['DEFAULT', 'SMOKE', 'FULL', 'DEVELOP', 'CASSANDRA', 'DSE'],
+      choices: ['DEFAULT', 'SMOKE', 'FULL', 'CASSANDRA', 'DSE'],
       description: '''<p>The matrix for the build.</p>
                       <table style="width:100%">
                         <col width="25%">
@@ -480,10 +473,6 @@ pipeline {
                         <tr>
                           <td><strong>FULL</strong></td>
                           <td>All server versions, python runtimes tested with and without Cython.</td>
-                        </tr>
-                        <tr>
-                          <td><strong>DEVELOP</strong></td>
-                          <td>Smaller matrix for dev purpose.</td>
                         </tr>
                         <tr>
                           <td><strong>CASSANDRA</strong></td>
@@ -629,10 +618,10 @@ pipeline {
   }
 
   triggers {
-    parameterizedCron((scheduleTriggerJobName() == env.JOB_NAME) ? """
+    parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
-      # These schedules will run with and without Cython enabled for Python v2.7.18 and v3.5.9
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=2.7.18 3.5.9;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
+      # These schedules will run with and without Cython enabled for Python 3.7.7 and 3.8.3
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.7.7 3.8.3;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
     """ : "")
   }
 

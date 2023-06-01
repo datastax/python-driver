@@ -77,7 +77,7 @@ def tuple_factory(colnames, rows):
         >>> session = cluster.connect('mykeyspace')
         >>> session.row_factory = tuple_factory
         >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
-        >>> print rows[0]
+        >>> print(rows[0])
         ('Bob', 42)
 
     .. versionchanged:: 2.0.0
@@ -133,16 +133,16 @@ def named_tuple_factory(colnames, rows):
         >>> user = rows[0]
 
         >>> # you can access field by their name:
-        >>> print "name: %s, age: %d" % (user.name, user.age)
+        >>> print("name: %s, age: %d" % (user.name, user.age))
         name: Bob, age: 42
 
         >>> # or you can access fields by their position (like a tuple)
         >>> name, age = user
-        >>> print "name: %s, age: %d" % (name, age)
+        >>> print("name: %s, age: %d" % (name, age))
         name: Bob, age: 42
         >>> name = user[0]
         >>> age = user[1]
-        >>> print "name: %s, age: %d" % (name, age)
+        >>> print("name: %s, age: %d" % (name, age))
         name: Bob, age: 42
 
     .. versionchanged:: 2.0.0
@@ -188,7 +188,7 @@ def dict_factory(colnames, rows):
         >>> session = cluster.connect('mykeyspace')
         >>> session.row_factory = dict_factory
         >>> rows = session.execute("SELECT name, age FROM users LIMIT 1")
-        >>> print rows[0]
+        >>> print(rows[0])
         {u'age': 42, u'name': u'Bob'}
 
     .. versionchanged:: 2.0.0
