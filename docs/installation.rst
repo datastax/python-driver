@@ -3,7 +3,7 @@ Installation
 
 Supported Platforms
 -------------------
-Python 2.7, 3.5, 3.6, 3.7 and 3.8 are supported. Both CPython (the standard Python
+Python 3.7 and 3.8 are supported.  Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.
@@ -26,7 +26,7 @@ To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print cassandra.__version__'
 
-It should print something like "3.22.0".
+It should print something like "3.27.0".
 
 .. _installation-datastax-graph:
 
@@ -34,7 +34,7 @@ It should print something like "3.22.0".
 ---------------------------
 The driver provides an optional fluent graph API that depends on Apache TinkerPop (gremlinpython). It is
 not installed by default. To be able to build Gremlin traversals, you need to install
-the `graph` requirements::
+the `graph` extra::
 
     pip install cassandra-driver[graph]
 
@@ -67,6 +67,27 @@ support this::
 
     pip install scales
 
+*Optional:* Column-Level Encryption (CLE) Support
+--------------------------------------------------
+The driver has built-in support for client-side encryption and
+decryption of data. For more, see :doc:`column_encryption`.  
+
+CLE depends on the Python `cryptography <https://cryptography.io/en/latest/>`_ module. 
+When installing Python driver 3.27.0. the `cryptography` module is 
+also downloaded and installed.
+If you are using Python driver 3.28.0 or later and want to use CLE, you must
+install the `cryptography <https://cryptography.io/en/latest/>`_ module.
+
+You can install this module along with the driver by specifying the `cle` extra::
+
+    pip install cassandra-driver[cle]
+
+Alternatively, you can also install the module directly via `pip`::
+
+    pip install cryptography
+
+Any version of cryptography >= 35.0 will work for the CLE feature.  You can find additional
+details at `PYTHON-1351 <https://datastax-oss.atlassian.net/browse/PYTHON-1351>`_
 
 Speeding Up Installation
 ^^^^^^^^^^^^^^^^^^^^^^^^
