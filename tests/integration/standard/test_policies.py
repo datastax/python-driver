@@ -161,3 +161,37 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
         (encrypted,unencrypted) = session.execute(prepared, [expected]).one()
         self.assertEquals(expected, encrypted)
         self.assertEquals(expected, unencrypted)
+
+    def test_end_to_end_python1356(self):
+        """Test to validate the fix for PYTHON-1356.  Class variables used to pass CLE policy down shouldn't persist."""
+
+        expected = 13579
+        expected_type = "int"
+
+        key = os.urandom(AES256_KEY_SIZE_BYTES)
+        cl_policy = AES256ColumnEncryptionPolicy()
+        col_desc = ColDesc('foo','bar','encrypted')
+        cl_policy.add_column(col_desc, key, expected_type)
+
+        cluster = TestCluster(column_encryption_policy=cl_policy)
+        session = cluster.connect()
+        self._recreate_keyspace(session)
+
+        # Use encode_and_encrypt helper function to populate date
+        session.execute("insert into foo.bar (encrypted, unencrypted) values (%s,%s)",(cl_policy.encode_and_encrypt(col_desc, expected), expected))
+
+        # We now open a new session _without_ the CLE policy specified.  We should _not_ be able to read decrypted bits from this session.
+        cluster2 = TestCluster()
+        session2 = cluster2.connect()
+
+        # A straight select from the database will now return the decrypted bits.  We select both encrypted and unencrypted
+        # values here to confirm that we don't interfere with regular processing of unencrypted vals.
+        (encrypted,unencrypted) = session2.execute("select encrypted, unencrypted from foo.bar where unencrypted = %s allow filtering", (expected,)).one()
+        self.assertEquals(cl_policy.encode_and_encrypt(col_desc, expected), encrypted)
+        self.assertEquals(expected, unencrypted)
+
+        # Confirm the same behaviour from a subsequent prepared statement as well
+        prepared = session2.prepare("select encrypted, unencrypted from foo.bar where unencrypted = ? allow filtering")
+        (encrypted,unencrypted) = session2.execute(prepared, [expected]).one()
+        self.assertEquals(cl_policy.encode_and_encrypt(col_desc, expected), encrypted)
+        self.assertEquals(expected, unencrypted)
