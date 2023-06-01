@@ -1,2 +1,1 @@
-cryptography >= 35.0
 geomet>=0.1,<0.3

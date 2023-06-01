@@ -24,7 +24,8 @@ when it's created.
 
     import os
 
-    from cassandra.policies import ColDesc, AES256ColumnEncryptionPolicy, AES256_KEY_SIZE_BYTES
+    from cassandra.policies import ColDesc
+    from cassandra.column_encryption.policies import AES256ColumnEncryptionPolicy, AES256_KEY_SIZE_BYTES
 
     key = os.urandom(AES256_KEY_SIZE_BYTES)
     cl_policy = AES256ColumnEncryptionPolicy()

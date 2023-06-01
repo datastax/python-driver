@@ -26,7 +26,7 @@ To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print cassandra.__version__'
 
-It should print something like "3.22.0".
+It should print something like "3.27.0".
 
 (*Optional*) Compression Support
 --------------------------------
