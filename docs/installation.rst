@@ -70,15 +70,13 @@ support this::
 *Optional:* Column-Level Encryption (CLE) Support
 --------------------------------------------------
 The driver has built-in support for client-side encryption and
-decryption of data. Please see :doc:`column_encryption` for more detail
-about this feature, including how to configure and use it.  This
-feature relies on the `cryptography <https://cryptography.io/en/latest/>`_ module
-for its implementation. The initial release of the CLE feature in Python driver 3.27.0
-explicitly listed cryptography as a required dependency; as a result the module will be
-automatically downloaded and installed when that version of the driver is installed.
-Later versions of the driver do not specify this module as a requirement, so if you
-want to use the CLE feature with a version of the driver after 3.27.0 you will need
-to take additional steps to install the cryptography module.
+decryption of data. For more, see :doc:`column_encryption`.  
+
+CLE depends on the Python `cryptography <https://cryptography.io/en/latest/>`_ module. 
+When installing Python driver 3.27.0. the `cryptography` module is 
+also downloaded and installed.
+If you are using Python driver 3.28.0 or later and want to use CLE, you must
+install the `cryptography <https://cryptography.io/en/latest/>`_ module.
 
 You can install this module along with the driver by specifying the `cle` extra::
 
