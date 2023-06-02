@@ -102,7 +102,7 @@ html_theme = 'sphinx_scylladb_theme'
 
 # -- Options for sitemap extension ---------------------------------------
 
-sitemap_url_scheme = 'stable/{link}'
+sitemap_url_scheme = "/stable/{link}"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -113,6 +113,7 @@ html_theme_options = {
     'github_issues_repository': 'scylladb/python-driver',
     'hide_edit_this_page_button': 'false',
     'hide_version_dropdown': ['master'],
+    'hide_feedback_buttons': 'false',
     'versions_unstable': UNSTABLE_VERSIONS,
     'versions_deprecated': DEPRECATED_VERSIONS,
 }
