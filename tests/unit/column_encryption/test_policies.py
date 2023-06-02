@@ -55,6 +55,23 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 policy.add_column(coldesc, os.urandom(key_size), "blob")
 
+    def test_add_column_invalid_iv_size_raises(self):
+        def test_iv_size(iv_size):
+                policy = AES256ColumnEncryptionPolicy(iv = os.urandom(iv_size))
+                policy.add_column(coldesc, os.urandom(AES256_KEY_SIZE_BYTES), "blob")
+                policy.encrypt(coldesc, os.urandom(128))
+
+        coldesc = ColDesc('ks1','table1','col1')
+        for iv_size in range(1,AES256_BLOCK_SIZE_BYTES - 1):
+            with self.assertRaises(ValueError):
+                test_iv_size(iv_size)
+        for iv_size in range(AES256_BLOCK_SIZE_BYTES + 1,(2 * AES256_BLOCK_SIZE_BYTES) - 1):
+            with self.assertRaises(ValueError):
+                test_iv_size(iv_size)
+
+        # Finally, confirm that the expected IV size has no issue
+        test_iv_size(AES256_BLOCK_SIZE_BYTES)
+
     def test_add_column_null_coldesc_raises(self):
         with self.assertRaises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
@@ -125,6 +142,9 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
             policy.decrypt(ColDesc('ks2','table2','col2'), encrypted_bytes)
 
     def test_cache_info(self):
+        # Exclude any interference from tests above
+        AES256ColumnEncryptionPolicy._build_cipher.cache_clear()
+
         coldesc1 = ColDesc('ks1','table1','col1')
         coldesc2 = ColDesc('ks2','table2','col2')
         coldesc3 = ColDesc('ks3','table3','col3')

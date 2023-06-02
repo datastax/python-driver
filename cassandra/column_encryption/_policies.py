@@ -35,15 +35,27 @@ ColData = namedtuple('ColData', ['key','type'])
 
 class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
-    # CBC uses an IV that's the same size as the block size
-    #
-    # TODO: Need to find some way to expose mode options
-    # (CBC etc.) without leaking classes from the underlying
-    # impl here
-    def __init__(self, mode = modes.CBC, iv = os.urandom(AES256_BLOCK_SIZE_BYTES)):
+    # Fix block cipher mode for now.  IV size is a function of block cipher used
+    # so fixing this avoids (possibly unnecessary) validation logic here.
+    mode = modes.CBC
 
-        self.mode = mode
+    # "iv" param here expects a bytearray that's the same size as the block
+    # size for AES-256 (128 bits or 16 bytes).  If none is provided a new one
+    # will be randomly generated, but in this case the IV should be recorded and
+    # preserved or else you will not be able to decrypt any data encrypted by this
+    # policy.
+    def __init__(self, iv=None):
+
+        # CBC uses an IV that's the same size as the block size
+        #
+        # Avoid defining IV with a default arg in order to stay away from
+        # any issues around the caching of default args
         self.iv = iv
+        if self.iv:
+            if not len(self.iv) == AES256_BLOCK_SIZE_BYTES:
+                raise ValueError("This policy uses AES-256 with CBC mode and therefore expects a 128-bit initialization vector")
+        else:
+            self.iv = os.urandom(AES256_BLOCK_SIZE_BYTES)
 
         # ColData for a given ColDesc is always preserved.  We only create a Cipher
         # when there's an actual need to for a given ColDesc
@@ -64,11 +76,13 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
 
         cipher = self._get_cipher(coldesc)
         encryptor = cipher.encryptor()
-        return encryptor.update(padded_bytes) + encryptor.finalize()
+        return self.iv + encryptor.update(padded_bytes) + encryptor.finalize()
 
-    def decrypt(self, coldesc, encrypted_bytes):
+    def decrypt(self, coldesc, bytes):
 
-        cipher = self._get_cipher(coldesc)
+        iv = bytes[:AES256_BLOCK_SIZE_BYTES]
+        encrypted_bytes = bytes[AES256_BLOCK_SIZE_BYTES:]
+        cipher = self._get_cipher(coldesc, iv=iv)
         decryptor = cipher.decryptor()
         padded_bytes = decryptor.update(encrypted_bytes) + decryptor.finalize()
 
@@ -108,19 +122,18 @@ class AES256ColumnEncryptionPolicy(ColumnEncryptionPolicy):
     def column_type(self, coldesc):
         return self.coldata[coldesc].type
 
-    def _get_cipher(self, coldesc):
+    def _get_cipher(self, coldesc, iv=None):
         """
         Access relevant state from this instance necessary to create a Cipher and then get one,
         hopefully returning a cached instance if we've already done so (and it hasn't been evicted)
         """
-
         try:
             coldata = self.coldata[coldesc]
-            return AES256ColumnEncryptionPolicy._build_cipher(coldata.key, self.mode, self.iv)
+            return AES256ColumnEncryptionPolicy._build_cipher(coldata.key, iv or self.iv)
         except KeyError:
             raise ValueError("Could not find column {}".format(coldesc))
 
     # Explicitly use a class method here to avoid caching self
     @lru_cache(maxsize=128)
-    def _build_cipher(key, mode, iv):
-        return Cipher(algorithms.AES256(key), mode(iv))
+    def _build_cipher(key, iv):
+        return Cipher(algorithms.AES256(key), AES256ColumnEncryptionPolicy.mode(iv))
