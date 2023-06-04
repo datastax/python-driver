@@ -17,7 +17,7 @@ utilize any server-side functionality to do its work.
 Warning: Consider Upgrading to 3.28.0 or Greater
 ------------------------------------------------
 There is a significant issue with the column encryption functionality in 3.27.0.  Unless you preserve the cipher
-initialization vector (IV) used by the :class:`~.ColumnEncryptionPolicy` when your data was written and supply
+initialization vector (IV) used by the :class:`~.AES256ColumnEncryptionPolicy` when your data was written and supply
 this IV when creating a policy to read this data you will **NOT BE ABLE TO DECRYPT YOUR DATA**.  See 
 `PYTHON-1350 <https://datastax-oss.atlassian.net/browse/PYTHON-1350>`_ for more detail.  Version 3.28.0 and
 greater avoid this issue by managing the IV automatically.  Note, however, that because of this change any 
