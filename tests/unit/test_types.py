@@ -25,7 +25,8 @@ from cassandra.cqltypes import (
     EmptyValue, LongType, SetType, UTF8Type,
     cql_typename, int8_pack, int64_pack, lookup_casstype,
     lookup_casstype_simple, parse_casstype_args,
-    int32_pack, Int32Type, ListType, MapType
+    int32_pack, Int32Type, ListType, MapType, VectorType,
+    FloatType
 )
 from cassandra.encoder import cql_quote
 from cassandra.pool import Host
@@ -188,6 +189,12 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(UTF8Type, ctype.subtypes[2])
         self.assertEqual([b'city', None, b'zip'], ctype.names)
 
+    def test_parse_casstype_vector(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)")
+        self.assertTrue(issubclass(ctype, VectorType))
+        self.assertEqual(3, ctype.vector_size)
+        self.assertEqual(FloatType, ctype.subtype)
+
     def test_empty_value(self):
         self.assertEqual(str(EmptyValue()), 'EMPTY')
 
@@ -301,6 +308,19 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cql_quote('test'), "'test'")
         self.assertEqual(cql_quote(0), '0')
 
+    def test_vector_round_trip(self):
+        base = [3.4, 2.9, 41.6, 12.0]
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        base_bytes = ctype.serialize(base, 0)
+        self.assertEqual(16, len(base_bytes))
+        result = ctype.deserialize(base_bytes, 0)
+        self.assertEqual(len(base), len(result))
+        for idx in range(0,len(base)):
+            self.assertAlmostEqual(base[idx], result[idx], places=5)
+
+    def test_vector_cql_parameterized_type(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<float, 4>")
 
 ZERO = datetime.timedelta(0)
 
