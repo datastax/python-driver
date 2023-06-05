@@ -14,15 +14,19 @@ also available, although in this case values must be manually encrypted and/or d
 Client-side encryption and decryption should work against all versions of Cassandra and DSE.  It does not
 utilize any server-side functionality to do its work.
 
-Warning: Consider Upgrading to 3.28.0 or Greater
+WARNING: Consider upgrading to 3.28.0 or later
 ------------------------------------------------
-There is a significant issue with the column encryption functionality in 3.27.0.  Unless you preserve the cipher
-initialization vector (IV) used by the :class:`~.AES256ColumnEncryptionPolicy` when your data was written and supply
-this IV when creating a policy to read this data you will **NOT BE ABLE TO DECRYPT YOUR DATA**.  See 
-`PYTHON-1350 <https://datastax-oss.atlassian.net/browse/PYTHON-1350>`_ for more detail.  Version 3.28.0 and
-greater avoid this issue by managing the IV automatically.  Note, however, that because of this change any 
-encrypted data written by version 3.27.0 of the driver will **NOT** be readable by version 3.28.0 or higher,
-so if you do upgrade you should re-encrypt your data with the new driver version.
+There is a significant issue with the column encryption functionality in Python driver 3.27.0.
+To be able to decrypt your data, you must preserve the cipher initialization vector (IV) used by 
+the :class:`~.AES256ColumnEncryptionPolicy` when your data was written.
+To decrypt your data, you must supply this IV when creating a policy to read this data.
+If you do not supply this IV in the policy to read this data, you will **NOT BE ABLE TO DECRYPT YOUR DATA**. 
+See 
+`PYTHON-1350 <https://datastax-oss.atlassian.net/browse/PYTHON-1350>`_ for more detail. 
+
+DataStax recommends upgrading to Python driver 3.28.0 or later to avoid this issue. 3.28.0 or later manages the IV automatically.  
+Because of this change in functionality, any encrypted data written in 3.27.0 will **NOT** be readable by 3.28.0 or later. 
+After upgrading to Python driver 3.28.0 or later, it is critical that you re-encrypt your data with the new driver version.
 
 Configuration
 -------------
