@@ -1,3 +1,25 @@
+3.28.0
+======
+June 5, 2023
+
+Features
+--------
+* Add support for vector type (PYTHON-1352)
+* Cryptography module is now an optional dependency (PYTHON-1351)
+
+Bug Fixes
+---------
+* Store IV along with encrypted text when using column-level encryption (PYTHON-1350)
+* Create session-specific protocol handlers to contain session-specific CLE policies (PYTHON-1356)
+
+Others
+------
+* Use Cython for smoke builds (PYTHON-1343)
+* Don't fail when inserting UDTs with prepared queries with some missing fields (PR 1151)
+* Convert print statement to function in docs (PR 1157)
+* Update comment for retry policy (DOC-3278)
+* Added error handling blog reference (DOC-2813)
+
 3.27.0
 ======
 May 1, 2023
