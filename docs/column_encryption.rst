@@ -14,11 +14,11 @@ also available, although in this case values must be manually encrypted and/or d
 Client-side encryption and decryption should work against all versions of Cassandra and DSE.  It does not
 utilize any server-side functionality to do its work.
 
-Warning: Change In Encryption Format From 3.27.0
+WARNING: Encryption format changes in 3.28.0
 ------------------------------------------------
-This version introduces a new encryption format for data written by :class:`~.AES256ColumnEncryptionPolicy`.
-As a result any encrypted data written by version 3.27.0 of the driver will **NOT** be readable by this 
-version, so if you're upgrading you should re-encrypt your data.
+Python driver 3.28.0 introduces a new encryption format for data written by :class:`~.AES256ColumnEncryptionPolicy`.
+As a result, any encrypted data written by Python driver 3.27.0 will **NOT** be readable.
+If you upgraded from 3.27.0, you should re-encrypt your data with 3.28.0.
 
 Configuration
 -------------
