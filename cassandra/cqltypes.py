@@ -66,7 +66,6 @@ cql_empty_type = 'empty'
 log = logging.getLogger(__name__)
 
 _number_types = frozenset((int, float))
-long = int
 
 def _name_from_hex_string(encoded_name):
     bin_str = unhexlify(encoded_name)
@@ -645,7 +644,7 @@ class DateType(_CassandraType):
                     raise TypeError('DateType arguments must be a datetime, date, or timestamp')
                 timestamp = v
 
-        return int64_pack(long(timestamp))
+        return int64_pack(int(timestamp))
 
 
 class TimestampType(DateType):
