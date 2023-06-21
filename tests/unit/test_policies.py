@@ -142,7 +142,7 @@ class RoundRobinPolicyTest(unittest.TestCase):
 
         # make the GIL switch after every instruction, maximizing
         # the chance of race conditions
-        check = six.PY2 or '__pypy__' in sys.builtin_module_names
+        check = '__pypy__' in sys.builtin_module_names
         if check:
             original_interval = sys.getcheckinterval()
         else:

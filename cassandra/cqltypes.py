@@ -54,10 +54,9 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
 from cassandra import util
 
 _little_endian_flag = 1  # we always serialize LE
-if six.PY3:
-    import ipaddress
+import ipaddress
 
-_ord = ord if six.PY2 else lambda x: x
+lambda x: x
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
@@ -66,16 +65,12 @@ cql_empty_type = 'empty'
 
 log = logging.getLogger(__name__)
 
-if six.PY3:
-    _number_types = frozenset((int, float))
-    long = int
+_number_types = frozenset((int, float))
+long = int
 
-    def _name_from_hex_string(encoded_name):
-        bin_str = unhexlify(encoded_name)
-        return bin_str.decode('ascii')
-else:
-    _number_types = frozenset((int, long, float))
-    _name_from_hex_string = unhexlify
+def _name_from_hex_string(encoded_name):
+    bin_str = unhexlify(encoded_name)
+    return bin_str.decode('ascii')
 
 
 def trim_if_startswith(s, prefix):
@@ -383,8 +378,6 @@ class _CassandraType(object):
             raise ValueError("%s types require %d subtypes (%d given)"
                              % (cls.typename, cls.num_subtypes, len(subtypes)))
         newname = cls.cass_parameterized_type_with(subtypes)
-        if six.PY2 and isinstance(newname, unicode):
-            newname = newname.encode('utf-8')
         return type(newname, (cls,), {'subtypes': subtypes, 'cassname': cls.cassname, 'fieldnames': names})
 
     @classmethod
@@ -415,16 +408,10 @@ class _UnrecognizedType(_CassandraType):
     num_subtypes = 'UNKNOWN'
 
 
-if six.PY3:
-    def mkUnrecognizedType(casstypename):
-        return CassandraTypeType(casstypename,
-                                 (_UnrecognizedType,),
-                                 {'typename': "'%s'" % casstypename})
-else:
-    def mkUnrecognizedType(casstypename):  # noqa
-        return CassandraTypeType(casstypename.encode('utf8'),
-                                 (_UnrecognizedType,),
-                                 {'typename': "'%s'" % casstypename})
+def mkUnrecognizedType(casstypename):
+    return CassandraTypeType(casstypename,
+                                (_UnrecognizedType,),
+                                {'typename': "'%s'" % casstypename})
 
 
 class BytesType(_CassandraType):
@@ -500,25 +487,21 @@ class ByteType(_CassandraType):
         return int8_pack(byts)
 
 
-if six.PY2:
-    class AsciiType(_CassandraType):
-        typename = 'ascii'
-        empty_binary_ok = True
-else:
-    class AsciiType(_CassandraType):
-        typename = 'ascii'
-        empty_binary_ok = True
 
-        @staticmethod
-        def deserialize(byts, protocol_version):
-            return byts.decode('ascii')
+class AsciiType(_CassandraType):
+    typename = 'ascii'
+    empty_binary_ok = True
 
-        @staticmethod
-        def serialize(var, protocol_version):
-            try:
-                return var.encode('ascii')
-            except UnicodeDecodeError:
-                return var
+    @staticmethod
+    def deserialize(byts, protocol_version):
+        return byts.decode('ascii')
+
+    @staticmethod
+    def serialize(var, protocol_version):
+        try:
+            return var.encode('ascii')
+        except UnicodeDecodeError:
+            return var
 
 
 class FloatType(_CassandraType):
@@ -603,7 +586,7 @@ class InetAddressType(_CassandraType):
                 # since we've already determined the AF
                 return socket.inet_aton(addr)
         except:
-            if six.PY3 and isinstance(addr, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            if isinstance(addr, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
                 return addr.packed
             raise ValueError("can't interpret %r as an inet address" % (addr,))
 
@@ -975,8 +958,6 @@ class UserType(TupleType):
     def make_udt_class(cls, keyspace, udt_name, field_names, field_types):
         assert len(field_names) == len(field_types)
 
-        if six.PY2 and isinstance(udt_name, unicode):
-            udt_name = udt_name.encode('utf-8')
 
         instance = cls._cache.get((keyspace, udt_name))
         if not instance or instance.fieldnames != field_names or instance.subtypes != field_types:
@@ -992,8 +973,6 @@ class UserType(TupleType):
 
     @classmethod
     def evict_udt_class(cls, keyspace, udt_name):
-        if six.PY2 and isinstance(udt_name, unicode):
-            udt_name = udt_name.encode('utf-8')
         try:
             del cls._cache[(keyspace, udt_name)]
         except KeyError:

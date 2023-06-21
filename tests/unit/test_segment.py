@@ -22,8 +22,6 @@ from cassandra.connection import segment_codec_no_compression, segment_codec_lz4
 
 
 def to_bits(b):
-    if six.PY2:
-        b = six.byte2int(b)
     return '{:08b}'.format(b)
 
 class SegmentCodecTest(unittest.TestCase):

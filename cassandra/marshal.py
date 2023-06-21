@@ -45,35 +45,22 @@ v3_header_pack = v3_header_struct.pack
 v3_header_unpack = v3_header_struct.unpack
 
 
-if six.PY3:
-    def byte2int(b):
-        return b
+
+def byte2int(b):
+    return b
 
 
-    def varint_unpack(term):
-        val = int(''.join("%02x" % i for i in term), 16)
-        if (term[0] & 128) != 0:
-            len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
-            val -= 1 << (len_term * 8)
-        return val
-else:
-    def byte2int(b):
-        return ord(b)
-
-
-    def varint_unpack(term):  # noqa
-        val = int(term.encode('hex'), 16)
-        if (ord(term[0]) & 128) != 0:
-            len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
-            val = val - (1 << (len_term * 8))
-        return val
+def varint_unpack(term):
+    val = int(''.join("%02x" % i for i in term), 16)
+    if (term[0] & 128) != 0:
+        len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
+        val -= 1 << (len_term * 8)
+    return val
 
 
 def bit_length(n):
-    if six.PY3 or isinstance(n, int):
-        return int.bit_length(n)
-    else:
-        return long.bit_length(n)
+    return int.bit_length(n)
+
 
 
 def varint_pack(big):

@@ -922,9 +922,6 @@ class OrderedMapSerializedKey(OrderedMap):
 import datetime
 import time
 
-if six.PY3:
-    long = int
-
 
 @total_ordering
 class Time(object):

@@ -460,11 +460,9 @@ class ClassicGraphFixtures(GraphFixtures):
                           GraphSON1Deserializer.deserialize_duration]
             }
 
-        if six.PY2:
-            data["blob2"] = ["Blob()",  buffer(b"Hello World"), GraphSON1Deserializer.deserialize_blob]
-        else:
-            data["blob3"] = ["Blob()", bytes(b"Hello World Again"), GraphSON1Deserializer.deserialize_blob]
-            data["blob4"] = ["Blob()", memoryview(b"And Again Hello World"), GraphSON1Deserializer.deserialize_blob]
+
+        data["blob3"] = ["Blob()", bytes(b"Hello World Again"), GraphSON1Deserializer.deserialize_blob]
+        data["blob4"] = ["Blob()", memoryview(b"And Again Hello World"), GraphSON1Deserializer.deserialize_blob]
 
         if DSE_VERSION >= Version("5.1"):
             data["time1"] = ["Time()", datetime.time(12, 6, 12, 444), GraphSON1Deserializer.deserialize_time]
@@ -965,7 +963,7 @@ class GraphTestConfiguration(object):
         """Generate tests for a graph configuration"""
         def decorator(klass):
             if DSE_VERSION:
-                predicate = inspect.ismethod if six.PY2 else inspect.isfunction
+                predicate = inspect.isfunction
                 for name, func in inspect.getmembers(klass, predicate=predicate):
                     if not name.startswith('_test'):
                         continue
@@ -984,7 +982,7 @@ class GraphTestConfiguration(object):
         """Generate schema tests for a graph configuration"""
         def decorator(klass):
             if DSE_VERSION:
-                predicate = inspect.ismethod if six.PY2 else inspect.isfunction
+                predicate = inspect.isfunction
                 for name, func in inspect.getmembers(klass, predicate=predicate):
                     if not name.startswith('_test'):
                         continue

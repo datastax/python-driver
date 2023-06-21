@@ -199,9 +199,9 @@ class MonitorReporter(Thread):
                 },
                 'platformInfo': {
                     'os': {
-                        'name': uname_info.system if six.PY3 else uname_info[0],
-                        'version': uname_info.release if six.PY3 else uname_info[2],
-                        'arch': uname_info.machine if six.PY3 else uname_info[4]
+                        'name': uname_info.system,
+                        'version': uname_info.release,
+                        'arch': uname_info.machine
                     },
                     'cpus': {
                         'length': multiprocessing.cpu_count(),

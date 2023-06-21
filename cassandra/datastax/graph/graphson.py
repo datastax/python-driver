@@ -164,9 +164,7 @@ class Int64TypeIO(IntegerTypeIO):
 
     @classmethod
     def deserialize(cls, value, reader=None):
-        if six.PY3:
-            return value
-        return long(value)
+        return value
 
 
 class FloatTypeIO(GraphSONTypeIO):
@@ -274,8 +272,7 @@ class BlobTypeIO(GraphSONTypeIO):
     @classmethod
     def serialize(cls, value, writer=None):
         value = base64.b64encode(value)
-        if six.PY3:
-            value = value.decode('utf-8')
+        value = value.decode('utf-8')
         return value
 
     @classmethod
@@ -845,12 +842,8 @@ if ipaddress:
     GraphSON1Serializer.register(ipaddress.IPv4Address, InetTypeIO)
     GraphSON1Serializer.register(ipaddress.IPv6Address, InetTypeIO)
 
-if six.PY2:
-    GraphSON1Serializer.register(buffer, ByteBufferTypeIO)
-    GraphSON1Serializer.register(unicode, TextTypeIO)
-else:
-    GraphSON1Serializer.register(memoryview, ByteBufferTypeIO)
-    GraphSON1Serializer.register(bytes, ByteBufferTypeIO)
+GraphSON1Serializer.register(memoryview, ByteBufferTypeIO)
+GraphSON1Serializer.register(bytes, ByteBufferTypeIO)
 
 
 class _BaseGraphSONDeserializer(object):
@@ -922,9 +915,7 @@ class GraphSON1Deserializer(_BaseGraphSONDeserializer):
 
     @classmethod
     def deserialize_bigint(cls, value):
-        if six.PY3:
-            return cls.deserialize_int(value)
-        return long(value)
+        return cls.deserialize_int(value)
 
     @classmethod
     def deserialize_double(cls, value):
@@ -1007,8 +998,6 @@ class GraphSON2Serializer(_BaseGraphSONSerializer):
 
 
 GraphSON2Serializer.register(int, IntegerTypeIO)
-if six.PY2:
-    GraphSON2Serializer.register(long, IntegerTypeIO)
 
 
 class GraphSON2Deserializer(_BaseGraphSONDeserializer):

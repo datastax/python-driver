@@ -114,10 +114,7 @@ class CloudTests(CloudProxyCluster):
         try:
             self.connect('/invalid/path/file.zip')
         except Exception as e:
-            if six.PY2:
-                self.assertIsInstance(e, IOError)
-            else:
-                self.assertIsInstance(e, FileNotFoundError)
+            self.assertIsInstance(e, FileNotFoundError)
 
     def test_load_balancing_policy_is_dcawaretokenlbp(self):
         self.connect(self.creds)

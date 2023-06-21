@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+import ipaddress
 
 from datetime import datetime
 import math
@@ -60,25 +61,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         params = ['key1', b'blobbyblob']
         query = "INSERT INTO blobstring (a, b) VALUES (%s, %s)"
 
-        # In python2, with Cassandra > 2.0, we don't treat the 'byte str' type as a blob, so we'll encode it
-        # as a string literal and have the following failure.
-        if six.PY2 and self.cql_version >= (3, 1, 0):
-            # Blob values can't be specified using string notation in CQL 3.1.0 and
-            # above which is used by default in Cassandra 2.0.
-            if self.cass_version >= (2, 1, 0):
-                msg = r'.*Invalid STRING constant \(.*?\) for "b" of type blob.*'
-            else:
-                msg = r'.*Invalid STRING constant \(.*?\) for b of type blob.*'
-            self.assertRaisesRegex(InvalidRequest, msg, s.execute, query, params)
-            return
-
-        # In python2, with Cassandra < 2.0, we can manually encode the 'byte str' type as hex for insertion in a blob.
-        if six.PY2:
-            cass_params = [params[0], params[1].encode('hex')]
-            s.execute(query, cass_params)
-        # In python 3, the 'bytes' type is treated as a blob, so we can correctly encode it with hex notation.
-        else:
-            s.execute(query, params)
+        s.execute(query, params)
 
         results = s.execute("SELECT * FROM blobstring")[0]
         for expected, actual in zip(params, results):
@@ -176,10 +159,8 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                 # verify data
                 result = s.execute("SELECT {0} FROM alltypes WHERE zz=%s".format(single_columns_string), (key,))[0][1]
                 compare_value = data_sample
-                if six.PY3:
-                    import ipaddress
-                    if isinstance(data_sample, ipaddress.IPv4Address) or isinstance(data_sample, ipaddress.IPv6Address):
-                        compare_value = str(data_sample)
+                if isinstance(data_sample, ipaddress.IPv4Address) or isinstance(data_sample, ipaddress.IPv6Address):
+                    compare_value = str(data_sample)
                 self.assertEqual(result, compare_value)
 
         # try the same thing with a prepared statement

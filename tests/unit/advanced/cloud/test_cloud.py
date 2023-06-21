@@ -96,7 +96,7 @@ class CloudTests(unittest.TestCase):
         }
 
         # The directory is not writtable.. we expect a permission error
-        exc = PermissionError if six.PY3 else OSError
+        exc = PermissionError
         with self.assertRaises(exc):
             cloud.get_cloud_config(config)
 

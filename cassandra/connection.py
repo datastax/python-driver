@@ -605,11 +605,8 @@ def defunct_on_error(f):
 
 DEFAULT_CQL_VERSION = '3.0.0'
 
-if six.PY3:
-    def int_from_buf_item(i):
-        return i
-else:
-    int_from_buf_item = ord
+def int_from_buf_item(i):
+    return i
 
 
 class _ConnectionIOBuffer(object):

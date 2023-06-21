@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-
 
 # Caching constants.
 CACHING_ALL = "ALL"
@@ -31,7 +29,5 @@ class ValidationError(CQLEngineException):
 
 
 class UnicodeMixin(object):
-    if six.PY3:
-        __str__ = lambda x: x.__unicode__()
-    else:
-        __str__ = lambda x: six.text_type(x).encode('utf-8')
+    __str__ = lambda x: x.__unicode__()
+

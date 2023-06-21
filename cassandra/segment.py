@@ -54,8 +54,6 @@ def compute_crc24(data, length):
 
 def compute_crc32(data, value):
     crc32 = zlib.crc32(data, value)
-    if six.PY2:
-        crc32 &= 0xffffffff
 
     return crc32
 

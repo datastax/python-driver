@@ -107,8 +107,6 @@ try:
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
-if six.PY3:
-    long = int
 
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
@@ -3345,10 +3343,6 @@ class Session(object):
                 'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
         field_names = type_meta.field_names
-        if six.PY2:
-            # go from unicode to string to avoid decode errors from implicit
-            # decode when formatting non-ascii values
-            field_names = [fn.encode('utf-8') for fn in field_names]
 
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (

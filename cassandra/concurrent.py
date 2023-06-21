@@ -145,7 +145,7 @@ class _ConcurrentExecutor(object):
         except Exception as exc:
             # exc_info with fail_fast to preserve stack trace info when raising on the client thread
             # (matches previous behavior -- not sure why we wouldn't want stack trace in the other case)
-            e = sys.exc_info() if self._fail_fast and six.PY2 else exc
+            e = exc
 
             # If we're not failing fast and all executions are raising, there is a chance of recursing
             # here as subsequent requests are attempted. If we hit this threshold, schedule this result/retry
@@ -165,11 +165,7 @@ class _ConcurrentExecutor(object):
 
     @staticmethod
     def _raise(exc):
-        if six.PY2 and isinstance(exc, tuple):
-            (exc_type, value, traceback) = exc
-            six.reraise(exc_type, value, traceback)
-        else:
-            raise exc
+        raise exc
 
 
 class ConcurrentExecutorGenResults(_ConcurrentExecutor):
