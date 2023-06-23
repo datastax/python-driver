@@ -56,7 +56,7 @@ from cassandra import util
 _little_endian_flag = 1  # we always serialize LE
 import ipaddress
 
-lambda x: x
+_ord = lambda x: x
 
 apache_cassandra_type_prefix = 'org.apache.cassandra.db.marshal.'
 
@@ -644,7 +644,7 @@ class DateType(_CassandraType):
                     raise TypeError('DateType arguments must be a datetime, date, or timestamp')
                 timestamp = v
 
-        return int64_pack(int(timestamp))
+        return int64_pack(timestamp)
 
 
 class TimestampType(DateType):

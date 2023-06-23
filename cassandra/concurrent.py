@@ -145,15 +145,14 @@ class _ConcurrentExecutor(object):
         except Exception as exc:
             # exc_info with fail_fast to preserve stack trace info when raising on the client thread
             # (matches previous behavior -- not sure why we wouldn't want stack trace in the other case)
-            e = exc
 
             # If we're not failing fast and all executions are raising, there is a chance of recursing
             # here as subsequent requests are attempted. If we hit this threshold, schedule this result/retry
             # and let the event loop thread return.
             if self._exec_depth < self.max_error_recursion:
-                self._put_result(e, idx, False)
+                self._put_result(exc, idx, False)
             else:
-                self.session.submit(self._put_result, e, idx, False)
+                self.session.submit(self._put_result, exc, idx, False)
         self._exec_depth -= 1
 
     def _on_success(self, result, future, idx):

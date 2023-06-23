@@ -142,26 +142,16 @@ class RoundRobinPolicyTest(unittest.TestCase):
 
         # make the GIL switch after every instruction, maximizing
         # the chance of race conditions
-        check = '__pypy__' in sys.builtin_module_names
-        if check:
-            original_interval = sys.getcheckinterval()
-        else:
-            original_interval = sys.getswitchinterval()
+        original_interval = sys.getswitchinterval()
 
         try:
-            if check:
-                sys.setcheckinterval(0)
-            else:
-                sys.setswitchinterval(0.0001)
+            sys.setswitchinterval(0.0001)
             for t in threads:
                 t.start()
             for t in threads:
                 t.join()
         finally:
-            if check:
-                sys.setcheckinterval(original_interval)
-            else:
-                sys.setswitchinterval(original_interval)
+            sys.setswitchinterval(original_interval)
 
         if errors:
             self.fail("Saw errors: %s" % (errors,))

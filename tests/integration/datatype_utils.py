@@ -14,8 +14,8 @@
 
 from decimal import Decimal
 from datetime import datetime, date, time
-from uuid import uuid1, uuid4
 import ipaddress
+from uuid import uuid1, uuid4
 
 from cassandra.util import OrderedMap, Date, Time, sortedset, Duration
 
