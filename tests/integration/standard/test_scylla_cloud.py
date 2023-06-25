@@ -41,7 +41,7 @@ class ScyllaCloudConfigTests(TestCase):
 
         docker_id, listen_address, listen_port = \
             start_sni_proxy(ccm_cluster.get_path(), nodes_info=nodes_info, listen_port=sni_port)
-        ccm_cluster.sni_proxy_docker_id = docker_id
+        ccm_cluster.sni_proxy_docker_ids = [docker_id]
         ccm_cluster.sni_proxy_listen_port = listen_port
         ccm_cluster._update_config()
 
