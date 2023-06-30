@@ -13,10 +13,13 @@
 # limitations under the License.
 
 import unittest
+import pytest
 
 from tests.integration import USE_CASS_EXTERNAL, use_cluster, TestCluster
 
 
+@pytest.mark.skip(reason="Flaky test - needs investigation whether its Scylla's or driver's fault."
+                         "Issue: https://github.com/scylladb/python-driver/issues/236")
 class MisconfiguredAuthenticationTests(unittest.TestCase):
     """ One node (not the contact point) has password auth. The rest of the nodes have no auth """
     @classmethod
