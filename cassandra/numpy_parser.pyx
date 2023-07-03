@@ -134,7 +134,7 @@ def make_array(coltype, array_size):
     """
     try:
         a = np.ma.empty((array_size,), dtype=_cqltype_to_numpy[coltype])
-        a.mask = np.zeros((array_size,), dtype=np.bool)
+        a.mask = np.zeros((array_size,), dtype=bool)
     except KeyError:
         a = np.empty((array_size,), dtype=obj_dtype)
     return a
