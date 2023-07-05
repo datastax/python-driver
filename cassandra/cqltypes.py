@@ -1,4 +1,4 @@
-# Copyright DataStax, Inc.
+    # Copyright DataStax, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -644,7 +644,7 @@ class DateType(_CassandraType):
                     raise TypeError('DateType arguments must be a datetime, date, or timestamp')
                 timestamp = v
 
-        return int64_pack(timestamp)
+        return int64_pack(int(timestamp))
 
 
 class TimestampType(DateType):
