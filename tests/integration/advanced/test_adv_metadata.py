@@ -46,7 +46,7 @@ class FunctionAndAggregateMetadataTests(BasicSharedKeyspaceUnitTestCaseRF1):
     @classmethod
     def tearDownClass(cls):
         if DSE_VERSION:
-            super(FunctionAndAggregateMetadataTests, cls).setUpClass()
+            super(FunctionAndAggregateMetadataTests, cls).tearDownClass()
 
     def setUp(self):
         self.func_name = self.function_table_name + '_func'
