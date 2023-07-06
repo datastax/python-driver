@@ -1,9 +1,6 @@
 environment:
   matrix:
-    - PYTHON: "C:\\Python27-x64"
-      cassandra_version: 3.11.2
-      ci_type: standard
-    - PYTHON: "C:\\Python35-x64"
+    - PYTHON: "C:\\Python37-x64"
       cassandra_version: 3.11.2
       ci_type: standard
 os: Visual Studio 2015
