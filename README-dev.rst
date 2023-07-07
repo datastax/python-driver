@@ -135,11 +135,11 @@ Running Unit Tests
 ------------------
 Unit tests can be run like so::
 
-    nosetests -w tests/unit/
+    pytest tests/unit/
 
 You can run a specific test method like so::
 
-    nosetests -w tests/unit/test_connection.py:ConnectionTest.test_bad_protocol_version
+    pytest tests/unit/test_connection.py::ConnectionTest::test_bad_protocol_version
 
 Running Integration Tests
 -------------------------
@@ -176,7 +176,7 @@ Use tee to capture logs and see them on your terminal::
 
 Testing Multiple Python Versions
 --------------------------------
-If you want to test all of python 2.7, 3.5, 3.6, 3.7, and pypy, use tox (this is what
+If you want to test all of python 3.6, 3.7, and pypy, use tox (this is what
 TravisCI runs)::
 
     tox
