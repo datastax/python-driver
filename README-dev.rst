@@ -172,7 +172,7 @@ Sometimes it's useful to output logs for the tests as they run::
 
 Testing Multiple Python Versions
 --------------------------------
-If you want to test multiple python versions, 3.7 and 3.8, use tox (this is what TravisCI runs)::
+If you want to test multiple python versions, such as 3.7 and 3.8, use tox (this is what TravisCI runs)::
 
     tox
 
