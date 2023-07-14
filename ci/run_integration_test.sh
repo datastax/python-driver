@@ -15,7 +15,7 @@ if (( aio_max_nr !=  aio_max_nr_recommended_value  )); then
    fi
 fi
 
-SCYLLA_RELEASE='release:5.0'
+SCYLLA_RELEASE='release:5.1'
 
 python3 -m venv .test-venv
 source .test-venv/bin/activate
