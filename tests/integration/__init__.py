@@ -372,15 +372,15 @@ lessthandse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('6.0')
 # 1. unittest doesn't skip setUpClass when used on class and we need it sometimes
 # 2. unittest doesn't have conditional xfail, and I prefer to use pytest than custom decorator
 # 3. unittest doesn't have a reason argument, so you don't see the reason in pytest report
-requires_collection_indexes = pytest.mark.xfail(SCYLLA_VERSION is not None and Version(SCYLLA_VERSION.split(':')[1]) < Version('5.2'),
+requires_collection_indexes = pytest.mark.skipif(SCYLLA_VERSION is not None and Version(SCYLLA_VERSION.split(':')[1]) < Version('5.2'),
                                               reason='Scylla supports collection indexes from 5.2 onwards') 
-requires_custom_indexes = pytest.mark.xfail(SCYLLA_VERSION is not None, 
+requires_custom_indexes = pytest.mark.skipif(SCYLLA_VERSION is not None,
                                           reason='Scylla does not support SASI or any other CUSTOM INDEX class')
-requires_java_udf = pytest.mark.xfail(SCYLLA_VERSION is not None,
+requires_java_udf = pytest.mark.skipif(SCYLLA_VERSION is not None,
                                     reason='Scylla does not support UDFs written in Java')
-requires_composite_type = pytest.mark.xfail(SCYLLA_VERSION is not None,
+requires_composite_type = pytest.mark.skipif(SCYLLA_VERSION is not None,
                                             reason='Scylla does not support composite types')
-requires_custom_payload = pytest.mark.xfail(SCYLLA_VERSION is not None or PROTOCOL_VERSION < 4,
+requires_custom_payload = pytest.mark.skipif(SCYLLA_VERSION is not None or PROTOCOL_VERSION < 4,
                                             reason='Scylla does not support custom payloads. Cassandra requires native protocol v4.0+')
 xfail_scylla = lambda reason, *args, **kwargs: pytest.mark.xfail(SCYLLA_VERSION is not None, reason=reason, *args, **kwargs)
 incorrect_test = lambda reason='This test seems to be incorrect and should be fixed', *args, **kwargs: pytest.mark.xfail(reason=reason, *args, **kwargs)

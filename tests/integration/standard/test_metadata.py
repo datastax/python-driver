@@ -1474,7 +1474,7 @@ class IndexMapTests(unittest.TestCase):
         self.assertIsInstance(table_meta.indexes[idx], IndexMetadata)
         self.drop_basic_table()
 
-
+@requires_java_udf
 class FunctionTest(unittest.TestCase):
     """
     Base functionality for Function and Aggregate metadata test classes
