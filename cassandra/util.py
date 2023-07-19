@@ -13,17 +13,22 @@
 # limitations under the License.
 
 from __future__ import with_statement
+from _weakref import ref
 import calendar
+from collections import OrderedDict
 from collections.abc import Mapping
 import datetime
 from functools import total_ordering
-import logging
 from itertools import chain
+import keyword
+import logging
 import pickle
 import random
 import re
-import uuid
+import socket
 import sys
+import time
+import uuid
 
 _HAS_GEOMET = True
 try:
@@ -211,147 +216,6 @@ def _resolve_contact_points_to_string_map(contact_points):
         ('{cp}:{port}'.format(cp=cp, port=port), _addrinfo_to_ip_strings(_addrinfo_or_none(cp, port)))
         for cp, port in contact_points
     )
-
-
-try:
-    from collections import OrderedDict
-except ImportError:
-    # OrderedDict from Python 2.7+
-
-    # Copyright (c) 2009 Raymond Hettinger
-    #
-    # Permission is hereby granted, free of charge, to any person
-    # obtaining a copy of this software and associated documentation files
-    # (the "Software"), to deal in the Software without restriction,
-    # including without limitation the rights to use, copy, modify, merge,
-    # publish, distribute, sublicense, and/or sell copies of the Software,
-    # and to permit persons to whom the Software is furnished to do so,
-    # subject to the following conditions:
-    #
-    #     The above copyright notice and this permission notice shall be
-    #     included in all copies or substantial portions of the Software.
-    #
-    #     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-    #     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-    #     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-    #     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-    #     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-    #     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-    #     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-    #     OTHER DEALINGS IN THE SOFTWARE.
-    from UserDict import DictMixin
-
-    class OrderedDict(dict, DictMixin):  # noqa
-        """ A dictionary which maintains the insertion order of keys. """
-
-        def __init__(self, *args, **kwds):
-            """ A dictionary which maintains the insertion order of keys. """
-
-            if len(args) > 1:
-                raise TypeError('expected at most 1 arguments, got %d' % len(args))
-            try:
-                self.__end
-            except AttributeError:
-                self.clear()
-            self.update(*args, **kwds)
-
-        def clear(self):
-            self.__end = end = []
-            end += [None, end, end]         # sentinel node for doubly linked list
-            self.__map = {}                 # key --> [key, prev, next]
-            dict.clear(self)
-
-        def __setitem__(self, key, value):
-            if key not in self:
-                end = self.__end
-                curr = end[1]
-                curr[2] = end[1] = self.__map[key] = [key, curr, end]
-            dict.__setitem__(self, key, value)
-
-        def __delitem__(self, key):
-            dict.__delitem__(self, key)
-            key, prev, next = self.__map.pop(key)
-            prev[2] = next
-            next[1] = prev
-
-        def __iter__(self):
-            end = self.__end
-            curr = end[2]
-            while curr is not end:
-                yield curr[0]
-                curr = curr[2]
-
-        def __reversed__(self):
-            end = self.__end
-            curr = end[1]
-            while curr is not end:
-                yield curr[0]
-                curr = curr[1]
-
-        def popitem(self, last=True):
-            if not self:
-                raise KeyError('dictionary is empty')
-            if last:
-                key = next(reversed(self))
-            else:
-                key = next(iter(self))
-            value = self.pop(key)
-            return key, value
-
-        def __reduce__(self):
-            items = [[k, self[k]] for k in self]
-            tmp = self.__map, self.__end
-            del self.__map, self.__end
-            inst_dict = vars(self).copy()
-            self.__map, self.__end = tmp
-            if inst_dict:
-                return (self.__class__, (items,), inst_dict)
-            return self.__class__, (items,)
-
-        def keys(self):
-            return list(self)
-
-        setdefault = DictMixin.setdefault
-        update = DictMixin.update
-        pop = DictMixin.pop
-        values = DictMixin.values
-        items = DictMixin.items
-        iterkeys = DictMixin.iterkeys
-        itervalues = DictMixin.itervalues
-        iteritems = DictMixin.iteritems
-
-        def __repr__(self):
-            if not self:
-                return '%s()' % (self.__class__.__name__,)
-            return '%s(%r)' % (self.__class__.__name__, self.items())
-
-        def copy(self):
-            return self.__class__(self)
-
-        @classmethod
-        def fromkeys(cls, iterable, value=None):
-            d = cls()
-            for key in iterable:
-                d[key] = value
-            return d
-
-        def __eq__(self, other):
-            if isinstance(other, OrderedDict):
-                if len(self) != len(other):
-                    return False
-                for p, q in zip(self.items(), other.items()):
-                    if p != q:
-                        return False
-                return True
-            return dict.__eq__(self, other)
-
-        def __ne__(self, other):
-            return not self == other
-
-
-# WeakSet from Python 2.7+ (https://code.google.com/p/weakrefset)
-
-from _weakref import ref
 
 
 class _IterationGuard(object):
@@ -916,10 +780,6 @@ class OrderedMapSerializedKey(OrderedMap):
         return self.cass_key_type.serialize(key, self.protocol_version)
 
 
-import datetime
-import time
-
-
 @total_ordering
 class Time(object):
     '''
@@ -1145,97 +1005,9 @@ class Date(object):
             # If we overflow datetime.[MIN|MAX]
             return str(self.days_from_epoch)
 
-import socket
-if hasattr(socket, 'inet_pton'):
-    inet_pton = socket.inet_pton
-    inet_ntop = socket.inet_ntop
-else:
-    """
-    Windows doesn't have socket.inet_pton and socket.inet_ntop until Python 3.4
-    This is an alternative impl using ctypes, based on this win_inet_pton project:
-    https://github.com/hickeroar/win_inet_pton
-    """
-    import ctypes
 
-    class sockaddr(ctypes.Structure):
-        """
-        Shared struct for ipv4 and ipv6.
-
-        https://msdn.microsoft.com/en-us/library/windows/desktop/ms740496(v=vs.85).aspx
-
-        ``__pad1`` always covers the port.
-
-        When being used for ``sockaddr_in6``, ``ipv4_addr`` actually covers ``sin6_flowinfo``, resulting
-        in proper alignment for ``ipv6_addr``.
-        """
-        _fields_ = [("sa_family", ctypes.c_short),
-                    ("__pad1", ctypes.c_ushort),
-                    ("ipv4_addr", ctypes.c_byte * 4),
-                    ("ipv6_addr", ctypes.c_byte * 16),
-                    ("__pad2", ctypes.c_ulong)]
-
-    if hasattr(ctypes, 'windll'):
-        WSAStringToAddressA = ctypes.windll.ws2_32.WSAStringToAddressA
-        WSAAddressToStringA = ctypes.windll.ws2_32.WSAAddressToStringA
-    else:
-        def not_windows(*args):
-            raise OSError("IPv6 addresses cannot be handled on Windows. "
-                            "Missing ctypes.windll")
-        WSAStringToAddressA = not_windows
-        WSAAddressToStringA = not_windows
-
-    def inet_pton(address_family, ip_string):
-        if address_family == socket.AF_INET:
-            return socket.inet_aton(ip_string)
-
-        addr = sockaddr()
-        addr.sa_family = address_family
-        addr_size = ctypes.c_int(ctypes.sizeof(addr))
-
-        if WSAStringToAddressA(
-                ip_string,
-                address_family,
-                None,
-                ctypes.byref(addr),
-                ctypes.byref(addr_size)
-        ) != 0:
-            raise socket.error(ctypes.FormatError())
-
-        if address_family == socket.AF_INET6:
-            return ctypes.string_at(addr.ipv6_addr, 16)
-
-        raise socket.error('unknown address family')
-
-    def inet_ntop(address_family, packed_ip):
-        if address_family == socket.AF_INET:
-            return socket.inet_ntoa(packed_ip)
-
-        addr = sockaddr()
-        addr.sa_family = address_family
-        addr_size = ctypes.c_int(ctypes.sizeof(addr))
-        ip_string = ctypes.create_string_buffer(128)
-        ip_string_size = ctypes.c_int(ctypes.sizeof(ip_string))
-
-        if address_family == socket.AF_INET6:
-            if len(packed_ip) != ctypes.sizeof(addr.ipv6_addr):
-                raise socket.error('packed IP wrong length for inet_ntoa')
-            ctypes.memmove(addr.ipv6_addr, packed_ip, 16)
-        else:
-            raise socket.error('unknown address family')
-
-        if WSAAddressToStringA(
-                ctypes.byref(addr),
-                addr_size,
-                None,
-                ip_string,
-                ctypes.byref(ip_string_size)
-        ) != 0:
-            raise socket.error(ctypes.FormatError())
-
-        return ip_string[:ip_string_size.value - 1]
-
-
-import keyword
+inet_pton = socket.inet_pton
+inet_ntop = socket.inet_ntop
 
 
 # similar to collections.namedtuple, reproduced here because Python 2.6 did not have the rename logic
