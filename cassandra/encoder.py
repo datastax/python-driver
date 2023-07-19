@@ -34,9 +34,6 @@ from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
 
 
 def cql_quote(term):
-    # The ordering of this method is important for the result of this method to
-    # be a native str type (for both Python 2 and 3)
-
     if isinstance(term, str):
         return "'%s'" % str(term).replace("'", "''")
     else:
