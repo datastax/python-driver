@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import re
-import six
 
 from cassandra.util import OrderedDict
 from cassandra.cqlengine import CQLEngineException
@@ -72,7 +71,7 @@ class BaseUserType(object):
         return not self.__eq__(other)
 
     def __str__(self):
-        return "{{{0}}}".format(', '.join("'{0}': {1}".format(k, getattr(self, k)) for k, v in six.iteritems(self._values)))
+        return "{{{0}}}".format(', '.join("'{0}': {1}".format(k, getattr(self, k)) for k, v in self._values.items()))
 
     def has_changed_fields(self):
         return any(v.changed for v in self._values.values())
@@ -93,14 +92,14 @@ class BaseUserType(object):
             raise AttributeError(attr)
 
     def __getitem__(self, key):
-        if not isinstance(key, six.string_types):
+        if not isinstance(key, str):
             raise TypeError
         if key not in self._fields.keys():
             raise KeyError
         return getattr(self, key)
 
     def __setitem__(self, key, val):
-        if not isinstance(key, six.string_types):
+        if not isinstance(key, str):
             raise TypeError
         if key not in self._fields.keys():
             raise KeyError
@@ -198,8 +197,7 @@ class UserTypeMetaClass(type):
         return klass
 
 
-@six.add_metaclass(UserTypeMetaClass)
-class UserType(BaseUserType):
+class UserType(BaseUserType, metaclass=UserTypeMetaClass):
     """
     This class is used to model User Defined Types. To define a type, declare a class inheriting from this,
     and assign field types as class attributes:

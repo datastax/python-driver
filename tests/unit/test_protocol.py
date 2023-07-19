@@ -14,7 +14,6 @@
 
 import unittest
 
-import six
 from mock import Mock
 
 from cassandra import ProtocolVersion, UnsupportedOperation

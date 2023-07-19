@@ -17,8 +17,7 @@ import unittest
 from itertools import islice, cycle
 from mock import Mock, patch, call
 from random import randint
-import six
-from six.moves._thread import LockType
+from _thread import LockType
 import sys
 import struct
 from threading import Thread
@@ -36,8 +35,6 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy)
 from cassandra.pool import Host
 from cassandra.query import Statement
-
-from six.moves import xrange
 
 
 class LoadBalancingPolicyTest(unittest.TestCase):
@@ -75,7 +72,7 @@ class RoundRobinPolicyTest(unittest.TestCase):
         hosts = [0, 1, 2, 3]
         policy = RoundRobinPolicy()
         policy.populate(None, hosts)
-        for i in xrange(20):
+        for i in range(20):
             qplan = list(policy.make_query_plan())
             self.assertEqual(sorted(qplan), hosts)
 
@@ -121,17 +118,17 @@ class RoundRobinPolicyTest(unittest.TestCase):
 
         def check_query_plan():
             try:
-                for i in xrange(100):
+                for i in range(100):
                     list(policy.make_query_plan())
             except Exception as exc:
                 errors.append(exc)
 
         def host_up():
-            for i in xrange(1000):
+            for i in range(1000):
                 policy.on_up(randint(0, 99))
 
         def host_down():
-            for i in xrange(1000):
+            for i in range(1000):
                 policy.on_down(randint(0, 99))
 
         threads = []
@@ -142,7 +139,7 @@ class RoundRobinPolicyTest(unittest.TestCase):
 
         # make the GIL switch after every instruction, maximizing
         # the chance of race conditions
-        check = six.PY2 or '__pypy__' in sys.builtin_module_names
+        check = '__pypy__' in sys.builtin_module_names
         if check:
             original_interval = sys.getcheckinterval()
         else:

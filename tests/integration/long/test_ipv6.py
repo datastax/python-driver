@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os, socket, errno
-import six
 from ccmlib import common
 
 from cassandra.cluster import NoHostAvailable

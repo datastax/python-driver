@@ -27,8 +27,6 @@ from tests.integration.cqlengine.base import TestQueryUpdateModel, BaseCassEngTe
 from tests.integration.cqlengine.operators import check_lookup
 from tests.integration import greaterthanorequalcass30
 
-import six
-
 
 class TestWhereOperators(unittest.TestCase):
 
@@ -47,15 +45,15 @@ class TestWhereOperators(unittest.TestCase):
 
     def test_operator_rendering(self):
         """ tests symbols are rendered properly """
-        self.assertEqual("=", six.text_type(EqualsOperator()))
-        self.assertEqual("!=", six.text_type(NotEqualsOperator()))
-        self.assertEqual("IN", six.text_type(InOperator()))
-        self.assertEqual(">", six.text_type(GreaterThanOperator()))
-        self.assertEqual(">=", six.text_type(GreaterThanOrEqualOperator()))
-        self.assertEqual("<", six.text_type(LessThanOperator()))
-        self.assertEqual("<=", six.text_type(LessThanOrEqualOperator()))
-        self.assertEqual("CONTAINS", six.text_type(ContainsOperator()))
-        self.assertEqual("LIKE", six.text_type(LikeOperator()))
+        self.assertEqual("=", str(EqualsOperator()))
+        self.assertEqual("!=", str(NotEqualsOperator()))
+        self.assertEqual("IN", str(InOperator()))
+        self.assertEqual(">", str(GreaterThanOperator()))
+        self.assertEqual(">=", str(GreaterThanOrEqualOperator()))
+        self.assertEqual("<", str(LessThanOperator()))
+        self.assertEqual("<=", str(LessThanOrEqualOperator()))
+        self.assertEqual("CONTAINS", str(ContainsOperator()))
+        self.assertEqual("LIKE", str(LikeOperator()))
 
 
 class TestIsNotNull(BaseCassEngTestCase):

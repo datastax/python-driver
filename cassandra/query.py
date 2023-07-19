@@ -23,8 +23,6 @@ from datetime import datetime, timedelta
 import re
 import struct
 import time
-import six
-from six.moves import range, zip
 import warnings
 
 from cassandra import ConsistencyLevel, OperationTimedOut
@@ -817,7 +815,7 @@ class BatchStatement(Statement):
         Like with other statements, parameters must be a sequence, even
         if there is only one item.
         """
-        if isinstance(statement, six.string_types):
+        if isinstance(statement, str):
             if parameters:
                 encoder = Encoder() if self._session is None else self._session.encoder
                 statement = bind_params(statement, parameters, encoder)
@@ -901,10 +899,8 @@ For example::
 
 
 def bind_params(query, params, encoder):
-    if six.PY2 and isinstance(query, six.text_type):
-        query = query.encode('utf-8')
     if isinstance(params, dict):
-        return query % dict((k, encoder.cql_encode_all_types(v)) for k, v in six.iteritems(params))
+        return query % dict((k, encoder.cql_encode_all_types(v)) for k, v in params.items())
     else:
         return query % tuple(encoder.cql_encode_all_types(v) for v in params)
 

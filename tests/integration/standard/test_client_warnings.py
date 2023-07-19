@@ -15,7 +15,6 @@
 
 import unittest
 
-import six
 from cassandra.query import BatchStatement
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, local, TestCluster

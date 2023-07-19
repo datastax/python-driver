@@ -21,7 +21,6 @@ import ssl
 from threading import Lock, Thread
 import time
 
-from six.moves import range
 
 from cassandra.connection import (Connection, ConnectionShutdown,
                                   NONBLOCKING, Timer, TimerManager)

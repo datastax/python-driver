@@ -17,7 +17,6 @@ import unittest
 from collections import deque
 from threading import RLock
 
-import six
 from mock import Mock, MagicMock, ANY
 
 from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType, OperationTimedOut

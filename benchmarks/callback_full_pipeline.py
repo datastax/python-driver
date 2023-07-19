@@ -18,7 +18,6 @@ from itertools import count
 from threading import Event
 
 from base import benchmark, BenchmarkThread
-from six.moves import range
 
 log = logging.getLogger(__name__)
 
