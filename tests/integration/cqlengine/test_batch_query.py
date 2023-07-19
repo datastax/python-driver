@@ -13,9 +13,6 @@
 # limitations under the License.
 import warnings
 
-import six
-import sure
-
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import drop_table, sync_table
 from cassandra.cqlengine.models import Model

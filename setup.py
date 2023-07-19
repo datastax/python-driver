@@ -417,8 +417,7 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = ['six >=1.9',
-                    'geomet>=0.1,<0.3',
+    dependencies = ['geomet>=0.1,<0.3',
                     'pyyaml > 5.0']
 
     _EXTRAS_REQUIRE = {

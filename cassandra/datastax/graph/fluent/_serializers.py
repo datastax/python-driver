@@ -14,8 +14,6 @@
 
 from collections import OrderedDict
 
-import six
-
 from gremlin_python.structure.io.graphsonV2d0 import (
     GraphSONReader as GraphSONReaderV2,
     GraphSONUtil as GraphSONUtil,  # no difference between v2 and v3
@@ -175,7 +173,7 @@ class TextDistancePSerializer(object):
 class DistanceIO(object):
     @classmethod
     def dictify(cls, v, _):
-        return GraphSONUtil.typedValue('Distance', six.text_type(v), prefix='dse')
+        return GraphSONUtil.typedValue('Distance', str(v), prefix='dse')
 
 
 GremlinUserTypeIO = _GremlinGraphSONTypeSerializer(UserTypeIO)
@@ -183,7 +181,7 @@ GremlinUserTypeIO = _GremlinGraphSONTypeSerializer(UserTypeIO)
 # GraphSON2
 dse_graphson2_serializers = OrderedDict([
     (t, _GremlinGraphSONTypeSerializer(s))
-    for t, s in six.iteritems(GraphSON2Serializer.get_type_definitions())
+    for t, s in GraphSON2Serializer.get_type_definitions().items()
 ])
 
 dse_graphson2_serializers.update(OrderedDict([
@@ -197,7 +195,7 @@ serializers = dse_graphson2_serializers
 
 dse_graphson2_deserializers = {
     k: _make_gremlin_graphson2_deserializer(v)
-    for k, v in six.iteritems(GraphSON2Deserializer.get_type_definitions())
+    for k, v in GraphSON2Deserializer.get_type_definitions().items()
 }
 
 dse_graphson2_deserializers.update({
@@ -228,7 +226,7 @@ gremlin_deserializers = gremlin_graphson2_deserializers
 # GraphSON3
 dse_graphson3_serializers = OrderedDict([
     (t, _GremlinGraphSONTypeSerializer(s))
-    for t, s in six.iteritems(GraphSON3Serializer.get_type_definitions())
+    for t, s in GraphSON3Serializer.get_type_definitions().items()
 ])
 
 dse_graphson3_serializers.update(OrderedDict([
@@ -239,7 +237,7 @@ dse_graphson3_serializers.update(OrderedDict([
 
 dse_graphson3_deserializers = {
     k: _make_gremlin_graphson3_deserializer(v)
-    for k, v in six.iteritems(GraphSON3Deserializer.get_type_definitions())
+    for k, v in GraphSON3Deserializer.get_type_definitions().items()
 }
 
 dse_graphson3_deserializers.update({

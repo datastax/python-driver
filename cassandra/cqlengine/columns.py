@@ -15,7 +15,6 @@
 from copy import deepcopy, copy
 from datetime import date, datetime, timedelta
 import logging
-import six
 from uuid import UUID as _UUID
 
 from cassandra import util
@@ -327,7 +326,7 @@ class Blob(Column):
 
     def to_database(self, value):
 
-        if not isinstance(value, (six.binary_type, bytearray)):
+        if not isinstance(value, (bytes, bytearray)):
             raise Exception("expecting a binary, got a %s" % type(value))
 
         val = super(Bytes, self).to_database(value)
@@ -381,7 +380,7 @@ class Text(Column):
 
     def validate(self, value):
         value = super(Text, self).validate(value)
-        if not isinstance(value, (six.string_types, bytearray)) and value is not None:
+        if not isinstance(value, (str, bytearray)) and value is not None:
             raise ValidationError('{0} {1} is not a string'.format(self.column_name, type(value)))
         if self.max_length is not None:
             if value and len(value) > self.max_length:
@@ -655,7 +654,7 @@ class UUID(Column):
             return
         if isinstance(val, _UUID):
             return val
-        if isinstance(val, six.string_types):
+        if isinstance(val, str):
             try:
                 return _UUID(val)
             except ValueError:

@@ -15,7 +15,6 @@
 from datetime import datetime, timedelta
 import json
 import logging
-import six
 import sys
 import traceback
 from uuid import uuid4
@@ -48,7 +47,7 @@ class JsonTestColumn(columns.Column):
     def to_python(self, value):
         if value is None:
             return
-        if isinstance(value, six.string_types):
+        if isinstance(value, str):
             return json.loads(value)
         else:
             return value

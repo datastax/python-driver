@@ -14,7 +14,7 @@
 
 import unittest
 
-from six.moves.urllib.request import build_opener, Request, HTTPHandler
+from urllib.request import build_opener, Request, HTTPHandler
 import re
 import os
 import time

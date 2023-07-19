@@ -32,8 +32,6 @@ try:
 except ImportError:
     SASLClient = None
 
-import six
-
 log = logging.getLogger(__name__)
 
 # Custom payload keys related to DSE Unified Auth
@@ -270,15 +268,15 @@ class PlainTextAuthenticator(BaseDSEAuthenticator):
         self.password = password
 
     def get_mechanism(self):
-        return six.b("PLAIN")
+        return b"PLAIN"
 
     def get_initial_challenge(self):
-        return six.b("PLAIN-START")
+        return b"PLAIN-START"
 
     def evaluate_challenge(self, challenge):
-        if challenge == six.b('PLAIN-START'):
+        if challenge == b'PLAIN-START':
             data = "\x00%s\x00%s" % (self.username, self.password)
-            return data if six.PY2 else data.encode()
+            return data.encode()
         raise Exception('Did not receive a valid challenge response from server')
 
 
@@ -297,13 +295,13 @@ class GSSAPIAuthenticator(BaseDSEAuthenticator):
         self.sasl = SASLClient(host, service, 'GSSAPI', qops=qops, **properties)
 
     def get_mechanism(self):
-        return six.b("GSSAPI")
+        return b"GSSAPI"
 
     def get_initial_challenge(self):
-        return six.b("GSSAPI-START")
+        return b"GSSAPI-START"
 
     def evaluate_challenge(self, challenge):
-        if challenge == six.b('GSSAPI-START'):
+        if challenge == b'GSSAPI-START':
             return self.sasl.process()
         else:
             return self.sasl.process(challenge)

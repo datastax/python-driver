@@ -14,7 +14,6 @@
 import unittest
 
 from uuid import uuid4
-import six
 
 from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine.statements import BaseCQLStatement
@@ -128,7 +127,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         ss = SelectStatement(self.table_name)
         like_clause = "text_for_%"
         ss.add_where(Column(db_field='text'), LikeOperator(), like_clause)
-        self.assertEqual(six.text_type(ss),
+        self.assertEqual(str(ss),
                          'SELECT * FROM {} WHERE "text" LIKE %(0)s'.format(self.table_name))
 
         result = execute(ss)

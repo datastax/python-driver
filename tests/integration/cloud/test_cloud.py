@@ -20,7 +20,6 @@ from cassandra.cqlengine import columns
 
 import unittest
 
-import six
 from ssl import SSLContext, PROTOCOL_TLS
 
 from cassandra import DriverException, ConsistencyLevel, InvalidRequest
@@ -114,10 +113,7 @@ class CloudTests(CloudProxyCluster):
         try:
             self.connect('/invalid/path/file.zip')
         except Exception as e:
-            if six.PY2:
-                self.assertIsInstance(e, IOError)
-            else:
-                self.assertIsInstance(e, FileNotFoundError)
+            self.assertIsInstance(e, FileNotFoundError)
 
     def test_load_balancing_policy_is_dcawaretokenlbp(self):
         self.connect(self.creds)
@@ -163,7 +159,7 @@ class CloudTests(CloudProxyCluster):
         self.assertEqual(self.session.default_consistency_level, ConsistencyLevel.LOCAL_QUORUM)
         # Verify EXEC_PROFILE_DEFAULT, EXEC_PROFILE_GRAPH_DEFAULT,
         # EXEC_PROFILE_GRAPH_SYSTEM_DEFAULT, EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT
-        for ep_key in six.iterkeys(self.cluster.profile_manager.profiles):
+        for ep_key in self.cluster.profile_manager.profiles.keys():
             ep = self.cluster.profile_manager.profiles[ep_key]
             self.assertEqual(
                 ep.consistency_level,

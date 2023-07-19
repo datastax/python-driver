@@ -14,7 +14,6 @@
 import unittest
 
 import logging
-import six
 
 from mock import patch, Mock
 
@@ -303,7 +302,7 @@ class ExecutionProfileTest(unittest.TestCase):
         rf = session.execute_async("query", execution_profile='non-default')
         self._verify_response_future_profile(rf, non_default_profile)
 
-        for name, ep in six.iteritems(cluster.profile_manager.profiles):
+        for name, ep in cluster.profile_manager.profiles.items():
             self.assertEqual(ep, session.get_execution_profile(name))
 
         # invalid ep

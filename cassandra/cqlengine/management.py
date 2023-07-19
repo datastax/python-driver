@@ -16,7 +16,6 @@ from collections import namedtuple
 import json
 import logging
 import os
-import six
 import warnings
 from itertools import product
 
@@ -232,7 +231,7 @@ def _sync_table(model, connection=None):
         except CQLEngineException as ex:
             # 1.2 doesn't return cf names, so we have to examine the exception
             # and ignore if it says the column family already exists
-            if "Cannot add already existing column family" not in six.text_type(ex):
+            if "Cannot add already existing column family" not in str(ex):
                 raise
     else:
         log.debug(format_log_context("sync_table checking existing table %s", keyspace=ks_name, connection=connection), cf_name)
@@ -477,7 +476,7 @@ def _update_options(model, connection=None):
         except KeyError:
             msg = format_log_context("Invalid table option: '%s'; known options: %s", keyspace=ks_name, connection=connection)
             raise KeyError(msg % (name, existing_options.keys()))
-        if isinstance(existing_value, six.string_types):
+        if isinstance(existing_value, str):
             if value != existing_value:
                 update_options[name] = value
         else:

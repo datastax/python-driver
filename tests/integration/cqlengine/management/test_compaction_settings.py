@@ -14,7 +14,6 @@
 
 import copy
 from mock import patch
-import six
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import drop_table, sync_table, _get_table_metadata, _update_options
@@ -110,7 +109,7 @@ class OptionsTest(BaseCassEngTestCase):
         cql = table_meta.export_as_string()
 
         for name, value in expected_options.items():
-            if isinstance(value, six.string_types):
+            if isinstance(value, str):
                 self.assertIn("%s = '%s'" % (name, value), cql)
             else:
                 start = cql.find("%s = {" % (name,))

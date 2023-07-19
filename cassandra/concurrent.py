@@ -16,8 +16,6 @@
 from collections import namedtuple
 from heapq import heappush, heappop
 from itertools import cycle
-import six
-from six.moves import xrange, zip
 from threading import Condition
 import sys
 
@@ -119,7 +117,7 @@ class _ConcurrentExecutor(object):
         self._current = 0
         self._exec_count = 0
         with self._condition:
-            for n in xrange(concurrency):
+            for n in range(concurrency):
                 if not self._execute_next():
                     break
         return self._results()
@@ -143,17 +141,13 @@ class _ConcurrentExecutor(object):
                 callback=self._on_success, callback_args=args,
                 errback=self._on_error, errback_args=args)
         except Exception as exc:
-            # exc_info with fail_fast to preserve stack trace info when raising on the client thread
-            # (matches previous behavior -- not sure why we wouldn't want stack trace in the other case)
-            e = sys.exc_info() if self._fail_fast and six.PY2 else exc
-
             # If we're not failing fast and all executions are raising, there is a chance of recursing
             # here as subsequent requests are attempted. If we hit this threshold, schedule this result/retry
             # and let the event loop thread return.
             if self._exec_depth < self.max_error_recursion:
-                self._put_result(e, idx, False)
+                self._put_result(exc, idx, False)
             else:
-                self.session.submit(self._put_result, e, idx, False)
+                self.session.submit(self._put_result, exc, idx, False)
         self._exec_depth -= 1
 
     def _on_success(self, result, future, idx):
@@ -162,14 +156,6 @@ class _ConcurrentExecutor(object):
 
     def _on_error(self, result, future, idx):
         self._put_result(result, idx, False)
-
-    @staticmethod
-    def _raise(exc):
-        if six.PY2 and isinstance(exc, tuple):
-            (exc_type, value, traceback) = exc
-            six.reraise(exc_type, value, traceback)
-        else:
-            raise exc
 
 
 class ConcurrentExecutorGenResults(_ConcurrentExecutor):
@@ -190,7 +176,7 @@ class ConcurrentExecutorGenResults(_ConcurrentExecutor):
                     try:
                         self._condition.release()
                         if self._fail_fast and not res[0]:
-                            self._raise(res[1])
+                            raise res[1]
                         yield res
                     finally:
                         self._condition.acquire()
@@ -221,9 +207,9 @@ class ConcurrentExecutorListResults(_ConcurrentExecutor):
             while self._current < self._exec_count:
                 self._condition.wait()
                 if self._exception and self._fail_fast:
-                    self._raise(self._exception)
+                    raise self._exception
         if self._exception and self._fail_fast:  # raise the exception even if there was no wait
-            self._raise(self._exception)
+            raise self._exception
         return [r[1] for r in sorted(self._results_queue)]
 
 

@@ -188,7 +188,7 @@ If your sudo configuration does not allow SETENV, you must push the option flag 
 applies these options to all dependencies (which break on the custom flag). Therefore, you must first install
 dependencies, then use install-option::
 
-    sudo pip install six futures
+    sudo pip install futures
     sudo pip install --install-option="--no-cython"
 
 

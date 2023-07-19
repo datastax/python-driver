@@ -19,8 +19,6 @@ from functools import wraps, partial, total_ordering
 from heapq import heappush, heappop
 import io
 import logging
-import six
-from six.moves import range
 import socket
 import struct
 import sys
@@ -36,7 +34,7 @@ from cassandra.protocol_features import ProtocolFeatures
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
 else:
-    from six.moves.queue import Queue, Empty  # noqa
+    from queue import Queue, Empty  # noqa
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
 from cassandra.marshal import int32_pack
@@ -613,12 +611,6 @@ def defunct_on_error(f):
 
 DEFAULT_CQL_VERSION = '3.0.0'
 
-if six.PY3:
-    def int_from_buf_item(i):
-        return i
-else:
-    int_from_buf_item = ord
-
 
 class _ConnectionIOBuffer(object):
     """
@@ -1164,7 +1156,7 @@ class Connection(object):
         buf = self._io_buffer.cql_frame_buffer.getvalue()
         pos = len(buf)
         if pos:
-            version = int_from_buf_item(buf[0]) & PROTOCOL_VERSION_MASK
+            version = buf[0] & PROTOCOL_VERSION_MASK
             if version not in ProtocolVersion.SUPPORTED_VERSIONS:
                 raise ProtocolError("This version of the driver does not support protocol version %d" % version)
             frame_header = frame_header_v3 if version >= 3 else frame_header_v1_v2
@@ -1367,7 +1359,7 @@ class Connection(object):
                           remote_supported_compressions)
             else:
                 compression_type = None
-                if isinstance(self.compression, six.string_types):
+                if isinstance(self.compression, str):
                     # the user picked a specific compression type ('snappy' or 'lz4')
                     if self.compression not in remote_supported_compressions:
                         raise ProtocolError(

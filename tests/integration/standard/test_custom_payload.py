@@ -15,8 +15,6 @@
 
 import unittest
 
-import six
-
 from cassandra.query import (SimpleStatement, BatchStatement, BatchType)
 
 from tests.integration import (use_singledc, PROTOCOL_VERSION, local, TestCluster,
@@ -140,16 +138,16 @@ class CustomPayloadTests(unittest.TestCase):
 
         # Long key value pair
         key_value = "x" * 10
-        custom_payload = {key_value: six.b(key_value)}
+        custom_payload = {key_value: key_value.encode()}
         self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Max supported value key pairs according C* binary protocol v4 should be 65534 (unsigned short max value)
         for i in range(65534):
-            custom_payload[str(i)] = six.b('x')
+            custom_payload[str(i)] = b'x'
         self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
         # Add one custom payload to this is too many key value pairs and should fail
-        custom_payload[str(65535)] = six.b('x')
+        custom_payload[str(65535)] = b'x'
         with self.assertRaises(ValueError):
             self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 

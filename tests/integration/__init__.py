@@ -32,7 +32,6 @@ import platform
 from threading import Event
 from subprocess import call
 from itertools import groupby
-import six
 import shutil
 import pytest
 
@@ -676,7 +675,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
 
         if os.name == "nt":
             if CCM_CLUSTER:
-                for node in six.itervalues(CCM_CLUSTER.nodes):
+                for node in CCM_CLUSTER.nodes.items():
                     os.system("taskkill /F /PID " + str(node.pid))
         else:
             call(["pkill", "-9", "-f", ".ccm"])

@@ -14,8 +14,6 @@
 
 import unittest
 
-import six
-
 from concurrent.futures import ThreadPoolExecutor
 from mock import Mock, ANY, call
 
@@ -54,7 +52,7 @@ class MockMetadata(object):
 
     def get_host(self, endpoint_or_address, port=None):
         if not isinstance(endpoint_or_address, EndPoint):
-            for host in six.itervalues(self.hosts):
+            for host in self.hosts.values():
                 if (host.address == endpoint_or_address and
                         (port is None or host.broadcast_rpc_port is None or host.broadcast_rpc_port == port)):
                     return host

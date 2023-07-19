@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-
 
 def initialize_registry(insights_registry):
     # This will be called from the cluster module, so we put all this behavior
@@ -203,8 +201,8 @@ def initialize_registry(insights_registry):
             'language': options.graph_language,
             'graphProtocol': options.graph_protocol
         }
-        updates = {k: v.decode('utf-8') for k, v in six.iteritems(rv)
-                   if isinstance(v, six.binary_type)}
+        updates = {k: v.decode('utf-8') for k, v in rv.items()
+                   if isinstance(v, bytes)}
         rv.update(updates)
         return rv
 

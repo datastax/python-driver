@@ -21,9 +21,6 @@ from cassandra.query import (bind_params, ValueSequence, PreparedStatement,
 from cassandra.cqltypes import Int32Type
 from cassandra.util import OrderedDict
 
-from six.moves import xrange
-import six
-
 
 class ParamBindingTest(unittest.TestCase):
 
@@ -40,7 +37,7 @@ class ParamBindingTest(unittest.TestCase):
         self.assertEqual(result, "(1, 'a', 2.0)")
 
     def test_generator_param(self):
-        result = bind_params("%s", ((i for i in xrange(3)),), Encoder())
+        result = bind_params("%s", ((i for i in range(3)),), Encoder())
         self.assertEqual(result, "[0, 1, 2]")
 
     def test_none_param(self):
@@ -149,7 +146,7 @@ class BoundStatementTestV1(unittest.TestCase):
 
     def test_extra_value(self):
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': 0, 'should_not_be_here': 123})  # okay to have extra keys in dict
-        self.assertEqual(self.bound.values, [six.b('\x00') * 4] * 4)  # four encoded zeros
+        self.assertEqual(self.bound.values, [b'\x00' * 4] * 4)  # four encoded zeros
         self.assertRaises(ValueError, self.bound.bind, (0, 0, 0, 0, 123))
 
     def test_values_none(self):

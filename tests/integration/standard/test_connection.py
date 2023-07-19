@@ -17,7 +17,6 @@ import unittest
 from functools import partial
 from mock import patch
 import logging
-from six.moves import range
 import sys
 import threading
 from threading import Thread, Event

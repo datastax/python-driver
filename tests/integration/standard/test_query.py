@@ -35,7 +35,6 @@ import random
 import re
 
 import mock
-import six
 
 
 log = logging.getLogger(__name__)
@@ -461,10 +460,10 @@ class ForcedHostIndexPolicy(RoundRobinPolicy):
         try:
             host = [live_hosts[self.host_index_to_use]]
         except IndexError as e:
-            six.raise_from(IndexError(
+            raise IndexError(
                 'You specified an index larger than the number of hosts. Total hosts: {}. Index specified: {}'.format(
                     len(live_hosts), self.host_index_to_use
-                )), e)
+                )) from e
         return host
 
 

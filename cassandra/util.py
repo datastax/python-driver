@@ -14,13 +14,14 @@
 
 from __future__ import with_statement
 import calendar
+from collections.abc import Mapping
 import datetime
 from functools import total_ordering
 import logging
 from itertools import chain
+import pickle
 import random
 import re
-import six
 import uuid
 import sys
 
@@ -789,10 +790,6 @@ class SortedSet(object):
 sortedset = SortedSet  # backwards-compatibility
 
 
-from cassandra.compat import Mapping
-from six.moves import cPickle
-
-
 class OrderedMap(Mapping):
     '''
     An ordered map that accepts non-hashable types for keys. It also maintains the
@@ -835,7 +832,7 @@ class OrderedMap(Mapping):
                 for k, v in e:
                     self._insert(k, v)
 
-        for k, v in six.iteritems(kwargs):
+        for k, v in kwargs.items():
             self._insert(k, v)
 
     def _insert(self, key, value):
@@ -901,7 +898,7 @@ class OrderedMap(Mapping):
             raise KeyError()
 
     def _serialize_key(self, key):
-        return cPickle.dumps(key)
+        return pickle.dumps(key)
 
 
 class OrderedMapSerializedKey(OrderedMap):
@@ -921,9 +918,6 @@ class OrderedMapSerializedKey(OrderedMap):
 
 import datetime
 import time
-
-if six.PY3:
-    long = int
 
 
 @total_ordering
@@ -951,11 +945,11 @@ class Time(object):
         - datetime.time: built-in time
         - string_type: a string time of the form "HH:MM:SS[.mmmuuunnn]"
         """
-        if isinstance(value, six.integer_types):
+        if isinstance(value, int):
             self._from_timestamp(value)
         elif isinstance(value, datetime.time):
             self._from_time(value)
-        elif isinstance(value, six.string_types):
+        elif isinstance(value, str):
             self._from_timestring(value)
         else:
             raise TypeError('Time arguments must be a whole number, datetime.time, or string')
@@ -1031,7 +1025,7 @@ class Time(object):
         if isinstance(other, Time):
             return self.nanosecond_time == other.nanosecond_time
 
-        if isinstance(other, six.integer_types):
+        if isinstance(other, int):
             return self.nanosecond_time == other
 
         return self.nanosecond_time % Time.MICRO == 0 and \
@@ -1080,11 +1074,11 @@ class Date(object):
         - datetime.date: built-in date
         - string_type: a string time of the form "yyyy-mm-dd"
         """
-        if isinstance(value, six.integer_types):
+        if isinstance(value, int):
             self.days_from_epoch = value
         elif isinstance(value, (datetime.date, datetime.datetime)):
             self._from_timetuple(value.timetuple())
-        elif isinstance(value, six.string_types):
+        elif isinstance(value, str):
             self._from_datestring(value)
         else:
             raise TypeError('Date arguments must be a whole number, datetime.date, or string')
@@ -1124,7 +1118,7 @@ class Date(object):
         if isinstance(other, Date):
             return self.days_from_epoch == other.days_from_epoch
 
-        if isinstance(other, six.integer_types):
+        if isinstance(other, int):
             return self.days_from_epoch == other
 
         try:
@@ -1688,7 +1682,7 @@ class DateRangeBound(object):
 
         if value is None:
             milliseconds = None
-        elif isinstance(value, six.integer_types):
+        elif isinstance(value, int):
             milliseconds = value
         elif isinstance(value, datetime.datetime):
             value = value.replace(
@@ -1956,12 +1950,10 @@ class Version(object):
 
         try:
             self.major = int(parts.pop())
-        except ValueError:
-            six.reraise(
-                ValueError,
-                ValueError("Couldn't parse version {}. Version should start with a number".format(version)),
-                sys.exc_info()[2]
-            )
+        except ValueError as e:
+            raise ValueError(
+                "Couldn't parse version {}. Version should start with a number".format(version))\
+                .with_traceback(e.__traceback__)
         try:
             self.minor = int(parts.pop()) if parts else 0
             self.patch = int(parts.pop()) if parts else 0
@@ -1994,8 +1986,8 @@ class Version(object):
 
     @staticmethod
     def _compare_version_part(version, other_version, cmp):
-        if not (isinstance(version, six.integer_types) and
-                isinstance(other_version, six.integer_types)):
+        if not (isinstance(version, int) and
+                isinstance(other_version, int)):
             version = str(version)
             other_version = str(other_version)
 

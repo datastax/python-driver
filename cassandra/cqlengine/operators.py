@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import six
 
 from cassandra.cqlengine import UnicodeMixin
 
@@ -44,8 +43,7 @@ class OpMapMeta(type):
         super(OpMapMeta, cls).__init__(name, bases, dct)
 
 
-@six.add_metaclass(OpMapMeta)
-class BaseWhereOperator(BaseQueryOperator):
+class BaseWhereOperator(BaseQueryOperator, metaclass=OpMapMeta):
     """ base operator used for where clauses """
     @classmethod
     def get_operator(cls, symbol):

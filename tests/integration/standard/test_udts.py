@@ -15,7 +15,6 @@
 import unittest
 from collections import namedtuple
 from functools import partial
-import six
 
 from cassandra import InvalidRequest
 from cassandra.cluster import UserTypeDoesNotExist, ExecutionProfile, EXEC_PROFILE_DEFAULT
@@ -287,9 +286,9 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual((None, None, None, None), s.execute(select)[0].b)
 
         # also test empty strings
-        s.execute(insert, [User('', None, None, six.binary_type())])
+        s.execute(insert, [User('', None, None, bytes())])
         results = s.execute("SELECT b FROM mytable WHERE a=0")
-        self.assertEqual(('', None, None, six.binary_type()), results[0].b)
+        self.assertEqual(('', None, None, bytes()), results[0].b)
 
         c.shutdown()
 
@@ -714,7 +713,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         s.execute("INSERT INTO %s (k, v) VALUES (0, {v0 : 3, v1 : 0xdeadbeef})" % (self.table_name,))
         val = s.execute('SELECT v FROM %s' % self.table_name)[0][0]
         self.assertEqual(val['v0'], 3)
-        self.assertEqual(val['v1'], six.b('\xde\xad\xbe\xef'))
+        self.assertEqual(val['v1'], b'\xde\xad\xbe\xef')
 
     @lessthancass30
     def test_alter_udt(self):

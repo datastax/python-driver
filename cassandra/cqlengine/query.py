@@ -16,7 +16,6 @@ import copy
 from datetime import datetime, timedelta
 from functools import partial
 import time
-import six
 from warnings import warn
 
 from cassandra.query import SimpleStatement, BatchType as CBatchType, BatchStatement
@@ -103,29 +102,29 @@ class AbstractQueryableColumn(UnicodeMixin):
 
         used where you'd typically want to use python's `in` operator
         """
-        return WhereClause(six.text_type(self), InOperator(), item)
+        return WhereClause(str(self), InOperator(), item)
 
     def contains_(self, item):
         """
         Returns a CONTAINS operator
         """
-        return WhereClause(six.text_type(self), ContainsOperator(), item)
+        return WhereClause(str(self), ContainsOperator(), item)
 
 
     def __eq__(self, other):
-        return WhereClause(six.text_type(self), EqualsOperator(), self._to_database(other))
+        return WhereClause(str(self), EqualsOperator(), self._to_database(other))
 
     def __gt__(self, other):
-        return WhereClause(six.text_type(self), GreaterThanOperator(), self._to_database(other))
+        return WhereClause(str(self), GreaterThanOperator(), self._to_database(other))
 
     def __ge__(self, other):
-        return WhereClause(six.text_type(self), GreaterThanOrEqualOperator(), self._to_database(other))
+        return WhereClause(str(self), GreaterThanOrEqualOperator(), self._to_database(other))
 
     def __lt__(self, other):
-        return WhereClause(six.text_type(self), LessThanOperator(), self._to_database(other))
+        return WhereClause(str(self), LessThanOperator(), self._to_database(other))
 
     def __le__(self, other):
-        return WhereClause(six.text_type(self), LessThanOrEqualOperator(), self._to_database(other))
+        return WhereClause(str(self), LessThanOrEqualOperator(), self._to_database(other))
 
 
 class BatchType(object):
@@ -231,7 +230,7 @@ class BatchQuery(object):
         opener = 'BEGIN ' + (str(batch_type) + ' ' if batch_type else '') + ' BATCH'
         if self.timestamp:
 
-            if isinstance(self.timestamp, six.integer_types):
+            if isinstance(self.timestamp, int):
                 ts = self.timestamp
             elif isinstance(self.timestamp, (datetime, timedelta)):
                 ts = self.timestamp
@@ -407,7 +406,7 @@ class AbstractQuerySet(object):
             return result
 
     def __unicode__(self):
-        return six.text_type(self._select_query())
+        return str(self._select_query())
 
     def __str__(self):
         return str(self.__unicode__())
@@ -604,7 +603,7 @@ class AbstractQuerySet(object):
 
     def first(self):
         try:
-            return six.next(iter(self))
+            return next(iter(self))
         except StopIteration:
             return None
 
@@ -901,7 +900,7 @@ class AbstractQuerySet(object):
         if v is None:
             v = 0
 
-        if not isinstance(v, six.integer_types):
+        if not isinstance(v, int):
             raise TypeError
         if v == self._limit:
             return self
@@ -925,7 +924,7 @@ class AbstractQuerySet(object):
                 print(user)
         """
 
-        if not isinstance(v, six.integer_types):
+        if not isinstance(v, int):
             raise TypeError
         if v == self._fetch_size:
             return self

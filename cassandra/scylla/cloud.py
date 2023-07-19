@@ -20,7 +20,6 @@ from ssl import SSLContext
 from contextlib import contextmanager
 from itertools import islice
 
-import six
 import yaml
 
 from cassandra.connection import SniEndPointFactory
@@ -105,7 +104,7 @@ class CloudConfiguration:
         for data_center in self.data_centers.values():
             with file_or_memory(path=data_center.get('certificateAuthorityPath'),
                                 data=data_center.get('certificateAuthorityData')) as cafile:
-                ssl_context.load_verify_locations(cadata=six.text_type(open(cafile).read()))
+                ssl_context.load_verify_locations(cadata=open(cafile).read())
         with file_or_memory(path=self.auth_info.get('clientCertificatePath'),
                             data=self.auth_info.get('clientCertificateData')) as certfile, \
                 file_or_memory(path=self.auth_info.get('clientKeyPath'), data=self.auth_info.get('clientKeyData')) as keyfile:
@@ -118,13 +117,10 @@ class CloudConfiguration:
         try:
             from OpenSSL import SSL
         except ImportError as e:
-            six.reraise(
-                ImportError,
-                ImportError(
-                    "PyOpenSSL must be installed to connect to scylla-cloud with the Eventlet or Twisted event loops"),
-                sys.exc_info()[2]
-            )
-        ssl_context = SSL.Context(SSL.TLS_CLIENT_METHOD)
+            raise ImportError(
+                "PyOpenSSL must be installed to connect to scylla-cloud with the Eventlet or Twisted event loops") \
+                .with_traceback(e.__traceback__)
+        ssl_context = SSL.Context(SSL.TLS_METHOD)
         ssl_context.set_verify(SSL.VERIFY_PEER, callback=lambda _1, _2, _3, _4, ok: True if self.skip_tls_verify else ok)
         for data_center in self.data_centers.values():
             with file_or_memory(path=data_center.get('certificateAuthorityPath'),

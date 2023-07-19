@@ -18,8 +18,6 @@ import tempfile
 import time
 from binascii import unhexlify
 
-import six
-
 import cassandra
 from cassandra import util
 from cassandra.cqltypes import (
@@ -166,7 +164,7 @@ class TypeTests(unittest.TestCase):
 
             @classmethod
             def apply_parameters(cls, subtypes, names):
-                return cls(subtypes, [unhexlify(six.b(name)) if name is not None else name for name in names])
+                return cls(subtypes, [unhexlify(name.encode()) if name is not None else name for name in names])
 
         class BarType(FooType):
             typename = 'org.apache.cassandra.db.marshal.BarType'
@@ -536,8 +534,8 @@ class DateRangeTypeTests(unittest.TestCase):
         self.assertRaises(ValueError, DateRangeType.serialize, no_bounds_object, 5)
 
     def test_serialized_value_round_trip(self):
-        vals = [six.b('\x01\x00\x00\x01%\xe9a\xf9\xd1\x06\x00\x00\x01v\xbb>o\xff\x00'),
-                six.b('\x01\x00\x00\x00\xdcm\x03-\xd1\x06\x00\x00\x01v\xbb>o\xff\x00')]
+        vals = [b'\x01\x00\x00\x01%\xe9a\xf9\xd1\x06\x00\x00\x01v\xbb>o\xff\x00',
+                b'\x01\x00\x00\x00\xdcm\x03-\xd1\x06\x00\x00\x01v\xbb>o\xff\x00']
         for serialized in vals:
             self.assertEqual(
                 serialized,

@@ -19,7 +19,6 @@ log = logging.getLogger(__name__)
 import unittest
 
 from itertools import cycle, count
-from six.moves import range
 from threading import Event
 
 from cassandra import ConsistencyLevel

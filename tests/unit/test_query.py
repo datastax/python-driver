@@ -14,8 +14,6 @@
 
 import unittest
 
-import six
-
 from cassandra.query import BatchStatement, SimpleStatement
 
 
@@ -25,7 +23,7 @@ class BatchStatementTest(unittest.TestCase):
     def test_clear(self):
         keyspace = 'keyspace'
         routing_key = 'routing_key'
-        custom_payload = {'key': six.b('value')}
+        custom_payload = {'key': b'value'}
 
         ss = SimpleStatement('whatever', keyspace=keyspace, routing_key=routing_key, custom_payload=custom_payload)
 
