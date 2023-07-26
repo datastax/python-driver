@@ -4,14 +4,6 @@ Upgrading
 .. toctree::
    :maxdepth: 1
 
-Upgrading from dse-driver
--------------------------
-
-Since 3.21.0, scylla-driver fully supports DataStax products. dse-driver and
-dse-graph users should now migrate to scylla-driver to benefit from latest bug fixes
-and new features. The upgrade to this new unified driver version is straightforward
-with no major API changes.
-
 Installation
 ^^^^^^^^^^^^
 
