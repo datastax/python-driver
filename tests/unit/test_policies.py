@@ -526,6 +526,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     def test_wrap_round_robin(self):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
@@ -557,6 +558,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     def test_wrap_dc_aware(self):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
@@ -685,6 +687,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         replicas = hosts[2:]
         cluster.metadata.get_replicas.return_value = replicas
 
@@ -775,6 +778,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         replicas = hosts[2:]
         cluster.metadata.get_replicas.return_value = replicas
 
@@ -1448,6 +1452,7 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
 
     def test_wrap_token_aware(self):
         cluster = Mock(spec=Cluster)
+        cluster.control_connection._tablets_routing_v1 = False
         hosts = [Host(DefaultEndPoint("127.0.0.{}".format(i)), SimpleConvictionPolicy) for i in range(1, 6)]
         for host in hosts:
             host.set_up()

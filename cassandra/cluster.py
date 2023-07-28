@@ -41,7 +41,7 @@ import uuid
 import weakref
 from weakref import WeakValueDictionary
 
-from cassandra import (ConsistencyLevel, AuthenticationFailed,
+from cassandra import (ConsistencyLevel, AuthenticationFailed, InvalidRequest,
                        OperationTimedOut, UnsupportedOperation,
                        SchemaTargetType, DriverException, ProtocolVersion,
                        UnresolvableContactPoints)
@@ -51,6 +51,7 @@ from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   EndPoint, DefaultEndPoint, DefaultEndPointFactory,
                                   ContinuousPagingState, SniEndPointFactory, ConnectionBusy)
 from cassandra.cqltypes import UserType
+import cassandra.cqltypes as types
 from cassandra.encoder import Encoder
 from cassandra.protocol import (QueryMessage, ResultMessage,
                                 ErrorMessage, ReadTimeoutErrorMessage,
@@ -79,6 +80,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              named_tuple_factory, dict_factory, tuple_factory, FETCH_SIZE_UNSET,
                              HostTargetingStatement)
 from cassandra.marshal import int64_pack
+from cassandra.tablets import Tablet, Tablets
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.compat import Mapping
 from cassandra.util import _resolve_contact_points_to_string_map, Version
@@ -1775,6 +1777,14 @@ class Cluster(object):
                     self.shutdown()
                     raise
 
+                # Update the information about tablet support after connection handshake.
+                self.load_balancing_policy._tablets_routing_v1 = self.control_connection._tablets_routing_v1
+                child_policy = self.load_balancing_policy.child_policy if hasattr(self.load_balancing_policy, 'child_policy') else None
+                while child_policy is not None:
+                    if hasattr(child_policy, '_tablet_routing_v1'):
+                        child_policy._tablet_routing_v1 = self.control_connection._tablets_routing_v1
+                    child_policy = child_policy.child_policy if hasattr(child_policy, 'child_policy') else None
+
                 self.profile_manager.check_supported()  # todo: rename this method
 
                 if self.idle_heartbeat_interval:
@@ -2388,7 +2398,6 @@ class Cluster(object):
     def add_prepared(self, query_id, prepared_statement):
         with self._prepared_statement_lock:
             self._prepared_statements[query_id] = prepared_statement
-
 
 class Session(object):
     """
@@ -3541,6 +3550,7 @@ class ControlConnection(object):
     _schema_meta_page_size = 1000
 
     _uses_peers_v2 = True
+    _tablets_routing_v1 = False
 
     # for testing purposes
     _time = time
@@ -3674,6 +3684,8 @@ class ControlConnection(object):
         # If sharding information is available, it's a ScyllaDB cluster, so do not use peers_v2 table.
         if connection.features.sharding_info is not None:
             self._uses_peers_v2 = False
+        
+        self._tablets_routing_v1 = connection.features.tablets_routing_v1
 
         # use weak references in both directions
         # _clear_watcher will be called when this ControlConnection is about to be finalized
@@ -4600,7 +4612,10 @@ class ResponseFuture(object):
         connection = None
         try:
             # TODO get connectTimeout from cluster settings
-            connection, request_id = pool.borrow_connection(timeout=2.0, routing_key=self.query.routing_key if self.query else None)
+            if self.query:
+                connection, request_id = pool.borrow_connection(timeout=2.0, routing_key=self.query.routing_key, keyspace=self.query.keyspace, table=self.query.table)
+            else:
+                connection, request_id = pool.borrow_connection(timeout=2.0)
             self._connection = connection
             result_meta = self.prepared_statement.result_metadata if self.prepared_statement else []
 
@@ -4718,6 +4733,19 @@ class ResponseFuture(object):
 
             self._warnings = getattr(response, 'warnings', None)
             self._custom_payload = getattr(response, 'custom_payload', None)
+
+            if self._custom_payload and self.session.cluster.control_connection._tablets_routing_v1 and 'tablets-routing-v1' in self._custom_payload:
+                protocol = self.session.cluster.protocol_version
+                info = self._custom_payload.get('tablets-routing-v1')
+                ctype = types.lookup_casstype('TupleType(LongType, LongType, ListType(TupleType(UUIDType, Int32Type)))')
+                tablet_routing_info = ctype.from_binary(info, protocol)
+                first_token = tablet_routing_info[0]
+                last_token = tablet_routing_info[1]
+                tablet_replicas = tablet_routing_info[2]
+                tablet = Tablet.from_row(first_token, last_token, tablet_replicas)
+                keyspace = self.query.keyspace
+                table = self.query.table
+                self.session.cluster.metadata._tablets.add_tablet(keyspace, table, tablet)
 
             if isinstance(response, ResultMessage):
                 if response.kind == RESULT_KIND_SET_KEYSPACE:

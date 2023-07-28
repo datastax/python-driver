@@ -75,7 +75,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.session._pools.get.assert_called_once_with('ip1')
-        pool.borrow_connection.assert_called_once_with(timeout=ANY, routing_key=ANY)
+        pool.borrow_connection.assert_called_once_with(timeout=ANY, routing_key=ANY, keyspace=ANY, table=ANY)
 
         connection.send_msg.assert_called_once_with(rf.message, 1, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
@@ -257,7 +257,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.session._pools.get.assert_called_once_with('ip1')
-        pool.borrow_connection.assert_called_once_with(timeout=ANY, routing_key=ANY)
+        pool.borrow_connection.assert_called_once_with(timeout=ANY, routing_key=ANY, keyspace=ANY, table=ANY)
         connection.send_msg.assert_called_once_with(rf.message, 1, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
         result = Mock(spec=UnavailableErrorMessage, info={})
@@ -276,7 +276,7 @@ class ResponseFutureTests(unittest.TestCase):
         # it should try again with the same host since this was
         # an UnavailableException
         rf.session._pools.get.assert_called_with(host)
-        pool.borrow_connection.assert_called_with(timeout=ANY, routing_key=ANY)
+        pool.borrow_connection.assert_called_with(timeout=ANY, routing_key=ANY, keyspace=ANY, table=ANY)
         connection.send_msg.assert_called_with(rf.message, 2, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
     def test_retry_with_different_host(self):
@@ -291,7 +291,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.session._pools.get.assert_called_once_with('ip1')
-        pool.borrow_connection.assert_called_once_with(timeout=ANY, routing_key=ANY)
+        pool.borrow_connection.assert_called_once_with(timeout=ANY, routing_key=ANY, keyspace=ANY, table=ANY)
         connection.send_msg.assert_called_once_with(rf.message, 1, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
         self.assertEqual(ConsistencyLevel.QUORUM, rf.message.consistency_level)
 
@@ -310,7 +310,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         # it should try with a different host
         rf.session._pools.get.assert_called_with('ip2')
-        pool.borrow_connection.assert_called_with(timeout=ANY, routing_key=ANY)
+        pool.borrow_connection.assert_called_with(timeout=ANY, routing_key=ANY, keyspace=ANY, table=ANY)
         connection.send_msg.assert_called_with(rf.message, 2, cb=ANY, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=[])
 
         # the consistency level should be the same

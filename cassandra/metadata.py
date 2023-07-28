@@ -44,6 +44,7 @@ from cassandra.util import OrderedDict, Version
 from cassandra.pool import HostDistance
 from cassandra.connection import EndPoint
 from cassandra.compat import Mapping
+from cassandra.tablets import Tablets
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +127,7 @@ class Metadata(object):
         self._hosts = {}
         self._host_id_by_endpoint = {}
         self._hosts_lock = RLock()
+        self._tablets = Tablets({})
 
     def export_schema_as_string(self):
         """

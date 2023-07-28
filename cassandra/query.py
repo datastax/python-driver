@@ -253,6 +253,13 @@ class Statement(object):
     .. versionadded:: 2.1.3
     """
 
+    table = None
+    """
+    The string name of the table this query acts on. This is used when the tablet
+    experimental feature is enabled and in the same time :class`~.TokenAwarePolicy`
+    is configured in the profile load balancing policy.
+    """
+
     custom_payload = None
     """
     :ref:`custom_payload` to be passed to the server.
@@ -272,7 +279,7 @@ class Statement(object):
 
     def __init__(self, retry_policy=None, consistency_level=None, routing_key=None,
                  serial_consistency_level=None, fetch_size=FETCH_SIZE_UNSET, keyspace=None, custom_payload=None,
-                 is_idempotent=False):
+                 is_idempotent=False, table=None):
         if retry_policy and not hasattr(retry_policy, 'on_read_timeout'):  # just checking one method to detect positional parameter errors
             raise ValueError('retry_policy should implement cassandra.policies.RetryPolicy')
         if retry_policy is not None:
@@ -286,6 +293,8 @@ class Statement(object):
             self.fetch_size = fetch_size
         if keyspace is not None:
             self.keyspace = keyspace
+        if table is not None:
+            self.table = table
         if custom_payload is not None:
             self.custom_payload = custom_payload
         self.is_idempotent = is_idempotent
@@ -548,6 +557,7 @@ class BoundStatement(Statement):
         meta = prepared_statement.column_metadata
         if meta:
             self.keyspace = meta[0].keyspace_name
+            self.table = meta[0].table_name
 
         Statement.__init__(self, retry_policy, consistency_level, routing_key,
                            serial_consistency_level, fetch_size, keyspace, custom_payload,
