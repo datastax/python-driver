@@ -24,7 +24,7 @@ import struct
 from threading import Thread
 
 from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ControlConnection
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
@@ -601,6 +601,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     class FakeCluster:
         def __init__(self):
             self.metadata = Mock(spec=Metadata)
+            self.control_connection = Mock(spec=ControlConnection)
 
     def test_get_distance(self):
         """

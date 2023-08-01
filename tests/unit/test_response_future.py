@@ -40,6 +40,7 @@ class ResponseFutureTests(unittest.TestCase):
     def make_basic_session(self):
         s = Mock(spec=Session)
         s.row_factory = lambda col_names, rows: [(col_names, rows)]
+        s.cluster.control_connection._tablets_routing_v1 = False
         return s
 
     def make_pool(self):
