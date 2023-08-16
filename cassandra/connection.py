@@ -31,6 +31,8 @@ import weakref
 import random
 import itertools
 
+from cassandra.protocol_features import ProtocolFeatures
+
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
 else:
@@ -772,6 +774,8 @@ class Connection(object):
 
     _on_orphaned_stream_released = None
 
+    features = None
+
     @property
     def _iobuf(self):
         # backward compatibility, to avoid any change in the reactors
@@ -1263,7 +1267,7 @@ class Connection(object):
                     return
 
         try:
-            response = decoder(header.version, self.user_type_map, stream_id,
+            response = decoder(header.version, self.features, self.user_type_map, stream_id,
                                header.flags, header.opcode, body, self.decompressor, result_metadata)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
@@ -1338,6 +1342,11 @@ class Connection(object):
         remote_supported_compressions = options_response.options['COMPRESSION']
         self._product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
 
+        protocol_features = ProtocolFeatures.parse_from_supported(options_response.options)
+        options = {}
+        protocol_features.add_startup_options(options)
+        self.features = protocol_features
+
         if self.cql_version:
             if self.cql_version not in supported_cql_versions:
                 raise ProtocolError(
@@ -1388,13 +1397,14 @@ class Connection(object):
                     self._compressor, self.decompressor = \
                         locally_supported_compressions[compression_type]
 
-        self._send_startup_message(compression_type, no_compact=self.no_compact)
+        self._send_startup_message(compression_type, no_compact=self.no_compact, extra_options=options)
 
     @defunct_on_error
-    def _send_startup_message(self, compression=None, no_compact=False):
+    def _send_startup_message(self, compression=None, no_compact=False, extra_options=None):
         log.debug("Sending StartupMessage on %s", self)
         opts = {'DRIVER_NAME': DRIVER_NAME,
-                'DRIVER_VERSION': DRIVER_VERSION}
+                'DRIVER_VERSION': DRIVER_VERSION,
+                **extra_options}
         if compression:
             opts['COMPRESSION'] = compression
         if no_compact:
