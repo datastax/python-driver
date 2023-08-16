@@ -22,9 +22,9 @@ import six
 from six.moves import range
 import io
 
-from cassandra import ProtocolVersion
+from cassandra import OperationType, ProtocolVersion
 from cassandra import type_codes, DriverException
-from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
+from cassandra import (Unavailable, WriteTimeout, RateLimitReached, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation, UserFunctionDescriptor,
@@ -390,6 +390,19 @@ class AlreadyExistsException(ConfigurationException):
     def to_exception(self):
         return AlreadyExists(**self.info)
 
+class RateLimitReachedException(ConfigurationException):
+    summary= 'Rate limit was exceeded for a partition affected by the request'
+    error_code = 0x4321
+
+    @staticmethod
+    def recv_error_info(f, protocol_version):
+        return {
+            'op_type': OperationType(read_byte(f)),
+            'rejected_by_coordinator': read_byte(f) != 0
+        }
+
+    def to_exception(self):
+        return RateLimitReached(**self.info)
 
 class ClientWriteError(RequestExecutionException):
     summary = 'Client write failure.'
