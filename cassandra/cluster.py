@@ -3668,6 +3668,11 @@ class ControlConnection(object):
                   "registering watchers and refreshing schema and topology",
                   connection)
 
+        # Indirect way to determine if conencted to a ScyllaDB cluster, which does not support peers_v2
+        # If sharding information is available, it's a ScyllaDB cluster, so do not use peers_v2 table.
+        if connection.features.sharding_info is not None:
+            self._uses_peers_v2 = False
+
         # use weak references in both directions
         # _clear_watcher will be called when this ControlConnection is about to be finalized
         # _watch_callback will get the actual callback from the Connection and relay it to
