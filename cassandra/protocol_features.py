@@ -1,5 +1,7 @@
 import logging
 
+from cassandra.shard_info import _ShardingInfo
+
 log = logging.getLogger(__name__)
 
 
@@ -7,13 +9,19 @@ RATE_LIMIT_ERROR_EXTENSION = "SCYLLA_RATE_LIMIT_ERROR"
 
 class ProtocolFeatures(object):
     rate_limit_error = None
+    shard_id = 0
+    sharding_info = None
 
-    def __init__(self, rate_limit_error=None):
+    def __init__(self, rate_limit_error=None, shard_id=0, sharding_info=None):
         self.rate_limit_error = rate_limit_error
+        self.shard_id = shard_id
+        self.sharding_info = sharding_info
 
     @staticmethod
     def parse_from_supported(supported):
-        return ProtocolFeatures(rate_limit_error = ProtocolFeatures.maybe_parse_rate_limit_error(supported))
+        rate_limit_error = ProtocolFeatures.maybe_parse_rate_limit_error(supported)
+        shard_id, sharding_info = ProtocolFeatures.parse_sharding_info(supported)
+        return ProtocolFeatures(rate_limit_error, shard_id, sharding_info)
 
     @staticmethod
     def maybe_parse_rate_limit_error(supported):
@@ -35,4 +43,23 @@ class ProtocolFeatures(object):
     def add_startup_options(self, options):
         if self.rate_limit_error is not None:
             options[RATE_LIMIT_ERROR_EXTENSION] = ""
+
+    @staticmethod
+    def parse_sharding_info(options):
+        shard_id = options.get('SCYLLA_SHARD', [''])[0] or None
+        shards_count = options.get('SCYLLA_NR_SHARDS', [''])[0] or None
+        partitioner = options.get('SCYLLA_PARTITIONER', [''])[0] or None
+        sharding_algorithm = options.get('SCYLLA_SHARDING_ALGORITHM', [''])[0] or None
+        sharding_ignore_msb = options.get('SCYLLA_SHARDING_IGNORE_MSB', [''])[0] or None
+        shard_aware_port = options.get('SCYLLA_SHARD_AWARE_PORT', [''])[0] or None
+        shard_aware_port_ssl = options.get('SCYLLA_SHARD_AWARE_PORT_SSL', [''])[0] or None
+        log.debug("Parsing sharding info from message options %s", options)
+
+        if not (shard_id or shards_count or partitioner == "org.apache.cassandra.dht.Murmur3Partitioner" or
+            sharding_algorithm == "biased-token-round-robin" or sharding_ignore_msb):
+            return 0, None
+
+        return int(shard_id), _ShardingInfo(shard_id, shards_count, partitioner, sharding_algorithm, sharding_ignore_msb,
+                                            shard_aware_port, shard_aware_port_ssl)
+
 
