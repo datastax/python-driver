@@ -100,7 +100,7 @@ class CloudConfiguration:
         return address, port, node_domain
 
     def create_ssl_context(self):
-        ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_SSLv23)
+        ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
         ssl_context.verify_mode = ssl.CERT_NONE if self.skip_tls_verify else ssl.CERT_REQUIRED
         for data_center in self.data_centers.values():
             with file_or_memory(path=data_center.get('certificateAuthorityPath'),
@@ -124,7 +124,7 @@ class CloudConfiguration:
                     "PyOpenSSL must be installed to connect to scylla-cloud with the Eventlet or Twisted event loops"),
                 sys.exc_info()[2]
             )
-        ssl_context = SSL.Context(SSL.TLS_METHOD)
+        ssl_context = SSL.Context(SSL.TLS_CLIENT_METHOD)
         ssl_context.set_verify(SSL.VERIFY_PEER, callback=lambda _1, _2, _3, _4, ok: True if self.skip_tls_verify else ok)
         for data_center in self.data_centers.values():
             with file_or_memory(path=data_center.get('certificateAuthorityPath'),
