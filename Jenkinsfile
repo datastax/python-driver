@@ -32,7 +32,7 @@ slack = new Slack()
 
 DEFAULT_CASSANDRA = ['2.1', '2.2', '3.0', '3.11', '4.0']
 DEFAULT_DSE = ['dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30']
-DEFAULT_RUNTIME = ['3.7.7', '3.8.3']
+DEFAULT_RUNTIME = ['3.8.16', '3.9.16', '3.10.11', '3.11.3']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
@@ -620,8 +620,8 @@ pipeline {
   triggers {
     parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
-      # These schedules will run with and without Cython enabled for Python 3.7.7 and 3.8.3
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.7.7 3.8.3;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
+      # These schedules will run with and without Cython enabled for Python 3.8.16 and 3.11.3
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.16 3.11.3;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
     """ : "")
   }
 
