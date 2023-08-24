@@ -30,8 +30,8 @@ import com.datastax.jenkins.drivers.python.Slack
 
 slack = new Slack()
 
-DEFAULT_CASSANDRA = ['2.1', '2.2', '3.0', '3.11', '4.0']
-DEFAULT_DSE = ['dse-5.0.15', 'dse-5.1.35', 'dse-6.0.18', 'dse-6.7.17', 'dse-6.8.30']
+DEFAULT_CASSANDRA = ['3.0', '3.11', '4.0']
+DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30']
 DEFAULT_RUNTIME = ['3.8.16', '3.9.16', '3.10.11', '3.11.3']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
@@ -503,14 +503,6 @@ pipeline {
                           <td>Default to the build context.</td>
                         </tr>
                         <tr>
-                          <td><strong>2.1</strong></td>
-                          <td>Apache CassandraⓇ; v2.1.x</td>
-                        </tr>
-                        <tr>
-                          <td><strong>2.2</strong></td>
-                          <td>Apache CassandarⓇ; v2.2.x</td>
-                        </tr>
-                        <tr>
                           <td><strong>3.0</strong></td>
                           <td>Apache CassandraⓇ v3.0.x</td>
                         </tr>
@@ -523,20 +515,8 @@ pipeline {
                           <td>Apache CassandraⓇ v4.0.x</td>
                         </tr>
                         <tr>
-                          <td><strong>dse-5.0.15</strong></td>
-                          <td>DataStax Enterprise v5.0.x (<b>Long Term Support</b>)</td>
-                        </tr>
-                        <tr>
                           <td><strong>dse-5.1.35</strong></td>
                           <td>DataStax Enterprise v5.1.x</td>
-                        </tr>
-                        <tr>
-                          <td><strong>dse-6.0.18</strong></td>
-                          <td>DataStax Enterprise v6.0.x</td>
-                        </tr>
-                        <tr>
-                          <td><strong>dse-6.7.17</strong></td>
-                          <td>DataStax Enterprise v6.7.x</td>
                         </tr>
                         <tr>
                           <td><strong>dse-6.8.30</strong></td>
@@ -621,7 +601,7 @@ pipeline {
     parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python 3.8.16 and 3.11.3
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.16 3.11.3;CI_SCHEDULE_SERVER_VERSION=2.2 3.11 dse-5.1.35 dse-6.0.18 dse-6.7.17
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.16 3.11.3;CI_SCHEDULE_SERVER_VERSION=3.11 4.0 dse-5.1.35 dse-6.8.30
     """ : "")
   }
 
