@@ -2,7 +2,8 @@
 scales
 nose
 mock>1.1
-ccm>=2.1.2
+ccm>=2.1.5
+PyYAML>=6.0.1
 pytz
 sure
 pure-sasl
