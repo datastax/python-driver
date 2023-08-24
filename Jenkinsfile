@@ -168,6 +168,7 @@ def initializeEnvironment() {
     pip install --upgrade pip
     pip install -U setuptools
     sed -i -e 's/pyyaml.*/pyyaml/' ${HOME}/ccm/requirements.txt
+    sed -i -e "s/\(pyYaml\) < [0-9]*\.[0-9]*'/\1'/" setup.py
     pip install ${HOME}/ccm
   '''
 
