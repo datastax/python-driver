@@ -167,6 +167,7 @@ def initializeEnvironment() {
     sudo apt-get install socat
     pip install --upgrade pip
     pip install -U setuptools
+    sed -i -e 's/pyyaml.*/pyyaml/' ${HOME}/ccm/requirements.txt
     pip install ${HOME}/ccm
   '''
 
