@@ -52,7 +52,7 @@ matrices = [
   ],
   "SMOKE": [
     "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(1),
-    "RUNTIME": DEFAULT_RUNTIME.takeRight(2),
+    "RUNTIME": DEFAULT_RUNTIME.take(1) + DEFAULT_RUNTIME.takeRight(1),
     "CYTHON": ["True"]
   ]
 ]
