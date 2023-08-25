@@ -167,9 +167,8 @@ def initializeEnvironment() {
     sudo apt-get install socat
     pip install --upgrade pip
     pip install -U setuptools
-    sed -i -e 's/pyyaml.*/pyyaml/' ${HOME}/ccm/requirements.txt
-    sed -i -e "s/pyYaml < 6.0/pyYaml/" ${HOME}/ccm/setup.py
     pip install ${HOME}/ccm
+    pip install "pyyaml > 6.0"
   '''
 
   // Determine if server version is Apache CassandraⓇ or DataStax Enterprise
