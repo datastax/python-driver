@@ -167,6 +167,9 @@ def initializeEnvironment() {
     sudo apt-get install socat
     pip install --upgrade pip
     pip install -U setuptools
+
+    # install a version of pyyaml<6.0 compatible with ccm-3.1.5 as of Aug 2023
+    # this works around the python-3.10+ compatibility problem as described in DSP-23524
     pip install wheel
     pip install "Cython<3.0" "pyyaml<6.0" --no-build-isolation
     pip install ${HOME}/ccm
