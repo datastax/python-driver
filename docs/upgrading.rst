@@ -91,7 +91,7 @@ DC-aware load balancing policy and to match other drivers.
 Execution API Updates
 ^^^^^^^^^^^^^^^^^^^^^
 Result return normalization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------
 `PYTHON-368 <https://datastax-oss.atlassian.net/browse/PYTHON-368>`_
 
 Previously results would be returned as a ``list`` of rows for result rows
@@ -129,7 +129,7 @@ This can send requests and load (possibly large) results into memory, so
 `~.ResultSet` will log a warning on implicit materialization.
 
 Trace information is not attached to executed Statements
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------------------------
 `PYTHON-318 <https://datastax-oss.atlassian.net/browse/PYTHON-318>`_
 
 Previously trace data was attached to Statements if tracing was enabled. This
@@ -147,7 +147,7 @@ returned for each query:
 :meth:`.ResultSet.get_all_query_traces()`
 
 Binding named parameters now ignores extra names
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------------------------
 `PYTHON-178 <https://datastax-oss.atlassian.net/browse/PYTHON-178Cassadfasdf>`_
 
 Previously, :meth:`.BoundStatement.bind()` would raise if a mapping

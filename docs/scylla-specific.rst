@@ -75,37 +75,6 @@ New Cluster Helpers
         print("successfully connected to all shards of all scylla nodes")
 
 
-New Table Attributes
---------------------
-
-* ``in_memory`` flag
-
-  New flag available on ``TableMetadata.options`` to indicate that it is an `In Memory <https://docs.scylladb.com/using-scylla/in-memory/>`_ table
-
-.. note::  in memory tables is a feature existing only in Scylla Enterprise
-
-.. code:: python
-
-    from cassandra.cluster import Cluster
-
-    cluster = Cluster()
-    session = cluster.connect()
-    session.execute("""
-        CREATE KEYSPACE IF NOT EXISTS keyspace1
-        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
-    """)
-
-    session.execute("""
-        CREATE TABLE IF NOT EXISTS keyspace1.standard1 (
-            key blob PRIMARY KEY,
-            "C0" blob
-        ) WITH in_memory=true AND compaction={'class': 'InMemoryCompactionStrategy'}
-    """)
-
-    cluster.refresh_table_metadata("keyspace1", "standard1")
-    assert cluster.metadata.keyspaces["keyspace1"].tables["standard1"].options["in_memory"] == True
-
-
 New Error Types
 --------------------
 
