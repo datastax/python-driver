@@ -129,13 +129,13 @@ class TimeUUID(uuid.UUID):
             return self.time == other.time and self.bytes[8:16] == other.bytes[8:16] 
         return NotImplemented
     
-    # def __lt__(self, other):
-    #     if isinstance(other, TimeUUID):
-    #         if self.time != other.time:
-    #             return self.time < other.time
-    #         else:
-    #             return self.lsb < other.lsb
-    #     return NotImplemented
+    def __lt__(self, other):
+        if isinstance(other, TimeUUID):
+            if self.time != other.time:
+                return self.time < other.time
+            else:
+                return self.lsb < other.lsb
+        return NotImplemented
 
     def __gt__(self, other):
         return not self <= other
