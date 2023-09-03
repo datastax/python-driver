@@ -116,6 +116,35 @@ def max_uuid_from_time(timestamp):
     """
     return uuid_from_time(timestamp, 0x7f7f7f7f7f7f, 0x3f7f)  # Max signed bytes (0x7f = 127)
 
+class TimeUUID(uuid.UUID):
+
+    @property
+    def lsb(self) -> int:
+        return int.from_bytes(self.bytes[8:16], 'big', signed=True)
+
+    def __eq__(self, other):
+        if isinstance(other, TimeUUID):
+            return self.time == other.time and self.lsb == other.lsb 
+        if isinstance(other, uuid.UUID):
+            return self.time == other.time and self.bytes[8:16] == other.bytes[8:16] 
+        return NotImplemented
+    
+    # def __lt__(self, other):
+    #     if isinstance(other, TimeUUID):
+    #         if self.time != other.time:
+    #             return self.time < other.time
+    #         else:
+    #             return self.lsb < other.lsb
+    #     return NotImplemented
+
+    def __gt__(self, other):
+        return not self <= other
+
+    def __le__(self, other):
+        return self < other or self == other
+
+    def __ge__(self, other):
+        return not self < other
 
 def uuid_from_time(time_arg, node=None, clock_seq=None):
     """
@@ -166,7 +195,7 @@ def uuid_from_time(time_arg, node=None, clock_seq=None):
     if node is None:
         node = random.getrandbits(48)
 
-    return uuid.UUID(fields=(time_low, time_mid, time_hi_version,
+    return TimeUUID(fields=(time_low, time_mid, time_hi_version,
                              clock_seq_hi_variant, clock_seq_low, node), version=1)
 
 LOWEST_TIME_UUID = uuid.UUID('00000000-0000-1000-8080-808080808080')

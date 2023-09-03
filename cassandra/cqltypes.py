@@ -677,7 +677,7 @@ class TimeUUIDType(DateType):
 
     @staticmethod
     def deserialize(byts, protocol_version):
-        return UUID(bytes=byts)
+        return util.TimeUUID(bytes=byts)
 
     @staticmethod
     def serialize(timeuuid, protocol_version):
