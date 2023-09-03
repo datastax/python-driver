@@ -963,7 +963,7 @@ class TestOrdering(unittest.TestCase):
         time2 = datetime.datetime(2023, 6, 19, 23, 49, 59, 961000)
         timeuuid1 = util.uuid_from_time(time1)
         timeuuid2 = util.uuid_from_time(time2)
-        # self.assertTrue(timeuuid1 < timeuuid2)
+        self.assertTrue(timeuuid1 < timeuuid2)
         
     def test_timeuuid_with_same_time(self):
         """
