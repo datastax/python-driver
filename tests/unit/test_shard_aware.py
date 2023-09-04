@@ -25,6 +25,7 @@ from cassandra.cluster import ShardAwareOptions
 from cassandra.pool import HostConnection, HostDistance
 from cassandra.connection import ShardingInfo, DefaultEndPoint
 from cassandra.metadata import Murmur3Token
+from cassandra.protocol_features import ProtocolFeatures
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class TestShardAware(unittest.TestCase):
                 'SCYLLA_SHARDING_ALGORITHM': ['biased-token-round-robin'],
                 'SCYLLA_SHARDING_IGNORE_MSB': ['12']
             }
-        shard_id, shard_info = ShardingInfo.parse_sharding_info(OptionsHolder())
+        shard_id, shard_info = ProtocolFeatures.parse_sharding_info(OptionsHolder().options)
 
         self.assertEqual(shard_id, 1)
         self.assertEqual(shard_info.shard_id_from_token(Murmur3Token.from_key(b"a").value), 4)
@@ -88,12 +89,10 @@ class TestShardAware(unittest.TestCase):
                 connection.is_defunct = False
                 connection.is_closed = False
                 connection.orphaned_threshold_reached = False
-                connection.endpoint = args[0]
-                connection.shard_id = kwargs.get('shard_id', self.connection_counter)
+                connection.endpoint = args[0] 
+                sharding_info = ShardingInfo(shard_id=1, shards_count=4, partitioner="", sharding_algorithm="", sharding_ignore_msb=0, shard_aware_port=19042, shard_aware_port_ssl=19045)
+                connection.features = ProtocolFeatures(shard_id=kwargs.get('shard_id', self.connection_counter), sharding_info=sharding_info)
                 self.connection_counter += 1
-                connection.sharding_info = ShardingInfo(shard_id=1, shards_count=4,
-                                                         partitioner="", sharding_algorithm="", sharding_ignore_msb=0,
-                                                         shard_aware_port=19042, shard_aware_port_ssl=19045)
 
                 return connection
 
@@ -107,7 +106,7 @@ class TestShardAware(unittest.TestCase):
                 f.result()
             assert len(pool._connections) == 4
             for shard_id, connection in pool._connections.items():
-                assert connection.shard_id == shard_id
+                assert connection.features.shard_id == shard_id
                 if shard_id == 0:
                     assert connection.endpoint == DefaultEndPoint("1.2.3.4")
                 else:

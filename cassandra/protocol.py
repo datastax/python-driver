@@ -22,9 +22,9 @@ import six
 from six.moves import range
 import io
 
-from cassandra import ProtocolVersion
+from cassandra import OperationType, ProtocolVersion
 from cassandra import type_codes, DriverException
-from cassandra import (Unavailable, WriteTimeout, ReadTimeout,
+from cassandra import (Unavailable, WriteTimeout, RateLimitReached, ReadTimeout,
                        WriteFailure, ReadFailure, FunctionFailure,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation, UserFunctionDescriptor,
@@ -126,10 +126,13 @@ class ErrorMessage(_MessageType, Exception):
         self.info = info
 
     @classmethod
-    def recv_body(cls, f, protocol_version, *args):
+    def recv_body(cls, f, protocol_version, protocol_features, *args):
         code = read_int(f)
         msg = read_string(f)
-        subcls = error_classes.get(code, cls)
+        if code == protocol_features.rate_limit_error:
+            subcls = RateLimitReachedException
+        else:
+            subcls = error_classes.get(code, cls)
         extra_info = subcls.recv_error_info(f, protocol_version)
         return subcls(code=code, message=msg, info=extra_info)
 
@@ -390,6 +393,19 @@ class AlreadyExistsException(ConfigurationException):
     def to_exception(self):
         return AlreadyExists(**self.info)
 
+class RateLimitReachedException(ConfigurationException):
+    summary= 'Rate limit was exceeded for a partition affected by the request'
+    error_code = 0x4321
+
+    @staticmethod
+    def recv_error_info(f, protocol_version):
+        return {
+            'op_type': OperationType(read_byte(f)),
+            'rejected_by_coordinator': read_byte(f) != 0
+        }
+
+    def to_exception(self):
+        return RateLimitReached(**self.info)
 
 class ClientWriteError(RequestExecutionException):
     summary = 'Client write failure.'
@@ -738,7 +754,7 @@ class ResultMessage(_MessageType):
             raise DriverException("Unknown RESULT kind: %d" % self.kind)
 
     @classmethod
-    def recv_body(cls, f, protocol_version, user_type_map, result_metadata):
+    def recv_body(cls, f, protocol_version, protocol_features, user_type_map, result_metadata):
         kind = read_int(f)
         msg = cls(kind)
         msg.recv(f, protocol_version, user_type_map, result_metadata)
@@ -1147,7 +1163,7 @@ class _ProtocolHandler(object):
         write_int(f, length)
 
     @classmethod
-    def decode_message(cls, protocol_version, user_type_map, stream_id, flags, opcode, body,
+    def decode_message(cls, protocol_version, protocol_features, user_type_map, stream_id, flags, opcode, body,
                        decompressor, result_metadata):
         """
         Decodes a native protocol message body
@@ -1193,7 +1209,7 @@ class _ProtocolHandler(object):
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
         msg_class = cls.message_types_by_opcode[opcode]
-        msg = msg_class.recv_body(body, protocol_version, user_type_map, result_metadata)
+        msg = msg_class.recv_body(body, protocol_version, protocol_features, user_type_map, result_metadata)
         msg.stream_id = stream_id
         msg.trace_id = trace_id
         msg.custom_payload = custom_payload

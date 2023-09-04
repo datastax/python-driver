@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from enum import Enum
 import logging
 
 
@@ -728,3 +729,21 @@ class UnresolvableContactPoints(DriverException):
     contact points, only when lookup fails for all hosts
     """
     pass
+
+
+class OperationType(Enum):
+    Read = 0
+    Write = 1
+
+class RateLimitReached(ConfigurationException):
+    '''
+    Rate limit was exceeded for a partition affected by the request.
+    '''
+    op_type = None
+    rejected_by_coordinator = False
+
+    def __init__(self, op_type=None, rejected_by_coordinator=False):
+        self.op_type = op_type
+        self.rejected_by_coordinator = rejected_by_coordinator
+        message = f"[request_error_rate_limit_reached OpType={op_type.name} RejectedByCoordinator={rejected_by_coordinator}]"
+        Exception.__init__(self, message)

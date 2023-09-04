@@ -31,6 +31,8 @@ import weakref
 import random
 import itertools
 
+from cassandra.protocol_features import ProtocolFeatures
+
 if 'gevent.monkey' in sys.modules:
     from gevent.queue import Queue, Empty
 else:
@@ -765,12 +767,11 @@ class Connection(object):
 
     _owning_pool = None
 
-    shard_id = 0
-    sharding_info = None
-
     _is_checksumming_enabled = False
 
     _on_orphaned_stream_released = None
+
+    features = None
 
     @property
     def _iobuf(self):
@@ -831,7 +832,7 @@ class Connection(object):
 
         self.lock = RLock()
         self.connected_event = Event()
-        self.shard_id = shard_id
+        self.features = ProtocolFeatures(shard_id=shard_id)
         self.total_shards = total_shards
         self.original_endpoint = self.endpoint
 
@@ -896,8 +897,8 @@ class Connection(object):
         self._socket = self.ssl_context.wrap_socket(self._socket, **ssl_options)
 
     def _initiate_connection(self, sockaddr):
-        if self.shard_id is not None:
-            for port in ShardawarePortGenerator.generate(self.shard_id, self.total_shards):
+        if self.features.shard_id is not None:
+            for port in ShardawarePortGenerator.generate(self.features.shard_id, self.total_shards):
                 try:
                     self._socket.bind(('', port))
                     break
@@ -1263,7 +1264,7 @@ class Connection(object):
                     return
 
         try:
-            response = decoder(header.version, self.user_type_map, stream_id,
+            response = decoder(header.version, self.features, self.user_type_map, stream_id,
                                header.flags, header.opcode, body, self.decompressor, result_metadata)
         except Exception as exc:
             log.exception("Error decoding response from Cassandra. "
@@ -1318,7 +1319,7 @@ class Connection(object):
 
     @defunct_on_error
     def _handle_options_response(self, options_response):
-        self.shard_id, self.sharding_info = ShardingInfo.parse_sharding_info(options_response)
+        self.features = ProtocolFeatures.parse_from_supported(options_response.options)
         if self.is_defunct:
             return
 
@@ -1337,6 +1338,9 @@ class Connection(object):
         supported_cql_versions = options_response.cql_versions
         remote_supported_compressions = options_response.options['COMPRESSION']
         self._product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
+
+        options = {}
+        self.features.add_startup_options(options)
 
         if self.cql_version:
             if self.cql_version not in supported_cql_versions:
@@ -1388,13 +1392,14 @@ class Connection(object):
                     self._compressor, self.decompressor = \
                         locally_supported_compressions[compression_type]
 
-        self._send_startup_message(compression_type, no_compact=self.no_compact)
+        self._send_startup_message(compression_type, no_compact=self.no_compact, extra_options=options)
 
     @defunct_on_error
-    def _send_startup_message(self, compression=None, no_compact=False):
+    def _send_startup_message(self, compression=None, no_compact=False, extra_options=None):
         log.debug("Sending StartupMessage on %s", self)
         opts = {'DRIVER_NAME': DRIVER_NAME,
-                'DRIVER_VERSION': DRIVER_VERSION}
+                'DRIVER_VERSION': DRIVER_VERSION,
+                **extra_options}
         if compression:
             opts['COMPRESSION'] = compression
         if no_compact:

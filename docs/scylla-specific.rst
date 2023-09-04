@@ -75,32 +75,37 @@ New Cluster Helpers
         print("successfully connected to all shards of all scylla nodes")
 
 
-New Table Attributes
+New Error Types
 --------------------
 
-* ``in_memory`` flag
+* ``SCYLLA_RATE_LIMIT_ERROR`` Error
 
-  New flag available on ``TableMetadata.options`` to indicate that it is an `In Memory <https://docs.scylladb.com/using-scylla/in-memory/>`_ table
-
-.. note::  in memory tables is a feature existing only in Scylla Enterprise
+  The ScyllaDB 5.1 introduced a feature called per-partition rate limiting. In case the (user defined) per-partition rate limit is exceeded, the database will start returning a Scylla-specific type of error: RateLimitReached.
 
 .. code:: python
 
+    from cassandra import RateLimitReached
     from cassandra.cluster import Cluster
 
     cluster = Cluster()
     session = cluster.connect()
     session.execute("""
-        CREATE KEYSPACE IF NOT EXISTS keyspace1
-        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
+        CREATE KEYSPACE IF NOT EXISTS keyspace1 
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
     """)
 
+    session.execute("USE keyspace1")
     session.execute("""
-        CREATE TABLE IF NOT EXISTS keyspace1.standard1 (
-            key blob PRIMARY KEY,
-            "C0" blob
-        ) WITH in_memory=true AND compaction={'class': 'InMemoryCompactionStrategy'}
+        CREATE TABLE tbl (pk int PRIMARY KEY, v int) 
+        WITH per_partition_rate_limit = {'max_writes_per_second': 1}
     """)
 
-    cluster.refresh_table_metadata("keyspace1", "standard1")
-    assert cluster.metadata.keyspaces["keyspace1"].tables["standard1"].options["in_memory"] == True
+    prepared = session.prepare("""
+        INSERT INTO tbl (pk, v) VALUES (?, ?)
+    """)
+    
+    try:
+        for _ in range(1000):
+            self.session.execute(prepared.bind((123, 456)))
+    except RateLimitReached:
+        raise
