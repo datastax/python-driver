@@ -81,13 +81,13 @@ rewrites:
     replace: 'https://www.datastax.com/dev/community'
   - search: 'https://docs.datastax.com/en/astra/aws/doc/index.html'
     replace: 'https://docs.datastax.com/en/astra-serverless/docs/connect/drivers/connect-python.html'
-  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#timeuuidFun'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun'
     replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#timeuuid-functions'
-  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#tokenFun'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun'
     replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#token'
-  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#collections'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#collections'
     replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/types.html#collections'
-  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#batchStmt'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#batchStmt'
     replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/dml.html#batch_statement'
 checks:
   external_links:
