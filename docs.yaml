@@ -89,6 +89,14 @@ rewrites:
     replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/types.html#collections'
   - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#batchStmt'
     replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/dml.html#batch_statement'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#timeuuidFun'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#timeuuid-functions'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#tokenFun'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#token'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#collections'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/types.html#collections'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#batchStmt'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/dml.html#batch_statement'
 checks:
   external_links:
     exclude:
