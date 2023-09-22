@@ -73,9 +73,47 @@ versions:
 redirects:
   - \A\/(.*)/\Z: /\1.html
 rewrites:
-  - search: cassandra.apache.org/doc/cql3/CQL.html
-    replace: cassandra.apache.org/doc/cql3/CQL-3.0.html
-  - search: http://www.datastax.com/documentation/cql/3.1/
-    replace: https://docs.datastax.com/en/archived/cql/3.1/
   - search: http://www.datastax.com/docs/1.2/cql_cli/cql/BATCH
     replace: https://docs.datastax.com/en/dse/6.7/cql/cql/cql_reference/cql_commands/cqlBatch.html
+  - search: http://www.datastax.com/documentation/cql/3.1/
+    replace: https://docs.datastax.com/en/archived/cql/3.1/
+  - search: 'https://community.datastax.com'
+    replace: 'https://www.datastax.com/dev/community'
+  - search: 'https://docs.datastax.com/en/astra/aws/doc/index.html'
+    replace: 'https://docs.datastax.com/en/astra-serverless/docs/connect/drivers/connect-python.html'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#timeuuidFun'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#timeuuid-functions'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#tokenFun'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#token'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#collections'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/types.html#collections'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL.html#batchStmt'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/dml.html#batch_statement'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#timeuuidFun'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#timeuuid-functions'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#tokenFun'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/functions.html#token'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#collections'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/types.html#collections'
+  - search: 'http://cassandra.apache.org/doc/cql3/CQL-3.0.html#batchStmt'
+    replace: 'https://cassandra.apache.org/doc/3.11/cassandra/cql/dml.html#batch_statement'
+checks:
+  external_links:
+    exclude:
+      - 'https://twitter.com/dsJavaDriver'
+      - 'https://twitter.com/datastaxeng'
+      - 'https://twitter.com/datastax'
+      - 'https://projectreactor.io'
+      - 'https://docs.datastax.com/en/drivers/java/4.[0-9]+/com/datastax/oss/driver/internal/'
+      - 'http://www.planetcassandra.org/blog/user-defined-functions-in-cassandra-3-0/'
+      - 'http://www.planetcassandra.org/making-the-change-from-thrift-to-cql/'
+      - 'https://academy.datastax.com/slack'
+      - 'https://community.datastax.com/index.html'
+      - 'https://micrometer.io/docs'
+      - 'http://datastax.github.io/java-driver/features/shaded_jar/'
+      - 'http://aka.ms/vcpython27'
+  internal_links:
+    exclude:
+      - 'netty_pipeline/'
+      - '../core/'
+      - '%5Bguava%20eviction%5D'
