@@ -2003,6 +2003,17 @@ class Cluster(object):
         reconnector.start()
 
     @run_in_executor
+    def on_down_potentially_blocking(self, host, is_host_addition):
+        self.profile_manager.on_down(host)
+        self.control_connection.on_down(host)
+        for session in tuple(self.sessions):
+            session.on_down(host)
+
+        for listener in self.listeners:
+            listener.on_down(host)
+
+        self._start_reconnector(host, is_host_addition)
+
     def on_down(self, host, is_host_addition, expect_host_to_be_down=False):
         """
         Intended for internal use only.
@@ -2028,18 +2039,9 @@ class Cluster(object):
             host.set_down()
             if (not was_up and not expect_host_to_be_down) or host.is_currently_reconnecting():
                 return
-
         log.warning("Host %s has been marked down", host)
 
-        self.profile_manager.on_down(host)
-        self.control_connection.on_down(host)
-        for session in tuple(self.sessions):
-            session.on_down(host)
-
-        for listener in self.listeners:
-            listener.on_down(host)
-
-        self._start_reconnector(host, is_host_addition)
+        self.on_down_potentially_blocking(host, is_host_addition)
 
     def on_add(self, host, refresh_nodes=True):
         if self.is_shutdown:
