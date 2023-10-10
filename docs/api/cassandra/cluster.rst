@@ -215,7 +215,7 @@
 
    .. automethod:: add_errback(fn, *args, **kwargs)
 
-   .. automethod:: add_callbacks(callback, errback, callback_args=(), callback_kwargs=None, errback_args=(), errback_args=None)
+   .. automethod:: add_callbacks(callback, errback, callback_args=(), callback_kwargs=None, errback_args=(), errback_kwargs=None)
 
 .. autoclass:: ResultSet ()
    :members:
