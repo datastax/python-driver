@@ -41,13 +41,12 @@ class AsyncioTimer(object):
 
     def __init__(self, timeout, callback, loop):
         delayed = self._call_delayed_coro(timeout=timeout,
-                                          callback=callback,
-                                          loop=loop)
+                                          callback=callback)
         self._handle = asyncio.run_coroutine_threadsafe(delayed, loop=loop)
 
     @staticmethod
-    async def _call_delayed_coro(timeout, callback, loop):
-        await asyncio.sleep(timeout, loop=loop)
+    async def _call_delayed_coro(timeout, callback):
+        await asyncio.sleep(timeout)
         return callback()
 
     def __lt__(self, other):
@@ -90,8 +89,8 @@ class AsyncioConnection(Connection):
         self._connect_socket()
         self._socket.setblocking(0)
 
-        self._write_queue = asyncio.Queue(loop=self._loop)
-        self._write_queue_lock = asyncio.Lock(loop=self._loop)
+        self._write_queue = asyncio.Queue()
+        self._write_queue_lock = asyncio.Lock()
 
         # see initialize_reactor -- loop is running in a separate thread, so we
         # have to use a threadsafe call
