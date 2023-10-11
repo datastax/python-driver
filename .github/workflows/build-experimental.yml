@@ -18,7 +18,7 @@ jobs:
         archs: [ aarch64, ppc64le ]
 
     steps:
-      - uses: actions/checkout@v2.1.0
+      - uses: actions/checkout@v3
 
       - name: Set up QEMU
         id: qemu
@@ -27,7 +27,7 @@ jobs:
           platforms: all
         if: runner.os == 'Linux'
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         name: Install Python
 
       - name: Install cibuildwheel

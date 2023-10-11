@@ -46,9 +46,9 @@ jobs:
             platform: PyPy
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         name: Install Python
 
       - name: Install cibuildwheel
@@ -113,7 +113,7 @@ jobs:
 
       - name: Build wheels
         run: |
-          python -m cibuildwheel --output-dir wheelhouse
+          python3 -m cibuildwheel --output-dir wheelhouse
 
       - uses: actions/upload-artifact@v2
         with:
@@ -124,9 +124,9 @@ jobs:
     if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         name: Install Python
 
       - name: Build sdist
