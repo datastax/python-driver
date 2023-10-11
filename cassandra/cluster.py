@@ -101,7 +101,9 @@ except ImportError:
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
-except ImportError:
+except (ImportError, AttributeError):
+    # AttributeError was add for handling python 3.12 https://github.com/eventlet/eventlet/issues/812
+    # TODO: remove it when eventlet issue would be fixed
     EventletConnection = None
 
 try:
@@ -115,9 +117,13 @@ if six.PY3:
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
         return False
-    import eventlet.patcher
-    return eventlet.patcher.is_monkey_patched('socket')
-
+    try:
+        import eventlet.patcher
+        return eventlet.patcher.is_monkey_patched('socket')
+    except (ImportError, AttributeError):
+        # AttributeError was add for handling python 3.12 https://github.com/eventlet/eventlet/issues/812
+        # TODO: remove it when eventlet issue would be fixed
+        return False
 
 def _is_gevent_monkey_patched():
     if 'gevent.monkey' not in sys.modules:
