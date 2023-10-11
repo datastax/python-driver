@@ -38,9 +38,7 @@ ccm remove
 
 # run test
 
-echo "export SCYLLA_VERSION=${SCYLLA_RELEASE}"
-echo "PROTOCOL_VERSION=4 EVENT_LOOP_MANAGER=asyncio pytest --import-mode append tests/integration/standard/"
 export SCYLLA_VERSION=${SCYLLA_RELEASE}
 export MAPPED_SCYLLA_VERSION=3.11.4
-PROTOCOL_VERSION=4 EVENT_LOOP_MANAGER=libev pytest -rf --import-mode append $*
+PROTOCOL_VERSION=4  pytest -rf --import-mode append $*
 

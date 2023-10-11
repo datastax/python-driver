@@ -10,15 +10,47 @@ on:
 
 jobs:
   tests:
-    runs-on: ubuntu-20.04
+    name: test ${{ matrix.event_loop_manager }} (${{ matrix.python-version }})
     if: "!contains(github.event.pull_request.labels.*.name, 'disable-integration-tests')"
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.8"
+            event_loop_manager: "libev"
 
+          - os: ubuntu-latest
+            python-version: "3.8"
+            event_loop_manager: "asyncio"
+
+          - os: ubuntu-latest
+            python-version: "3.8"
+            event_loop_manager: "asyncore"
+
+          - os: ubuntu-latest
+            python-version: "3.11"
+            event_loop_manager: "libev"
+
+          - os: ubuntu-latest
+            python-version: "3.11"
+            event_loop_manager: "asyncio"
+
+          - os: ubuntu-latest
+            python-version: "3.11"
+            event_loop_manager: "asyncore"
+
+          - os: ubuntu-latest
+            python-version: "3.12"
+            event_loop_manager: "libev"
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
     - name: Test with pytest
       run: |
+        export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
         ./ci/run_integration_test.sh tests/integration/standard/ tests/integration/cqlengine/
