@@ -26,8 +26,12 @@ from unittest import SkipTest
 
 from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.cluster import NoHostAvailable, ConnectionShutdown, ExecutionProfile, EXEC_PROFILE_DEFAULT
-import cassandra.io.asyncorereactor
-from cassandra.io.asyncorereactor import AsyncoreConnection
+
+try:
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+except ImportError:
+    AsyncoreConnection = None
+
 from cassandra.protocol import QueryMessage
 from cassandra.connection import Connection
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateListener

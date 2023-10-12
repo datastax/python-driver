@@ -6,15 +6,22 @@ from ccmlib.utils.sni_proxy import refresh_certs, get_cluster_info, start_sni_pr
 
 from tests.integration import use_cluster
 from cassandra.cluster import Cluster, TwistedConnection
-from cassandra.io.asyncorereactor import AsyncoreConnection
-from cassandra.io.libevreactor import LibevConnection
-from cassandra.io.geventreactor import GeventConnection
-from cassandra.io.eventletreactor import EventletConnection
-from cassandra.io.asyncioreactor import AsyncioConnection
 
-supported_connection_classes = [AsyncoreConnection, LibevConnection, TwistedConnection]
+
+from cassandra.io.libevreactor import LibevConnection
+supported_connection_classes = [LibevConnection, TwistedConnection]
+try:
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+    supported_connection_classes += [AsyncoreConnection]
+except ImportError:
+    pass
+
+#from cassandra.io.geventreactor import GeventConnection
+#from cassandra.io.eventletreactor import EventletConnection
+#from cassandra.io.asyncioreactor import AsyncioConnection
+
 # need to run them with specific configuration like `gevent.monkey.patch_all()` or under async functions
-unsupported_connection_classes = [GeventConnection, AsyncioConnection, EventletConnection]
+# unsupported_connection_classes = [GeventConnection, AsyncioConnection, EventletConnection]
 
 
 class ScyllaCloudConfigTests(TestCase):
