@@ -12,44 +12,23 @@ jobs:
   tests:
     name: test ${{ matrix.event_loop_manager }} (${{ matrix.python-version }})
     if: "!contains(github.event.pull_request.labels.*.name, 'disable-integration-tests')"
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            python-version: "3.8"
-            event_loop_manager: "libev"
-
-          - os: ubuntu-latest
-            python-version: "3.8"
-            event_loop_manager: "asyncio"
-
-          - os: ubuntu-latest
-            python-version: "3.8"
+        python-version: ["3.11.4", "3.12.0b4"]
+        event_loop_manager: ["libev", "asyncio", "asyncore"]
+        exclude:
+          - python-version: "3.12.0b4"
             event_loop_manager: "asyncore"
 
-          - os: ubuntu-latest
-            python-version: "3.11"
-            event_loop_manager: "libev"
-
-          - os: ubuntu-latest
-            python-version: "3.11"
-            event_loop_manager: "asyncio"
-
-          - os: ubuntu-latest
-            python-version: "3.11"
-            event_loop_manager: "asyncore"
-
-          - os: ubuntu-latest
-            python-version: "3.12"
-            event_loop_manager: "libev"
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - name: setup pyenv ${{ matrix.python-version }}
+      uses: "gabrielfalcao/pyenv-action@v16"
       with:
-        python-version: ${{ matrix.python-version }}
+        default: 2.7.14
+        versions: ${{ matrix.python-version }}
     - name: Test with pytest
       run: |
         export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
