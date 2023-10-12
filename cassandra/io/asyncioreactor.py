@@ -1,5 +1,5 @@
 from cassandra.connection import Connection, ConnectionShutdown
-
+import sys
 import asyncio
 import logging
 import os
@@ -88,9 +88,11 @@ class AsyncioConnection(Connection):
 
         self._connect_socket()
         self._socket.setblocking(0)
-
-        self._write_queue = asyncio.Queue()
-        self._write_queue_lock = asyncio.Lock()
+        loop_args = dict()
+        if sys.version_info[0] == 3 and sys.version_info[1] < 10:
+            loop_args['loop'] = self._loop
+        self._write_queue = asyncio.Queue(**loop_args)
+        self._write_queue_lock = asyncio.Lock(**loop_args)
 
         # see initialize_reactor -- loop is running in a separate thread, so we
         # have to use a threadsafe call
@@ -173,7 +175,7 @@ class AsyncioConnection(Connection):
 
     async def _push_msg(self, chunks):
         # This lock ensures all chunks of a message are sequential in the Queue
-        with await self._write_queue_lock:
+        async with self._write_queue_lock:
             for chunk in chunks:
                 self._write_queue.put_nowait(chunk)
 
