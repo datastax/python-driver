@@ -99,7 +99,11 @@ except ImportError:
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
-except ImportError:
+# PYTHON-1364
+#
+# At the moment eventlet initialization is chucking AttributeErrors due to it's dependence on pyOpenSSL
+# and some changes in Python 3.12 which have some knock-on effects there.
+except (ImportError, AttributeError):
     EventletConnection = None
 
 try:
@@ -113,8 +117,12 @@ if six.PY3:
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
         return False
-    import eventlet.patcher
-    return eventlet.patcher.is_monkey_patched('socket')
+    try:
+        import eventlet.patcher
+        return eventlet.patcher.is_monkey_patched('socket')
+    # Another case related to PYTHON-1364
+    except AttributeError:
+        return False
 
 
 def _is_gevent_monkey_patched():
