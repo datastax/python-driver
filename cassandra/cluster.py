@@ -116,8 +116,12 @@ except ImportError:
 def _is_gevent_monkey_patched():
     if 'gevent.monkey' not in sys.modules:
         return False
-    import gevent.socket
-    return socket.socket is gevent.socket.socket
+    try:
+        import eventlet.patcher
+        return eventlet.patcher.is_monkey_patched('socket')
+    # Another case related to PYTHON-1364
+    except AttributeError:
+        return False
 
 def _try_gevent_import():
     if _is_gevent_monkey_patched():
