@@ -587,7 +587,7 @@ class CoreGraphQueryWithTypeWrapperTest(GraphUnitTestCase):
         vl = VertexLabel(['tupleOf(Int, Bigint)'])
         schema.create_vertex_label(self.session, vl, execution_profile=ep)
 
-        prop_name = next(vl.non_pk_properties.keys())
+        prop_name = next(iter(vl.non_pk_properties.keys()))
         with self.assertRaises(InvalidRequest):
             schema.add_vertex(self.session, vl, prop_name, (1, 42), execution_profile=ep)
 

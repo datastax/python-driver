@@ -459,7 +459,7 @@ class _AbstractTraversalTest(GraphUnitTestCase):
         for data in schema.fixtures.datatypes().values():
             typ, value, deserializer = data
             vertex_label = VertexLabel([typ])
-            property_name = next(vertex_label.non_pk_properties.keys())
+            property_name = next(iter(vertex_label.non_pk_properties.keys()))
             if use_schema or schema is CoreGraphSchema:
                 schema.create_vertex_label(self.session, vertex_label, execution_profile=ep)
 
@@ -537,7 +537,7 @@ class _AbstractTraversalTest(GraphUnitTestCase):
         g = self.fetch_traversal_source(graphson)
         for typ, value in data.values():
             vertex_label = VertexLabel([typ])
-            property_name = next(vertex_label.non_pk_properties.keys())
+            property_name = next(iter(vertex_label.non_pk_properties.keys()))
             schema.create_vertex_label(self.session, vertex_label, execution_profile=ep)
 
             write_traversal = g.addV(str(vertex_label.label)).property('pkid', vertex_label.id). \
