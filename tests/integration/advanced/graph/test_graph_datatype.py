@@ -87,7 +87,7 @@ class GenericGraphDataTypeTest(GraphUnitTestCase):
         for data in schema.fixtures.datatypes().values():
             typ, value, deserializer = data
             vertex_label = VertexLabel([typ])
-            property_name = next(vertex_label.non_pk_properties.keys())
+            property_name = next(iter(vertex_label.non_pk_properties.keys()))
             schema.create_vertex_label(self.session, vertex_label, execution_profile=ep)
             vertex = list(schema.add_vertex(self.session, vertex_label, property_name, value, execution_profile=ep))[0]
 
@@ -168,7 +168,7 @@ class GenericGraphDataTypeTest(GraphUnitTestCase):
 
         for typ, value in data.values():
             vertex_label = VertexLabel([typ])
-            property_name = next(vertex_label.non_pk_properties.keys())
+            property_name = next(iter(vertex_label.non_pk_properties.keys()))
             schema.create_vertex_label(self.session, vertex_label, execution_profile=ep)
 
             vertex = list(schema.add_vertex(self.session, vertex_label, property_name, value, execution_profile=ep))[0]

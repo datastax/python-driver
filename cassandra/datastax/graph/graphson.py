@@ -135,7 +135,7 @@ class IntegerTypeIO(GraphSONTypeIO):
 
     @classmethod
     def get_specialized_serializer(cls, value):
-        if type(value) in int and (value > MAX_INT32 or value < MIN_INT32):
+        if type(value) is int and (value > MAX_INT32 or value < MIN_INT32):
             return Int64TypeIO
 
         return Int32TypeIO
