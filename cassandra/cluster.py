@@ -143,7 +143,10 @@ else:
     try:
         from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA
     except ImportError:
-        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+        try:
+            from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection # NOQA
+        except ImportError:
+            from cassandra.io.asyncioreactor import AsyncioConnection as DefaultConnection  # NOQA
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
