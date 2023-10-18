@@ -15,12 +15,19 @@ import unittest
 
 from mock import patch
 import socket
-import cassandra.io.asyncorereactor as asyncorereactor
-from cassandra.io.asyncorereactor import AsyncoreConnection
+try:
+    import cassandra.io.asyncorereactor as asyncorereactor
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+    ASYNCCORE_AVAILABLE = True
+except ImportError:
+    ASYNCCORE_AVAILABLE = False
+    AsyncoreConnection = None
+
 from tests import is_monkey_patched
 from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
 
 
+@unittest.skipIf(not ASYNCCORE_AVAILABLE, 'asyncore is deprecated')
 class AsyncorePatcher(unittest.TestCase):
 
     @classmethod

@@ -25,14 +25,20 @@ log = logging.getLogger()
 def is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
         return False
-    import eventlet.patcher
+    try:
+        import eventlet.patcher
+    except AttributeError:
+        return False
     return eventlet.patcher.is_monkey_patched('socket')
 
 
 def is_gevent_monkey_patched():
     if 'gevent.monkey' not in sys.modules:
         return False
-    import gevent.socket
+    try:
+        import gevent.socket
+    except AttributeError:
+        return False
     return socket.socket is gevent.socket.socket
 
 
