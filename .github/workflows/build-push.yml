@@ -10,7 +10,7 @@ env:
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
- CIBW_SKIP: cp35* cp36* *musllinux*
+ CIBW_SKIP: cp35* cp36* *musllinux* cp312*
 
 jobs:
   build_wheels:
@@ -53,7 +53,7 @@ jobs:
 
       - name: Install cibuildwheel
         run: |
-          python -m pip install cibuildwheel==2.12.1
+          python3 -m pip install cibuildwheel==2.16.2
 
       - name: Install OpenSSL for Windows
         if: runner.os == 'Windows'
