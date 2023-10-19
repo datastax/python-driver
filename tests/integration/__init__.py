@@ -612,6 +612,10 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                     # Selecting only features we need for tests, i.e. anything but CDC.
                     CCM_CLUSTER = CCMScyllaCluster(path, cluster_name, **ccm_options)
                     CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf'], 'start_native_transport': True})
+
+                    # Permit IS NOT NULL restriction on non-primary key columns of a materialized view
+                    # This allows `test_metadata_with_quoted_identifiers` to run
+                    CCM_CLUSTER.set_configuration_options({'strict_is_not_null_in_views': False})
                 else:
                     CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
                     CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
