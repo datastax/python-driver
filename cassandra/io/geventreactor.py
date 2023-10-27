@@ -20,7 +20,6 @@ import gevent.ssl
 import logging
 import time
 
-from six.moves import range
 
 from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
 

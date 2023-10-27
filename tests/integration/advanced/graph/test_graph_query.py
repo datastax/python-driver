@@ -14,7 +14,6 @@
 
 
 import sys
-import six
 from packaging.version import Version
 
 from copy import copy
@@ -83,7 +82,7 @@ class BasicGraphQueryTest(BasicGraphUnitTestCase):
             res = s.execute_graph("null")
 
             for k, v in cl.items():
-                self.assertEqual(res.response_future.message.custom_payload[graph_params[k]], six.b(ConsistencyLevel.value_to_name[v]))
+                self.assertEqual(res.response_future.message.custom_payload[graph_params[k]], ConsistencyLevel.value_to_name[v].encode())
 
             # passed profile values override session defaults
             cl = {0: ConsistencyLevel.ALL, 1: ConsistencyLevel.QUORUM}
@@ -97,7 +96,7 @@ class BasicGraphQueryTest(BasicGraphUnitTestCase):
             res = s.execute_graph("null", execution_profile=tmp_profile)
 
             for k, v in cl.items():
-                self.assertEqual(res.response_future.message.custom_payload[graph_params[k]], six.b(ConsistencyLevel.value_to_name[v]))
+                self.assertEqual(res.response_future.message.custom_payload[graph_params[k]], ConsistencyLevel.value_to_name[v].encode())
         finally:
             default_profile.graph_options = default_graph_opts
 
@@ -588,7 +587,7 @@ class CoreGraphQueryWithTypeWrapperTest(GraphUnitTestCase):
         vl = VertexLabel(['tupleOf(Int, Bigint)'])
         schema.create_vertex_label(self.session, vl, execution_profile=ep)
 
-        prop_name = next(six.iterkeys(vl.non_pk_properties))
+        prop_name = next(iter(vl.non_pk_properties.keys()))
         with self.assertRaises(InvalidRequest):
             schema.add_vertex(self.session, vl, prop_name, (1, 42), execution_profile=ep)
 

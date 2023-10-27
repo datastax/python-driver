@@ -18,8 +18,7 @@ import json
 import sys
 import tempfile
 import shutil
-import six
-from six.moves.urllib.request import urlopen
+from urllib.request import urlopen
 
 _HAS_SSL = True
 try:
@@ -182,11 +181,9 @@ def _pyopenssl_context_from_cert(ca_cert_location, cert_location, key_location):
     try:
         from OpenSSL import SSL
     except ImportError as e:
-        six.reraise(
-            ImportError,
-            ImportError("PyOpenSSL must be installed to connect to Astra with the Eventlet or Twisted event loops"),
-            sys.exc_info()[2]
-        )
+        raise ImportError(
+            "PyOpenSSL must be installed to connect to Astra with the Eventlet or Twisted event loops")\
+            .with_traceback(e.__traceback__)
     ssl_context = SSL.Context(SSL.TLSv1_METHOD)
     ssl_context.set_verify(SSL.VERIFY_PEER, callback=lambda _1, _2, _3, _4, ok: ok)
     ssl_context.use_certificate_file(cert_location)

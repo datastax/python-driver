@@ -14,7 +14,6 @@
 
 import logging
 import re
-import six
 from warnings import warn
 
 from cassandra.cqlengine import CQLEngineException, ValidationError
@@ -614,7 +613,7 @@ class BaseModel(object):
 
     def __getitem__(self, key):
         """ Returns column's value. """
-        if not isinstance(key, six.string_types):
+        if not isinstance(key, str):
             raise TypeError
         if key not in self._columns.keys():
             raise KeyError
@@ -622,7 +621,7 @@ class BaseModel(object):
 
     def __setitem__(self, key, val):
         """ Sets a column's value. """
-        if not isinstance(key, six.string_types):
+        if not isinstance(key, str):
             raise TypeError
         if key not in self._columns.keys():
             raise KeyError
@@ -1042,8 +1041,7 @@ class ModelMetaClass(type):
         return klass
 
 
-@six.add_metaclass(ModelMetaClass)
-class Model(BaseModel):
+class Model(BaseModel, metaclass=ModelMetaClass):
     __abstract__ = True
     """
     *Optional.* Indicates that this model is only intended to be used as a base class for other models.

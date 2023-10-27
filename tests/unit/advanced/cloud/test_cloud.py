@@ -9,7 +9,6 @@
 import tempfile
 import os
 import shutil
-import six
 
 import unittest
 
@@ -96,8 +95,7 @@ class CloudTests(unittest.TestCase):
         }
 
         # The directory is not writtable.. we expect a permission error
-        exc = PermissionError if six.PY3 else OSError
-        with self.assertRaises(exc):
+        with self.assertRaises(PermissionError):
             cloud.get_cloud_config(config)
 
         # With use_default_tempdir, we expect an connection refused

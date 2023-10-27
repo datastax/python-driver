@@ -15,13 +15,12 @@
 from binascii import unhexlify
 from bisect import bisect_left
 from collections import defaultdict
+from collections.abc import Mapping
 from functools import total_ordering
 from hashlib import md5
 import json
 import logging
 import re
-import six
-from six.moves import zip
 import sys
 from threading import RLock
 import struct
@@ -42,7 +41,6 @@ from cassandra.query import dict_factory, bind_params
 from cassandra.util import OrderedDict, Version
 from cassandra.pool import HostDistance
 from cassandra.connection import EndPoint
-from cassandra.compat import Mapping
 
 log = logging.getLogger(__name__)
 
@@ -292,7 +290,7 @@ class Metadata(object):
 
         token_to_host_owner = {}
         ring = []
-        for host, token_strings in six.iteritems(token_map):
+        for host, token_strings in token_map.items():
             for token_string in token_strings:
                 token = token_class.from_string(token_string)
                 ring.append(token)
@@ -350,7 +348,7 @@ class Metadata(object):
         return self._hosts.get(endpoint_or_address)
 
     def _get_host_by_address(self, address, port=None):
-        for host in six.itervalues(self._hosts):
+        for host in self._hosts.values():
             if (host.broadcast_rpc_address == address and
                     (port is None or host.broadcast_rpc_port is None or host.broadcast_rpc_port == port)):
                 return host
@@ -387,8 +385,7 @@ class ReplicationStrategyTypeType(type):
 
 
 
-@six.add_metaclass(ReplicationStrategyTypeType)
-class _ReplicationStrategy(object):
+class _ReplicationStrategy(object, metaclass=ReplicationStrategyTypeType):
     options_map = None
 
     @classmethod
@@ -627,7 +624,7 @@ class NetworkTopologyStrategy(ReplicationStrategy):
                 racks_this_dc = dc_racks[dc]
                 hosts_this_dc = len(hosts_per_dc[dc])
 
-                for token_offset_index in six.moves.range(index, index+num_tokens):
+                for token_offset_index in range(index, index+num_tokens):
                     if token_offset_index >= len(token_offsets):
                         token_offset_index = token_offset_index - len(token_offsets)
 
@@ -854,7 +851,7 @@ class KeyspaceMetadata(object):
 
         # note the intentional order of add before remove
         # this makes sure the maps are never absent something that existed before this update
-        for index_name, index_metadata in six.iteritems(table_metadata.indexes):
+        for index_name, index_metadata in table_metadata.indexes.items():
             self.indexes[index_name] = index_metadata
 
         for index_name in (n for n in old_indexes if n not in table_metadata.indexes):
@@ -1341,7 +1338,7 @@ class TableMetadata(object):
 
         if self.extensions:
             registry = _RegisteredExtensionType._extension_registry
-            for k in six.viewkeys(registry) & self.extensions:  # no viewkeys on OrderedMapSerializeKey
+            for k in registry.keys() & self.extensions:  # no viewkeys on OrderedMapSerializeKey
                 ext = registry[k]
                 cql = ext.after_table_cql(self, k, self.extensions[k])
                 if cql:
@@ -1557,8 +1554,7 @@ class _RegisteredExtensionType(type):
         return cls
 
 
-@six.add_metaclass(_RegisteredExtensionType)
-class RegisteredTableExtension(TableExtensionInterface):
+class RegisteredTableExtension(TableExtensionInterface, metaclass=_RegisteredExtensionType):
     """
     Extending this class registers it by name (associated by key in the `system_schema.tables.extensions` map).
     """
@@ -1864,7 +1860,7 @@ class MD5Token(HashToken):
 
     @classmethod
     def hash_fn(cls, key):
-        if isinstance(key, six.text_type):
+        if isinstance(key, str):
             key = key.encode('UTF-8')
         return abs(varint_unpack(md5(key).digest()))
 
@@ -1878,7 +1874,7 @@ class BytesToken(Token):
     def from_string(cls, token_string):
         """ `token_string` should be the string representation from the server. """
         # unhexlify works fine with unicode input in everythin but pypy3, where it Raises "TypeError: 'str' does not support the buffer interface"
-        if isinstance(token_string, six.text_type):
+        if isinstance(token_string, str):
             token_string = token_string.encode('ascii')
         # The BOP stores a hex string
         return cls(unhexlify(token_string))
@@ -2970,17 +2966,17 @@ class SchemaParserDSE68(SchemaParserDSE67):
 
         try:
             # Make sure we process vertices before edges
-            for table_meta in [t for t in six.itervalues(keyspace_meta.tables)
+            for table_meta in [t for t in keyspace_meta.tables.values()
                                if t.name in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
                 _build_table_graph_metadata(table_meta)
 
             # all other tables...
-            for table_meta in [t for t in six.itervalues(keyspace_meta.tables)
+            for table_meta in [t for t in keyspace_meta.tables.values()
                                if t.name not in self.keyspace_table_vertex_rows[keyspace_meta.name]]:
                 _build_table_graph_metadata(table_meta)
         except Exception:
             # schema error, remove all graph metadata for this keyspace
-            for t in six.itervalues(keyspace_meta.tables):
+            for t in keyspace_meta.tables.values():
                 t.edge = t.vertex = None
             keyspace_meta._exc_info = sys.exc_info()
             log.exception("Error while parsing graph metadata for keyspace %s", keyspace_meta.name)
@@ -3194,7 +3190,7 @@ class MaterializedViewMetadata(object):
 
         if self.extensions:
             registry = _RegisteredExtensionType._extension_registry
-            for k in six.viewkeys(registry) & self.extensions:  # no viewkeys on OrderedMapSerializeKey
+            for k in registry.keys() & self.extensions:  # no viewkeys on OrderedMapSerializeKey
                 ext = registry[k]
                 cql = ext.after_table_cql(self, k, self.extensions[k])
                 if cql:

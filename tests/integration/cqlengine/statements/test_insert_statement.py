@@ -13,8 +13,6 @@
 # limitations under the License.
 import unittest
 
-import six
-
 from cassandra.cqlengine.columns import Column
 from cassandra.cqlengine.statements import InsertStatement
 
@@ -27,7 +25,7 @@ class InsertStatementTests(unittest.TestCase):
         ist.add_assignment(Column(db_field='c'), 'd')
 
         self.assertEqual(
-            six.text_type(ist),
+            str(ist),
             'INSERT INTO table ("a", "c") VALUES (%(0)s, %(1)s)'
         )
 
@@ -38,7 +36,7 @@ class InsertStatementTests(unittest.TestCase):
 
         ist.update_context_id(4)
         self.assertEqual(
-            six.text_type(ist),
+            str(ist),
             'INSERT INTO table ("a", "c") VALUES (%(4)s, %(5)s)'
         )
         ctx = ist.get_context()
@@ -48,4 +46,4 @@ class InsertStatementTests(unittest.TestCase):
         ist = InsertStatement('table', ttl=60)
         ist.add_assignment(Column(db_field='a'), 'b')
         ist.add_assignment(Column(db_field='c'), 'd')
-        self.assertIn('USING TTL 60', six.text_type(ist))
+        self.assertIn('USING TTL 60', str(ist))

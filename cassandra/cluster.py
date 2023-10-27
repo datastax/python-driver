@@ -21,6 +21,7 @@ from __future__ import absolute_import
 import atexit
 from binascii import hexlify
 from collections import defaultdict
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
 from functools import partial, wraps
@@ -29,8 +30,8 @@ import json
 import logging
 from warnings import warn
 from random import random
-import six
-from six.moves import filter, range, queue as Queue
+import re
+import queue
 import socket
 import sys
 import time
@@ -79,7 +80,6 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              HostTargetingStatement)
 from cassandra.marshal import int64_pack
 from cassandra.timestamps import MonotonicTimestampGenerator
-from cassandra.compat import Mapping
 from cassandra.util import _resolve_contact_points_to_string_map, Version
 
 from cassandra.datastax.insights.reporter import MonitorReporter
@@ -110,9 +110,6 @@ try:
     from weakref import WeakSet
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
-
-if six.PY3:
-    long = int
 
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
@@ -1158,7 +1155,7 @@ class Cluster(object):
             else:
                 self._contact_points_explicit = True
 
-            if isinstance(contact_points, six.string_types):
+            if isinstance(contact_points, str):
                 raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
 
             if None in contact_points:
@@ -1793,8 +1790,8 @@ class Cluster(object):
         return session
 
     def _session_register_user_types(self, session):
-        for keyspace, type_map in six.iteritems(self._user_types):
-            for udt_name, klass in six.iteritems(type_map):
+        for keyspace, type_map in self._user_types.items():
+            for udt_name, klass in type_map.items():
                 session.user_type_registered(keyspace, udt_name, klass)
 
     def _cleanup_failed_on_up_handling(self, host):
@@ -2683,7 +2680,7 @@ class Session(object):
         """
         custom_payload = custom_payload if custom_payload else {}
         if execute_as:
-            custom_payload[_proxy_execute_key] = six.b(execute_as)
+            custom_payload[_proxy_execute_key] = execute_as.encode()
 
         future = self._create_response_future(
             query, parameters, trace, custom_payload, timeout,
@@ -2747,8 +2744,8 @@ class Session(object):
 
         custom_payload = execution_profile.graph_options.get_options_map()
         if execute_as:
-            custom_payload[_proxy_execute_key] = six.b(execute_as)
-        custom_payload[_request_timeout_key] = int64_pack(long(execution_profile.request_timeout * 1000))
+            custom_payload[_proxy_execute_key] = execute_as.encode()
+        custom_payload[_request_timeout_key] = int64_pack(int(execution_profile.request_timeout * 1000))
 
         future = self._create_response_future(query, parameters=None, trace=trace, custom_payload=custom_payload,
                                               timeout=_NOT_SET, execution_profile=execution_profile)
@@ -2885,7 +2882,7 @@ class Session(object):
 
         prepared_statement = None
 
-        if isinstance(query, six.string_types):
+        if isinstance(query, str):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
@@ -3353,10 +3350,6 @@ class Session(object):
                 'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
         field_names = type_meta.field_names
-        if six.PY2:
-            # go from unicode to string to avoid decode errors from implicit
-            # decode when formatting non-ascii values
-            field_names = [fn.encode('utf-8') for fn in field_names]
 
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
@@ -4035,7 +4028,7 @@ class ControlConnection(object):
             log.debug("[control connection] Schemas match")
             return None
 
-        return dict((version, list(nodes)) for version, nodes in six.iteritems(versions))
+        return dict((version, list(nodes)) for version, nodes in versions.items())
 
     def _get_peers_query(self, peers_query_type, connection=None):
         """
@@ -4155,7 +4148,7 @@ class _Scheduler(Thread):
     is_shutdown = False
 
     def __init__(self, executor):
-        self._queue = Queue.PriorityQueue()
+        self._queue = queue.PriorityQueue()
         self._scheduled_tasks = set()
         self._count = count()
         self._executor = executor
@@ -4213,7 +4206,7 @@ class _Scheduler(Thread):
                     else:
                         self._queue.put_nowait((run_at, i, task))
                         break
-            except Queue.Empty:
+            except queue.Empty:
                 pass
 
             time.sleep(0.1)

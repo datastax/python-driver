@@ -24,7 +24,6 @@ import weakref
 import sys
 import ssl
 
-from six.moves import range
 
 try:
     from weakref import WeakSet

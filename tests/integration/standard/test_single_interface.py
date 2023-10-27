@@ -14,8 +14,6 @@
 
 import unittest
 
-import six
-
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
@@ -54,7 +52,7 @@ class SingleInterfaceTest(unittest.TestCase):
         broadcast_rpc_ports = []
         broadcast_ports = []
         self.assertEqual(len(hosts), 3)
-        for endpoint, host in six.iteritems(hosts):
+        for endpoint, host in hosts.items():
 
             self.assertEqual(endpoint.address, host.broadcast_rpc_address)
             self.assertEqual(endpoint.port, host.broadcast_rpc_port)

@@ -13,7 +13,6 @@
 # limitations under the License.
 import unittest
 
-import six
 import mock
 import logging
 from packaging.version import Version

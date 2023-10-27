@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-
 from libc.stdint cimport (int8_t, int16_t, int32_t, int64_t,
                           uint8_t, uint16_t, uint32_t, uint64_t)
 from libc.string cimport memcpy
@@ -23,8 +21,6 @@ from cassandra.buffer cimport Buffer, buf_read, to_bytes
 
 cdef bint is_little_endian
 from cassandra.util import is_little_endian
-
-cdef bint PY3 = six.PY3
 
 ctypedef fused num_t:
     int64_t
@@ -57,10 +53,7 @@ cdef inline num_t unpack_num(Buffer *buf, num_t *dummy=NULL): # dummy pointer be
 
 cdef varint_unpack(Buffer *term):
     """Unpack a variable-sized integer"""
-    if PY3:
-        return varint_unpack_py3(to_bytes(term))
-    else:
-        return varint_unpack_py2(to_bytes(term))
+    return varint_unpack_py3(to_bytes(term))
 
 # TODO: Optimize these two functions
 cdef varint_unpack_py3(bytes term):
@@ -68,13 +61,6 @@ cdef varint_unpack_py3(bytes term):
     if (term[0] & 128) != 0:
         shift = len(term) * 8  # * Note below
         val -= 1 << shift
-    return val
-
-cdef varint_unpack_py2(bytes term):  # noqa
-    val = int(term.encode('hex'), 16)
-    if (ord(term[0]) & 128) != 0:
-        shift = len(term) * 8  # * Note below
-        val = val - (1 << shift)
     return val
 
 # * Note *

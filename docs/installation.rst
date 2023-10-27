@@ -70,10 +70,10 @@ support this::
 *Optional:* Column-Level Encryption (CLE) Support
 --------------------------------------------------
 The driver has built-in support for client-side encryption and
-decryption of data. For more, see :doc:`column_encryption`.  
+decryption of data. For more, see :doc:`column_encryption`.
 
-CLE depends on the Python `cryptography <https://cryptography.io/en/latest/>`_ module. 
-When installing Python driver 3.27.0. the `cryptography` module is 
+CLE depends on the Python `cryptography <https://cryptography.io/en/latest/>`_ module.
+When installing Python driver 3.27.0. the `cryptography` module is
 also downloaded and installed.
 If you are using Python driver 3.28.0 or later and want to use CLE, you must
 install the `cryptography <https://cryptography.io/en/latest/>`_ module.
@@ -211,7 +211,7 @@ If your sudo configuration does not allow SETENV, you must push the option flag 
 applies these options to all dependencies (which break on the custom flag). Therefore, you must first install
 dependencies, then use install-option::
 
-    sudo pip install six futures
+    sudo pip install futures
     sudo pip install --install-option="--no-cython"
 
 

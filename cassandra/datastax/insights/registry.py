@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
 from collections import OrderedDict
 from warnings import warn
 
@@ -59,7 +58,7 @@ class InsightsSerializerRegistry(object):
         try:
             return self._mapping_dict[cls]
         except KeyError:
-            for registered_cls, serializer in six.iteritems(self._mapping_dict):
+            for registered_cls, serializer in self._mapping_dict.items():
                 if issubclass(cls, registered_cls):
                     return self._mapping_dict[registered_cls]
         raise ValueError

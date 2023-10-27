@@ -42,3 +42,6 @@ tests/unit/cython/bytesio_testhelper.c
 #iPython
 *.ipynb
 
+venv
+docs/venv
+.eggs

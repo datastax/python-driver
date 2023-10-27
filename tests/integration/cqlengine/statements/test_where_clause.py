@@ -13,7 +13,6 @@
 # limitations under the License.
 import unittest
 
-import six
 from cassandra.cqlengine.operators import EqualsOperator
 from cassandra.cqlengine.statements import StatementException, WhereClause
 
@@ -30,7 +29,7 @@ class TestWhereClause(unittest.TestCase):
         wc = WhereClause('a', EqualsOperator(), 'c')
         wc.set_context_id(5)
 
-        self.assertEqual('"a" = %(5)s', six.text_type(wc), six.text_type(wc))
+        self.assertEqual('"a" = %(5)s', str(wc), str(wc))
         self.assertEqual('"a" = %(5)s', str(wc), type(wc))
 
     def test_equality_method(self):

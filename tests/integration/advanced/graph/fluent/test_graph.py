@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-
 from cassandra import cluster
 from cassandra.cluster import ContinuousPagingOptions
 from cassandra.datastax.graph.fluent import DseGraph
@@ -120,10 +118,10 @@ class BatchStatementTests(BaseExplicitExecutionTest):
         ep = self.get_execution_profile(graphson)
         batch = DseGraph.batch(session=self.session,
                                execution_profile=self.get_execution_profile(graphson, traversal=True))
-        for data in six.itervalues(datatypes):
+        for data in datatypes.values():
             typ, value, deserializer = data
             vertex_label = VertexLabel([typ])
-            property_name = next(six.iterkeys(vertex_label.non_pk_properties))
+            property_name = next(iter(vertex_label.non_pk_properties.keys()))
             values[property_name] = value
             if use_schema or schema is CoreGraphSchema:
                 schema.create_vertex_label(self.session, vertex_label, execution_profile=ep)

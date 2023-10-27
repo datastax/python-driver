@@ -17,7 +17,6 @@ import unittest
 from collections import defaultdict
 import difflib
 import logging
-import six
 import sys
 import time
 import os
@@ -990,7 +989,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         update_v = s.prepare('UPDATE system_schema.views SET extensions=? WHERE keyspace_name=? AND view_name=?')
         # extensions registered, one present
         # --------------------------------------
-        ext_map = {Ext0.name: six.b("THA VALUE")}
+        ext_map = {Ext0.name: b"THA VALUE"}
         [(s.execute(update_t, (ext_map, ks, t)), s.execute(update_v, (ext_map, ks, v)))
          for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
         self.cluster.refresh_table_metadata(ks, t)
@@ -1012,8 +1011,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         # extensions registered, one present
         # --------------------------------------
-        ext_map = {Ext0.name: six.b("THA VALUE"),
-                   Ext1.name: six.b("OTHA VALUE")}
+        ext_map = {Ext0.name: b"THA VALUE",
+                   Ext1.name: b"OTHA VALUE"}
         [(s.execute(update_t, (ext_map, ks, t)), s.execute(update_v, (ext_map, ks, v)))
          for _ in self.cluster.metadata.all_hosts()]  # we're manipulating metadata - do it on all hosts
         self.cluster.refresh_table_metadata(ks, t)
@@ -1046,7 +1045,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = TestCluster()
         cluster.connect()
 
-        self.assertIsInstance(cluster.metadata.export_schema_as_string(), six.string_types)
+        self.assertIsInstance(cluster.metadata.export_schema_as_string(), str)
         cluster.shutdown()
 
     def test_export_keyspace_schema(self):
@@ -1059,8 +1058,8 @@ class TestCodeCoverage(unittest.TestCase):
 
         for keyspace in cluster.metadata.keyspaces:
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-            self.assertIsInstance(keyspace_metadata.export_as_string(), six.string_types)
-            self.assertIsInstance(keyspace_metadata.as_cql_query(), six.string_types)
+            self.assertIsInstance(keyspace_metadata.export_as_string(), str)
+            self.assertIsInstance(keyspace_metadata.as_cql_query(), str)
         cluster.shutdown()
 
     def assert_equal_diff(self, received, expected):
@@ -1238,8 +1237,8 @@ CREATE TABLE export_udts.users (
 
         cluster.connect('test3rf')
 
-        self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', six.b('key'))), [])
-        host = list(cluster.metadata.get_replicas('test3rf', six.b('key')))[0]
+        self.assertNotEqual(list(cluster.metadata.get_replicas('test3rf', b'key')), [])
+        host = list(cluster.metadata.get_replicas('test3rf', b'key'))[0]
         self.assertEqual(host.datacenter, 'dc1')
         self.assertEqual(host.rack, 'r1')
         cluster.shutdown()

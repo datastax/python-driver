@@ -23,8 +23,6 @@ import logging
 from threading import Event
 import time
 
-from six.moves import xrange
-
 from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
 try:
     from eventlet.green.OpenSSL import SSL
@@ -190,5 +188,5 @@ class EventletConnection(Connection):
 
     def push(self, data):
         chunk_size = self.out_buffer_size
-        for i in xrange(0, len(data), chunk_size):
+        for i in range(0, len(data), chunk_size):
             self._write_queue.put(data[i:i + chunk_size])

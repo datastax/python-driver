@@ -24,8 +24,6 @@ from cassandra.query import dict_factory, tuple_factory, SimpleStatement
 
 from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 
-from six import next
-
 import unittest
 
 log = logging.getLogger(__name__)

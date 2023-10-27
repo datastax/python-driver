@@ -14,8 +14,6 @@
 
 import unittest
 
-import six
-
 from cassandra.cluster import _ConfigMode
 from cassandra.cqlengine import connection
 from cassandra.query import dict_factory

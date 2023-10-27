@@ -14,8 +14,6 @@
 
 from datetime import datetime, timedelta
 import time
-import six
-from six.moves import filter
 
 from cassandra.query import FETCH_SIZE_UNSET
 from cassandra.cqlengine import columns
@@ -114,7 +112,7 @@ class WhereClause(BaseClause):
 
     def __unicode__(self):
         field = ('"{0}"' if self.quote_field else '{0}').format(self.field)
-        return u'{0} {1} {2}'.format(field, self.operator, six.text_type(self.query_value))
+        return u'{0} {1} {2}'.format(field, self.operator, str(self.query_value))
 
     def __hash__(self):
         return super(WhereClause, self).__hash__() ^ hash(self.operator)
@@ -186,8 +184,7 @@ class ContainerUpdateTypeMapMeta(type):
         super(ContainerUpdateTypeMapMeta, cls).__init__(name, bases, dct)
 
 
-@six.add_metaclass(ContainerUpdateTypeMapMeta)
-class ContainerUpdateClause(AssignmentClause):
+class ContainerUpdateClause(AssignmentClause, metaclass=ContainerUpdateTypeMapMeta):
 
     def __init__(self, field, value, operation=None, previous=None):
         super(ContainerUpdateClause, self).__init__(field, value)
@@ -563,7 +560,7 @@ class BaseCQLStatement(UnicodeMixin):
         self.conditionals.append(clause)
 
     def _get_conditionals(self):
-        return 'IF {0}'.format(' AND '.join([six.text_type(c) for c in self.conditionals]))
+        return 'IF {0}'.format(' AND '.join([str(c) for c in self.conditionals]))
 
     def get_context_size(self):
         return len(self.get_context())
@@ -584,7 +581,7 @@ class BaseCQLStatement(UnicodeMixin):
         if not self.timestamp:
             return None
 
-        if isinstance(self.timestamp, six.integer_types):
+        if isinstance(self.timestamp, int):
             return self.timestamp
 
         if isinstance(self.timestamp, timedelta):
@@ -602,7 +599,7 @@ class BaseCQLStatement(UnicodeMixin):
 
     @property
     def _where(self):
-        return 'WHERE {0}'.format(' AND '.join([six.text_type(c) for c in self.where_clauses]))
+        return 'WHERE {0}'.format(' AND '.join([str(c) for c in self.where_clauses]))
 
 
 class SelectStatement(BaseCQLStatement):
@@ -629,10 +626,10 @@ class SelectStatement(BaseCQLStatement):
             fetch_size=fetch_size
         )
 
-        self.fields = [fields] if isinstance(fields, six.string_types) else (fields or [])
+        self.fields = [fields] if isinstance(fields, str) else (fields or [])
         self.distinct_fields = distinct_fields
         self.count = count
-        self.order_by = [order_by] if isinstance(order_by, six.string_types) else order_by
+        self.order_by = [order_by] if isinstance(order_by, str) else order_by
         self.limit = limit
         self.allow_filtering = allow_filtering
 
@@ -653,7 +650,7 @@ class SelectStatement(BaseCQLStatement):
             qs += [self._where]
 
         if self.order_by and not self.count:
-            qs += ['ORDER BY {0}'.format(', '.join(six.text_type(o) for o in self.order_by))]
+            qs += ['ORDER BY {0}'.format(', '.join(str(o) for o in self.order_by))]
 
         if self.limit:
             qs += ['LIMIT {0}'.format(self.limit)]
@@ -798,7 +795,7 @@ class UpdateStatement(AssignmentStatement):
             qs += ["USING {0}".format(" AND ".join(using_options))]
 
         qs += ['SET']
-        qs += [', '.join([six.text_type(c) for c in self.assignments])]
+        qs += [', '.join([str(c) for c in self.assignments])]
 
         if self.where_clauses:
             qs += [self._where]
@@ -849,7 +846,7 @@ class DeleteStatement(BaseCQLStatement):
             conditionals=conditionals
         )
         self.fields = []
-        if isinstance(fields, six.string_types):
+        if isinstance(fields, str):
             fields = [fields]
         for field in fields or []:
             self.add_field(field)
@@ -874,7 +871,7 @@ class DeleteStatement(BaseCQLStatement):
         return ctx
 
     def add_field(self, field):
-        if isinstance(field, six.string_types):
+        if isinstance(field, str):
             field = FieldDeleteClause(field)
         if not isinstance(field, BaseClause):
             raise StatementException("only instances of AssignmentClause can be added to statements")
