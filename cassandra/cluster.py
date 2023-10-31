@@ -128,6 +128,15 @@ def _is_gevent_monkey_patched():
     import gevent.socket
     return socket.socket is gevent.socket.socket
 
+def try_import_libev():
+    try:
+        from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA
+        return True
+    except ImportError:
+        return False
+
+def try_import_asyncore():
+        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
 
 # default to gevent when we are monkey patched with gevent, eventlet when
 # monkey patched with eventlet, otherwise if libev is available, use that as
@@ -136,11 +145,10 @@ if _is_gevent_monkey_patched():
     from cassandra.io.geventreactor import GeventConnection as DefaultConnection
 elif _is_eventlet_monkey_patched():
     from cassandra.io.eventletreactor import EventletConnection as DefaultConnection
+elif try_import_libev():
+    pass
 else:
-    try:
-        from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA
-    except ImportError:
-        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+    try_import_asyncore();
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
