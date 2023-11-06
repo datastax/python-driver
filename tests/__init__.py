@@ -34,9 +34,12 @@ if not log.handlers:
 def is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
         return False
-    import eventlet.patcher
-    return eventlet.patcher.is_monkey_patched('socket')
-
+    try:
+        import eventlet.patcher
+        return eventlet.patcher.is_monkey_patched('socket')
+    # Yet another case related to PYTHON-1364
+    except AttributeError:
+        return False
 
 def is_gevent_monkey_patched():
     if 'gevent.monkey' not in sys.modules:
