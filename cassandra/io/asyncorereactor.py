@@ -30,12 +30,13 @@ try:
 except ImportError:
     from cassandra.util import WeakSet  # noqa
 
+from cassandra import DependencyException
 try:
     import asyncore
 except ModuleNotFoundError:
-    raise ImportError(
+    raise DependencyException(
         "Unable to import asyncore module.  Note that this module has been removed in Python 3.12 "
-        "so when using the driver with this version (or anything newer) you will need to use on of the "
+        "so when using the driver with this version (or anything newer) you will need to use one of the "
         "other event loop implementations."
     )
 

@@ -24,7 +24,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
-from functools import partial, wraps
+from functools import partial, reduce, wraps
 from itertools import groupby, count, chain
 import json
 import logging
@@ -44,7 +44,7 @@ from weakref import WeakValueDictionary
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
                        SchemaTargetType, DriverException, ProtocolVersion,
-                       UnresolvableContactPoints)
+                       UnresolvableContactPoints, DependencyException)
 from cassandra.auth import _proxy_execute_key, PlainTextAuthProvider
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported,
@@ -111,6 +111,19 @@ try:
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
+def _is_gevent_monkey_patched():
+    if 'gevent.monkey' not in sys.modules:
+        return False
+    import gevent.socket
+    return socket.socket is gevent.socket.socket
+
+def _try_gevent_import():
+    if _is_gevent_monkey_patched():
+        from cassandra.io.geventreactor import GeventConnection
+        return (GeventConnection,None)
+    else:
+        return (None,None)
+
 def _is_eventlet_monkey_patched():
     if 'eventlet.patcher' not in sys.modules:
         return False
@@ -121,34 +134,42 @@ def _is_eventlet_monkey_patched():
     except AttributeError:
         return False
 
+def _try_eventlet_import():
+    if _is_eventlet_monkey_patched():
+        from cassandra.io.eventletreactor import EventletConnection
+        return (EventletConnection,None)
+    else:
+        return (None,None)
 
-def _is_gevent_monkey_patched():
-    if 'gevent.monkey' not in sys.modules:
-        return False
-    import gevent.socket
-    return socket.socket is gevent.socket.socket
-
-def try_import_libev():
+def _try_libev_import():
     try:
-        from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA
-        return True
-    except ImportError:
-        return False
+        from cassandra.io.libevreactor import LibevConnection
+        return (LibevConnection,None)
+    except DependencyException as e:
+        return (None, e)
 
-def try_import_asyncore():
-        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+def _try_asyncore_import():
+    try:
+        from cassandra.io.asyncorereactor import AsyncoreConnection
+        return (AsyncoreConnection,None)
+    except DependencyException as e:
+        return (None, e)
 
-# default to gevent when we are monkey patched with gevent, eventlet when
-# monkey patched with eventlet, otherwise if libev is available, use that as
-# the default because it's fastest. Otherwise, use asyncore.
-if _is_gevent_monkey_patched():
-    from cassandra.io.geventreactor import GeventConnection as DefaultConnection
-elif _is_eventlet_monkey_patched():
-    from cassandra.io.eventletreactor import EventletConnection as DefaultConnection
-elif try_import_libev():
-    pass
-else:
-    try_import_asyncore();
+def _connection_reduce_fn(val,import_fn):
+    (rv, excs) = val
+    # If we've already found a workable Connection class return immediately
+    if rv:
+        return val
+    (import_result, exc) = import_fn()
+    if exc:
+        excs.append(exc)
+    return (rv or import_result, excs)
+
+conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncore_import)
+(conn_class, excs) = reduce(_connection_reduce_fn, conn_fns, (None,[]))
+if excs:
+    raise DependencyException("Exception loading connection class dependencies", excs)
+DefaultConnection = conn_class
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
