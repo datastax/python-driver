@@ -443,6 +443,8 @@ class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
+        if AsyncoreConnection is None:
+            raise unittest.SkipTest('Unable to import asyncore module')
         ConnectionTests.setUp(self)
 
     def clean_global_loop(self):
