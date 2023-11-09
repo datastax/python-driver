@@ -130,8 +130,10 @@ jobs:
         name: Install Python
 
       - name: Build sdist
-        run: python setup.py sdist
-
+        run: |
+          pip install build
+          python -m build --sdist
+          
       - uses: actions/upload-artifact@v2
         with:
           path: dist/*.tar.gz
