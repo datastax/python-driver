@@ -1,3 +1,5 @@
+import threading
+
 from cassandra.connection import Connection, ConnectionShutdown
 import sys
 import asyncio
@@ -110,8 +112,11 @@ class AsyncioConnection(Connection):
             if cls._pid != os.getpid():
                 cls._loop = None
             if cls._loop is None:
-                cls._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(cls._loop)
+                try:
+                    cls._loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    cls._loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(cls._loop)
 
             if not cls._loop_thread:
                 # daemonize so the loop will be shut down on interpreter
@@ -164,7 +169,7 @@ class AsyncioConnection(Connection):
         else:
             chunks = [data]
 
-        if self._loop_thread.ident != get_ident():
+        if self._loop_thread != threading.current_thread():
             asyncio.run_coroutine_threadsafe(
                 self._push_msg(chunks),
                 loop=self._loop
