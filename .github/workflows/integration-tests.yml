@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11.4", "3.12.0b4"]
+        python-version: ["3.8.17", "3.11.4", "3.12.0b4"]
         event_loop_manager: ["libev", "asyncio", "asyncore"]
         exclude:
           - python-version: "3.12.0b4"
