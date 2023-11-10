@@ -177,9 +177,14 @@ def initializeEnvironment() {
 
   // Determine if server version is Apache CassandraⓇ or DataStax Enterprise
   if (env.CASSANDRA_VERSION.split('-')[0] == 'dse') {
-    sh label: 'Install DataStax Enterprise requirements', script: '''#!/bin/bash -lex
-      pip install -r test-datastax-requirements.txt
-    '''
+    if (env.PYTHON_VERSION =~ /3\.12\.\d+/) {
+      echo "Cannot install DSE dependencies for Python 3.12.x.  See PYTHON-1368 for more detail."
+    }
+    else {
+      sh label: 'Install DataStax Enterprise requirements', script: '''#!/bin/bash -lex
+        pip install -r test-datastax-requirements.txt
+      '''
+    }
   } else {
     sh label: 'Install Apache CassandraⓇ requirements', script: '''#!/bin/bash -lex
       pip install -r test-requirements.txt
@@ -292,17 +297,22 @@ def executeStandardTests() {
   '''
 
   if (env.CASSANDRA_VERSION.split('-')[0] == 'dse' && env.CASSANDRA_VERSION.split('-')[1] != '4.8') {
-    sh label: 'Execute DataStax Enterprise integration tests', script: '''#!/bin/bash -lex
-      # Load CCM environment variable
-      set -o allexport
-      . ${HOME}/environment.txt
-      set +o allexport
+    if (env.PYTHON_VERSION =~ /3\.12\.\d+/) {
+      echo "Cannot install DSE dependencies for Python 3.12.x.  See PYTHON-1368 for more detail."
+    }
+    else {
+      sh label: 'Execute DataStax Enterprise integration tests', script: '''#!/bin/bash -lex
+        # Load CCM environment variable
+        set -o allexport
+        . ${HOME}/environment.txt
+        set +o allexport
 
-      EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} DSE_VERSION=${DSE_VERSION} ADS_HOME="${HOME}/" VERIFY_CYTHON=${CYTHON_ENABLED} pynose -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=dse_results.xml tests/integration/advanced/ || true
-    '''
+        EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} DSE_VERSION=${DSE_VERSION} ADS_HOME="${HOME}/" VERIFY_CYTHON=${CYTHON_ENABLED} pynose -s -v --logging-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --with-ignore-docstrings --with-xunit --xunit-file=dse_results.xml tests/integration/advanced/ || true
+      '''
+    }
   }
 
-  sh label: 'Execute DataStax Constellation integration tests', script: '''#!/bin/bash -lex
+  sh label: 'Execute DataStax Astra integration tests', script: '''#!/bin/bash -lex
     # Load CCM environment variable
     set -o allexport
     . ${HOME}/environment.txt
