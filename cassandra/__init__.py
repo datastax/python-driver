@@ -728,3 +728,19 @@ class UnresolvableContactPoints(DriverException):
     contact points, only when lookup fails for all hosts
     """
     pass
+
+class DependencyException(Exception):
+    """
+    Specific exception class for handling issues with driver dependencies
+    """
+
+    excs = []
+    """
+    A sequence of child exceptions
+    """
+
+    def __init__(self, msg, excs=[]):
+        complete_msg = msg
+        if excs:
+            complete_msg += ("The following exceptions were observed: \n" + '\n'.join(str(e) for e in excs))
+        Exception.__init__(self, complete_msg)

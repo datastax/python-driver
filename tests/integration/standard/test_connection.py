@@ -23,12 +23,9 @@ from threading import Thread, Event
 import time
 from unittest import SkipTest
 
-from cassandra import ConsistencyLevel, OperationTimedOut
+from cassandra import ConsistencyLevel, OperationTimedOut, DependencyException
 from cassandra.cluster import NoHostAvailable, ConnectionShutdown, ExecutionProfile, EXEC_PROFILE_DEFAULT
-import cassandra.io.asyncorereactor
-from cassandra.io.asyncorereactor import AsyncoreConnection
 from cassandra.protocol import QueryMessage
-from cassandra.connection import Connection
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateListener
 from cassandra.pool import HostConnectionPool
 
@@ -37,9 +34,15 @@ from tests.integration import use_singledc, get_node, CASSANDRA_IP, local, \
     requiresmallclockgranularity, greaterthancass20, TestCluster
 
 try:
+    import cassandra.io.asyncorereactor
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+except DependencyException:
+    AsyncoreConnection = None
+
+try:
     from cassandra.io.libevreactor import LibevConnection
     import cassandra.io.libevreactor
-except ImportError:
+except DependencyException:
     LibevConnection = None
 
 
@@ -440,6 +443,8 @@ class AsyncoreConnectionTests(ConnectionTests, unittest.TestCase):
     def setUp(self):
         if is_monkey_patched():
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
+        if AsyncoreConnection is None:
+            raise unittest.SkipTest('Unable to import asyncore module')
         ConnectionTests.setUp(self)
 
     def clean_global_loop(self):
