@@ -826,9 +826,7 @@ class Cluster(object):
 
     In addition to ``wrap_socket`` kwargs, clients may also specify ``'check_hostname': True`` to verify the cert hostname
     as outlined in RFC 2818 and RFC 6125. Note that this requires the certificate to be transferred, so
-    should almost always require the option ``'cert_reqs': ssl.CERT_REQUIRED``. Note also that this functionality was not built into
-    Python standard library until (2.7.9, 3.2). To enable this mechanism in earlier versions, patch ``ssl.match_hostname``
-    with a custom or `back-ported function <https://pypi.org/project/backports.ssl_match_hostname/>`_.
+    should almost always require the option ``'cert_reqs': ssl.CERT_REQUIRED``.
     """
 
     ssl_context = None
