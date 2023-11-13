@@ -28,7 +28,7 @@ from tests.integration import (
 
 if not hasattr(ssl, 'match_hostname'):
     try:
-        from backports.ssl_match_hostname import match_hostname
+        from ssl import match_hostname
         ssl.match_hostname = match_hostname
     except ImportError:
         pass  # tests will fail
