@@ -1,6 +1,7 @@
 -r requirements.txt
 scales
 nose
+pytest
 mock>1.1
 ccm>=2.1.2
 pytz
