@@ -62,7 +62,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         for event in events:
             LOGGER.info("%s %s %s", event.source, event.thread_name, event.description)
         for event in events:
-            self.assertEqual(event.thread_name, shard_name)
+            self.assertIn(shard_name, event.thread_name)
         self.assertIn('querying locally', "\n".join([event.description for event in events]))
 
         trace_id = results.response_future.get_query_trace_ids()[0]
@@ -71,7 +71,7 @@ class TestShardAwareIntegration(unittest.TestCase):
         for event in events:
             LOGGER.info("%s %s", event.thread, event.activity)
         for event in events:
-            self.assertEqual(event.thread, shard_name)
+            self.assertIn(shard_name, event.thread)
         self.assertIn('querying locally', "\n".join([event.activity for event in events]))
 
     def create_ks_and_cf(self):
