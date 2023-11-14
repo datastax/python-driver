@@ -742,5 +742,5 @@ class DependencyException(Exception):
     def __init__(self, msg, excs=[]):
         complete_msg = msg
         if excs:
-            complete_msg += ("The following exceptions were observed: \n" + '\n'.join(str(e) for e in excs))
+            complete_msg += ("\nThe following exceptions were observed: \n - " + '\n - '.join(str(e) for e in excs))
         Exception.__init__(self, complete_msg)

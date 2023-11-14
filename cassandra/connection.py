@@ -733,7 +733,6 @@ class Connection(object):
     _socket = None
 
     _socket_impl = socket
-    _ssl_impl = ssl
 
     _check_hostname = False
     _product_type = None
@@ -777,15 +776,21 @@ class Connection(object):
         self._on_orphaned_stream_released = on_orphaned_stream_released
 
         if ssl_options:
-            self._check_hostname = bool(self.ssl_options.pop('check_hostname', False))
-            if self._check_hostname:
-                if not getattr(ssl, 'match_hostname', None):
-                    raise RuntimeError("ssl_options specify 'check_hostname', but ssl.match_hostname is not provided. "
-                                       "Patch or upgrade Python to use this option.")
             self.ssl_options.update(self.endpoint.ssl_options or {})
         elif self.endpoint.ssl_options:
             self.ssl_options = self.endpoint.ssl_options
 
+        # PYTHON-1331
+        #
+        # We always use SSLContext.wrap_socket() now but legacy configs may have other params that were passed to ssl.wrap_socket()...
+        # and either could have 'check_hostname'.  Remove these params into a separate map and use them to build an SSLContext if
+        # we need to do so.
+        #
+        # Note the use of pop() here; we are very deliberately removing these params from ssl_options if they're present.  After this
+        # operation ssl_options shoudl contain only args needed for the ssl_context.wrap_socket() call.
+        ssl_context_args = {k:self.ssl_options.pop(k, None) for k in ['check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']}
+        if not self.ssl_context:
+            self.ssl_context = self._build_ssl_context_from_options(ssl_context_args)
 
         if protocol_version >= 3:
             self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
@@ -852,6 +857,25 @@ class Connection(object):
         else:
             return conn
 
+    def _build_ssl_context_from_options(self, opts):
+        # Python >= 3.10 requires either PROTOCOL_TLS_CLIENT or PROTOCOL_TLS_SERVER so we'll get ahead of things by always
+        # being explicit
+        rv = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
+        rv.check_hostname = bool(opts.pop('check_hostname', False))
+
+        certfile = opts.pop('certfile', None)
+        keyfile = opts.pop('keyfile', None)
+        if certfile:
+            rv.load_cert_chain(certfile, keyfile)
+        ca_certs = opts.pop('ca_certs', None)
+        if ca_certs:
+            rv.load_verify_locations(ca_certs)
+        ciphers = opts.pop('ciphers', None)
+        if ciphers:
+            rv.set_ciphers(ciphers)
+
+        return rv
+
     def _wrap_socket_from_context(self):
         ssl_options = self.ssl_options or {}
         # PYTHON-1186: set the server_hostname only if the SSLContext has
@@ -860,13 +884,16 @@ class Connection(object):
                 'server_hostname' not in ssl_options):
             ssl_options = ssl_options.copy()
             ssl_options['server_hostname'] = self.endpoint.address
-        self._socket = self.ssl_context.wrap_socket(self._socket, **ssl_options)
+        return self.ssl_context.wrap_socket(self._socket, **ssl_options)
 
     def _initiate_connection(self, sockaddr):
         self._socket.connect(sockaddr)
 
-    def _match_hostname(self):
-        ssl.match_hostname(self._socket.getpeercert(), self.endpoint.address)
+    # PYTHON-1331
+    #
+    # Allow implementations specific to an event loop to add additional behaviours
+    def _validate_hostname(self):
+        pass
 
     def _get_socket_addresses(self):
         address, port = self.endpoint.resolve()
@@ -887,16 +914,18 @@ class Connection(object):
             try:
                 self._socket = self._socket_impl.socket(af, socktype, proto)
                 if self.ssl_context:
-                    self._wrap_socket_from_context()
-                elif self.ssl_options:
-                    if not self._ssl_impl:
-                        raise RuntimeError("This version of Python was not compiled with SSL support")
-                    self._socket = self._ssl_impl.wrap_socket(self._socket, **self.ssl_options)
+                    self._socket = self._wrap_socket_from_context()
                 self._socket.settimeout(self.connect_timeout)
                 self._initiate_connection(sockaddr)
                 self._socket.settimeout(None)
+
+                # PYTHON-1331
+                #
+                # Most checking is done via the check_hostname param on the SSLContext.
+                # Subclasses can add additional behaviours via _validate_hostname() so
+                # run that here.
                 if self._check_hostname:
-                    self._match_hostname()
+                    self._validate_hostname()
                 sockerr = None
                 break
             except socket.error as err:
