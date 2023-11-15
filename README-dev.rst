@@ -139,7 +139,7 @@ Unit tests can be run like so::
 
 You can run a specific test method like so::
 
-    nosetests -w tests/unit/test_connection.py::ConnectionTest::test_bad_protocol_version
+    nosetests -w tests/unit/test_connection.py:ConnectionTest.test_bad_protocol_version
 
 Running PyTest Unit Tests
 ------------------
