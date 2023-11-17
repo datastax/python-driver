@@ -811,9 +811,9 @@ class Cluster(object):
     Using ssl_options without ssl_context is deprecated and will be removed in the
     next major release.
 
-    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` (or
-    ``ssl.wrap_socket()`` if used without ssl_context) when new sockets are created.
-    This should be used when client encryption is enabled in Cassandra.
+    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` 
+    when new sockets are created. This should be used when client encryption is enabled 
+    in Cassandra.
 
     The following documentation only applies when ssl_options is used without ssl_context.
 

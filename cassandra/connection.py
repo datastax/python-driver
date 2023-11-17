@@ -756,7 +756,7 @@ class Connection(object):
         self.endpoint = host if isinstance(host, EndPoint) else DefaultEndPoint(host, port)
 
         self.authenticator = authenticator
-        self.ssl_options = ssl_options.copy() if ssl_options else None
+        self.ssl_options = ssl_options.copy() if ssl_options else {}
         self.ssl_context = ssl_context
         self.sockopts = sockopts
         self.compression = compression
