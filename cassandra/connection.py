@@ -787,8 +787,9 @@ class Connection(object):
         # we need to do so.
         #
         # Note the use of pop() here; we are very deliberately removing these params from ssl_options if they're present.  After this
-        # operation ssl_options shoudl contain only args needed for the ssl_context.wrap_socket() call.
-        ssl_context_args = {k:self.ssl_options.pop(k, None) for k in ['check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']}
+        # operation ssl_options should contain only args needed for the ssl_context.wrap_socket() call.
+        ssl_context_args = {k:self.ssl_options.pop(k, None) for k in \
+            ['ssl_version', 'cert_reqs', 'check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']}
         if not self.ssl_context:
             self.ssl_context = self._build_ssl_context_from_options(ssl_context_args)
 
@@ -860,8 +861,11 @@ class Connection(object):
     def _build_ssl_context_from_options(self, opts):
         # Python >= 3.10 requires either PROTOCOL_TLS_CLIENT or PROTOCOL_TLS_SERVER so we'll get ahead of things by always
         # being explicit
-        rv = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
+        ssl_version = opts.pop('ssl_version', ssl.PROTOCOL_TLS_CLIENT)
+        cert_reqs = opts.pop('cert_reqs', ssl.CERT_REQUIRED)
+        rv = ssl.SSLContext(protocol=ssl_version)
         rv.check_hostname = bool(opts.pop('check_hostname', False))
+        rv.options = cert_reqs
 
         certfile = opts.pop('certfile', None)
         keyfile = opts.pop('keyfile', None)
