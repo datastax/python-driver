@@ -861,7 +861,7 @@ class Connection(object):
     def _build_ssl_context_from_options(self, opts):
         # Python >= 3.10 requires either PROTOCOL_TLS_CLIENT or PROTOCOL_TLS_SERVER so we'll get ahead of things by always
         # being explicit
-        ssl_version = opts.pop('ssl_version', ssl.PROTOCOL_TLS_CLIENT)
+        ssl_version = int(opts.pop('ssl_version', ssl.PROTOCOL_TLS_CLIENT))
         cert_reqs = opts.pop('cert_reqs', ssl.CERT_REQUIRED)
         rv = ssl.SSLContext(protocol=ssl_version)
         rv.check_hostname = bool(opts.pop('check_hostname', False))
