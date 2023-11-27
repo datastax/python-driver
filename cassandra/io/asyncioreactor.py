@@ -106,6 +106,8 @@ class AsyncioConnection(Connection):
         )
         self._send_options_message()
 
+        self._background_tasks = set()
+
     @classmethod
     def initialize_reactor(cls):
         with cls._lock:
@@ -176,7 +178,10 @@ class AsyncioConnection(Connection):
             )
         else:
             # avoid races/hangs by just scheduling this, not using threadsafe
-            self._loop.create_task(self._push_msg(chunks))
+            task = self._loop.create_task(self._push_msg(chunks))
+
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
     async def _push_msg(self, chunks):
         # This lock ensures all chunks of a message are sequential in the Queue
