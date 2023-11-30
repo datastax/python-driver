@@ -788,9 +788,9 @@ class Connection(object):
         #
         # Note the use of pop() here; we are very deliberately removing these params from ssl_options if they're present.  After this
         # operation ssl_options should contain only args needed for the ssl_context.wrap_socket() call.
-        ssl_context_args = {k:self.ssl_options.pop(k, None) for k in \
-            ['ssl_version', 'cert_reqs', 'check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']}
-        if not self.ssl_context:
+        if not self.ssl_context and self.ssl_options:
+            ssl_context_names = ['ssl_version', 'cert_reqs', 'check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']
+            ssl_context_args = {k:self.ssl_options.pop(k, None) for k in ssl_context_names}
             self.ssl_context = self._build_ssl_context_from_options(ssl_context_args)
 
         if protocol_version >= 3:
