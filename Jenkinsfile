@@ -196,7 +196,8 @@ def initializeEnvironment() {
   }
 
   sh label: 'Install unit test modules', script: '''#!/bin/bash -lex
-    pip install nose-ignore-docstring nose-exclude service_identity
+    pip install --no-deps nose-ignore-docstring nose-exclude
+    pip install service_identity
   '''
 
   if (env.CYTHON_ENABLED  == 'True') {
