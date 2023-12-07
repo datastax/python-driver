@@ -789,9 +789,7 @@ class Connection(object):
         # Note the use of pop() here; we are very deliberately removing these params from ssl_options if they're present.  After this
         # operation ssl_options should contain only args needed for the ssl_context.wrap_socket() call.
         if not self.ssl_context and self.ssl_options:
-            ssl_context_names = ['ssl_version', 'cert_reqs', 'check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']
-            ssl_context_args = {k:self.ssl_options.pop(k, None) for k in ssl_context_names}
-            self.ssl_context = self._build_ssl_context_from_options(ssl_context_args)
+            self.ssl_context = self._build_ssl_context_from_options()
 
         if protocol_version >= 3:
             self.max_request_id = min(self.max_in_flight - 1, (2 ** 15) - 1)
@@ -858,37 +856,48 @@ class Connection(object):
         else:
             return conn
 
-    def _build_ssl_context_from_options(self, opts):
+    def _build_ssl_context_from_options(self):
+
+        # Extract a subset of names from self.ssl_options which apply to SSLContext creation
+        ssl_context_opt_names = ['ssl_version', 'cert_reqs', 'check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']
+        opts = {k:self.ssl_options.get(k, None) for k in ssl_context_opt_names if k in self.ssl_options}
+
         # Python >= 3.10 requires either PROTOCOL_TLS_CLIENT or PROTOCOL_TLS_SERVER so we'll get ahead of things by always
         # being explicit
-        ssl_version = opts.pop('ssl_version') or ssl.PROTOCOL_TLS_CLIENT
-        cert_reqs = opts.pop('cert_reqs') or ssl.CERT_REQUIRED
+        ssl_version = opts.get('ssl_version', None) or ssl.PROTOCOL_TLS_CLIENT
+        cert_reqs = opts.get('cert_reqs', None) or ssl.CERT_REQUIRED
         rv = ssl.SSLContext(protocol=int(ssl_version))
-        rv.check_hostname = bool(opts.pop('check_hostname', False))
+        rv.check_hostname = bool(opts.get('check_hostname', False))
         rv.options = int(cert_reqs)
 
-        certfile = opts.pop('certfile', None)
-        keyfile = opts.pop('keyfile', None)
+        certfile = opts.get('certfile', None)
+        keyfile = opts.get('keyfile', None)
         if certfile:
             rv.load_cert_chain(certfile, keyfile)
-        ca_certs = opts.pop('ca_certs', None)
+        ca_certs = opts.get('ca_certs', None)
         if ca_certs:
             rv.load_verify_locations(ca_certs)
-        ciphers = opts.pop('ciphers', None)
+        ciphers = opts.get('ciphers', None)
         if ciphers:
             rv.set_ciphers(ciphers)
 
         return rv
 
     def _wrap_socket_from_context(self):
-        ssl_options = self.ssl_options or {}
+
+        # Extract a subset of names from self.ssl_options which apply to SSLContext.wrap_socket (or at least the parts
+        # of it that don't involve building an SSLContext under the covers)
+        wrap_socket_opt_names = ['server_side', 'do_handshake_on_connect', 'suppress_ragged_eofs', 'server_hostname']
+        opts = {k:self.ssl_options.get(k, None) for k in wrap_socket_opt_names if k in self.ssl_options}
+
         # PYTHON-1186: set the server_hostname only if the SSLContext has
         # check_hostname enabled and it is not already provided by the EndPoint ssl options
-        if (self.ssl_context.check_hostname and
-                'server_hostname' not in ssl_options):
-            ssl_options = ssl_options.copy()
-            ssl_options['server_hostname'] = self.endpoint.address
-        return self.ssl_context.wrap_socket(self._socket, **ssl_options)
+        #opts['server_hostname'] = self.endpoint.address
+        if (self.ssl_context.check_hostname and 'server_hostname' not in opts):
+            server_hostname = self.endpoint.address
+            opts['server_hostname'] = server_hostname
+
+        return self.ssl_context.wrap_socket(self._socket, **opts)
 
     def _initiate_connection(self, sockaddr):
         self._socket.connect(sockaddr)
