@@ -49,7 +49,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack, point_be, point_le,
                                vints_pack, vints_unpack)
-from cassandra import util
+from cassandra import util, VectorDeserializationFailure
 
 _little_endian_flag = 1  # we always serialize LE
 import ipaddress
@@ -461,6 +461,7 @@ class UUIDType(_CassandraType):
 
 class BooleanType(_CassandraType):
     typename = 'boolean'
+    serial_size = 1
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -500,6 +501,7 @@ class AsciiType(_CassandraType):
 
 class FloatType(_CassandraType):
     typename = 'float'
+    serial_size = 4
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -512,6 +514,7 @@ class FloatType(_CassandraType):
 
 class DoubleType(_CassandraType):
     typename = 'double'
+    serial_size = 8
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -524,6 +527,7 @@ class DoubleType(_CassandraType):
 
 class LongType(_CassandraType):
     typename = 'bigint'
+    serial_size = 8
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -536,6 +540,7 @@ class LongType(_CassandraType):
 
 class Int32Type(_CassandraType):
     typename = 'int'
+    serial_size = 4
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -648,6 +653,7 @@ class TimestampType(DateType):
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
+    serial_size = 16
 
     def my_timestamp(self):
         return util.unix_time_from_uuid1(self.val)
@@ -694,6 +700,7 @@ class SimpleDateType(_CassandraType):
 
 class ShortType(_CassandraType):
     typename = 'smallint'
+    serial_size = 2
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -706,6 +713,7 @@ class ShortType(_CassandraType):
 
 class TimeType(_CassandraType):
     typename = 'time'
+    serial_size = 8
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -1411,8 +1419,11 @@ class VectorType(_CassandraType):
 
     @classmethod
     def deserialize(cls, byts, protocol_version):
-        indexes = (4 * x for x in range(0, cls.vector_size))
-        return [cls.subtype.deserialize(byts[idx:idx + 4], protocol_version) for idx in indexes]
+        serialized_size = getattr(cls.subtype, "serial_size", None)
+        if not serialized_size:
+            raise VectorDeserializationFailure("Cannot determine serialized size for vector with subtype %s" % cls.subtype.__name__)
+        indexes = (serialized_size * x for x in range(0, cls.vector_size))
+        return [cls.subtype.deserialize(byts[idx:idx + serialized_size], protocol_version) for idx in indexes]
 
     @classmethod
     def serialize(cls, v, protocol_version):
