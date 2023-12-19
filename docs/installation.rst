@@ -215,12 +215,15 @@ dependencies, then use install-option::
     sudo pip install --install-option="--no-cython"
 
 
+Supported Event Loops
+^^^^^^^^^^^^^^^^^^^^^
+For Python versions before 3.12 the driver uses the ``asyncore`` module for its default
+event loop.  Other event loops such as ``libev``, ``gevent`` and ``eventlet`` are also
+available via Python modules or C extensions.  Python 3.12 has removed ``asyncore`` entirely
+so for this platform one of these other event loops must be used.
+
 libev support
 ^^^^^^^^^^^^^
-The driver currently uses Python's ``asyncore`` module for its default
-event loop.  For better performance, ``libev`` is also supported through
-a C extension.
-
 If you're on Linux, you should be able to install libev
 through a package manager.  For example, on Debian/Ubuntu::
 
