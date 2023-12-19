@@ -744,3 +744,9 @@ class DependencyException(Exception):
         if excs:
             complete_msg += ("\nThe following exceptions were observed: \n - " + '\n - '.join(str(e) for e in excs))
         Exception.__init__(self, complete_msg)
+
+class VectorDeserializationFailure(DriverException):
+    """
+    The driver was unable to deserialize a given vector
+    """
+    pass
