@@ -1,4 +1,4 @@
-dist: xenial
+dist: jammy
 sudo: false
 
 language: python
@@ -6,8 +6,6 @@ python:
   - "3.8"
   - "3.9"
   - "3.10"
-  - "3.11"
-  - "3.12"
 
 env:
   - CASS_DRIVER_NO_CYTHON=1
