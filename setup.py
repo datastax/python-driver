@@ -413,6 +413,7 @@ def run_setup(extensions):
         version=__version__,
         description=' DataStax Driver for Apache Cassandra',
         long_description=long_description,
+        long_description_content_type='text/x-rst',
         url='http://github.com/datastax/python-driver',
         project_urls={
             'Documentation': 'https://docs.datastax.com/en/developer/python-driver/latest/',
