@@ -178,7 +178,10 @@ def initializeEnvironment() {
   // Determine if server version is Apache CassandraⓇ or DataStax Enterprise
   if (env.CASSANDRA_VERSION.split('-')[0] == 'dse') {
     if (env.PYTHON_VERSION =~ /3\.12\.\d+/) {
-      echo "Cannot install DSE dependencies for Python 3.12.x.  See PYTHON-1368 for more detail."
+      echo "Cannot install DSE dependencies for Python 3.12.x; installing Apache CassandraⓇ requirements only.  See PYTHON-1368 for more detail."
+      sh label: 'Install Apache CassandraⓇ requirements', script: '''#!/bin/bash -lex
+        pip install -r test-requirements.txt
+      '''
     }
     else {
       sh label: 'Install DataStax Enterprise requirements', script: '''#!/bin/bash -lex
@@ -196,7 +199,8 @@ def initializeEnvironment() {
   }
 
   sh label: 'Install unit test modules', script: '''#!/bin/bash -lex
-    pip install pynose nose-ignore-docstring nose-exclude service_identity
+    pip install --no-deps nose-ignore-docstring nose-exclude
+    pip install service_identity
   '''
 
   if (env.CYTHON_ENABLED  == 'True') {

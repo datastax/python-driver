@@ -165,10 +165,12 @@ def _connection_reduce_fn(val,import_fn):
         excs.append(exc)
     return (rv or import_result, excs)
 
+log = logging.getLogger(__name__)
+
 conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncore_import)
 (conn_class, excs) = reduce(_connection_reduce_fn, conn_fns, (None,[]))
-if excs:
-    raise DependencyException("Exception loading connection class dependencies", excs)
+if not conn_class:
+    raise DependencyException("Unable to load a default connection class", excs)
 DefaultConnection = conn_class
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
@@ -176,8 +178,6 @@ DefaultConnection = conn_class
 # thread.
 # See http://bugs.python.org/issue10923
 "".encode('utf8')
-
-log = logging.getLogger(__name__)
 
 
 DEFAULT_MIN_REQUESTS = 5
@@ -811,9 +811,9 @@ class Cluster(object):
     Using ssl_options without ssl_context is deprecated and will be removed in the
     next major release.
 
-    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` (or
-    ``ssl.wrap_socket()`` if used without ssl_context) when new sockets are created.
-    This should be used when client encryption is enabled in Cassandra.
+    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` 
+    when new sockets are created. This should be used when client encryption is enabled 
+    in Cassandra.
 
     The following documentation only applies when ssl_options is used without ssl_context.
 
@@ -829,6 +829,12 @@ class Cluster(object):
     should almost always require the option ``'cert_reqs': ssl.CERT_REQUIRED``. Note also that this functionality was not built into
     Python standard library until (2.7.9, 3.2). To enable this mechanism in earlier versions, patch ``ssl.match_hostname``
     with a custom or `back-ported function <https://pypi.org/project/backports.ssl_match_hostname/>`_.
+
+    .. versionchanged:: 3.29.0
+
+    ``ssl.match_hostname`` has been deprecated since Python 3.7 (and removed in Python 3.12).  This functionality is now implemented
+    via ``ssl.SSLContext.check_hostname``.  All options specified above (including ``check_hostname``) should continue to behave in a
+    way that is consistent with prior implementations.
     """
 
     ssl_context = None
