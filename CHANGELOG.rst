@@ -11,7 +11,7 @@ Features
 Others
 ------
 * Remove outdated Python pre-3.7 references (PR 1186)
-* Removed backup(.bak) files (PR 1185)
+* Remove backup(.bak) files (PR 1185)
 * Fix doc typo in add_callbacks (PR 1177)
 
 3.28.0
