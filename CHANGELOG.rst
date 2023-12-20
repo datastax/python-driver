@@ -6,7 +6,7 @@ Features
 --------
 * Add support for Python 3.9 through 3.12, drop support for 3.7 (PYTHON-1283)
 * Removal of dependency on six module (PR 1172)
-* Raise explicit exception when we try to deserialize a vector with a subtype that isn’t constant size (PYTHON-1371)
+* Raise explicit exception when deserializing a vector with a subtype that isn’t a constant size (PYTHON-1371)
 
 Others
 ------
