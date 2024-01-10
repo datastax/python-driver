@@ -188,7 +188,7 @@ of the driver may use the same placeholders for both).
 
 Passing Parameters to CQL Queries
 ---------------------------------
-Althought it is not recommended, you can also pass parameters to non-prepared
+Although it is not recommended, you can also pass parameters to non-prepared
 statements. The driver supports two forms of parameter place-holders: positional
 and named.
 
