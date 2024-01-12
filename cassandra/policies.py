@@ -19,6 +19,7 @@ from threading import Lock
 import socket
 import warnings
 from cassandra import WriteType as WT
+from cassandra.connection import UnixSocketEndPoint
 
 
 # This is done this way because WriteType was originally
@@ -422,8 +423,13 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
         connections to.
         """
         self._allowed_hosts = tuple(hosts)
-        self._allowed_hosts_resolved = [endpoint[4][0] for a in self._allowed_hosts
-                                        for endpoint in socket.getaddrinfo(a, None, socket.AF_UNSPEC, socket.SOCK_STREAM)]
+        self._allowed_hosts_resolved = []
+        for h in self._allowed_hosts:
+            if isinstance(h, UnixSocketEndPoint):
+                self._allowed_hosts_resolved.append(h._unix_socket_path)
+            else:
+                self._allowed_hosts_resolved.extend([endpoint[4][0]
+                                        for endpoint in socket.getaddrinfo(h, None, socket.AF_UNSPEC, socket.SOCK_STREAM)])
 
         RoundRobinPolicy.__init__(self)
 
