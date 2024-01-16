@@ -32,4 +32,11 @@ jobs:
     - name: Test with pytest
       run: |
         export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
+        export SCYLLA_VERSION='release:5.1'
         ./ci/run_integration_test.sh tests/integration/standard/ tests/integration/cqlengine/
+    
+    - name: Test tablets
+      run: |
+        export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
+        export SCYLLA_VERSION='unstable/master:2024-01-03T08:06:57Z'
+        ./ci/run_integration_test.sh tests/integration/experiments/

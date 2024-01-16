@@ -15,8 +15,6 @@ if (( aio_max_nr !=  aio_max_nr_recommended_value  )); then
    fi
 fi
 
-SCYLLA_RELEASE='release:5.1'
-
 python3 -m venv .test-venv
 source .test-venv/bin/activate
 pip install -U pip wheel setuptools
@@ -33,12 +31,11 @@ pip install https://github.com/scylladb/scylla-ccm/archive/master.zip
 
 # download version
 
-ccm create scylla-driver-temp -n 1 --scylla --version ${SCYLLA_RELEASE}
+ccm create scylla-driver-temp -n 1 --scylla --version ${SCYLLA_VERSION}
 ccm remove
 
 # run test
 
-export SCYLLA_VERSION=${SCYLLA_RELEASE}
 export MAPPED_SCYLLA_VERSION=3.11.4
 PROTOCOL_VERSION=4  pytest -rf --import-mode append $*
 

@@ -109,3 +109,16 @@ New Error Types
             self.session.execute(prepared.bind((123, 456)))
     except RateLimitReached:
         raise
+
+
+Tablet Awareness
+----------------
+
+**scylla-driver** is tablet aware, which mean that it is able to parse `TABLETS_ROUTING_V1` extension to ProtocolFeatures, recieve tablet information send by Scylla in `custom_payload` part of `RESULT` message, and utilize it.
+Thanks to that queries to tablet based tables are still shard aware.
+
+Details on the scylla cql protocol extensions
+https://github.com/scylladb/scylladb/blob/master/docs/dev/protocol-extensions.md#negotiate-sending-tablets-info-to-the-drivers
+
+Details on the sending tablet information to the drivers
+https://github.com/scylladb/scylladb/blob/master/docs/dev/protocol-extensions.md#sending-tablet-info-to-the-drivers

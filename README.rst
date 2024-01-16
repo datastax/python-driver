@@ -26,6 +26,7 @@ Features
 * `Concurrent execution utilities <http://python-driver.docs.scylladb.com/stable/api/cassandra/concurrent.html>`_
 * `Object mapper <http://python-driver.docs.scylladb.com/stable/object-mapper.html>`_
 * `Shard awareness <http://python-driver.docs.scylladb.com/stable/scylla-specific.html#shard-awareness>`_
+* `Tablet awareness <http://python-driver.docs.scylladb.com/stable/scylla-specific.html#tablet-awareness>`_
 
 Installation
 ------------

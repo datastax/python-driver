@@ -24,7 +24,7 @@ import struct
 from threading import Thread
 
 from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ControlConnection
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
@@ -526,6 +526,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     def test_wrap_round_robin(self):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
@@ -557,6 +558,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     def test_wrap_dc_aware(self):
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         hosts = [Host(DefaultEndPoint(str(i)), SimpleConvictionPolicy) for i in range(4)]
         for host in hosts:
             host.set_up()
@@ -599,6 +601,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
     class FakeCluster:
         def __init__(self):
             self.metadata = Mock(spec=Metadata)
+            self.control_connection = Mock(spec=ControlConnection)
 
     def test_get_distance(self):
         """
@@ -685,6 +688,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         replicas = hosts[2:]
         cluster.metadata.get_replicas.return_value = replicas
 
@@ -775,6 +779,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
 
         cluster = Mock(spec=Cluster)
         cluster.metadata = Mock(spec=Metadata)
+        cluster.control_connection._tablets_routing_v1 = False
         replicas = hosts[2:]
         cluster.metadata.get_replicas.return_value = replicas
 
@@ -1448,6 +1453,7 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
 
     def test_wrap_token_aware(self):
         cluster = Mock(spec=Cluster)
+        cluster.control_connection._tablets_routing_v1 = False
         hosts = [Host(DefaultEndPoint("127.0.0.{}".format(i)), SimpleConvictionPolicy) for i in range(1, 6)]
         for host in hosts:
             host.set_up()
