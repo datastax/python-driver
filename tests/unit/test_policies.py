@@ -34,7 +34,7 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
                                 IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy)
 from cassandra.pool import Host
-from cassandra.connection import DefaultEndPoint
+from cassandra.connection import DefaultEndPoint, UnixSocketEndPoint
 from cassandra.query import Statement
 
 from six.moves import xrange
@@ -1253,6 +1253,17 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
         hosts = ['localhost']
         policy = WhiteListRoundRobinPolicy(hosts)
         host = Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy)
+        policy.populate(None, [host])
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(sorted(qplan), [host])
+
+        self.assertEqual(policy.distance(host), HostDistance.LOCAL)
+    
+    def test_hosts_with_socket_hostname(self):
+        hosts = [UnixSocketEndPoint('/tmp/scylla-workdir/cql.m')]
+        policy = WhiteListRoundRobinPolicy(hosts)
+        host = Host(UnixSocketEndPoint('/tmp/scylla-workdir/cql.m'), SimpleConvictionPolicy)
         policy.populate(None, [host])
 
         qplan = list(policy.make_query_plan())
