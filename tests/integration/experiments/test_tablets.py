@@ -80,8 +80,9 @@ class TestTabletsIntegration(unittest.TestCase):
             CREATE KEYSPACE test1
             WITH replication = {
                 'class': 'NetworkTopologyStrategy', 
-                'replication_factor': 1, 
-                'initial_tablets': 8
+                'replication_factor': 1 
+            } AND tablets = {
+                'initial': 8
             }
             """)
 
