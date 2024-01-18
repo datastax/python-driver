@@ -294,6 +294,7 @@ class LibevConnection(Connection):
         if not self.is_defunct:
             self.error_all_requests(
                 ConnectionShutdown("Connection to %s was closed" % self.endpoint))
+            self.connected_event.set()
 
     def handle_write(self, watcher, revents, errno=None):
         if revents & libev.EV_ERROR:
