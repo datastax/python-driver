@@ -404,6 +404,7 @@ class HostConnection(object):
         self._is_replacing = False
         self._connecting = set()
         self._connections = {}
+        self._pending_connections = []
         # A pool of additional connections which are not used but affect how Scylla
         # assigns shards to them. Scylla tends to assign the shard which has
         # the lowest number of connections. If connections are not distributed
@@ -638,13 +639,19 @@ class HostConnection(object):
                 future.cancel()
 
             connections_to_close = self._connections.copy()
+            pending_connections_to_close = self._pending_connections.copy()
             self._connections.clear()
+            self._pending_connections.clear()
 
         # connection.close can call pool.return_connection, which will
         #  obtain self._lock via self._stream_available_condition.
         # So, it never should be called within self._lock context
         for connection in connections_to_close.values():
             log.debug("Closing connection (%s) to %s", id(connection), self.host)
+            connection.close()
+
+        for connection in pending_connections_to_close:
+            log.debug("Closing pending connection (%s) to %s", id(connection), self.host)
             connection.close()
 
         self._close_excess_connections()
@@ -714,12 +721,12 @@ class HostConnection(object):
         log.debug("shard_aware_endpoint=%r", shard_aware_endpoint)
 
         if shard_aware_endpoint:
-            conn = self._session.cluster.connection_factory(shard_aware_endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released,
+            conn = self._session.cluster.connection_factory(shard_aware_endpoint, host_conn=self, on_orphaned_stream_released=self.on_orphaned_stream_released,
                                                             shard_id=shard_id,
                                                             total_shards=self.host.sharding_info.shards_count)
             conn.original_endpoint = self.host.endpoint
         else:
-            conn = self._session.cluster.connection_factory(self.host.endpoint, on_orphaned_stream_released=self.on_orphaned_stream_released)
+            conn = self._session.cluster.connection_factory(self.host.endpoint, host_conn=self, on_orphaned_stream_released=self.on_orphaned_stream_released)
 
         log.debug("Received a connection %s for shard_id=%i on host %s", id(conn), conn.features.shard_id, self.host)
         if self.is_shutdown:

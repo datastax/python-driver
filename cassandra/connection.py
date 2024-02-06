@@ -865,7 +865,7 @@ class Connection(object):
         raise NotImplementedError()
 
     @classmethod
-    def factory(cls, endpoint, timeout, *args, **kwargs):
+    def factory(cls, endpoint, timeout, host_conn = None, *args, **kwargs):
         """
         A factory function which returns connections which have
         succeeded in connecting and are ready for service (or
@@ -874,6 +874,10 @@ class Connection(object):
         start = time.time()
         kwargs['connect_timeout'] = timeout
         conn = cls(endpoint, *args, **kwargs)
+        if host_conn is not None:
+            host_conn._pending_connections.append(conn)
+            if host_conn.is_shutdown:
+                conn.close()
         elapsed = time.time() - start
         conn.connected_event.wait(timeout - elapsed)
         if conn.last_error:
