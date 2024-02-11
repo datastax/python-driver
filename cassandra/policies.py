@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import random
 from itertools import islice, cycle, groupby, repeat
 import logging
 from random import randint, shuffle
@@ -1017,6 +1017,57 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
             return self.RETRY_NEXT_HOST, None
         else:
             return self._pick_consistency(alive_replicas)
+
+
+class ExponentialBackoffRetryPolicy(RetryPolicy):
+    """
+    A policy that do retries with exponential backoff
+    """
+
+    def __init__(self, max_num_retries: float, min_interval: float = 0.1, max_interval: float = 10.0,
+                 *args, **kwargs):
+        """
+        `max_num_retries` counts how many times the operation would be retried,
+        `min_interval` is the initial time in seconds to wait before first retry
+        `max_interval` is the maximum time to wait between retries
+        """
+        self.min_interval = min_interval
+        self.max_num_retries = max_num_retries
+        self.max_interval = max_interval
+        super(ExponentialBackoffRetryPolicy).__init__(*args, **kwargs)
+
+    def _calculate_backoff(self, attempt: int):
+        delay = min(self.max_interval, self.min_interval * 2 ** attempt)
+        # add some jitter
+        delay += random.random() * self.min_interval - (self.min_interval / 2)
+        return delay
+
+    def on_read_timeout(self, query, consistency, required_responses,
+                        received_responses, data_retrieved, retry_num):
+        if retry_num < self.max_num_retries and received_responses >= required_responses and not data_retrieved:
+            return self.RETRY, consistency, self._calculate_backoff(retry_num)
+        else:
+            return self.RETHROW, None, None
+
+    def on_write_timeout(self, query, consistency, write_type,
+                         required_responses, received_responses, retry_num):
+        if retry_num < self.max_num_retries and write_type == WriteType.BATCH_LOG:
+            return self.RETRY, consistency, self._calculate_backoff(retry_num)
+        else:
+            return self.RETHROW, None, None
+
+    def on_unavailable(self, query, consistency, required_replicas,
+                       alive_replicas, retry_num):
+        if retry_num < self.max_num_retries:
+            return self.RETRY_NEXT_HOST, None, self._calculate_backoff(retry_num)
+        else:
+            return self.RETHROW, None, None
+
+    def on_request_error(self, query, consistency, error, retry_num):
+        if retry_num < self.max_num_retries:
+            return self.RETRY_NEXT_HOST, None, self._calculate_backoff(retry_num)
+        else:
+            return self.RETHROW, None, None
 
 
 class AddressTranslator(object):

@@ -32,7 +32,7 @@ from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCA
                                 RetryPolicy, WriteType,
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
-                                IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy)
+                                IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy, ExponentialBackoffRetryPolicy)
 from cassandra.pool import Host
 from cassandra.connection import DefaultEndPoint, UnixSocketEndPoint
 from cassandra.query import Statement
@@ -1245,6 +1245,24 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
             query=None, consistency=ONE, required_replicas=3, alive_replicas=1, retry_num=0)
         self.assertEqual(retry, RetryPolicy.RETRY)
         self.assertEqual(consistency, ConsistencyLevel.ONE)
+
+
+class ExponentialRetryPolicyTest(unittest.TestCase):
+    def test_calculate_backoff(self):
+        policy = ExponentialBackoffRetryPolicy(max_num_retries=2)
+
+        cases = [
+            (0, 0.1),
+            (1, 2 * 0.1),
+            (2, (2 * 2) * 0.1),
+            (3, (2 * 2 * 2) * 0.1),
+        ]
+
+        for attempts, delay in cases:
+            for i in range(100):
+                d = policy._calculate_backoff(attempts)
+                assert d > delay - (0.1 / 2), f"d={d} attempts={attempts}, delay={delay}"
+                assert d < delay + (0.1 / 2), f"d={d} attempts={attempts}, delay={delay}"
 
 
 class WhiteListRoundRobinPolicyTest(unittest.TestCase):
