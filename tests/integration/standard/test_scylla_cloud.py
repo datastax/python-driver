@@ -41,7 +41,7 @@ class ScyllaCloudConfigTests(TestCase):
 
         ccm_cluster._update_config()
 
-        ccm_cluster.start(wait_for_binary_proto=True)
+        ccm_cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         nodes_info = get_cluster_info(ccm_cluster, port=ssl_port)
         refresh_certs(ccm_cluster, nodes_info)

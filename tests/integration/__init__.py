@@ -499,7 +499,7 @@ def is_current_cluster(cluster_name, node_counts, workloads):
 
 
 def start_cluster_wait_for_up(cluster):
-    cluster.start(wait_for_binary_proto=True)
+    cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
     # Added to wait for slow nodes to start up
     log.debug("Cluster started waiting for binary ports")
     for node in CCM_CLUSTER.nodes.values():
@@ -623,6 +623,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                     else:
                         CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf'], 'start_native_transport': True})
 
+                    CCM_CLUSTER.set_configuration_options({'skip_wait_for_gossip_to_settle': 0})
                     # Permit IS NOT NULL restriction on non-primary key columns of a materialized view
                     # This allows `test_metadata_with_quoted_identifiers` to run
                     CCM_CLUSTER.set_configuration_options({'strict_is_not_null_in_views': False})
@@ -659,7 +660,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 node.set_workloads(workloads)
         if start:
             log.debug("Starting CCM cluster: {0}".format(cluster_name))
-            CCM_CLUSTER.start(jvm_args=jvm_args, wait_for_binary_proto=True)
+            CCM_CLUSTER.start(jvm_args=jvm_args, wait_for_binary_proto=True, wait_other_notice=True)
             # Added to wait for slow nodes to start up
             log.debug("Cluster started waiting for binary ports")
             for node in CCM_CLUSTER.nodes.values():
