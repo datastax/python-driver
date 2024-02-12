@@ -1691,13 +1691,13 @@ class Cluster(object):
                 "when using protocol_version 1 or 2.")
         self._max_connections_per_host[host_distance] = max_connections
 
-    def connection_factory(self, endpoint, *args, **kwargs):
+    def connection_factory(self, endpoint, host_conn = None, *args, **kwargs):
         """
         Called to create a new connection with proper configuration.
         Intended for internal use only.
         """
         kwargs = self._make_connection_kwargs(endpoint, kwargs)
-        return self.connection_class.factory(endpoint, self.connect_timeout, *args, **kwargs)
+        return self.connection_class.factory(endpoint, self.connect_timeout, host_conn, *args, **kwargs)
 
     def _make_connection_factory(self, host, *args, **kwargs):
         kwargs = self._make_connection_kwargs(host.endpoint, kwargs)
