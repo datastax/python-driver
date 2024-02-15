@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import unittest
-
 from collections import namedtuple
 from functools import partial
 import six
@@ -127,17 +126,15 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
             CREATE KEYSPACE udt_test_register_before_connecting
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
             """)
-        s.set_keyspace("udt_test_register_before_connecting")
-        s.execute("CREATE TYPE user (age int, name text)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
+        s.execute("CREATE TYPE udt_test_register_before_connecting.user (age int, name text)")
+        s.execute("CREATE TABLE udt_test_register_before_connecting.mytable (a int PRIMARY KEY, b frozen<user>)")
 
         s.execute("""
             CREATE KEYSPACE udt_test_register_before_connecting2
             WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }
             """)
-        s.set_keyspace("udt_test_register_before_connecting2")
-        s.execute("CREATE TYPE user (state text, is_cool boolean)")
-        s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
+        s.execute("CREATE TYPE udt_test_register_before_connecting2.user (state text, is_cool boolean)")
+        s.execute("CREATE TABLE udt_test_register_before_connecting2.mytable (a int PRIMARY KEY, b frozen<user>)")
 
         # now that types are defined, shutdown and re-create Cluster
         c.shutdown()
@@ -150,19 +147,18 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         c.register_user_type("udt_test_register_before_connecting2", "user", User2)
 
         s = c.connect(wait_for_all_pools=True)
+        c.control_connection.wait_for_schema_agreement()
 
-        s.set_keyspace("udt_test_register_before_connecting")
-        s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User1(42, 'bob')))
-        result = s.execute("SELECT b FROM mytable WHERE a=0")
+        s.execute("INSERT INTO udt_test_register_before_connecting.mytable (a, b) VALUES (%s, %s)", (0, User1(42, 'bob')))
+        result = s.execute("SELECT b FROM udt_test_register_before_connecting.mytable WHERE a=0")
         row = result[0]
         self.assertEqual(42, row.b.age)
         self.assertEqual('bob', row.b.name)
         self.assertTrue(type(row.b) is User1)
 
         # use the same UDT name in a different keyspace
-        s.set_keyspace("udt_test_register_before_connecting2")
-        s.execute("INSERT INTO mytable (a, b) VALUES (%s, %s)", (0, User2('Texas', True)))
-        result = s.execute("SELECT b FROM mytable WHERE a=0")
+        s.execute("INSERT INTO udt_test_register_before_connecting2.mytable (a, b) VALUES (%s, %s)", (0, User2('Texas', True)))
+        result = s.execute("SELECT b FROM udt_test_register_before_connecting2.mytable WHERE a=0")
         row = result[0]
         self.assertEqual('Texas', row.b.state)
         self.assertEqual(True, row.b.is_cool)
