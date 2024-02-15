@@ -87,6 +87,7 @@ class AsyncioConnection(Connection):
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
+        self._background_tasks = set()
 
         self._connect_socket()
         self._socket.setblocking(0)
@@ -106,7 +107,7 @@ class AsyncioConnection(Connection):
         )
         self._send_options_message()
 
-        self._background_tasks = set()
+
 
     @classmethod
     def initialize_reactor(cls):
