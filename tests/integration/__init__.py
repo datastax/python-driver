@@ -43,6 +43,7 @@ from cassandra.protocol import ConfigurationException
 from cassandra import ProtocolVersion
 
 try:
+    import ccmlib
     from ccmlib.dse_cluster import DseCluster
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib.scylla_cluster import ScyllaCluster as CCMScyllaCluster
@@ -95,6 +96,12 @@ def get_server_versions():
     c.shutdown()
 
     return (cass_version, cql_version)
+
+
+def get_scylla_version(scylla_ccm_version_string):
+    """ get scylla version from ccm before starting a cluster"""
+    ccm_repo_cache_dir, _ = ccmlib.scylla_repository.setup(version=scylla_ccm_version_string)
+    return  ccmlib.common.get_version_from_build(ccm_repo_cache_dir)
 
 
 def _tuple_version(version_string):
@@ -372,9 +379,8 @@ lessthandse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('6.0')
 # 1. unittest doesn't skip setUpClass when used on class and we need it sometimes
 # 2. unittest doesn't have conditional xfail, and I prefer to use pytest than custom decorator
 # 3. unittest doesn't have a reason argument, so you don't see the reason in pytest report
-# TODO remove second check when we stop using unstable version in CI for tablets
-requires_collection_indexes = pytest.mark.skipif(SCYLLA_VERSION is not None and (len(SCYLLA_VERSION.split('/')) != 0 or Version(SCYLLA_VERSION.split(':')[1]) < Version('5.2')),
-                                              reason='Scylla supports collection indexes from 5.2 onwards') 
+requires_collection_indexes = pytest.mark.skipif(SCYLLA_VERSION is not None and Version(get_scylla_version(SCYLLA_VERSION)) < Version('5.2'),
+                                              reason='Scylla supports collection indexes from 5.2 onwards')
 requires_custom_indexes = pytest.mark.skipif(SCYLLA_VERSION is not None,
                                           reason='Scylla does not support SASI or any other CUSTOM INDEX class')
 requires_java_udf = pytest.mark.skipif(SCYLLA_VERSION is not None,
