@@ -144,7 +144,7 @@ murmur3_ext = Extension('cassandra.cmurmur3',
 
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
-                      include_dirs=['/usr/include/libev', '/usr/local/include', '/opt/local/include'],
+                      include_dirs=['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/opt/homebrew/include', os.path.expanduser('~/homebrew/include')],
                       libraries=['ev'],
                       library_dirs=['/usr/local/lib', '/opt/local/lib'])
 
