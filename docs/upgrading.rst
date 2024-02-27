@@ -351,7 +351,3 @@ The following dependencies have officially been made optional:
 
 * ``scales``
 * ``blist``
-
-And one new dependency has been added (to enable Python 3 support):
-
-* ``six``
