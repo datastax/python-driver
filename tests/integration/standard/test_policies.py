@@ -16,7 +16,7 @@ import unittest
 
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, \
-    WhiteListRoundRobinPolicy
+    WhiteListRoundRobinPolicy, ExponentialBackoffRetryPolicy
 from cassandra.pool import Host
 from cassandra.connection import DefaultEndPoint
 
@@ -90,3 +90,20 @@ class WhiteListRoundRobinPolicyTests(unittest.TestCase):
             queried_hosts.update(response.response_future.attempted_hosts)
         queried_hosts = set(host.address for host in queried_hosts)
         self.assertEqual(queried_hosts, only_connect_hosts)
+
+
+class ExponentialRetryPolicyTests(unittest.TestCase):
+
+    def setUp(self):
+        self.cluster = TestCluster(default_retry_policy=ExponentialBackoffRetryPolicy(max_num_retries=3))
+        self.session = self.cluster.connect()
+
+    def tearDown(self):
+        self.cluster.shutdown()
+
+    def test_exponential_retries(self):
+        self.session.execute(
+            """
+            CREATE KEYSPACE preparedtests
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+            """)

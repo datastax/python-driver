@@ -5012,12 +5012,16 @@ class ResponseFuture(object):
                 return response.to_exception()
             else:
                 return response
+        if len(retry_decision) == 2:
+            retry_type, consistency = retry_decision
+            delay = 0
+        elif len(retry_decision) == 3:
+            retry_type, consistency, delay = retry_decision
 
-        retry_type, consistency = retry_decision
         if retry_type in (RetryPolicy.RETRY, RetryPolicy.RETRY_NEXT_HOST):
             self._query_retries += 1
             reuse = retry_type == RetryPolicy.RETRY
-            self._retry(reuse, consistency, host)
+            self._retry(reuse, consistency, host, delay)
         elif retry_type is RetryPolicy.RETHROW:
             self._set_final_exception(exception_from_response(response))
         else:  # IGNORE
@@ -5027,7 +5031,7 @@ class ResponseFuture(object):
 
         self._errors[host] = exception_from_response(response)
 
-    def _retry(self, reuse_connection, consistency_level, host):
+    def _retry(self, reuse_connection, consistency_level, host, delay):
         if self._final_exception:
             # the connection probably broke while we were waiting
             # to retry the operation
@@ -5039,7 +5043,7 @@ class ResponseFuture(object):
             self.message.consistency_level = consistency_level
 
         # don't retry on the event loop thread
-        self.session.submit(self._retry_task, reuse_connection, host)
+        self.session.cluster.scheduler.schedule(delay, self._retry_task, reuse_connection, host)
 
     def _retry_task(self, reuse_connection, host):
         if self._final_exception:

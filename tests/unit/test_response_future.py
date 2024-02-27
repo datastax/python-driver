@@ -30,7 +30,7 @@ from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessag
                                 RESULT_KIND_ROWS, RESULT_KIND_SET_KEYSPACE,
                                 RESULT_KIND_SCHEMA_CHANGE, RESULT_KIND_PREPARED,
                                 ProtocolHandler)
-from cassandra.policies import RetryPolicy
+from cassandra.policies import RetryPolicy, ExponentialBackoffRetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
 
@@ -265,7 +265,7 @@ class ResponseFutureTests(unittest.TestCase):
         host = Mock()
         rf._set_result(host, None, None, result)
 
-        session.submit.assert_called_once_with(rf._retry_task, True, host)
+        rf.session.cluster.scheduler.schedule.assert_called_once_with(ANY, rf._retry_task, True, host)
         self.assertEqual(1, rf._query_retries)
 
         connection = Mock(spec=Connection)
@@ -300,7 +300,7 @@ class ResponseFutureTests(unittest.TestCase):
         host = Mock()
         rf._set_result(host, None, None, result)
 
-        session.submit.assert_called_once_with(rf._retry_task, False, host)
+        rf.session.cluster.scheduler.schedule.assert_called_once_with(ANY, rf._retry_task, False, host)
         # query_retries does get incremented for Overloaded/Bootstrapping errors (since 3.18)
         self.assertEqual(1, rf._query_retries)
 
@@ -332,7 +332,8 @@ class ResponseFutureTests(unittest.TestCase):
         rf._set_result(host, None, None, result)
 
         # simulate the executor running this
-        session.submit.assert_called_once_with(rf._retry_task, False, host)
+        rf.session.cluster.scheduler.schedule.assert_called_once_with(ANY, rf._retry_task, False, host)
+
         rf._retry_task(False, host)
 
         # it should try with a different host
@@ -342,10 +343,33 @@ class ResponseFutureTests(unittest.TestCase):
         rf._set_result(host, None, None, result)
 
         # simulate the executor running this
-        session.submit.assert_called_with(rf._retry_task, False, host)
+        rf.session.cluster.scheduler.schedule.assert_called_with(ANY, rf._retry_task, False, host)
         rf._retry_task(False, host)
 
         self.assertRaises(NoHostAvailable, rf.result)
+
+    def test_exponential_retry_policy_fail(self):
+        session = self.make_session()
+        pool = session._pools.get.return_value
+        connection = Mock(spec=Connection)
+        pool.borrow_connection.return_value = (connection, 1)
+
+        query = SimpleStatement("SELECT * FROM foo")
+        message = QueryMessage(query=query, consistency_level=ConsistencyLevel.ONE)
+        rf = ResponseFuture(session, message, query, 1, retry_policy=ExponentialBackoffRetryPolicy(2))
+        rf.send_request()
+        rf.session._pools.get.assert_called_once_with('ip1')
+
+        result = Mock(spec=IsBootstrappingErrorMessage, info={})
+        host = Mock()
+        rf._set_result(host, None, None, result)
+
+        # simulate the executor running this
+        rf.session.cluster.scheduler.schedule.assert_called_once_with(ANY, rf._retry_task, False, host)
+
+        delay = rf.session.cluster.scheduler.schedule.mock_calls[-1][1][0]
+        assert delay > 0.05
+        rf._retry_task(False, host)
 
     def test_all_pools_shutdown(self):
         session = self.make_basic_session()
