@@ -23,7 +23,6 @@ import logging
 import warnings
 from packaging.version import Version
 
-import six
 import cassandra
 from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT, ControlConnection, Cluster
 from cassandra.concurrent import execute_concurrent
