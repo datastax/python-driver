@@ -2169,6 +2169,9 @@ class Cluster(object):
         the metadata.
         Intended for internal use only.
         """
+        with self.metadata._hosts_lock:
+            if endpoint in self.metadata._host_id_by_endpoint:
+                return self.metadata._hosts[self.metadata._host_id_by_endpoint[endpoint]], False
         host, new = self.metadata.add_or_return_host(Host(endpoint, self.conviction_policy_factory, datacenter, rack, host_id=host_id))
         if new and signal:
             log.info("New Cassandra host %r discovered", host)
