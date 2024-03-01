@@ -10,10 +10,10 @@ import cassandra
 # -- Global variables
 
 # Build documentation for the following tags and branches
-TAGS = ['3.21.0-scylla', '3.22.3-scylla', '3.24.8-scylla', '3.25.4-scylla', '3.25.11-scylla', '3.26.6-scylla']
+TAGS = ['3.21.0-scylla', '3.22.3-scylla', '3.24.8-scylla', '3.25.4-scylla', '3.25.11-scylla', '3.26.7-scylla']
 BRANCHES = ['master']
 # Set the latest version.
-LATEST_VERSION = '3.26.6-scylla'
+LATEST_VERSION = '3.26.7-scylla'
 # Set which versions are not released yet.
 UNSTABLE_VERSIONS = ['master']
 # Set which versions are deprecated
