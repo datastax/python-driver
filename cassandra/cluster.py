@@ -3950,9 +3950,6 @@ class ControlConnection(object):
         should_rebuild_token_map = force_token_rebuild or self._cluster.metadata.partitioner is None
         for row in peers_result:
             if not self._is_valid_peer(row):
-                log.warning(
-                    "Found an invalid row for peer (%s). Ignoring host." %
-                    _NodeInfo.get_broadcast_rpc_address(row))
                 continue
 
             endpoint = self._cluster.endpoint_factory.create(row)
@@ -4019,9 +4016,40 @@ class ControlConnection(object):
 
     @staticmethod
     def _is_valid_peer(row):
-        return bool(_NodeInfo.get_broadcast_rpc_address(row) and row.get("host_id") and
-                    row.get("data_center") and row.get("rack") and
-                    ('tokens' not in row or row.get('tokens')))
+        broadcast_rpc = _NodeInfo.get_broadcast_rpc_address(row)
+        host_id = row.get("host_id")
+
+        if not broadcast_rpc:
+            log.warning(
+                "Found an invalid row for peer - missing broadcast_rpc (full row: %s). Ignoring host." %
+                row)
+            return False
+
+        if not host_id:
+            log.warning(
+                "Found an invalid row for peer - missing host_id (broadcast_rpc: %s). Ignoring host." %
+                broadcast_rpc)
+            return False
+
+        if not row.get("data_center"):
+            log.warning(
+                "Found an invalid row for peer - missing data_center (broadcast_rpc: %s, host_id: %s). Ignoring host." %
+                (broadcast_rpc, host_id))
+            return False
+
+        if not row.get("rack"):
+            log.warning(
+                "Found an invalid row for peer - missing rack (broadcast_rpc: %s, host_id: %s). Ignoring host." %
+                (broadcast_rpc, host_id))
+            return False
+
+        if "tokens" in row and not row.get("tokens"):
+            log.warning(
+                "Found an invalid row for peer - tokens is None (broadcast_rpc: %s, host_id: %s). Ignoring host." %
+                (broadcast_rpc, host_id))
+            return False
+
+        return True
 
     def _update_location_info(self, host, datacenter, rack):
         if host.datacenter == datacenter and host.rack == rack:
