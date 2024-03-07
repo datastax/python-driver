@@ -344,8 +344,10 @@ class Metadata(object):
             self._host_id_by_endpoint.pop(host.endpoint, False)
             return bool(self._hosts.pop(host.host_id, False))
 
-    def remove_host_by_host_id(self, host_id):
+    def remove_host_by_host_id(self, host_id, endpoint=None):
         with self._hosts_lock:
+            if endpoint and self._host_id_by_endpoint[endpoint] == host_id:
+                self._host_id_by_endpoint.pop(endpoint, False)
             return bool(self._hosts.pop(host_id, False))
 
     def update_host(self, host, old_endpoint):
