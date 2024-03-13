@@ -145,13 +145,15 @@ murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
 libev_includes = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
+libev_libdirs = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
 if is_macos:
     libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
+    libev_libdirs.extend(['/opt/homebrew/lib'])
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
                       include_dirs=libev_includes,
                       libraries=['ev'],
-                      library_dirs=['/usr/local/lib', '/opt/local/lib', '/usr/lib64'])
+                      library_dirs=libev_libdirs)
 
 platform_unsupported_msg = \
 """
