@@ -88,7 +88,9 @@ class MockMetadata(object):
     def all_hosts_items(self):
         return list(self.hosts.items())
 
-    def remove_host_by_host_id(self, host_id):
+    def remove_host_by_host_id(self, host_id, endpoint=None):
+        if endpoint and self._host_id_by_endpoint[endpoint] == host_id:
+            self._host_id_by_endpoint.pop(endpoint, False)
         self.removed_hosts.append(self.hosts.pop(host_id, False))
         return bool(self.hosts.pop(host_id, False))
 
