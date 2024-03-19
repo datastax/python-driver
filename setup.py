@@ -131,6 +131,8 @@ class BuildFailed(Exception):
     def __init__(self, ext):
         self.ext = ext
 
+is_windows = sys.platform.startswith('win32')
+is_macos = sys.platform.startswith('darwin')
 
 def get_subdriname(directory_path):
     try:
@@ -160,8 +162,6 @@ def get_libev_headers_path():
 murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
-is_macos = sys.platform.startswith('darwin')
-
 libev_includes = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
 libev_libdirs = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
 if is_macos:
@@ -176,9 +176,9 @@ if conan_envfile.exists():
 
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
-                      include_dirs=libev_includes+['/usr/include/libev', '/usr/local/include', '/opt/local/include'],
+                      include_dirs=libev_includes,
                       libraries=['ev'],
-                      library_dirs=libev_libdirs+['/usr/local/lib', '/opt/local/lib'])
+                      library_dirs=libev_libdirs)
 
 platform_unsupported_msg = \
 """
@@ -200,8 +200,6 @@ pypy_unsupported_msg = \
 Some optional C extensions are not supported in PyPy. Only murmur3 will be built.
 =================================================================================
 """
-
-is_windows = os.name == 'nt'
 
 is_pypy = "PyPy" in sys.version
 if is_pypy:
