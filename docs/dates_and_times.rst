@@ -11,46 +11,38 @@ Timestamps in Cassandra are timezone-naive timestamps encoded as millseconds sin
 timestamps in this database usually find it easiest to reason about them if they are always assumed to be UTC. To quote the
 pytz documentation, "The preferred way of dealing with times is to always work in UTC, converting to localtime only when
 generating output to be read by humans." The driver adheres to this tenant, and assumes UTC is always in the database. The
-driver attempts to make this correct on the way in, and assumes no timezone on the way out.
+driver attempts to make this correct on the way in, and assumes no timezone on the way out. Timestamps in Cassandra are
+idealized markers, much like ``datetime.datetime`` in the Python standard library. Unlike this Python implementation, the
+Cassandra encoding supports much wider ranges. To accommodate these ranges without overflow, this driver returns these data
+in custom type: :class:`.util.Datetime`.
 
 Write Path
 ~~~~~~~~~~
 When inserting timestamps, the driver handles serialization for the write path as follows:
 
-If the input is a ``datetime.datetime``, the serialization is normalized by starting with the ``utctimetuple()`` of the
-value.
-
-- If the ``datetime`` object is timezone-aware, the timestamp is shifted, and represents the UTC timestamp equivalent.
-- If the ``datetime`` object is timezone-naive, this results in no shift -- any ``datetime`` with no timezone information is assumed to be UTC
-
-Note the second point above applies even to "local" times created using ``now()``::
-
-    >>> d = datetime.now()
-
-    >>> print(d.tzinfo)
-    None
-
-
-These do not contain timezone information intrinsically, so they will be assumed to be UTC and not shifted. When generating
-timestamps in the application, it is clearer to use ``datetime.utcnow()`` to be explicit about it.
+The driver accepts anything that can be used to construct the :class:`.util.Datetime` class.
+See the linked API docs for details. It uses :attr:`.util.Datetime.milliseconds_from_epoch` as epoch-relative millisecond timestamp.
 
 If the input for a timestamp is numeric, it is assumed to be a epoch-relative millisecond timestamp, as specified in the
 CQL spec -- no scaling or conversion is done.
 
 Read Path
 ~~~~~~~~~
+The driver always returns custom type for ``timestamp``.
+
 The driver always assumes persisted timestamps are UTC and makes no attempt to localize them. Returned values are
-timezone-naive ``datetime.datetime``. We follow this approach because the datetime API has deficiencies around daylight
+timezone-naive :class:`.util.Datetime`. We follow this approach because the datetime API has deficiencies around daylight
 saving time, and the defacto package for handling this is a third-party package (we try to minimize external dependencies
 and not make decisions for the integrator).
 
 The decision for how to handle timezones is left to the application. For the most part it is straightforward to apply
-localization to the ``datetime``\s returned by queries. One prevalent method is to use pytz for localization::
+localization to the :class:`.util.Datetime` returned by queries converted to ``datetime.datetime`` by
+`.util.Datetime.datetime`. One prevalent method is to use pytz for localization::
 
     import pytz
     user_tz = pytz.timezone('US/Central')
     timestamp_naive = row.ts
-    timestamp_utc = pytz.utc.localize(timestamp_naive)
+    timestamp_utc = pytz.utc.localize(timestamp_naive.datetime())
     timestamp_presented = timestamp_utc.astimezone(user_tz)
 
 This is the most robust approach (likely refactored into a function). If it is deemed too cumbersome to apply for all call

@@ -41,7 +41,7 @@ from cassandra.protocol import (
 from cassandra.query import named_tuple_factory
 from cassandra.util import (
     OPEN_BOUND, Date, DateRange, DateRangeBound,
-    DateRangePrecision, Time, ms_timestamp_from_datetime,
+    DateRangePrecision, Datetime, Time, ms_timestamp_from_datetime,
     datetime_from_timestamp
 )
 from tests.unit.util import check_sequence_consistency
@@ -201,7 +201,7 @@ class TypeTests(unittest.TestCase):
 
     def test_datetype(self):
         now_time_seconds = time.time()
-        now_datetime = datetime.datetime.utcfromtimestamp(now_time_seconds)
+        now_datetime = util.Datetime(datetime.datetime.utcfromtimestamp(now_time_seconds))
 
         # Cassandra timestamps in millis
         now_timestamp = now_time_seconds * 1e3
@@ -982,6 +982,35 @@ class TestOrdering(unittest.TestCase):
         check_sequence_consistency(self, time_from_string_equal, equal=True)
 
         check_sequence_consistency(self, self._shuffle_lists(time_from_int, time_from_datetime, time_from_string))
+
+    def test_datetime_order(self):
+        """
+        Test Datetime class is ordered consistently
+
+        @expected_result the datetimes are ordered correctly
+
+        @test_category data_types
+        """
+        date_format = "%Y-%m-%d %H:%M:%S"
+
+        datetimes_from_value = [
+            Datetime(int((datetime.datetime.strptime(dtstr, date_format) -
+                  datetime.datetime(1970, 1, 1)).total_seconds() * 1000))
+            for dtstr in ("2017-01-02 00:05:21", "2017-01-06 00:05:22", "2017-01-10 00:05:23", "2017-01-14 00:05:24")
+        ]
+        datetimes_from_value_equal = [Datetime(1), Datetime(1)]
+        check_sequence_consistency(self, datetimes_from_value)
+        check_sequence_consistency(self, datetimes_from_value_equal, equal=True)
+
+        datetimes_from_datetime = [Datetime(datetime.datetime.strptime(dtstr, date_format))
+                               for dtstr in ("2017-01-03 00:05:25", "2017-01-07 00:05:26", "2017-01-11 00:05:27", "2017-01-15 00:05:28")]
+        datetimes_from_datetime_equal = [Datetime(datetime.datetime.strptime("2017-01-01 00:05:23", date_format)),
+                               Datetime(datetime.datetime.strptime("2017-01-01 00:05:23", date_format))]
+        check_sequence_consistency(self, datetimes_from_datetime)
+        check_sequence_consistency(self, datetimes_from_datetime_equal, equal=True)
+
+        check_sequence_consistency(self, self._shuffle_lists(datetimes_from_value,
+                                                             datetimes_from_datetime))
 
     def test_token_order(self):
         """

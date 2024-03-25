@@ -17,7 +17,7 @@ from datetime import datetime, date, time
 import ipaddress
 from uuid import uuid1, uuid4
 
-from cassandra.util import OrderedMap, Date, Time, sortedset, Duration
+from cassandra.util import Datetime, OrderedMap, Date, Time, sortedset, Duration
 
 from tests.integration import get_server_versions
 
@@ -103,7 +103,7 @@ def get_sample_data():
             sample_data[datatype] = 'text'
 
         elif datatype == 'timestamp':
-            sample_data[datatype] = datetime(2013, 12, 31, 23, 59, 59, 999000)
+            sample_data[datatype] = Datetime(datetime(2013, 12, 31, 23, 59, 59, 999000))
 
         elif datatype == 'timeuuid':
             sample_data[datatype] = uuid1()

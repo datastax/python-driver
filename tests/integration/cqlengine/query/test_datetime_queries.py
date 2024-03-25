@@ -15,6 +15,7 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
 from cassandra.cqlengine.functions import get_total_seconds
+from cassandra.util import Datetime
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
@@ -65,7 +66,7 @@ class TestDateTimeQueries(BaseCassEngTestCase):
     @execute_count(3)
     def test_datetime_precision(self):
         """ Tests that millisecond resolution is preserved when saving datetime objects """
-        now = datetime.now()
+        now = Datetime(datetime.now())
         pk = 1000
         obj = DateTimeQueryTestModel.create(user=pk, day=now, data='energy cheese')
         load = DateTimeQueryTestModel.get(user=pk)

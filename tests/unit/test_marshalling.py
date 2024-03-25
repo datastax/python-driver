@@ -23,7 +23,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from cassandra.cqltypes import lookup_casstype, DecimalType, UTF8Type, DateType
-from cassandra.util import OrderedMapSerializedKey, sortedset, Time, Date
+from cassandra.util import Datetime, OrderedMapSerializedKey, sortedset, Time, Date
 
 marshalled_value_pairs = (
     # binary form, type, python native type
@@ -37,8 +37,8 @@ marshalled_value_pairs = (
     (b'\x7f\xff\xff\xff\xff\xff\xff\xff', 'CounterColumnType', 9223372036854775807),
     (b'\x80\x00\x00\x00\x00\x00\x00\x00', 'CounterColumnType', -9223372036854775808),
     (b'', 'CounterColumnType', None),
-    (b'\x00\x00\x013\x7fb\xeey', 'DateType', datetime(2011, 11, 7, 18, 55, 49, 881000)),
-    (b'\x00\x00\x01P\xc5~L\x00', 'DateType', datetime(2015, 11, 2)),
+    (b'\x00\x00\x013\x7fb\xeey', 'DateType', Datetime(datetime(2011, 11, 7, 18, 55, 49, 881000))),
+    (b'\x00\x00\x01P\xc5~L\x00', 'DateType', Datetime(datetime(2015, 11, 2))),
     (b'', 'DateType', None),
     (b'\x00\x00\x00\r\nJ\x04"^\x91\x04\x8a\xb1\x18\xfe', 'DecimalType', Decimal('1243878957943.1234124191998')),
     (b'\x00\x00\x00\x06\xe5\xde]\x98Y', 'DecimalType', Decimal('-112233.441191')),
@@ -131,7 +131,7 @@ class UnmarshalTest(unittest.TestCase):
                                  % (valtype, marshaller, type(whatwegot), type(serializedval)))
 
     def test_date(self):
-        # separate test because it will deserialize as datetime
+        # separate test because it will deserialize as Datetime
         self.assertEqual(DateType.from_binary(DateType.to_binary(date(2015, 11, 2), 1), 1), datetime(2015, 11, 2))
 
     def test_decimal(self):

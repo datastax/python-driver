@@ -85,21 +85,17 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         for event in trace.events:
             str(event)
 
-    def test_row_error_message(self):
-        """
-        Test to validate, new column deserialization message
-        @since 3.7.0
-        @jira_ticket PYTHON-361
-        @expected_result Special failed decoding message should be present
+    def test_datetime_outside_range(self):
+        """ Test to validate if driver supports datetime outside datetime.[MIN|MAX]YEAR range """
+        self.session.execute("CREATE TABLE {0}.{1} (k int PRIMARY KEY, v date)".format(self.keyspace_name,self.function_table_name))
 
-        @test_category tracing
-        """
-        self.session.execute("CREATE TABLE {0}.{1} (k int PRIMARY KEY, v timestamp)".format(self.keyspace_name,self.function_table_name))
-        ss = SimpleStatement("INSERT INTO {0}.{1} (k, v) VALUES (1, 1000000000000000)".format(self.keyspace_name, self.function_table_name))
+        ss = SimpleStatement("INSERT INTO {0}.{1} (k, v) VALUES (1, {2})".format(self.keyspace_name, self.function_table_name, 2**30))
         self.session.execute(ss)
-        with self.assertRaises(DriverException) as context:
-            self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
-        self.assertIn("Failed decoding result column", str(context.exception))
+        self.session.execute("SELECT totimestamp(v) FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
+
+        ss = SimpleStatement("INSERT INTO {0}.{1} (k, v) VALUES (1, {2})".format(self.keyspace_name, self.function_table_name, 2**31 - 2**29))
+        self.session.execute(ss)
+        self.session.execute("SELECT totimestamp(v) FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
 
     def test_trace_id_to_resultset(self):
 

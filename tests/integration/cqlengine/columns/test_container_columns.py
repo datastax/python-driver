@@ -25,6 +25,7 @@ import cassandra.cqlengine.columns as columns
 from cassandra.cqlengine.functions import get_total_seconds
 from cassandra.cqlengine.models import Model, ValidationError
 from cassandra.cqlengine.management import sync_table, drop_table
+from cassandra.util import Datetime
 
 from tests.integration import CASSANDRA_IP
 from tests.integration.cqlengine import is_prepend_reversed
@@ -389,7 +390,7 @@ class TestMapColumn(BaseCassEngTestCase):
         """ Tests that a basic usage works as expected """
         k1 = uuid4()
         k2 = uuid4()
-        now = datetime.now()
+        now = Datetime(datetime.now())
         then = now + timedelta(days=1)
         m1 = TestMapModel.create(int_map={1: k1, 2: k2},
                                  text_map={'now': now, 'then': then})
