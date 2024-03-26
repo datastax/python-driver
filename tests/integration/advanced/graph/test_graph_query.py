@@ -55,7 +55,7 @@ class BasicGraphQueryTest(BasicGraphUnitTestCase):
         cl_attrs = ('graph_read_consistency_level', 'graph_write_consistency_level')
 
         # Iterates over the graph options and constructs an array containing
-        # The graph_options that correlate to graoh read and write consistency levels
+        # The graph_options that correlate to graph read and write consistency levels
         graph_params = [a[2] for a in _graph_options if a[0] in cl_attrs]
 
         s = self.session

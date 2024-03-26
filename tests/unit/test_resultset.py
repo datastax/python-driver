@@ -121,7 +121,7 @@ class ResultSetTests(unittest.TestCase):
         # index access before iteration causes list to be materialized
         self.assertEqual(rs[0], expected[0])
 
-        # resusable iteration
+        # reusable iteration
         self.assertListEqual(list(rs), expected)
         self.assertListEqual(list(rs), expected)
 
@@ -136,7 +136,7 @@ class ResultSetTests(unittest.TestCase):
         # index access before iteration causes list to be materialized
         self.assertEqual(rs[0], expected[0])
         self.assertEqual(rs[9], expected[9])
-        # resusable iteration
+        # reusable iteration
         self.assertListEqual(list(rs), expected)
         self.assertListEqual(list(rs), expected)
 

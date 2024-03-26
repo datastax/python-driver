@@ -125,7 +125,7 @@ def use_cluster_with_graph(num_nodes):
 
 class BasicGeometricUnitTestCase(BasicKeyspaceUnitTestCase):
     """
-    This base test class is used by all the geomteric tests. It contains class level teardown and setup
+    This base test class is used by all the geometric tests. It contains class level teardown and setup
     methods. It also contains the test fixtures used by those tests
     """
 
