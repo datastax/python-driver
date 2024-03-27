@@ -27,7 +27,6 @@ the corresponding CQL or Cassandra type strings.
 # for example), these classes would be a good place to tack on
 # .from_cql_literal() and .as_cql_literal() classmethods (or whatever).
 
-from __future__ import absolute_import  # to enable import io from stdlib
 import ast
 from binascii import unhexlify
 import calendar
