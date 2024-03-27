@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import unittest
-
-from mock import Mock, ANY, call, patch
 from io import BytesIO
 import time
 from threading import Lock
+from unittest.mock import Mock, ANY, call, patch
 
 from cassandra import OperationTimedOut
 from cassandra.cluster import Cluster

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import unittest
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from cassandra.connection import DefaultEndPoint
 

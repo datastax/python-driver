@@ -15,8 +15,7 @@ import unittest
 
 import logging
 import time
-
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from cassandra import OperationTimedOut
 from cassandra.cluster import (EXEC_PROFILE_DEFAULT, Cluster, ExecutionProfile,

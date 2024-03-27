@@ -33,7 +33,7 @@ import time
 import random
 import re
 
-import mock
+from unittest import mock
 
 
 log = logging.getLogger(__name__)

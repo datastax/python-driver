@@ -1,7 +1,6 @@
 -r requirements.txt
 scales
 pynose
-mock>1.1
 ccm>=2.1.2
 pytz
 sure

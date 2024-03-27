@@ -27,7 +27,7 @@ from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYP
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 
 import uuid
-import mock
+from unittest import mock
 
 
 def setup_module():

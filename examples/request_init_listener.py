@@ -18,7 +18,6 @@
 # about the encoded request size. Note that the counts would be available using the internal 'metrics' tracking --
 # this is just demonstrating a way to track a few custom attributes.
 
-from __future__ import print_function
 from cassandra.cluster import Cluster
 from greplin import scales
 

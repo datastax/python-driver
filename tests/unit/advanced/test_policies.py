@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import unittest
-
-from mock import Mock
+from unittest.mock import Mock
 
 from cassandra.pool import Host
 from cassandra.policies import RoundRobinPolicy

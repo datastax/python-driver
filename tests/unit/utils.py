@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from concurrent.futures import Future
 from functools import wraps
+from unittest.mock import patch
+
+from concurrent.futures import Future
 from cassandra.cluster import Session
-from mock import patch
 
 
 def mock_session_pools(f):

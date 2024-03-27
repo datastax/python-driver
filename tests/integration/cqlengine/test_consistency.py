@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
+from unittest import mock
 from uuid import uuid4
 
 from cassandra import ConsistencyLevel as CL, ConsistencyLevel

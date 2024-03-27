@@ -17,8 +17,7 @@ import sys
 import traceback
 import time
 from packaging.version import Version
-
-from mock import Mock
+from unittest.mock import Mock
 
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy
 from cassandra import (

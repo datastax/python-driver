@@ -27,7 +27,7 @@ import random
 from functools import wraps
 from itertools import cycle
 from io import BytesIO
-from mock import Mock
+from unittest.mock import Mock
 
 import errno
 import logging

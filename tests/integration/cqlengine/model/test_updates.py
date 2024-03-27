@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unittest.mock import patch
 from uuid import uuid4
 
-from mock import patch
 from cassandra.cqlengine import ValidationError
 
 from tests.integration import greaterthancass21

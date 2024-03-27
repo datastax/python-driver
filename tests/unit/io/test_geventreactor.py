@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+from unittest.mock import patch
 
 
 from tests.unit.io.utils import TimerTestMixin
@@ -22,8 +23,6 @@ try:
     import gevent.monkey
 except ImportError:
     GeventConnection = None  # noqa
-
-from mock import patch
 
 
 skip_condition = GeventConnection is None or EVENT_LOOP_MANAGER != "gevent"
