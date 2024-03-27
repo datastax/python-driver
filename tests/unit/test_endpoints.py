@@ -12,7 +12,7 @@ import itertools
 
 from cassandra.connection import DefaultEndPoint, SniEndPoint, SniEndPointFactory
 
-from mock import patch
+from unittest.mock import patch
 
 
 def socket_getaddrinfo(*args):

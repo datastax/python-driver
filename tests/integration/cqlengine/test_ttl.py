@@ -23,7 +23,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.models import Model
 from uuid import uuid4
 from cassandra.cqlengine import columns
-import mock
+from unittest import mock
 from cassandra.cqlengine.connection import get_session
 from tests.integration import CASSANDRA_VERSION, greaterthancass20
 

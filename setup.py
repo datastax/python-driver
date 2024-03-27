@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 import os
 import sys
 import warnings
@@ -436,7 +435,7 @@ def run_setup(extensions):
         include_package_data=True,
         install_requires=dependencies,
         extras_require=_EXTRAS_REQUIRE,
-        tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
+        tests_require=['nose', 'PyYAML', 'pytz', 'sure'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',

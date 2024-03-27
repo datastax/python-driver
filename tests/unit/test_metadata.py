@@ -15,7 +15,7 @@ import unittest
 
 from binascii import unhexlify
 import logging
-from mock import Mock
+from unittest.mock import Mock
 import os
 import timeit
 
