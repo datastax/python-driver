@@ -138,15 +138,22 @@ class BuildFailed(Exception):
     def __init__(self, ext):
         self.ext = ext
 
+is_windows = sys.platform.startswith('win32')
+is_macos = sys.platform.startswith('darwin')
 
 murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
+libev_includes = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
+libev_libdirs = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
+if is_macos:
+    libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
+    libev_libdirs.extend(['/opt/homebrew/lib'])
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
-                      include_dirs=['/usr/include/libev', '/usr/local/include', '/opt/local/include'],
+                      include_dirs=libev_includes,
                       libraries=['ev'],
-                      library_dirs=['/usr/local/lib', '/opt/local/lib'])
+                      library_dirs=libev_libdirs)
 
 platform_unsupported_msg = \
 """
@@ -168,8 +175,6 @@ pypy_unsupported_msg = \
 Some optional C extensions are not supported in PyPy. Only murmur3 will be built.
 =================================================================================
 """
-
-is_windows = os.name == 'nt'
 
 is_pypy = "PyPy" in sys.version
 if is_pypy:
@@ -401,8 +406,7 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = ['six >=1.9',
-                    'geomet>=0.1,<0.3']
+    dependencies = ['geomet>=0.1,<0.3']
 
     _EXTRAS_REQUIRE = {
         'graph': ['gremlinpython==3.4.6'],
@@ -414,6 +418,7 @@ def run_setup(extensions):
         version=__version__,
         description=' DataStax Driver for Apache Cassandra',
         long_description=long_description,
+        long_description_content_type='text/x-rst',
         url='http://github.com/datastax/python-driver',
         project_urls={
             'Documentation': 'https://docs.datastax.com/en/developer/python-driver/latest/',
@@ -439,8 +444,11 @@ def run_setup(extensions):
             'Natural Language :: English',
             'Operating System :: OS Independent',
             'Programming Language :: Python',
-            'Programming Language :: Python :: 3.7',
             'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3.9',
+            'Programming Language :: Python :: 3.10',
+            'Programming Language :: Python :: 3.11',
+            'Programming Language :: Python :: 3.12',
             'Programming Language :: Python :: Implementation :: CPython',
             'Programming Language :: Python :: Implementation :: PyPy',
             'Topic :: Software Development :: Libraries :: Python Modules'

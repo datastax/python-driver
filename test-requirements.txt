@@ -1,19 +1,16 @@
 -r requirements.txt
 scales
-nose
+pynose
 pytest
 mock>1.1
 ccm>=2.1.2
 pytz
 sure
 pure-sasl
-twisted[tls]; python_version >= '3.5'
-twisted[tls]==19.2.1; python_version < '3.5'
-gevent>=1.0
+twisted[tls]
+gevent
 eventlet
 cython>=0.20,<0.30
 packaging
-backports.ssl_match_hostname; python_version < '2.7.9'
-futurist; python_version >= '3.7'
-asynctest; python_version >= '3.5'
-ipaddress; python_version < '3.3.0'
+futurist
+asynctest

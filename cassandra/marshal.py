@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
 import struct
 
 
@@ -45,35 +44,16 @@ v3_header_pack = v3_header_struct.pack
 v3_header_unpack = v3_header_struct.unpack
 
 
-if six.PY3:
-    def byte2int(b):
-        return b
-
-
-    def varint_unpack(term):
-        val = int(''.join("%02x" % i for i in term), 16)
-        if (term[0] & 128) != 0:
-            len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
-            val -= 1 << (len_term * 8)
-        return val
-else:
-    def byte2int(b):
-        return ord(b)
-
-
-    def varint_unpack(term):  # noqa
-        val = int(term.encode('hex'), 16)
-        if (ord(term[0]) & 128) != 0:
-            len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
-            val = val - (1 << (len_term * 8))
-        return val
+def varint_unpack(term):
+    val = int(''.join("%02x" % i for i in term), 16)
+    if (term[0] & 128) != 0:
+        len_term = len(term)  # pulling this out of the expression to avoid overflow in cython optimized code
+        val -= 1 << (len_term * 8)
+    return val
 
 
 def bit_length(n):
-    if six.PY3 or isinstance(n, int):
-        return int.bit_length(n)
-    else:
-        return long.bit_length(n)
+    return int.bit_length(n)
 
 
 def varint_pack(big):
@@ -91,7 +71,7 @@ def varint_pack(big):
     if pos and revbytes[-1] & 0x80:
         revbytes.append(0)
     revbytes.reverse()
-    return six.binary_type(revbytes)
+    return bytes(revbytes)
 
 
 point_be = struct.Struct('>dd')
@@ -113,7 +93,7 @@ def vints_unpack(term):  # noqa
     values = []
     n = 0
     while n < len(term):
-        first_byte = byte2int(term[n])
+        first_byte = term[n]
 
         if (first_byte & 128) == 0:
             val = first_byte
@@ -124,7 +104,7 @@ def vints_unpack(term):  # noqa
             while n < end:
                 n += 1
                 val <<= 8
-                val |= byte2int(term[n]) & 0xff
+                val |= term[n] & 0xff
 
         n += 1
         values.append(decode_zig_zag(val))
@@ -162,4 +142,4 @@ def vints_pack(values):
             revbytes.append(abs(v))
 
     revbytes.reverse()
-    return six.binary_type(revbytes)
+    return bytes(revbytes)

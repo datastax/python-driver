@@ -22,7 +22,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 28, 0)
+__version_info__ = (3, 29, 1)
 __version__ = '.'.join(map(str, __version_info__))
 
 
@@ -726,5 +726,27 @@ class UnresolvableContactPoints(DriverException):
 
     Note that this is *not* raised when a :class:`.Cluster` is created with no
     contact points, only when lookup fails for all hosts
+    """
+    pass
+
+class DependencyException(Exception):
+    """
+    Specific exception class for handling issues with driver dependencies
+    """
+
+    excs = []
+    """
+    A sequence of child exceptions
+    """
+
+    def __init__(self, msg, excs=[]):
+        complete_msg = msg
+        if excs:
+            complete_msg += ("\nThe following exceptions were observed: \n - " + '\n - '.join(str(e) for e in excs))
+        Exception.__init__(self, complete_msg)
+
+class VectorDeserializationFailure(DriverException):
+    """
+    The driver was unable to deserialize a given vector
     """
     pass

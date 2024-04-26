@@ -27,28 +27,15 @@ import math
 import sys
 import types
 from uuid import UUID
-import six
+import ipaddress
 
 from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
                             sortedset, Time, Date, Point, LineString, Polygon)
 
-if six.PY3:
-    import ipaddress
-
-if six.PY3:
-    long = int
-
 
 def cql_quote(term):
-    # The ordering of this method is important for the result of this method to
-    # be a native str type (for both Python 2 and 3)
-
     if isinstance(term, str):
         return "'%s'" % str(term).replace("'", "''")
-    # This branch of the if statement will only be used by Python 2 to catch
-    # unicode strings, text_type is used to prevent type errors with Python 3.
-    elif isinstance(term, six.text_type):
-        return "'%s'" % term.encode('utf8').replace("'", "''")
     else:
         return str(term)
 
@@ -97,21 +84,13 @@ class Encoder(object):
             Polygon: self.cql_encode_str_quoted
         }
 
-        if six.PY2:
-            self.mapping.update({
-                unicode: self.cql_encode_unicode,
-                buffer: self.cql_encode_bytes,
-                long: self.cql_encode_object,
-                types.NoneType: self.cql_encode_none,
-            })
-        else:
-            self.mapping.update({
-                memoryview: self.cql_encode_bytes,
-                bytes: self.cql_encode_bytes,
-                type(None): self.cql_encode_none,
-                ipaddress.IPv4Address: self.cql_encode_ipaddress,
-                ipaddress.IPv6Address: self.cql_encode_ipaddress
-            })
+        self.mapping.update({
+            memoryview: self.cql_encode_bytes,
+            bytes: self.cql_encode_bytes,
+            type(None): self.cql_encode_none,
+            ipaddress.IPv4Address: self.cql_encode_ipaddress,
+            ipaddress.IPv6Address: self.cql_encode_ipaddress
+        })
 
     def cql_encode_none(self, val):
         """
@@ -134,16 +113,8 @@ class Encoder(object):
     def cql_encode_str_quoted(self, val):
         return "'%s'" % val
 
-    if six.PY3:
-        def cql_encode_bytes(self, val):
-            return (b'0x' + hexlify(val)).decode('utf-8')
-    elif sys.version_info >= (2, 7):
-        def cql_encode_bytes(self, val):  # noqa
-            return b'0x' + hexlify(val)
-    else:
-        # python 2.6 requires string or read-only buffer for hexlify
-        def cql_encode_bytes(self, val):  # noqa
-            return b'0x' + hexlify(buffer(val))
+    def cql_encode_bytes(self, val):
+        return (b'0x' + hexlify(val)).decode('utf-8')
 
     def cql_encode_object(self, val):
         """
@@ -169,7 +140,7 @@ class Encoder(object):
         with millisecond precision.
         """
         timestamp = calendar.timegm(val.utctimetuple())
-        return str(long(timestamp * 1e3 + getattr(val, 'microsecond', 0) / 1e3))
+        return str(int(timestamp * 1e3 + getattr(val, 'microsecond', 0) / 1e3))
 
     def cql_encode_date(self, val):
         """
@@ -214,7 +185,7 @@ class Encoder(object):
         return '{%s}' % ', '.join('%s: %s' % (
             self.mapping.get(type(k), self.cql_encode_object)(k),
             self.mapping.get(type(v), self.cql_encode_object)(v)
-        ) for k, v in six.iteritems(val))
+        ) for k, v in val.items())
 
     def cql_encode_list_collection(self, val):
         """
@@ -236,14 +207,13 @@ class Encoder(object):
         if :attr:`~Encoder.mapping` does not contain an entry for the type.
         """
         encoded = self.mapping.get(type(val), self.cql_encode_object)(val)
-        if as_text_type and not isinstance(encoded, six.text_type):
+        if as_text_type and not isinstance(encoded, str):
             return encoded.decode('utf-8')
         return encoded
 
-    if six.PY3:
-        def cql_encode_ipaddress(self, val):
-            """
-            Converts an ipaddress (IPV4Address, IPV6Address) to a CQL string. This
-            is suitable for ``inet`` type columns.
-            """
-            return "'%s'" % val.compressed
+    def cql_encode_ipaddress(self, val):
+        """
+        Converts an ipaddress (IPV4Address, IPV6Address) to a CQL string. This
+        is suitable for ``inet`` type columns.
+        """
+        return "'%s'" % val.compressed

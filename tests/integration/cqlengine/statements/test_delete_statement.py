@@ -17,7 +17,6 @@ from unittest import TestCase
 from cassandra.cqlengine.columns import Column
 from cassandra.cqlengine.statements import DeleteStatement, WhereClause, MapDeleteClause, ConditionalClause
 from cassandra.cqlengine.operators import *
-import six
 
 
 class DeleteStatementTests(TestCase):
@@ -31,24 +30,24 @@ class DeleteStatementTests(TestCase):
     def test_field_rendering(self):
         """ tests that fields are properly added to the select statement """
         ds = DeleteStatement('table', ['f1', 'f2'])
-        self.assertTrue(six.text_type(ds).startswith('DELETE "f1", "f2"'), six.text_type(ds))
+        self.assertTrue(str(ds).startswith('DELETE "f1", "f2"'), str(ds))
         self.assertTrue(str(ds).startswith('DELETE "f1", "f2"'), str(ds))
 
     def test_none_fields_rendering(self):
         """ tests that a '*' is added if no fields are passed in """
         ds = DeleteStatement('table', None)
-        self.assertTrue(six.text_type(ds).startswith('DELETE FROM'), six.text_type(ds))
+        self.assertTrue(str(ds).startswith('DELETE FROM'), str(ds))
         self.assertTrue(str(ds).startswith('DELETE FROM'), str(ds))
 
     def test_table_rendering(self):
         ds = DeleteStatement('table', None)
-        self.assertTrue(six.text_type(ds).startswith('DELETE FROM table'), six.text_type(ds))
+        self.assertTrue(str(ds).startswith('DELETE FROM table'), str(ds))
         self.assertTrue(str(ds).startswith('DELETE FROM table'), str(ds))
 
     def test_where_clause_rendering(self):
         ds = DeleteStatement('table', None)
         ds.add_where(Column(db_field='a'), EqualsOperator(), 'b')
-        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" = %(0)s', six.text_type(ds))
+        self.assertEqual(str(ds), 'DELETE FROM table WHERE "a" = %(0)s', str(ds))
 
     def test_context_update(self):
         ds = DeleteStatement('table', None)
@@ -56,7 +55,7 @@ class DeleteStatementTests(TestCase):
         ds.add_where(Column(db_field='a'), EqualsOperator(), 'b')
 
         ds.update_context_id(7)
-        self.assertEqual(six.text_type(ds), 'DELETE "d"[%(8)s] FROM table WHERE "a" = %(7)s')
+        self.assertEqual(str(ds), 'DELETE "d"[%(8)s] FROM table WHERE "a" = %(7)s')
         self.assertEqual(ds.get_context(), {'7': 'b', '8': 3})
 
     def test_context(self):
@@ -69,23 +68,23 @@ class DeleteStatementTests(TestCase):
         ds.add_where(Column(db_field='a'), EqualsOperator(), 'b')
         ds.add_where(Column(db_field='created_at'), GreaterThanOrEqualOperator(), '0')
         ds.add_where(Column(db_field='created_at'), LessThanOrEqualOperator(), '10')
-        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" >= %(1)s AND "created_at" <= %(2)s', six.text_type(ds))
+        self.assertEqual(str(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" >= %(1)s AND "created_at" <= %(2)s', str(ds))
 
         ds = DeleteStatement('table', None)
         ds.add_where(Column(db_field='a'), EqualsOperator(), 'b')
         ds.add_where(Column(db_field='created_at'), InOperator(), ['0', '10', '20'])
-        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" IN %(1)s', six.text_type(ds))
+        self.assertEqual(str(ds), 'DELETE FROM table WHERE "a" = %(0)s AND "created_at" IN %(1)s', str(ds))
 
         ds = DeleteStatement('table', None)
         ds.add_where(Column(db_field='a'), NotEqualsOperator(), 'b')
-        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "a" != %(0)s', six.text_type(ds))
+        self.assertEqual(str(ds), 'DELETE FROM table WHERE "a" != %(0)s', str(ds))
 
     def test_delete_conditional(self):
         where = [WhereClause('id', EqualsOperator(), 1)]
         conditionals = [ConditionalClause('f0', 'value0'), ConditionalClause('f1', 'value1')]
         ds = DeleteStatement('table', where=where, conditionals=conditionals)
         self.assertEqual(len(ds.conditionals), len(conditionals))
-        self.assertEqual(six.text_type(ds), 'DELETE FROM table WHERE "id" = %(0)s IF "f0" = %(1)s AND "f1" = %(2)s', six.text_type(ds))
+        self.assertEqual(str(ds), 'DELETE FROM table WHERE "id" = %(0)s IF "f0" = %(1)s AND "f1" = %(2)s', str(ds))
         fields = ['one', 'two']
         ds = DeleteStatement('table', fields=fields, where=where, conditionals=conditionals)
-        self.assertEqual(six.text_type(ds), 'DELETE "one", "two" FROM table WHERE "id" = %(0)s IF "f0" = %(1)s AND "f1" = %(2)s', six.text_type(ds))
+        self.assertEqual(str(ds), 'DELETE "one", "two" FROM table WHERE "id" = %(0)s IF "f0" = %(1)s AND "f1" = %(2)s', str(ds))

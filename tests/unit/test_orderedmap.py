@@ -16,7 +16,6 @@ import unittest
 
 from cassandra.util import OrderedMap, OrderedMapSerializedKey
 from cassandra.cqltypes import EMPTY, UTF8Type, lookup_casstype
-import six
 
 class OrderedMapTest(unittest.TestCase):
     def test_init(self):
@@ -118,11 +117,11 @@ class OrderedMapTest(unittest.TestCase):
 
         itr = iter(om)
         self.assertEqual(sum([1 for _ in itr]), len(keys))
-        self.assertRaises(StopIteration, six.next, itr)
+        self.assertRaises(StopIteration, next, itr)
 
         self.assertEqual(list(iter(om)), keys)
-        self.assertEqual(list(six.iteritems(om)), items)
-        self.assertEqual(list(six.itervalues(om)), values)
+        self.assertEqual(list(om.items()), items)
+        self.assertEqual(list(om.values()), values)
 
     def test_len(self):
         self.assertEqual(len(OrderedMap()), 0)

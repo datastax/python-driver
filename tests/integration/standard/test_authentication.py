@@ -16,7 +16,6 @@ from packaging.version import Version
 import logging
 import time
 
-import six
 from cassandra.cluster import NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider, SASLClient, SaslAuthProvider
 

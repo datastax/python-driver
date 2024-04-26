@@ -21,7 +21,6 @@ log = logging.getLogger(__name__)
 import unittest
 
 from itertools import cycle, count
-from six.moves import range
 from packaging.version import Version
 import time
 

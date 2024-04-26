@@ -21,14 +21,13 @@ import ssl
 from threading import Lock, Thread
 import time
 
-from six.moves import range
-
+from cassandra import DependencyException
 from cassandra.connection import (Connection, ConnectionShutdown,
                                   NONBLOCKING, Timer, TimerManager)
 try:
     import cassandra.io.libevwrapper as libev
 except ImportError:
-    raise ImportError(
+    raise DependencyException(
         "The C extension needed to use libev was not found.  This "
         "probably means that you didn't have the required build dependencies "
         "when installing the driver.  See "

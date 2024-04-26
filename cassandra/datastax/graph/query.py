@@ -15,8 +15,6 @@
 import json
 from warnings import warn
 
-import six
-
 from cassandra import ConsistencyLevel
 from cassandra.query import Statement, SimpleStatement
 from cassandra.datastax.graph.types import Vertex, Edge, Path, VertexProperty
@@ -77,7 +75,7 @@ class GraphOptions(object):
         self._graph_options = {}
         kwargs.setdefault('graph_source', 'g')
         kwargs.setdefault('graph_language', GraphOptions.DEFAULT_GRAPH_LANGUAGE)
-        for attr, value in six.iteritems(kwargs):
+        for attr, value in kwargs.items():
             if attr not in _graph_option_names:
                 warn("Unknown keyword argument received for GraphOptions: {0}".format(attr))
             setattr(self, attr, value)
@@ -103,7 +101,7 @@ class GraphOptions(object):
         for cl in ('graph-write-consistency', 'graph-read-consistency'):
             cl_enum = options.get(cl)
             if cl_enum is not None:
-                options[cl] = six.b(ConsistencyLevel.value_to_name[cl_enum])
+                options[cl] = ConsistencyLevel.value_to_name[cl_enum].encode()
         return options
 
     def set_source_default(self):
@@ -157,8 +155,8 @@ for opt in _graph_options:
     def set(self, value, key=opt[2]):
         if value is not None:
             # normalize text here so it doesn't have to be done every time we get options map
-            if isinstance(value, six.text_type) and not isinstance(value, six.binary_type):
-                value = six.b(value)
+            if isinstance(value, str):
+                value = value.encode()
             self._graph_options[key] = value
         else:
             self._graph_options.pop(key, None)
@@ -278,7 +276,7 @@ class Result(object):
         raise AttributeError("Result has no top-level attribute %r" % (attr,))
 
     def __getitem__(self, item):
-        if isinstance(self.value, dict) and isinstance(item, six.string_types):
+        if isinstance(self.value, dict) and isinstance(item, str):
             return self.value[item]
         elif isinstance(self.value, list) and isinstance(item, int):
             return self.value[item]

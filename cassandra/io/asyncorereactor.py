@@ -24,14 +24,21 @@ import weakref
 import sys
 import ssl
 
-from six.moves import range
 
 try:
     from weakref import WeakSet
 except ImportError:
     from cassandra.util import WeakSet  # noqa
 
-import asyncore
+from cassandra import DependencyException
+try:
+    import asyncore
+except ModuleNotFoundError:
+    raise DependencyException(
+        "Unable to import asyncore module.  Note that this module has been removed in Python 3.12 "
+        "so when using the driver with this version (or anything newer) you will need to use one of the "
+        "other event loop implementations."
+    )
 
 from cassandra.connection import Connection, ConnectionShutdown, NONBLOCKING, Timer, TimerManager
 

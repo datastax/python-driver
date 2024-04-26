@@ -23,12 +23,7 @@ import logging
 import itertools
 from functools import partial
 
-import six
-
-try:
-    import ipaddress
-except:
-    ipaddress = None
+import ipaddress
 
 
 from cassandra.cqltypes import cql_types_from_string
@@ -95,8 +90,7 @@ class _GraphSONTypeType(type):
         return "{0}:{1}".format(cls.prefix, cls.graphson_base_type)
 
 
-@six.add_metaclass(_GraphSONTypeType)
-class GraphSONTypeIO(object):
+class GraphSONTypeIO(object, metaclass=_GraphSONTypeType):
     """Represent a serializable GraphSON type"""
 
     prefix = 'g'
@@ -109,7 +103,7 @@ class GraphSONTypeIO(object):
 
     @classmethod
     def serialize(cls, value, writer=None):
-        return six.text_type(value)
+        return str(value)
 
     @classmethod
     def deserialize(cls, value, reader=None):
@@ -141,7 +135,7 @@ class IntegerTypeIO(GraphSONTypeIO):
 
     @classmethod
     def get_specialized_serializer(cls, value):
-        if type(value) in six.integer_types and (value > MAX_INT32 or value < MIN_INT32):
+        if type(value) is int and (value > MAX_INT32 or value < MIN_INT32):
             return Int64TypeIO
 
         return Int32TypeIO
@@ -164,9 +158,7 @@ class Int64TypeIO(IntegerTypeIO):
 
     @classmethod
     def deserialize(cls, value, reader=None):
-        if six.PY3:
-            return value
-        return long(value)
+        return value
 
 
 class FloatTypeIO(GraphSONTypeIO):
@@ -274,8 +266,7 @@ class BlobTypeIO(GraphSONTypeIO):
     @classmethod
     def serialize(cls, value, writer=None):
         value = base64.b64encode(value)
-        if six.PY3:
-            value = value.decode('utf-8')
+        value = value.decode('utf-8')
         return value
 
     @classmethod
@@ -343,7 +334,7 @@ class DurationTypeIO(GraphSONTypeIO):
             raise ValueError('Invalid duration: {0}'.format(value))
 
         duration = {k: float(v) if v is not None else 0
-                    for k, v in six.iteritems(duration.groupdict())}
+                    for k, v in duration.groupdict().items()}
         return datetime.timedelta(days=duration['days'], hours=duration['hours'],
                                   minutes=duration['minutes'], seconds=duration['seconds'])
 
@@ -512,7 +503,7 @@ class JsonMapTypeIO(GraphSONTypeIO):
     @classmethod
     def serialize(cls, value, writer=None):
         out = {}
-        for k, v in six.iteritems(value):
+        for k, v in value.items():
             out[k] = writer.serialize(v, writer)
 
         return out
@@ -528,7 +519,7 @@ class MapTypeIO(GraphSONTypeIO):
     def definition(cls, value, writer=None):
         out = OrderedDict([('cqlType', cls.cql_type)])
         out['definition'] = []
-        for k, v in six.iteritems(value):
+        for k, v in value.items():
             # we just need the first pair to write the def
             out['definition'].append(writer.definition(k))
             out['definition'].append(writer.definition(v))
@@ -538,7 +529,7 @@ class MapTypeIO(GraphSONTypeIO):
     @classmethod
     def serialize(cls, value, writer=None):
         out = []
-        for k, v in six.iteritems(value):
+        for k, v in value.items():
             out.append(writer.serialize(k, writer))
             out.append(writer.serialize(v, writer))
 
@@ -841,16 +832,10 @@ class GraphSON1Serializer(_BaseGraphSONSerializer):
     ])
 
 
-if ipaddress:
-    GraphSON1Serializer.register(ipaddress.IPv4Address, InetTypeIO)
-    GraphSON1Serializer.register(ipaddress.IPv6Address, InetTypeIO)
-
-if six.PY2:
-    GraphSON1Serializer.register(buffer, ByteBufferTypeIO)
-    GraphSON1Serializer.register(unicode, TextTypeIO)
-else:
-    GraphSON1Serializer.register(memoryview, ByteBufferTypeIO)
-    GraphSON1Serializer.register(bytes, ByteBufferTypeIO)
+GraphSON1Serializer.register(ipaddress.IPv4Address, InetTypeIO)
+GraphSON1Serializer.register(ipaddress.IPv6Address, InetTypeIO)
+GraphSON1Serializer.register(memoryview, ByteBufferTypeIO)
+GraphSON1Serializer.register(bytes, ByteBufferTypeIO)
 
 
 class _BaseGraphSONDeserializer(object):
@@ -922,9 +907,7 @@ class GraphSON1Deserializer(_BaseGraphSONDeserializer):
 
     @classmethod
     def deserialize_bigint(cls, value):
-        if six.PY3:
-            return cls.deserialize_int(value)
-        return long(value)
+        return cls.deserialize_int(value)
 
     @classmethod
     def deserialize_double(cls, value):
@@ -1007,8 +990,6 @@ class GraphSON2Serializer(_BaseGraphSONSerializer):
 
 
 GraphSON2Serializer.register(int, IntegerTypeIO)
-if six.PY2:
-    GraphSON2Serializer.register(long, IntegerTypeIO)
 
 
 class GraphSON2Deserializer(_BaseGraphSONDeserializer):
@@ -1055,7 +1036,7 @@ class GraphSON2Reader(object):
             except KeyError:
                 pass
             # list and map are treated as normal json objs (could be isolated deserializers)
-            return {self.deserialize(k): self.deserialize(v) for k, v in six.iteritems(obj)}
+            return {self.deserialize(k): self.deserialize(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [self.deserialize(o) for o in obj]
         else:
@@ -1109,7 +1090,7 @@ class GraphSON3Serializer(GraphSON2Serializer):
             if self.user_types is None:
                 try:
                     user_types = self.context['cluster']._user_types[self.context['graph_name']]
-                    self.user_types = dict(map(reversed, six.iteritems(user_types)))
+                    self.user_types = dict(map(reversed, user_types.items()))
                 except KeyError:
                     self.user_types = {}
 

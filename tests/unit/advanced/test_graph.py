@@ -17,8 +17,6 @@ import json
 
 import unittest
 
-import six
-
 from cassandra import ConsistencyLevel
 from cassandra.policies import RetryPolicy
 from cassandra.graph import (SimpleGraphStatement, GraphOptions, GraphProtocol, Result,
@@ -278,7 +276,7 @@ class GraphOptionTests(unittest.TestCase):
         other = GraphOptions(**kwargs)
         options = base.get_options_map(other)
         updated = self.opt_mapping['graph_name']
-        self.assertEqual(options[updated], six.b('unit_test'))
+        self.assertEqual(options[updated], b'unit_test')
         for name in (n for n in self.opt_mapping.values() if n != updated):
             self.assertEqual(options[name], base._graph_options[name])
 
@@ -288,22 +286,22 @@ class GraphOptionTests(unittest.TestCase):
     def test_set_attr(self):
         expected = 'test@@@@'
         opts = GraphOptions(graph_name=expected)
-        self.assertEqual(opts.graph_name, six.b(expected))
+        self.assertEqual(opts.graph_name, expected.encode())
         expected = 'somethingelse####'
         opts.graph_name = expected
-        self.assertEqual(opts.graph_name, six.b(expected))
+        self.assertEqual(opts.graph_name, expected.encode())
 
         # will update options with set value
         another = GraphOptions()
         self.assertIsNone(another.graph_name)
         another.update(opts)
-        self.assertEqual(another.graph_name, six.b(expected))
+        self.assertEqual(another.graph_name, expected.encode())
 
         opts.graph_name = None
         self.assertIsNone(opts.graph_name)
         # will not update another with its set-->unset value
         another.update(opts)
-        self.assertEqual(another.graph_name, six.b(expected))  # remains unset
+        self.assertEqual(another.graph_name, expected.encode())  # remains unset
         opt_map = another.get_options_map(opts)
         self.assertEqual(opt_map, another._graph_options)
 
@@ -318,7 +316,7 @@ class GraphOptionTests(unittest.TestCase):
         self.assertEqual(len(opts._graph_options), len(api_params))
         for name, value in api_params.items():
             try:
-                value = six.b(value)
+                value = value.encode()
             except:
                 pass  # already bytes
             self.assertEqual(getattr(opts, name), value)
@@ -335,8 +333,8 @@ class GraphOptionTests(unittest.TestCase):
 
         # mapping from base
         opt_map = opts.get_options_map()
-        self.assertEqual(opt_map['graph-read-consistency'], six.b(ConsistencyLevel.value_to_name[read_cl]))
-        self.assertEqual(opt_map['graph-write-consistency'], six.b(ConsistencyLevel.value_to_name[write_cl]))
+        self.assertEqual(opt_map['graph-read-consistency'], ConsistencyLevel.value_to_name[read_cl].encode())
+        self.assertEqual(opt_map['graph-write-consistency'], ConsistencyLevel.value_to_name[write_cl].encode())
 
         # empty by default
         new_opts = GraphOptions()
@@ -346,8 +344,8 @@ class GraphOptionTests(unittest.TestCase):
 
         # set from other
         opt_map = new_opts.get_options_map(opts)
-        self.assertEqual(opt_map['graph-read-consistency'], six.b(ConsistencyLevel.value_to_name[read_cl]))
-        self.assertEqual(opt_map['graph-write-consistency'], six.b(ConsistencyLevel.value_to_name[write_cl]))
+        self.assertEqual(opt_map['graph-read-consistency'], ConsistencyLevel.value_to_name[read_cl].encode())
+        self.assertEqual(opt_map['graph-write-consistency'], ConsistencyLevel.value_to_name[write_cl].encode())
 
     def test_graph_source_convenience_attributes(self):
         opts = GraphOptions()

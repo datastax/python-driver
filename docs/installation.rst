@@ -3,7 +3,7 @@ Installation
 
 Supported Platforms
 -------------------
-Python 3.7 and 3.8 are supported.  Both CPython (the standard Python
+Python 3.8 through 3.12 are supported.  Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.
@@ -26,7 +26,7 @@ To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print cassandra.__version__'
 
-It should print something like "3.27.0".
+It should print something like "3.29.1".
 
 .. _installation-datastax-graph:
 
@@ -70,10 +70,10 @@ support this::
 *Optional:* Column-Level Encryption (CLE) Support
 --------------------------------------------------
 The driver has built-in support for client-side encryption and
-decryption of data. For more, see :doc:`column_encryption`.  
+decryption of data. For more, see :doc:`column_encryption`.
 
-CLE depends on the Python `cryptography <https://cryptography.io/en/latest/>`_ module. 
-When installing Python driver 3.27.0. the `cryptography` module is 
+CLE depends on the Python `cryptography <https://cryptography.io/en/latest/>`_ module.
+When installing Python driver 3.27.0. the `cryptography` module is
 also downloaded and installed.
 If you are using Python driver 3.28.0 or later and want to use CLE, you must
 install the `cryptography <https://cryptography.io/en/latest/>`_ module.
@@ -211,16 +211,19 @@ If your sudo configuration does not allow SETENV, you must push the option flag 
 applies these options to all dependencies (which break on the custom flag). Therefore, you must first install
 dependencies, then use install-option::
 
-    sudo pip install six futures
+    sudo pip install futures
     sudo pip install --install-option="--no-cython"
 
 
+Supported Event Loops
+^^^^^^^^^^^^^^^^^^^^^
+For Python versions before 3.12 the driver uses the ``asyncore`` module for its default
+event loop.  Other event loops such as ``libev``, ``gevent`` and ``eventlet`` are also
+available via Python modules or C extensions.  Python 3.12 has removed ``asyncore`` entirely
+so for this platform one of these other event loops must be used.
+
 libev support
 ^^^^^^^^^^^^^
-The driver currently uses Python's ``asyncore`` module for its default
-event loop.  For better performance, ``libev`` is also supported through
-a C extension.
-
 If you're on Linux, you should be able to install libev
 through a package manager.  For example, on Debian/Ubuntu::
 

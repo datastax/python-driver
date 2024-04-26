@@ -21,16 +21,17 @@ from __future__ import absolute_import
 import atexit
 from binascii import hexlify
 from collections import defaultdict
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait as wait_futures
 from copy import copy
-from functools import partial, wraps
+from functools import partial, reduce, wraps
 from itertools import groupby, count, chain
 import json
 import logging
 from warnings import warn
 from random import random
-import six
-from six.moves import filter, range, queue as Queue
+import re
+import queue
 import socket
 import sys
 import time
@@ -43,7 +44,7 @@ from weakref import WeakValueDictionary
 from cassandra import (ConsistencyLevel, AuthenticationFailed,
                        OperationTimedOut, UnsupportedOperation,
                        SchemaTargetType, DriverException, ProtocolVersion,
-                       UnresolvableContactPoints)
+                       UnresolvableContactPoints, DependencyException)
 from cassandra.auth import _proxy_execute_key, PlainTextAuthProvider
 from cassandra.connection import (ConnectionException, ConnectionShutdown,
                                   ConnectionHeartbeat, ProtocolVersionUnsupported,
@@ -79,7 +80,6 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
                              HostTargetingStatement)
 from cassandra.marshal import int64_pack
 from cassandra.timestamps import MonotonicTimestampGenerator
-from cassandra.compat import Mapping
 from cassandra.util import _resolve_contact_points_to_string_map, Version
 
 from cassandra.datastax.insights.reporter import MonitorReporter
@@ -99,7 +99,11 @@ except ImportError:
 
 try:
     from cassandra.io.eventletreactor import EventletConnection
-except ImportError:
+# PYTHON-1364
+#
+# At the moment eventlet initialization is chucking AttributeErrors due to it's dependence on pyOpenSSL
+# and some changes in Python 3.12 which have some knock-on effects there.
+except (ImportError, AttributeError):
     EventletConnection = None
 
 try:
@@ -107,43 +111,73 @@ try:
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
 
-if six.PY3:
-    long = int
-
-def _is_eventlet_monkey_patched():
-    if 'eventlet.patcher' not in sys.modules:
-        return False
-    import eventlet.patcher
-    return eventlet.patcher.is_monkey_patched('socket')
-
-
 def _is_gevent_monkey_patched():
     if 'gevent.monkey' not in sys.modules:
         return False
     import gevent.socket
     return socket.socket is gevent.socket.socket
 
+def _try_gevent_import():
+    if _is_gevent_monkey_patched():
+        from cassandra.io.geventreactor import GeventConnection
+        return (GeventConnection,None)
+    else:
+        return (None,None)
 
-# default to gevent when we are monkey patched with gevent, eventlet when
-# monkey patched with eventlet, otherwise if libev is available, use that as
-# the default because it's fastest. Otherwise, use asyncore.
-if _is_gevent_monkey_patched():
-    from cassandra.io.geventreactor import GeventConnection as DefaultConnection
-elif _is_eventlet_monkey_patched():
-    from cassandra.io.eventletreactor import EventletConnection as DefaultConnection
-else:
+def _is_eventlet_monkey_patched():
+    if 'eventlet.patcher' not in sys.modules:
+        return False
     try:
-        from cassandra.io.libevreactor import LibevConnection as DefaultConnection  # NOQA
-    except ImportError:
-        from cassandra.io.asyncorereactor import AsyncoreConnection as DefaultConnection  # NOQA
+        import eventlet.patcher
+        return eventlet.patcher.is_monkey_patched('socket')
+    # Another case related to PYTHON-1364
+    except AttributeError:
+        return False
+
+def _try_eventlet_import():
+    if _is_eventlet_monkey_patched():
+        from cassandra.io.eventletreactor import EventletConnection
+        return (EventletConnection,None)
+    else:
+        return (None,None)
+
+def _try_libev_import():
+    try:
+        from cassandra.io.libevreactor import LibevConnection
+        return (LibevConnection,None)
+    except DependencyException as e:
+        return (None, e)
+
+def _try_asyncore_import():
+    try:
+        from cassandra.io.asyncorereactor import AsyncoreConnection
+        return (AsyncoreConnection,None)
+    except DependencyException as e:
+        return (None, e)
+
+def _connection_reduce_fn(val,import_fn):
+    (rv, excs) = val
+    # If we've already found a workable Connection class return immediately
+    if rv:
+        return val
+    (import_result, exc) = import_fn()
+    if exc:
+        excs.append(exc)
+    return (rv or import_result, excs)
+
+log = logging.getLogger(__name__)
+
+conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncore_import)
+(conn_class, excs) = reduce(_connection_reduce_fn, conn_fns, (None,[]))
+if not conn_class:
+    raise DependencyException("Unable to load a default connection class", excs)
+DefaultConnection = conn_class
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
 # if code that is being imported tries to import the module in a seperate
 # thread.
 # See http://bugs.python.org/issue10923
 "".encode('utf8')
-
-log = logging.getLogger(__name__)
 
 
 DEFAULT_MIN_REQUESTS = 5
@@ -777,9 +811,9 @@ class Cluster(object):
     Using ssl_options without ssl_context is deprecated and will be removed in the
     next major release.
 
-    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` (or
-    ``ssl.wrap_socket()`` if used without ssl_context) when new sockets are created.
-    This should be used when client encryption is enabled in Cassandra.
+    An optional dict which will be used as kwargs for ``ssl.SSLContext.wrap_socket`` 
+    when new sockets are created. This should be used when client encryption is enabled 
+    in Cassandra.
 
     The following documentation only applies when ssl_options is used without ssl_context.
 
@@ -795,6 +829,12 @@ class Cluster(object):
     should almost always require the option ``'cert_reqs': ssl.CERT_REQUIRED``. Note also that this functionality was not built into
     Python standard library until (2.7.9, 3.2). To enable this mechanism in earlier versions, patch ``ssl.match_hostname``
     with a custom or `back-ported function <https://pypi.org/project/backports.ssl_match_hostname/>`_.
+
+    .. versionchanged:: 3.29.0
+
+    ``ssl.match_hostname`` has been deprecated since Python 3.7 (and removed in Python 3.12).  This functionality is now implemented
+    via ``ssl.SSLContext.check_hostname``.  All options specified above (including ``check_hostname``) should continue to behave in a
+    way that is consistent with prior implementations.
     """
 
     ssl_context = None
@@ -1150,7 +1190,7 @@ class Cluster(object):
             else:
                 self._contact_points_explicit = True
 
-            if isinstance(contact_points, six.string_types):
+            if isinstance(contact_points, str):
                 raise TypeError("contact_points should not be a string, it should be a sequence (e.g. list) of strings")
 
             if None in contact_points:
@@ -1785,8 +1825,8 @@ class Cluster(object):
         return session
 
     def _session_register_user_types(self, session):
-        for keyspace, type_map in six.iteritems(self._user_types):
-            for udt_name, klass in six.iteritems(type_map):
+        for keyspace, type_map in self._user_types.items():
+            for udt_name, klass in type_map.items():
                 session.user_type_registered(keyspace, udt_name, klass)
 
     def _cleanup_failed_on_up_handling(self, host):
@@ -2675,7 +2715,7 @@ class Session(object):
         """
         custom_payload = custom_payload if custom_payload else {}
         if execute_as:
-            custom_payload[_proxy_execute_key] = six.b(execute_as)
+            custom_payload[_proxy_execute_key] = execute_as.encode()
 
         future = self._create_response_future(
             query, parameters, trace, custom_payload, timeout,
@@ -2739,8 +2779,8 @@ class Session(object):
 
         custom_payload = execution_profile.graph_options.get_options_map()
         if execute_as:
-            custom_payload[_proxy_execute_key] = six.b(execute_as)
-        custom_payload[_request_timeout_key] = int64_pack(long(execution_profile.request_timeout * 1000))
+            custom_payload[_proxy_execute_key] = execute_as.encode()
+        custom_payload[_request_timeout_key] = int64_pack(int(execution_profile.request_timeout * 1000))
 
         future = self._create_response_future(query, parameters=None, trace=trace, custom_payload=custom_payload,
                                               timeout=_NOT_SET, execution_profile=execution_profile)
@@ -2877,7 +2917,7 @@ class Session(object):
 
         prepared_statement = None
 
-        if isinstance(query, six.string_types):
+        if isinstance(query, str):
             query = SimpleStatement(query)
         elif isinstance(query, PreparedStatement):
             query = query.bind(parameters)
@@ -3345,10 +3385,6 @@ class Session(object):
                 'User type %s does not exist in keyspace %s' % (user_type, keyspace))
 
         field_names = type_meta.field_names
-        if six.PY2:
-            # go from unicode to string to avoid decode errors from implicit
-            # decode when formatting non-ascii values
-            field_names = [fn.encode('utf-8') for fn in field_names]
 
         def encode(val):
             return '{ %s }' % ' , '.join('%s : %s' % (
@@ -4027,7 +4063,7 @@ class ControlConnection(object):
             log.debug("[control connection] Schemas match")
             return None
 
-        return dict((version, list(nodes)) for version, nodes in six.iteritems(versions))
+        return dict((version, list(nodes)) for version, nodes in versions.items())
 
     def _get_peers_query(self, peers_query_type, connection=None):
         """
@@ -4147,7 +4183,7 @@ class _Scheduler(Thread):
     is_shutdown = False
 
     def __init__(self, executor):
-        self._queue = Queue.PriorityQueue()
+        self._queue = queue.PriorityQueue()
         self._scheduled_tasks = set()
         self._count = count()
         self._executor = executor
@@ -4205,7 +4241,7 @@ class _Scheduler(Thread):
                     else:
                         self._queue.put_nowait((run_at, i, task))
                         break
-            except Queue.Empty:
+            except queue.Empty:
                 pass
 
             time.sleep(0.1)

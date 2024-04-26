@@ -14,7 +14,6 @@
 import unittest
 
 import mock
-import six
 from uuid import uuid4
 
 from cassandra.cqlengine import columns
@@ -113,7 +112,7 @@ class TestConditional(BaseCassEngTestCase):
         tc = ConditionalClause('some_value', 23)
         tc.set_context_id(3)
 
-        self.assertEqual('"some_value" = %(3)s', six.text_type(tc))
+        self.assertEqual('"some_value" = %(3)s', str(tc))
         self.assertEqual('"some_value" = %(3)s', str(tc))
 
     def test_batch_update_conditional(self):

@@ -17,7 +17,6 @@ import unittest
 from collections import deque
 from threading import RLock
 
-import six
 from mock import Mock, MagicMock, ANY
 
 from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType, OperationTimedOut
@@ -627,7 +626,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf._on_timeout()
         pool.return_connection.assert_called_once_with(connection, stream_was_orphaned=True)
-        self.assertRaisesRegexp(OperationTimedOut, "Client request timeout", rf.result)
+        self.assertRaisesRegex(OperationTimedOut, "Client request timeout", rf.result)
 
         assert len(connection.request_ids) == 0, \
             "Request IDs should be empty but it's not: {}".format(connection.request_ids)

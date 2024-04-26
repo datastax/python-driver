@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
 from cassandra.auth import PlainTextAuthenticator
 
 import unittest
@@ -24,6 +23,6 @@ class TestPlainTextAuthenticator(unittest.TestCase):
     def test_evaluate_challenge_with_unicode_data(self):
         authenticator = PlainTextAuthenticator("johnӁ", "doeӁ")
         self.assertEqual(
-            authenticator.evaluate_challenge(six.ensure_binary('PLAIN-START')),
-            six.ensure_binary("\x00johnӁ\x00doeӁ")
+            authenticator.evaluate_challenge(b'PLAIN-START'),
+            "\x00johnӁ\x00doeӁ".encode('utf-8')
         )

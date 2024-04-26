@@ -1,10 +1,11 @@
-dist: xenial
+dist: jammy
 sudo: false
 
 language: python
 python:
-  - "3.7"
   - "3.8"
+  - "3.9"
+  - "3.10"
 
 env:
   - CASS_DRIVER_NO_CYTHON=1
@@ -13,7 +14,7 @@ addons:
   apt:
     packages:
     - build-essential
-    - python-dev
+    - python3-dev
     - pypy-dev
     - libc-ares-dev
     - libev4

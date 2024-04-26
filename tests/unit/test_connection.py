@@ -14,8 +14,7 @@
 import unittest
 
 from mock import Mock, ANY, call, patch
-import six
-from six import BytesIO
+from io import BytesIO
 import time
 from threading import Lock
 
@@ -41,14 +40,14 @@ class ConnectionTest(unittest.TestCase):
 
     def make_header_prefix(self, message_class, version=Connection.protocol_version, stream_id=0):
         if Connection.protocol_version < 3:
-            return six.binary_type().join(map(uint8_pack, [
+            return bytes().join(map(uint8_pack, [
                 0xff & (HEADER_DIRECTION_TO_CLIENT | version),
                 0,  # flags (compression)
                 stream_id,
                 message_class.opcode  # opcode
             ]))
         else:
-            return six.binary_type().join(map(uint8_pack, [
+            return bytes().join(map(uint8_pack, [
                 0xff & (HEADER_DIRECTION_TO_CLIENT | version),
                 0,  # flags (compression)
                 0,  # MSB for v3+ stream

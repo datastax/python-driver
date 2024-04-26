@@ -14,7 +14,6 @@
 import unittest
 
 import logging
-import six
 import time
 
 from mock import Mock, patch

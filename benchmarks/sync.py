@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from base import benchmark, BenchmarkThread
-from six.moves import range
 
 
 class Runner(BenchmarkThread):

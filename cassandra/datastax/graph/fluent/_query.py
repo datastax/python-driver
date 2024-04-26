@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
 import logging
 
 from cassandra.graph import SimpleGraphStatement, GraphProtocol
@@ -55,7 +54,7 @@ class _GremlinGraphSONWriterAdapter(object):
             if self.user_types is None:
                 try:
                     user_types = self.context['cluster']._user_types[self.context['graph_name']]
-                    self.user_types = dict(map(reversed, six.iteritems(user_types)))
+                    self.user_types = dict(map(reversed, user_types.items()))
                 except KeyError:
                     self.user_types = {}
 

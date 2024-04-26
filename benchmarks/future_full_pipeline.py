@@ -14,7 +14,7 @@
 
 import logging
 from base import benchmark, BenchmarkThread
-from six.moves import queue
+import queue
 
 log = logging.getLogger(__name__)
 

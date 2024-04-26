@@ -19,7 +19,7 @@ of parallel requests with a Queue.
 
 import time
 import uuid
-from six.moves import queue
+import queue
 
 from cassandra.cluster import Cluster
 
