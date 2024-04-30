@@ -196,7 +196,7 @@ class BatchQuery(object):
             callback(*args, **kwargs)
 
     def add_callback(self, fn, *args, **kwargs):
-        """Add a function and arguments to be passed to it to be executed after the batch executes.
+        r"""Add a function and arguments to be passed to it to be executed after the batch executes.
 
         A batch can support multiple callbacks.
 
@@ -272,7 +272,7 @@ class BatchQuery(object):
 
 
 class ContextQuery(object):
-    """
+    r"""
     A Context manager to allow a Model to switch context easily. Presently, the context only
     specifies a keyspace for model IO.
 

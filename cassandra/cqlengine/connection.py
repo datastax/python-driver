@@ -315,7 +315,7 @@ def setup(
         lazy_connect=False,
         retry_connect=False,
         **kwargs):
-    """
+    r"""
     Setup a the driver connection used by the mapper
 
     :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`)
