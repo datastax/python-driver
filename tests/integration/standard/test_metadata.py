@@ -21,7 +21,7 @@ import sys
 import time
 import os
 from packaging.version import Version
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
 

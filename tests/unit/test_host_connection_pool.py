@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import unittest
-
-from mock import Mock, NonCallableMagicMock
 from threading import Thread, Event, Lock
+from unittest.mock import Mock, NonCallableMagicMock
 
 from cassandra.cluster import Session
 from cassandra.connection import Connection
