@@ -1840,9 +1840,9 @@ class AggregateMetadata(FunctionTest):
             cql_init = encoder.cql_encode_all_types(init_cond)
             with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('update_map', 'map<int, int>', init_cond=cql_init)) as va:
                 map_res = s.execute("SELECT %s(v) AS map_res FROM t" % va.function_kwargs['name']).one().map_res
-                self.assertDictContainsSubset(expected_map_values, map_res)
+                self.assertLessEqual(expected_map_values.items(), map_res.items())
                 init_not_updated = dict((k, init_cond[k]) for k in set(init_cond) - expected_key_set)
-                self.assertDictContainsSubset(init_not_updated, map_res)
+                self.assertLessEqual(init_not_updated.items(), map_res.items())
         c.shutdown()
 
     def test_aggregates_after_functions(self):
