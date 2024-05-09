@@ -46,10 +46,15 @@ jobs:
             platform: PyPy
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         name: Install Python
+
+      - name: Enable pip installing globally
+        if: runner.os == 'MacOs' || runner.os == 'Windows'
+        run: |
+          echo "PIP_BREAK_SYSTEM_PACKAGES=1" >> $GITHUB_ENV
 
       - name: Install cibuildwheel
         run: |
@@ -124,9 +129,9 @@ jobs:
     if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         name: Install Python
 
       - name: Build sdist
@@ -134,7 +139,7 @@ jobs:
           pip install build
           python -m build --sdist
           
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           path: dist/*.tar.gz
 
@@ -146,7 +151,7 @@ jobs:
     # alternatively, to publish when a GitHub Release is created, use the following rule:
     # if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: artifact
           path: dist
