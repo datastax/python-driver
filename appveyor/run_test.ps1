@@ -11,6 +11,9 @@ echo $env:ci_type
 python --version
 python -c "import platform; print(platform.architecture())"
 
+pip install -r test-requirements.txt
+pip install nose-ignore-docstring
+
 $wc = New-Object 'System.Net.WebClient'
 
 if($env:ci_type -eq 'unit'){
