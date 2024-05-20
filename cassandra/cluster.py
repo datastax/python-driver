@@ -5451,7 +5451,7 @@ class ResultSet(object):
         except AttributeError:
             raise DriverException("Attempted to cancel paging with no active session. This is only for requests with ContinuousdPagingOptions.")
 
-    batch_regex = re.compile('^\s*BEGIN\s+[a-zA-Z]*\s*BATCH')
+    batch_regex = re.compile(r'^\s*BEGIN\s+[a-zA-Z]*\s*BATCH')
 
     @property
     def was_applied(self):
