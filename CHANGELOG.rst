@@ -3,7 +3,7 @@
 March 19, 2024
 
 Bug Fixes
---------
+---------
 * cassandra-driver for Python 3.12 Linux is compiled without libev support (PYTHON-1378)
 * Consider moving to native wheel builds for OS X and removing universal2 wheels (PYTHON-1379)
 
