@@ -131,7 +131,7 @@ Then, browse to `localhost:8000 <http://localhost:8000>`_.
 Tests
 =====
 
-Running Unit Tests
+Running Nose Unit Tests
 ------------------
 Unit tests can be run like so::
 
@@ -140,6 +140,16 @@ Unit tests can be run like so::
 You can run a specific test method like so::
 
     nosetests -w tests/unit/test_connection.py:ConnectionTest.test_bad_protocol_version
+
+Running PyTest Unit Tests
+------------------
+Unit tests can be run like so::
+
+    pytest tests/unit/
+
+You can run a specific test method like so::
+
+    pytest tests/unit/test_connection.py::ConnectionTest::test_bad_protocol_version
 
 Running Integration Tests
 -------------------------
@@ -170,14 +180,14 @@ Sometimes it's useful to output logs for the tests as they run::
 
     nosetests -w tests/unit/ --nocapture --nologcapture
 
-Use tee to capture logs and see them on your terminal::
+    or
 
-    nosetests -w tests/unit/ --nocapture --nologcapture 2>&1 | tee test.log
+    pytest tests/unit --log-file=test.log
 
 Testing Multiple Python Versions
 --------------------------------
-Use tox to test all of Python 3.8 through 3.12 and pypy (this is what
-TravisCI runs)::
+
+Use tox to test all of Python 3.8 through 3.12 and pypy (this is what TravisCI runs)::
 
     tox
 
