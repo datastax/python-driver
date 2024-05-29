@@ -19,7 +19,7 @@ from tests.unit.io.utils import TimerTestMixin
 from tests import notpypy, EVENT_LOOP_MANAGER
 
 from eventlet import monkey_patch
-from mock import patch
+from unittest.mock import patch
 
 try:
     from cassandra.io.eventletreactor import EventletConnection

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import uuid
-import mock
+from unittest import mock
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine import models

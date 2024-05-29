@@ -16,8 +16,8 @@
 import unittest
 
 import logging
-from mock import sentinel
 import sys
+from unittest.mock import sentinel
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import (

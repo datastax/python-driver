@@ -13,7 +13,7 @@
 # limitations under the License.
 import unittest
 
-from mock import patch
+from unittest.mock import patch
 import socket
 import cassandra.io.asyncorereactor as asyncorereactor
 from cassandra.io.asyncorereactor import AsyncoreConnection

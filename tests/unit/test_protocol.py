@@ -14,7 +14,7 @@
 
 import unittest
 
-from mock import Mock
+from unittest.mock import Mock
 
 from cassandra import ProtocolVersion, UnsupportedOperation
 from cassandra.protocol import (
