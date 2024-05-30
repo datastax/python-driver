@@ -17,20 +17,16 @@ from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import sync_table, create_keyspace_simple
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
-
-import unittest
-
-from ssl import SSLContext, PROTOCOL_TLS
-
 from cassandra import DriverException, ConsistencyLevel, InvalidRequest
 from cassandra.cluster import NoHostAvailable, ExecutionProfile, Cluster, _execution_profile_to_string
 from cassandra.connection import SniEndPoint
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy, ConstantReconnectionPolicy
 
-from mock import patch
+from ssl import SSLContext, PROTOCOL_TLS
+from unittest.mock import patch
 
-from tests.integration import requirescloudproxy, TestCluster
+from tests.integration import requirescloudproxy
 from tests.util import wait_until_not_raised
 from tests.integration.cloud import CloudProxyCluster, CLOUD_PROXY_SERVER
 

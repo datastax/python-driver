@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import unittest
+from unittest.mock import Mock
 
 from cassandra.cluster import _ConfigMode
 from cassandra.cqlengine import connection
 from cassandra.query import dict_factory
-
-from mock import Mock
 
 
 class ConnectionTest(unittest.TestCase):

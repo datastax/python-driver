@@ -15,7 +15,7 @@
 import unittest
 
 from itertools import islice, cycle
-from mock import Mock, patch, call
+from unittest.mock import Mock, patch, call
 from random import randint
 import pytest
 from _thread import LockType

@@ -17,7 +17,7 @@ import unittest
 
 from collections import deque
 from copy import copy
-from mock import Mock, call, patch
+from unittest.mock import Mock, patch
 import time
 from uuid import uuid4
 import logging

@@ -27,7 +27,7 @@ import random
 from functools import wraps
 from itertools import cycle
 from io import BytesIO
-from mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock
 
 import errno
 import logging
@@ -35,9 +35,6 @@ import math
 import os
 from socket import error as socket_error
 import ssl
-
-import unittest
-
 import time
 
 

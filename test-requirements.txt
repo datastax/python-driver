@@ -1,7 +1,6 @@
 -r requirements.txt
 scales
 pytest
-mock>1.1
 pytz
 sure
 pure-sasl

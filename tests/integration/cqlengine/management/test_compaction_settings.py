@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import copy
-from mock import patch
+from unittest.mock import patch
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import drop_table, sync_table, _get_table_metadata, _update_options

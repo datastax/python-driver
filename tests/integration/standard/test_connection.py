@@ -15,7 +15,7 @@
 import unittest
 
 from functools import partial
-from mock import patch
+from unittest.mock import patch
 import logging
 import sys
 import threading

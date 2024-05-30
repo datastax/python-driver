@@ -24,7 +24,7 @@ from cassandra.cluster import Session
 from cassandra import InvalidRequest
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine.connection import NOT_SET
-import mock
+from unittest import mock
 from cassandra.cqlengine import functions
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.models import Model

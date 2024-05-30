@@ -10,7 +10,7 @@ except (ImportError, SyntaxError, AttributeError):
 from tests import is_monkey_patched, connection_class
 from tests.unit.io.utils import TimerCallback, TimerTestMixin
 
-from mock import patch
+from unittest.mock import patch
 
 import unittest
 import time

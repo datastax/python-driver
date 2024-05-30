@@ -19,9 +19,8 @@ from cassandra.protocol_features import ProtocolFeatures
 from cassandra.shard_info import _ShardingInfo
 
 import unittest
-
-from mock import Mock, NonCallableMagicMock, MagicMock
 from threading import Thread, Event, Lock
+from unittest.mock import Mock, NonCallableMagicMock, MagicMock
 
 from cassandra.cluster import Session, ShardAwareOptions
 from cassandra.connection import Connection

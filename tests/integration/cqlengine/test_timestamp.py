@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from datetime import timedelta, datetime
-import mock
+from unittest import mock
 import sure
 from uuid import uuid4
 

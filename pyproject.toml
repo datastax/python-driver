@@ -39,7 +39,6 @@ graph =  ['gremlinpython==3.4.6']
 cle = ['cryptography>=35.0']
 test = [
     "pytest",
-    "mock>=2.0.0",
     "PyYAML",
     "pytz",
     "sure",
