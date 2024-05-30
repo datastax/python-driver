@@ -15,7 +15,7 @@ import unittest
 
 from datetime import datetime, date, time
 from decimal import Decimal
-from mock import Mock
+from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 from cassandra.cqlengine.models import Model

@@ -28,7 +28,7 @@ from cassandra.connection import SniEndPoint
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy, ConstantReconnectionPolicy
 
-from mock import patch
+from unittest.mock import patch
 
 from tests.integration import requirescloudproxy
 from tests.util import wait_until_not_raised

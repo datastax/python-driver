@@ -13,7 +13,7 @@
 # limitations under the License.
 import unittest
 
-from mock import patch
+from unittest.mock import patch
 
 from cassandra.cqlengine import columns, CQLEngineException
 from cassandra.cqlengine.management import sync_table, drop_table, create_keyspace_simple, drop_keyspace

@@ -9,13 +9,11 @@
 import tempfile
 import os
 import shutil
-
 import unittest
+from unittest.mock import patch
 
 from cassandra import DriverException
 from cassandra.datastax import cloud
-
-from mock import patch
 
 from tests import notwindows
 

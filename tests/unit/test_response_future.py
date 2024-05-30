@@ -16,8 +16,7 @@ import unittest
 
 from collections import deque
 from threading import RLock
-
-from mock import Mock, MagicMock, ANY
+from unittest.mock import Mock, MagicMock, ANY
 
 from cassandra import ConsistencyLevel, Unavailable, SchemaTargetType, SchemaChangeType, OperationTimedOut
 from cassandra.cluster import Session, ResponseFuture, NoHostAvailable, ProtocolVersion

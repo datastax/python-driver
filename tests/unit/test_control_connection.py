@@ -15,7 +15,7 @@
 import unittest
 
 from concurrent.futures import ThreadPoolExecutor
-from mock import Mock, ANY, call
+from unittest.mock import Mock, ANY, call
 
 from cassandra import OperationTimedOut, SchemaTargetType, SchemaChangeType
 from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
