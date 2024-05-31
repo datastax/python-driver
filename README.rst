@@ -1,5 +1,9 @@
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![PyPI version](https://badge.fury.io/py/scylla-driver.svg)](https://badge.fury.io/py/scylla-driver)
+.. |license| image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+    :target: https://opensource.org/licenses/Apache-2.0
+.. |version| image:: https://badge.fury.io/py/scylla-driver.svg
+    :target: https://badge.fury.io/py/scylla-driver
+
+|license| |version|
 
 Scylla Python Driver
 ====================
