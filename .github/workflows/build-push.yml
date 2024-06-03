@@ -120,8 +120,9 @@ jobs:
         run: |
           python3 -m cibuildwheel --output-dir wheelhouse
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
+          name: wheels-${{ matrix.os }}-${{ matrix.platform }}
           path: ./wheelhouse/*.whl
 
   build_sdist:
@@ -141,10 +142,49 @@ jobs:
           
       - uses: actions/upload-artifact@v4
         with:
+          name: source-dist
           path: dist/*.tar.gz
 
+  build_wheels_extra_arch:
+    if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
+    # The host should always be linux
+    runs-on: ubuntu-latest
+    name: Build extra arch ${{ matrix.archs }} wheels
+    strategy:
+      fail-fast: false
+      matrix:
+        archs: [ aarch64,]  # ppc64le ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+        if: runner.os == 'Linux'
+
+      - uses: actions/setup-python@v5
+        name: Install Python
+
+      - name: Install cibuildwheel
+        run: |
+          python -m pip install cibuildwheel==2.16.2
+
+      - name: Build wheels
+        env:
+          CIBW_BUILD: "cp39* cp310* cp311* cp312*" # limit to specific version since it take much more time than jobs limit
+        run: |
+          python -m cibuildwheel --archs  ${{ matrix.archs }} --output-dir wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.archs }}
+          path: ./wheelhouse/*.whl
+
   upload_pypi:
-    needs: [build_wheels, build_sdist]
+    needs: [build_wheels, build_wheels_extra_arch, build_sdist]
     runs-on: ubuntu-latest
     # upload to PyPI on every tag starting with 'v'
     if: github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
@@ -153,10 +193,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: artifact
           path: dist
+          merge-multiple: true
 
-      - uses: pypa/gh-action-pypi-publish@master
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
+          skip-existing: true
           password: ${{ secrets.PYPI_API_TOKEN }}
