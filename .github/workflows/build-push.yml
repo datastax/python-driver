@@ -186,6 +186,9 @@ jobs:
   upload_pypi:
     needs: [build_wheels, build_wheels_extra_arch, build_sdist]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
     # upload to PyPI on every tag starting with 'v'
     if: github.event_name == 'push' && endsWith(github.event.ref, 'scylla')
     # alternatively, to publish when a GitHub Release is created, use the following rule:
@@ -199,4 +202,3 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
-          password: ${{ secrets.PYPI_API_TOKEN }}
