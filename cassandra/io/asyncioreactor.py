@@ -113,15 +113,17 @@ class AsyncioConnection(Connection):
     def initialize_reactor(cls):
         with cls._lock:
             if cls._pid != os.getpid():
+                # This means that class was passed to another process,
+                # e.g. using multiprocessing.
+                # In such case the class instance will be different and passing
+                # tasks to loop thread won't work.
+                # To fix we need to re-initialize the class
                 cls._loop = None
+                cls._loop_thread = None
+                cls._pid = os.getpid()
             if cls._loop is None:
-                try:
-                    cls._loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    cls._loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(cls._loop)
-
-            if not cls._loop_thread:
+                assert cls._loop_thread is None
+                cls._loop = asyncio.new_event_loop()
                 # daemonize so the loop will be shut down on interpreter
                 # shutdown
                 cls._loop_thread = Thread(target=cls._loop.run_forever,
