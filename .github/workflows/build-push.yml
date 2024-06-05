@@ -63,7 +63,7 @@ jobs:
       - name: Install OpenSSL for Windows
         if: runner.os == 'Windows'
         run: |
-          choco install openssl -f -y
+          choco install openssl --version=3.3.1 -f -y
 
       - name: Install OpenSSL for MacOS
         if: runner.os == 'MacOs'
