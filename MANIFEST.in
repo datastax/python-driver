@@ -4,3 +4,4 @@ include cassandra/io/libevwrapper.c
 include cassandra/*.pyx
 include cassandra/*.pxd
 include cassandra/*.h
+graft build-release

@@ -15,7 +15,9 @@
 from __future__ import print_function
 import os
 import sys
+import json
 import warnings
+from pathlib import Path
 
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     print("Running gevent tests")
@@ -142,6 +144,20 @@ class BuildFailed(Exception):
 murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
+is_macos = sys.platform.startswith('darwin')
+
+libev_includes = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
+libev_libdirs = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
+if is_macos:
+    libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
+    libev_libdirs.extend(['/opt/homebrew/lib'])
+
+conan_envfile = Path(__file__).parent / 'build-release/conan/conandeps.env'
+if conan_envfile.exists():
+    conan_paths = json.loads(conan_envfile.read_text())
+    libev_includes.extend([conan_paths.get('include_dirs')])
+    libev_libdirs.extend([conan_paths.get('library_dirs')])
+
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
                       include_dirs=['/usr/include/libev', '/usr/local/include', '/opt/local/include'],
@@ -184,7 +200,7 @@ elif not is_supported_arch:
 
 try_extensions = "--no-extensions" not in sys.argv and is_supported_platform and is_supported_arch and not os.environ.get('CASS_DRIVER_NO_EXTENSIONS')
 try_murmur3 = try_extensions and "--no-murmur3" not in sys.argv
-try_libev = try_extensions and "--no-libev" not in sys.argv and not is_pypy and not is_windows
+try_libev = try_extensions and "--no-libev" not in sys.argv and not is_pypy
 try_cython = try_extensions and "--no-cython" not in sys.argv and not is_pypy and not os.environ.get('CASS_DRIVER_NO_CYTHON')
 try_cython &= 'egg_info' not in sys.argv  # bypass setup_requires for pip egg_info calls, which will never have --install-option"--no-cython" coming fomr pip
 

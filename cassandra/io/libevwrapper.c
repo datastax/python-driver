@@ -1,3 +1,5 @@
+#pragma comment(lib, "Ws2_32.Lib")
+
 #include <Python.h>
 #include <ev.h>
 

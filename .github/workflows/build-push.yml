@@ -10,7 +10,7 @@ env:
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
- CIBW_SKIP: cp35* cp36* pp*i686 *musllinux*
+ CIBW_SKIP: cp35* cp36* cp37* pp*i686 *musllinux*
  CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
  CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux_2_28
  CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
@@ -62,6 +62,16 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           choco install openssl --version=3.3.1 -f -y
+
+      - name: Install Conan
+        if: runner.os == 'Windows'
+        uses: turtlebrowser/get-conan@main
+
+      - name: configure libev for Windows
+        if: runner.os == 'Windows'
+        run: |
+          conan profile detect
+          conan install conanfile.py
 
       - name: Install OpenSSL for MacOS
         if: runner.os == 'MacOs'
