@@ -1,0 +1,46 @@
+name: Build pre release python versions
+
+on: [push, pull_request]
+
+env:
+ CIBW_TEST_COMMAND_LINUX: "pytest --import-mode append {project}/tests/unit -k 'not (test_connection_initialization or test_cloud)' && EVENT_LOOP_MANAGER=gevent pytest --import-mode append {project}/tests/unit/io/test_geventreactor.py"
+ CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
+ CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
+ CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
+ CIBW_PRERELEASE_PYTHONS: True
+ CIBW_SKIP: cp35* cp36* *musllinux*
+
+jobs:
+  build_wheels:
+    name: Build wheels ${{ matrix.os }} (${{ matrix.platform }})
+    if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build')) || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        name: Install Python
+
+      - name: Install cibuildwheel
+        run: |
+          python3 -m pip install cibuildwheel==2.19.1
+
+      - name: Overwrite for Linux 64
+        if: runner.os == 'Linux' && matrix.platform == 'x86_64'
+        run: |
+          echo "CIBW_BUILD=cp313*_x86_64" >> $GITHUB_ENV
+
+      - name: Build wheels
+        run: |
+          python3 -m cibuildwheel --output-dir wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.platform }}
+          path: ./wheelhouse/*.whl
