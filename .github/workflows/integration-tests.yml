@@ -17,14 +17,16 @@ jobs:
       fail-fast: false
       matrix:
         java-version: [8]
-        python-version: ["3.8.17", "3.11.4", "3.12.0b4"]
+        python-version: ["3.8", "3.11", "3.12", "3.13"]
         event_loop_manager: ["libev", "asyncio", "asyncore"]
         exclude:
-          - python-version: "3.12.0b4"
+          - python-version: "3.12"
+            event_loop_manager: "asyncore"
+          - python-version: "3.13"
             event_loop_manager: "asyncore"
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up JDK ${{ matrix.java-version }}
       uses: actions/setup-java@v4
@@ -32,11 +34,12 @@ jobs:
         java-version: ${{ matrix.java-version }}
         distribution: 'adopt'
 
-    - name: setup pyenv ${{ matrix.python-version }}
-      uses: "gabrielfalcao/pyenv-action@v16"
+    - uses: actions/setup-python@v5
+      name: Install Python ${{ matrix.python-version }}
       with:
-        default: 2.7.14
-        versions: ${{ matrix.python-version }}
+        python-version: ${{ matrix.python-version }}
+        allow-prereleases: true
+
     - name: Test with pytest
       run: |
         export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
