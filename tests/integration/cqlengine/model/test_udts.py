@@ -13,7 +13,7 @@
 # limitations under the License.
 import unittest
 
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from decimal import Decimal
 from unittest.mock import Mock
 from uuid import UUID, uuid4
@@ -272,7 +272,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         self.addCleanup(drop_table, AllDatatypesModel)
 
         input = AllDatatypes(a='ascii', b=2 ** 63 - 1, c=bytearray(b'hello world'), d=True,
-                             e=datetime.utcfromtimestamp(872835240), f=Decimal('12.3E+7'), g=2.39,
+                             e=datetime.fromtimestamp(872835240, tz=timezone.utc).replace(tzinfo=None), f=Decimal('12.3E+7'), g=2.39,
                              h=3.4028234663852886e+38, i='123.123.123.123', j=2147483647, k='text',
                              l=UUID('FE2B4360-28C6-11E2-81C1-0800200C9A66'),
                              m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'))
