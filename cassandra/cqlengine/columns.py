@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from copy import deepcopy, copy
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import logging
 from uuid import UUID as _UUID
 
@@ -551,7 +551,7 @@ class DateTime(Column):
         elif isinstance(value, date):
             return datetime(*(value.timetuple()[:6]))
 
-        return datetime.utcfromtimestamp(value)
+        return datetime.fromtimestamp(value, tz=timezone.utc).replace(tzinfo=None)
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
