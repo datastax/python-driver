@@ -205,8 +205,8 @@ class BatchQuery(object):
 
         :param fn: Callable object
         :type fn: callable
-        :param \*args: Positional arguments to be passed to the callback at the time of execution
-        :param \*\*kwargs: Named arguments to be passed to the callback at the time of execution
+        :param args: Positional arguments to be passed to the callback at the time of execution
+        :param kwargs: Named arguments to be passed to the callback at the time of execution
         """
         if not callable(fn):
             raise ValueError("Value for argument 'fn' is {0} and is not a callable object.".format(type(fn)))
@@ -276,8 +276,8 @@ class ContextQuery(object):
     A Context manager to allow a Model to switch context easily. Presently, the context only
     specifies a keyspace for model IO.
 
-    :param \*args: One or more models. A model should be a class type, not an instance.
-    :param \*\*kwargs: (optional) Context parameters: can be *keyspace* or *connection*
+    :param args: One or more models. A model should be a class type, not an instance.
+    :param kwargs: (optional) Context parameters: can be *keyspace* or *connection*
 
     For example:
 
