@@ -97,7 +97,7 @@ class TestDatetime(BaseCassEngTestCase):
         dt_value = 1454520554
         self.DatetimeTest.objects.create(test_id=5, created_at=dt_value)
         dt2 = self.DatetimeTest.objects(test_id=5).first()
-        self.assertEqual(dt2.created_at, datetime.utcfromtimestamp(dt_value))
+        self.assertEqual(dt2.created_at, util.Datetime(datetime.utcfromtimestamp(dt_value)))
 
     def test_datetime_large(self):
         dt_value = datetime(2038, 12, 31, 10, 10, 10, 123000)
@@ -318,12 +318,12 @@ class TestDateTime(DataType, BaseCassEngTestCase):
     def setUpClass(cls):
         cls.db_klass, cls.python_klass = (
             DateTime,
-            datetime
+            util.Datetime
         )
         cls.first_value, cls.second_value, cls.third_value = (
-            datetime(2017, 4, 13, 18, 34, 24, 317000),
-            datetime(1, 1, 1),
-            datetime(1, 1, 2)
+            util.Datetime(datetime(2017, 4, 13, 18, 34, 24, 317000)),
+            util.Datetime(datetime(1, 1, 1)),
+            util.Datetime(datetime(1, 1, 2))
         )
         super(TestDateTime, cls).setUpClass()
 

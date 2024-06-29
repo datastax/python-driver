@@ -21,7 +21,7 @@ from cassandra import util
 from cassandra.cqltypes import SimpleDateType, _cqltypes, UserType
 from cassandra.cqlengine import ValidationError
 from cassandra.cqlengine.functions import get_total_seconds
-from cassandra.util import Duration as _Duration
+from cassandra.util import Datetime, Duration as _Duration
 
 log = logging.getLogger(__name__)
 
@@ -541,17 +541,19 @@ class DateTime(Column):
     def to_python(self, value):
         if value is None:
             return
+        elif isinstance(value, Datetime):
+            return value
         if isinstance(value, datetime):
             if DateTime.truncate_microseconds:
                 us = value.microsecond
                 truncated_us = us // 1000 * 1000
-                return value - timedelta(microseconds=us - truncated_us)
+                return Datetime(value - timedelta(microseconds=us - truncated_us))
             else:
-                return value
+                return Datetime(value)
         elif isinstance(value, date):
-            return datetime(*(value.timetuple()[:6]))
+            return Datetime(datetime(*(value.timetuple()[:6])))
 
-        return datetime.utcfromtimestamp(value)
+        return Datetime(datetime.utcfromtimestamp(value))
 
     def to_database(self, value):
         value = super(DateTime, self).to_database(value)
@@ -560,6 +562,11 @@ class DateTime(Column):
         if not isinstance(value, datetime):
             if isinstance(value, date):
                 value = datetime(value.year, value.month, value.day)
+            elif isinstance(value, Datetime):
+                try:
+                    value = value.datetime()
+                except ValueError:
+                    return int(value.milliseconds_from_epoch)
             else:
                 raise ValidationError("{0} '{1}' is not a datetime object".format(self.column_name, value))
         epoch = datetime(1970, 1, 1, tzinfo=value.tzinfo)

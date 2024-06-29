@@ -32,6 +32,7 @@ import ast
 from binascii import unhexlify
 import calendar
 from collections import namedtuple
+import datetime
 from decimal import Decimal
 import io
 from itertools import chain
@@ -627,17 +628,16 @@ class DateType(_CassandraType):
     @staticmethod
     def deserialize(byts, protocol_version):
         timestamp = int64_unpack(byts) / 1000.0
-        return util.datetime_from_timestamp(timestamp)
+        return util.Datetime(util.Datetime(util.DATETIME_EPOC) + datetime.timedelta(seconds=timestamp))
 
     @staticmethod
     def serialize(v, protocol_version):
         try:
-            # v is datetime
-            timestamp_seconds = calendar.timegm(v.utctimetuple())
-            timestamp = timestamp_seconds * 1e3 + getattr(v, 'microsecond', 0) / 1e3
+            # v is Datetime
+            timestamp = v.milliseconds_from_epoch
         except AttributeError:
             try:
-                timestamp = calendar.timegm(v.timetuple()) * 1e3
+                timestamp = util.Datetime(v).milliseconds_from_epoch
             except AttributeError:
                 # Ints and floats are valid timestamps too
                 if type(v) not in _number_types:

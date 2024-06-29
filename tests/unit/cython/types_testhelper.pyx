@@ -23,6 +23,7 @@ import io
 from cassandra.cqltypes import DateType
 from cassandra.protocol import write_value
 from cassandra.deserializers import find_deserializer
+from cassandra.util import Datetime
 from cassandra.bytesio cimport BytesIOReader
 from cassandra.buffer cimport Buffer
 from cassandra.deserializers cimport from_binary, Deserializer
@@ -38,7 +39,7 @@ def test_datetype(assert_equal):
         cdef BytesIOReader reader
         cdef Buffer buf
 
-        dt = datetime.datetime.utcfromtimestamp(timestamp)
+        dt = Datetime(datetime.datetime.utcfromtimestamp(timestamp))
 
         bytes = io.BytesIO()
         write_value(bytes, DateType.serialize(dt, 0))
@@ -89,7 +90,7 @@ def test_date_side_by_side(assert_equal):
         bior = BytesIOReader(blob)
         buf.ptr = bior.read()
         buf.size = bior.size
-        cython_deserialized = from_binary(cython_deserializer, &buf, 0)
+        cython_deserialized = Datetime(from_binary(cython_deserializer, &buf, 0))
         python_deserialized = DateType.deserialize(blob, 0)
         assert_equal(cython_deserialized, python_deserialized)
 
