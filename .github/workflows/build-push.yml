@@ -10,7 +10,7 @@ env:
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
- CIBW_SKIP: cp35* cp36* *musllinux*
+ CIBW_SKIP: cp35* cp36* pp*i686 *musllinux*
  CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
  CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux_2_28
  CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
@@ -29,13 +29,7 @@ jobs:
             platform: x86_64
 
           - os: ubuntu-latest
-            platform: i686
-
-          - os: ubuntu-latest
             platform: PyPy
-
-          - os: windows-latest
-            platform: win32
 
           - os: windows-latest
             platform: win64
@@ -79,12 +73,6 @@ jobs:
         run: |
           echo "CIBW_BUILD=cp3*_x86_64" >> $GITHUB_ENV
 
-      - name: Overwrite for Linux 32
-        if: runner.os == 'Linux' && matrix.platform == 'i686'
-        run: |
-          echo "CIBW_BUILD=cp*_i686" >> $GITHUB_ENV
-          echo "CIBW_TEST_COMMAND_LINUX=" >> $GITHUB_ENV
-
       - name: Overwrite for Linux PyPy
         if: runner.os == 'Linux' && matrix.platform == 'PyPy'
         run: |
@@ -95,11 +83,6 @@ jobs:
         if: runner.os == 'Windows' && matrix.platform == 'win64'
         run: |
           echo "CIBW_BUILD=cp*win_amd64" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
-
-      - name: Overwrite for Windows 32
-        if: runner.os == 'Windows' && matrix.platform == 'win32'
-        run: |
-          echo "CIBW_BUILD=cp*win32" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
 
       - name: Overwrite for Windows PyPY
         if: runner.os == 'Windows' && matrix.platform == 'PyPy'
