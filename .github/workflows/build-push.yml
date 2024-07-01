@@ -8,9 +8,13 @@ env:
  CIBW_TEST_COMMAND_MACOS: "pytest --import-mode append {project}/tests/unit -k 'not (test_multi_timer_validation or test_empty_connections or test_connection_initialization or test_timer_cancellation or test_cloud)' "
  CIBW_TEST_COMMAND_WINDOWS: "pytest --import-mode append {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor or test_connection_initialization or test_cloud)\" "
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
- CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
+ CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
  CIBW_SKIP: cp35* cp36* *musllinux*
+ CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+ CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux_2_28
+ CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+ CIBW_MANYLINUX_PYPY_AARCH64_IMAGE: manylinux_2_28
 
 jobs:
   build_wheels:
