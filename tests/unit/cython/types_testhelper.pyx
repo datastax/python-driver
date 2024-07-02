@@ -38,7 +38,7 @@ def test_datetype(assert_equal):
         cdef BytesIOReader reader
         cdef Buffer buf
 
-        dt = datetime.datetime.utcfromtimestamp(timestamp)
+        dt = datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
 
         bytes = io.BytesIO()
         write_value(bytes, DateType.serialize(dt, 0))
@@ -52,11 +52,11 @@ def test_datetype(assert_equal):
     # deserialize
     # epoc
     expected = 0
-    assert_equal(deserialize(expected), datetime.datetime.utcfromtimestamp(expected))
+    assert_equal(deserialize(expected), datetime.datetime.fromtimestamp(expected, tz=datetime.timezone.utc))
 
     # beyond 32b
     expected = 2 ** 33
-    assert_equal(deserialize(expected), datetime.datetime(2242, 3, 16, 12, 56, 32))
+    assert_equal(deserialize(expected), datetime.datetime(2242, 3, 16, 12, 56, 32, tz=datetime.timezone.utc))
 
     # less than epoc (PYTHON-119)
     expected = -770172256

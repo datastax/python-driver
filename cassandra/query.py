@@ -19,7 +19,7 @@ queries.
 """
 
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 import struct
 import time
@@ -1085,7 +1085,7 @@ class TraceEvent(object):
 
     def __init__(self, description, timeuuid, source, source_elapsed, thread_name):
         self.description = description
-        self.datetime = datetime.utcfromtimestamp(unix_time_from_uuid1(timeuuid))
+        self.datetime = datetime.fromtimestamp(unix_time_from_uuid1(timeuuid), tz=timezone.utc)
         self.source = source
         if source_elapsed is not None:
             self.source_elapsed = timedelta(microseconds=source_elapsed)
