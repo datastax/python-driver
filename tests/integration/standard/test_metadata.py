@@ -972,9 +972,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         table_meta = ks_meta.tables[t]
         view_meta = table_meta.views[v]
 
-        self.assertFalse(table_meta.extensions)
-        self.assertFalse(view_meta.extensions)
-
         original_table_cql = table_meta.export_as_string()
         original_view_cql = view_meta.export_as_string()
 
@@ -990,8 +987,6 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         class Ext1(Ext0):
             name = t + '##'
 
-        self.assertFalse(table_meta.extensions)
-        self.assertFalse(view_meta.extensions)
         self.assertIn(Ext0.name, _RegisteredExtensionType._extension_registry)
         self.assertIn(Ext1.name, _RegisteredExtensionType._extension_registry)
         # There will bee the RLAC extension here.
