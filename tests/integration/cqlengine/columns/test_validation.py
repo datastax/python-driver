@@ -15,7 +15,7 @@
 import unittest
 
 import sys
-from datetime import datetime, timedelta, date, tzinfo, time
+from datetime import datetime, timedelta, date, tzinfo, time, timezone
 from decimal import Decimal as D
 from uuid import uuid4, uuid1
 from packaging.version import Version
@@ -97,7 +97,7 @@ class TestDatetime(BaseCassEngTestCase):
         dt_value = 1454520554
         self.DatetimeTest.objects.create(test_id=5, created_at=dt_value)
         dt2 = self.DatetimeTest.objects(test_id=5).first()
-        self.assertEqual(dt2.created_at, datetime.utcfromtimestamp(dt_value))
+        self.assertEqual(dt2.created_at, datetime.fromtimestamp(dt_value, tz=timezone.utc).replace(tzinfo=None))
 
     def test_datetime_large(self):
         dt_value = datetime(2038, 12, 31, 10, 10, 10, 123000)
@@ -809,7 +809,7 @@ class TestTimeUUIDFromDatetime(BaseCassEngTestCase):
         assert isinstance(uuid, UUID)
 
         ts = (uuid.time - 0x01b21dd213814000) / 1e7 # back to a timestamp
-        new_dt = datetime.utcfromtimestamp(ts)
+        new_dt = datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
 
         # checks that we created a UUID1 with the proper timestamp
         assert new_dt == dt
