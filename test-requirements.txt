@@ -1,6 +1,6 @@
 -r requirements.txt
 scales
-pynose
+pytest
 ccm>=2.1.2
 pytz
 sure
