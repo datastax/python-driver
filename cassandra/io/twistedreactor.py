@@ -102,6 +102,9 @@ class TwistedLoop(object):
                 self._thread.start()
                 atexit.register(partial(_cleanup, weakref.ref(self)))
 
+    def _reactor_stopped(self):
+        return reactor._stopped
+
     def _cleanup(self):
         if self._thread:
             reactor.callFromThread(reactor.stop)
