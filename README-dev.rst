@@ -145,11 +145,11 @@ Running Integration Tests
 -------------------------
 In order to run integration tests, you must specify a version to run using the ``CASSANDRA_VERSION`` or ``DSE_VERSION`` environment variable::
 
-    CASSANDRA_VERSION=2.0.9 nosetests -w tests/integration/standard
+    CASSANDRA_VERSION=2.0.9 pytest tests/integration/standard
 
 Or you can specify a cassandra directory (to test unreleased versions)::
 
-    CASSANDRA_DIR=/home/thobbs/cassandra nosetests -w tests/integration/standard/
+    CASSANDRA_DIR=/path/to/cassandra pytest tests/integration/standard/
 
 Specifying the usage of an already running Cassandra cluster
 ------------------------------------------------------------
