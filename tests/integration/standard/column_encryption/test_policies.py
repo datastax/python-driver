@@ -58,14 +58,14 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
         # A straight select from the database will now return the decrypted bits.  We select both encrypted and unencrypted
         # values here to confirm that we don't interfere with regular processing of unencrypted vals.
         (encrypted,unencrypted) = session.execute("select encrypted, unencrypted from foo.bar where unencrypted = %s allow filtering", (expected,)).one()
-        self.assertEquals(expected, encrypted)
-        self.assertEquals(expected, unencrypted)
+        self.assertEqual(expected, encrypted)
+        self.assertEqual(expected, unencrypted)
 
         # Confirm the same behaviour from a subsequent prepared statement as well
         prepared = session.prepare("select encrypted, unencrypted from foo.bar where unencrypted = ? allow filtering")
         (encrypted,unencrypted) = session.execute(prepared, [expected]).one()
-        self.assertEquals(expected, encrypted)
-        self.assertEquals(expected, unencrypted)
+        self.assertEqual(expected, encrypted)
+        self.assertEqual(expected, unencrypted)
 
     def test_end_to_end_simple(self):
 
@@ -86,14 +86,14 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
         # A straight select from the database will now return the decrypted bits.  We select both encrypted and unencrypted
         # values here to confirm that we don't interfere with regular processing of unencrypted vals.
         (encrypted,unencrypted) = session.execute("select encrypted, unencrypted from foo.bar where unencrypted = %s allow filtering", (expected,)).one()
-        self.assertEquals(expected, encrypted)
-        self.assertEquals(expected, unencrypted)
+        self.assertEqual(expected, encrypted)
+        self.assertEqual(expected, unencrypted)
 
         # Confirm the same behaviour from a subsequent prepared statement as well
         prepared = session.prepare("select encrypted, unencrypted from foo.bar where unencrypted = ? allow filtering")
         (encrypted,unencrypted) = session.execute(prepared, [expected]).one()
-        self.assertEquals(expected, encrypted)
-        self.assertEquals(expected, unencrypted)
+        self.assertEqual(expected, encrypted)
+        self.assertEqual(expected, unencrypted)
 
     def test_end_to_end_different_cle_contexts_different_ivs(self):
         """
@@ -135,8 +135,8 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
         cluster2 = TestCluster(column_encryption_policy=cl_policy2)
         session2 = cluster2.connect()
         (encrypted,unencrypted) = session2.execute("select encrypted, unencrypted from foo.bar where unencrypted = %s allow filtering", (expected,)).one()
-        self.assertEquals(expected, encrypted)
-        self.assertEquals(expected, unencrypted)
+        self.assertEqual(expected, encrypted)
+        self.assertEqual(expected, unencrypted)
 
     def test_end_to_end_different_cle_contexts_different_policies(self):
         """
@@ -161,10 +161,10 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
         # A straight select from the database will now return the decrypted bits.  We select both encrypted and unencrypted
         # values here to confirm that we don't interfere with regular processing of unencrypted vals.
         (encrypted,unencrypted) = session2.execute("select encrypted, unencrypted from foo.bar where unencrypted = %s allow filtering", (expected,)).one()
-        self.assertEquals(cl_policy.encode_and_encrypt(col_desc, expected), encrypted)
-        self.assertEquals(expected, unencrypted)
+        self.assertEqual(cl_policy.encode_and_encrypt(col_desc, expected), encrypted)
+        self.assertEqual(expected, unencrypted)
 
         # Confirm the same behaviour from a subsequent prepared statement as well
         prepared = session2.prepare("select encrypted, unencrypted from foo.bar where unencrypted = ? allow filtering")
         (encrypted,unencrypted) = session2.execute(prepared, [expected]).one()
-        self.assertEquals(cl_policy.encode_and_encrypt(col_desc, expected), encrypted)
+        self.assertEqual(cl_policy.encode_and_encrypt(col_desc, expected), encrypted)
