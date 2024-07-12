@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
+
+import pytest
+
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import drop_table, sync_table
 from cassandra.cqlengine.models import Model
@@ -238,7 +242,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
             call_history.append(args)
 
         with patch('cassandra.cqlengine.query.BatchQuery.warn_multiple_exec', False):
-            with pytest.warns() as w:
+            with warnings.catch_warnings(record=True) as w:
                 with BatchQuery() as batch:
                     batch.add_callback(my_callback)
                     batch.execute()
