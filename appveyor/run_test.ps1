@@ -15,12 +15,12 @@ $wc = New-Object 'System.Net.WebClient'
 
 if($env:ci_type -eq 'unit'){
     echo "Running Unit tests"
-    nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit
+    pytest -s -v --junit-xml=unit_results.xml .\tests\unit
 
     $env:EVENT_LOOP_MANAGER="gevent"
-    nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit\io\test_geventreactor.py
+    pytest -s -v --junit-xml=unit_results.xml .\tests\unit\io\test_geventreactor.py
     $env:EVENT_LOOP_MANAGER="eventlet"
-    nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit\io\test_eventletreactor.py
+    pytest -s -v --junit-xml=unit_results.xml .\tests\unit\io\test_eventletreactor.py
     $env:EVENT_LOOP_MANAGER="asyncore"
 
     echo "uploading unit results"
@@ -31,13 +31,13 @@ if($env:ci_type -eq 'unit'){
 if($env:ci_type -eq 'standard'){
 
     echo "Running CQLEngine integration tests"
-    nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=cqlengine_results.xml .\tests\integration\cqlengine
+    pytest -s -v --junit-xml=cqlengine_results.xml .\tests\integration\cqlengine
     $cqlengine_tests_result = $lastexitcode
     $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\cqlengine_results.xml))
     echo "uploading CQLEngine test results"
 
     echo "Running standard integration tests"
-    nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=standard_results.xml .\tests\integration\standard
+    pytest -s -v --junit-xml=standard_results.xml .\tests\integration\standard
     $integration_tests_result = $lastexitcode
     $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\standard_results.xml))
     echo "uploading standard integration test results"

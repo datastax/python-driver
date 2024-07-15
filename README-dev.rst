@@ -155,14 +155,14 @@ Specifying the usage of an already running Cassandra cluster
 ------------------------------------------------------------
 The test will start the appropriate Cassandra clusters when necessary  but if you don't want this to happen because a Cassandra cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example::
 
-    USE_CASS_EXTERNAL=1 CASSANDRA_VERSION=2.0.9 nosetests -w tests/integration/standard
+    USE_CASS_EXTERNAL=1 CASSANDRA_VERSION=2.0.9 pytest tests/integration/standard
 
 Specify a Protocol Version for Tests
 ------------------------------------
 The protocol version defaults to 1 for cassandra 1.2 and 2 otherwise.  You can explicitly set
 it with the ``PROTOCOL_VERSION`` environment variable::
 
-    PROTOCOL_VERSION=3 nosetests -w tests/integration/standard
+    PROTOCOL_VERSION=3 pytest tests/integration/standard
 
 Testing Multiple Python Versions
 --------------------------------
