@@ -12,7 +12,6 @@ build
 MANIFEST
 dist
 .coverage
-nosetests.xml
 cover/
 docs/_build/
 tests/integration/ccm

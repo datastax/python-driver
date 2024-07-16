@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import platform
 import unittest
 
 from unittest.mock import patch
@@ -64,7 +65,7 @@ class AsyncorePatcher(unittest.TestCase):
             except:
                 pass
 
-
+@unittest.skipIf(not ASYNCCORE_AVAILABLE, 'asyncore is deprecated')
 class AsyncoreConnectionTest(ReactorTestMixin, AsyncorePatcher):
 
     connection_class = AsyncoreConnection
@@ -75,6 +76,7 @@ class AsyncoreConnectionTest(ReactorTestMixin, AsyncorePatcher):
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
 
+@unittest.skipIf(not ASYNCCORE_AVAILABLE, 'asyncore is deprecated')
 class TestAsyncoreTimer(TimerTestMixin, AsyncorePatcher):
     connection_class = AsyncoreConnection
 

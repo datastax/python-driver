@@ -48,6 +48,16 @@ environment variable::
 
     SCYLLA_VERSION="release:5.1" python -m pytest tests/integration/standard tests/integration/cqlengine/
 
+Or you can specify a scylla/cassandra directory (to test unreleased versions)::
+
+    SCYLLA_VERSION=/path/to/scylla pytest tests/integration/standard/
+
+Specifying the usage of an already running Scylla cluster
+------------------------------------------------------------
+The test will start the appropriate Scylla clusters when necessary  but if you don't want this to happen because a Scylla cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example::
+
+    USE_CASS_EXTERNAL=1 SCYLLA_VERSION='release:5.1' pytest tests/integration/standard
+
 Specify a Protocol Version for Tests
 ------------------------------------
 The protocol version defaults to:

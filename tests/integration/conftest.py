@@ -4,6 +4,8 @@ import logging
 import pytest
 from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
 
+from tests.integration import teardown_package
+
 from . import CLUSTER_NAME, SINGLE_NODE_CLUSTER_NAME, MULTIDC_CLUSTER_NAME
 from . import path as ccm_path
 
@@ -22,3 +24,9 @@ def cleanup_clusters():
                 cluster.clear()
             except FileNotFoundError:
                 pass
+
+@pytest.fixture(scope='session', autouse=True)
+def setup_and_teardown_packages():
+    print('setup')
+    yield
+    teardown_package()

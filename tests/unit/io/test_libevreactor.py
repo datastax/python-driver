@@ -14,11 +14,8 @@
 import unittest
 
 from unittest.mock import patch, Mock
-import weakref
 import socket
 
-from tests import is_monkey_patched
-from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
 from cassandra import DependencyException
 
 try:
@@ -26,6 +23,9 @@ try:
     from cassandra.io.libevreactor import LibevConnection
 except (ImportError, DependencyException):
     LibevConnection = None  # noqa
+
+from tests import is_monkey_patched
+from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
 
 
 class LibevConnectionTest(ReactorTestMixin, unittest.TestCase):

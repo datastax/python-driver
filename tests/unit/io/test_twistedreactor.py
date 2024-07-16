@@ -66,7 +66,9 @@ class TestTwistedProtocol(unittest.TestCase):
         self.tr.protocol = self.obj_ut
 
     def tearDown(self):
-        pass
+        loop = twistedreactor.TwistedConnection._loop
+        if loop and not loop._reactor_stopped():
+            loop._cleanup()
 
     def test_makeConnection(self):
         """
@@ -91,7 +93,8 @@ class TestTwistedConnection(unittest.TestCase):
     def setUp(self):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
-        twistedreactor.TwistedConnection._loop._cleanup()
+        if twistedreactor.TwistedConnection._loop:
+            twistedreactor.TwistedConnection._loop._cleanup()
         twistedreactor.TwistedConnection.initialize_reactor()
         self.reactor_cft_patcher = patch(
             'twisted.internet.reactor.callFromThread')

@@ -18,17 +18,6 @@ import sys
 import json
 import warnings
 from pathlib import Path
-
-if __name__ == '__main__' and len(sys.argv) > 1:
-    if sys.argv[1] == "gevent_nosetests":
-        print("Running gevent tests")
-        from gevent.monkey import patch_all
-        patch_all()
-    elif sys.argv[1] == "eventlet_nosetests":
-        print("Running eventlet tests")
-        from eventlet import monkey_patch
-        monkey_patch()
-
 from setuptools.command.build_ext import build_ext
 from setuptools import Extension, Command, setup
 from setuptools.errors import (CCompilerError, PlatformError,
@@ -40,17 +29,6 @@ try:
 except ImportError:
     has_subprocess = False
 
-try:
-    from nose.commands import nosetests
-except ImportError:
-    gevent_nosetests = None
-    eventlet_nosetests = None
-else:
-    class gevent_nosetests(nosetests):
-        description = "run nosetests with gevent monkey patching"
-
-    class eventlet_nosetests(nosetests):
-        description = "run nosetests with eventlet monkey patching"
 
 has_cqlengine = False
 if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == "install":
@@ -424,12 +402,6 @@ def pre_build_check():
 def run_setup(extensions):
 
     kw = {'cmdclass': {'doc': DocCommand}}
-    if gevent_nosetests is not None:
-        kw['cmdclass']['gevent_nosetests'] = gevent_nosetests
-
-    if eventlet_nosetests is not None:
-        kw['cmdclass']['eventlet_nosetests'] = eventlet_nosetests
-
     kw['cmdclass']['build_ext'] = build_extensions
     kw['ext_modules'] = [Extension('DUMMY', [])]  # dummy extension makes sure build_ext is called for install
 

@@ -24,7 +24,6 @@ import weakref
 import sys
 import ssl
 
-
 try:
     from weakref import WeakSet
 except ImportError:

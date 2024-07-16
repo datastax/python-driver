@@ -33,7 +33,7 @@ import pytest
 
 from cassandra.cqlengine import connection
 from cassandra.cqlengine.management import create_keyspace_simple, drop_keyspace, CQLENG_ALLOW_SCHEMA_MANAGEMENT
-from tests.integration import use_single_node
+from tests.integration import use_single_node, teardown_package as parent_teardown_package
 
 from . import setup_connection, DEFAULT_KEYSPACE
 
@@ -52,3 +52,9 @@ def cqlengine_fixture():
 
     drop_keyspace(DEFAULT_KEYSPACE)
     connection.unregister_connection("default")
+
+
+@pytest.fixture(scope='session', autouse=True)
+def setup_and_teardown_packages():
+    yield
+    parent_teardown_package()

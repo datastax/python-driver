@@ -22,8 +22,6 @@ from threading import Lock, Thread
 import time
 
 from cassandra import DependencyException
-from cassandra.connection import (Connection, ConnectionShutdown,
-                                  NONBLOCKING, Timer, TimerManager)
 try:
     import cassandra.io.libevwrapper as libev
 except ImportError:
@@ -34,6 +32,9 @@ except ImportError:
         "http://datastax.github.io/python-driver/installation.html#c-extensions "
         "for instructions on installing build dependencies and building "
         "the C extension.")
+
+from cassandra.connection import (Connection, ConnectionShutdown,
+                                  NONBLOCKING, Timer, TimerManager)
 
 
 log = logging.getLogger(__name__)
