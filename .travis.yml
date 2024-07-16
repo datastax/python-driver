@@ -6,6 +6,7 @@ python:
   - "3.8"
   - "3.9"
   - "3.10"
+  - "3.11"
 
 env:
   - CASS_DRIVER_NO_CYTHON=1

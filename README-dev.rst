@@ -135,49 +135,38 @@ Running Unit Tests
 ------------------
 Unit tests can be run like so::
 
-    nosetests -w tests/unit/
+    pytest tests/unit/
 
 You can run a specific test method like so::
 
-    nosetests -w tests/unit/test_connection.py:ConnectionTest.test_bad_protocol_version
+    pytest tests/unit/test_connection.py::ConnectionTest::test_bad_protocol_version
 
 Running Integration Tests
 -------------------------
 In order to run integration tests, you must specify a version to run using the ``CASSANDRA_VERSION`` or ``DSE_VERSION`` environment variable::
 
-    CASSANDRA_VERSION=2.0.9 nosetests -w tests/integration/standard
+    CASSANDRA_VERSION=2.0.9 pytest tests/integration/standard
 
 Or you can specify a cassandra directory (to test unreleased versions)::
 
-    CASSANDRA_DIR=/home/thobbs/cassandra nosetests -w tests/integration/standard/
+    CASSANDRA_DIR=/path/to/cassandra pytest tests/integration/standard/
 
 Specifying the usage of an already running Cassandra cluster
 ------------------------------------------------------------
 The test will start the appropriate Cassandra clusters when necessary  but if you don't want this to happen because a Cassandra cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example::
 
-    USE_CASS_EXTERNAL=1 CASSANDRA_VERSION=2.0.9 nosetests -w tests/integration/standard
+    USE_CASS_EXTERNAL=1 CASSANDRA_VERSION=2.0.9 pytest tests/integration/standard
 
 Specify a Protocol Version for Tests
 ------------------------------------
 The protocol version defaults to 1 for cassandra 1.2 and 2 otherwise.  You can explicitly set
 it with the ``PROTOCOL_VERSION`` environment variable::
 
-    PROTOCOL_VERSION=3 nosetests -w tests/integration/standard
-
-Seeing Test Logs in Real Time
------------------------------
-Sometimes it's useful to output logs for the tests as they run::
-
-    nosetests -w tests/unit/ --nocapture --nologcapture
-
-Use tee to capture logs and see them on your terminal::
-
-    nosetests -w tests/unit/ --nocapture --nologcapture 2>&1 | tee test.log
+    PROTOCOL_VERSION=3 pytest tests/integration/standard
 
 Testing Multiple Python Versions
 --------------------------------
-Use tox to test all of Python 3.8 through 3.12 and pypy (this is what
-TravisCI runs)::
+Use tox to test all of Python 3.8 through 3.12 and pypy (this is what TravisCI runs)::
 
     tox
 

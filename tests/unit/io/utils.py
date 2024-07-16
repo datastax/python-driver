@@ -181,7 +181,7 @@ class TimerTestMixin(object):
         timer = self.create_timer(timeout, callback.invoke)
         timer.cancel()
         # Release context allow for timer thread to run.
-        time.sleep(.2)
+        time.sleep(timeout * 2)
         timer_manager = self._timers
         # Assert that the cancellation was honored
         self.assertFalse(timer_manager._queue)

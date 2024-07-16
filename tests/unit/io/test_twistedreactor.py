@@ -66,7 +66,9 @@ class TestTwistedProtocol(unittest.TestCase):
         self.tr.protocol = self.obj_ut
 
     def tearDown(self):
-        pass
+        loop = twistedreactor.TwistedConnection._loop
+        if not loop._reactor_stopped():
+            loop._cleanup()
 
     def test_makeConnection(self):
         """

@@ -11,12 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import platform
+import socket
 import unittest
 
 from unittest.mock import patch
-import socket
-import cassandra.io.asyncorereactor as asyncorereactor
-from cassandra.io.asyncorereactor import AsyncoreConnection
+from packaging.version import Version
+
+from cassandra import DependencyException
+try:
+    import cassandra.io.asyncorereactor as asyncorereactor
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+except DependencyException:
+    AsyncoreConnection = None
+
 from tests import is_monkey_patched
 from tests.unit.io.utils import ReactorTestMixin, TimerTestMixin, noop_if_monkey_patched
 
@@ -54,7 +62,8 @@ class AsyncorePatcher(unittest.TestCase):
             except:
                 pass
 
-
+has_asyncore = Version(platform.python_version()) < Version("3.12.0")
+@unittest.skipUnless(has_asyncore, "asyncore has been removed in Python 3.12")
 class AsyncoreConnectionTest(ReactorTestMixin, AsyncorePatcher):
 
     connection_class = AsyncoreConnection
@@ -65,6 +74,7 @@ class AsyncoreConnectionTest(ReactorTestMixin, AsyncorePatcher):
             raise unittest.SkipTest("Can't test asyncore with monkey patching")
 
 
+@unittest.skipUnless(has_asyncore, "asyncore has been removed in Python 3.12")
 class TestAsyncoreTimer(TimerTestMixin, AsyncorePatcher):
     connection_class = AsyncoreConnection
 

@@ -13,6 +13,8 @@
 # limitations under the License.
 import warnings
 
+import pytest
+
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import drop_table, sync_table
 from cassandra.cqlengine.models import Model
@@ -215,7 +217,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         def my_callback(*args, **kwargs):
             call_history.append(args)
 
-        with warnings.catch_warnings(record=True) as w:
+        with pytest.warns() as w:
             with BatchQuery() as batch:
                 batch.add_callback(my_callback)
                 batch.execute()
