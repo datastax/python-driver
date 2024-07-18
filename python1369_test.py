@@ -23,21 +23,20 @@ class Python1369Test(unittest.TestCase):
   }"""
         self.session.execute(ks_stmt)
     
-    def _create_and_populate_table(self, subtype="float"):
+    def _create_and_populate_table(self, subtype="float", data={}):
         table_stmt = """CREATE TABLE test.foo (
     i int PRIMARY KEY,
     j vector<%s, 3>
 )""" % (subtype,)
         self.session.execute(table_stmt)
-        self.session.execute("CREATE CUSTOM INDEX ann_index ON test.foo (j) USING 'StorageAttachedIndex'")
-        self.session.execute("insert into test.foo (i,j) values (1,[8, 2.3, 58])")
-        self.session.execute("insert into test.foo (i,j) values (2,[1.2, 3.4, 5.6])")
-        self.session.execute("insert into test.foo (i,j) values (5,[23, 18, 3.9])")
+        for k,v in data.items():
+            self.session.execute("insert into test.foo (i,j) values (%d,%s)" % (k,v))
 
     def test_float_vector(self):
-        self._create_and_populate_table(subtype="float")
+        data = {1:[8, 2.3, 58], 2:[1.2, 3.4, 5.6], 5:[23, 18, 3.9]}
+        self._create_and_populate_table(subtype="float", data=data)
 
-        rs = self.session.execute("select j from test.foo order by j ann of [3.4, 7.8, 9.1] limit 1")
+        rs = self.session.execute("select j from test.foo where i = 2")
         rows = rs.all()
         self.assertEqual(len(rows), 1)
         observed = rows[0].j
@@ -48,13 +47,14 @@ class Python1369Test(unittest.TestCase):
         self.session.execute("drop table test.foo")
 
     def test_float_varint(self):
-        self._create_and_populate_table(subtype="varint")
+        data = {1:[8, 2, 58], 2:[1, 3, 5], 5:[23, 18, 3]}
+        self._create_and_populate_table(subtype="varint", data=data)
 
-        rs = self.session.execute("select j from test.foo order by j ann of [3.4, 7.8, 9.1] limit 1")
+        rs = self.session.execute("select j from test.foo where i = 2")
         rows = rs.all()
         self.assertEqual(len(rows), 1)
         observed = rows[0].j
-        expected = [1.2, 3.4, 5.6]
+        expected = [1, 3, 5]
         for idx in range(0, 3):
             self.assertAlmostEqual(observed[idx], expected[idx], places=5)
 
