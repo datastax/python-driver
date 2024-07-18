@@ -32,30 +32,24 @@ class Python1369Test(unittest.TestCase):
         for k,v in data.items():
             self.session.execute("insert into test.foo (i,j) values (%d,%s)" % (k,v))
 
-    def test_float_vector(self):
-        data = {1:[8, 2.3, 58], 2:[1.2, 3.4, 5.6], 5:[23, 18, 3.9]}
-        self._create_and_populate_table(subtype="float", data=data)
-
+    def _execute_test(self, expected):
         rs = self.session.execute("select j from test.foo where i = 2")
         rows = rs.all()
         self.assertEqual(len(rows), 1)
         observed = rows[0].j
-        expected = [1.2, 3.4, 5.6]
         for idx in range(0, 3):
             self.assertAlmostEqual(observed[idx], expected[idx], places=5)
 
+    def test_float_vector(self):
+        expected = [1.2, 3.4, 5.6]
+        data = {1:[8, 2.3, 58], 2:expected, 5:[23, 18, 3.9]}
+        self._create_and_populate_table(subtype="float", data=data)
+        self._execute_test(expected)
         self.session.execute("drop table test.foo")
 
-    def test_float_varint(self):
-        data = {1:[8, 2, 58], 2:[1, 3, 5], 5:[23, 18, 3]}
+    def test_varint_vector(self):
+        expected=[1, 3, 5]
+        data = {1:[8, 2, 58], 2:expected, 5:[23, 18, 3]}
         self._create_and_populate_table(subtype="varint", data=data)
-
-        rs = self.session.execute("select j from test.foo where i = 2")
-        rows = rs.all()
-        self.assertEqual(len(rows), 1)
-        observed = rows[0].j
-        expected = [1, 3, 5]
-        for idx in range(0, 3):
-            self.assertAlmostEqual(observed[idx], expected[idx], places=5)
-
+        self._execute_test(expected)
         self.session.execute("drop table test.foo")
