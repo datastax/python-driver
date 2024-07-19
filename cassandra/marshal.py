@@ -111,6 +111,20 @@ def vints_unpack(term):  # noqa
 
     return tuple(values)
 
+def uvint_unpack(bytes):
+    first_byte = bytes[0]
+
+    if (first_byte & 128) == 0:
+        return (first_byte,1)
+
+    num_extra_bytes = 8 - (~first_byte & 0xff).bit_length()
+    rv = first_byte & (0xff >> num_extra_bytes)
+    for idx in range(1,num_extra_bytes + 1):
+        new_byte = bytes[idx]
+        rv <<= 8
+        rv |= new_byte & 0xff
+
+    return (rv, num_extra_bytes + 1)
 
 def vints_pack(values):
     revbytes = bytearray()

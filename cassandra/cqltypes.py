@@ -48,7 +48,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack, point_be, point_le,
-                               vints_pack, vints_unpack)
+                               vints_pack, vints_unpack, uvint_unpack)
 from cassandra import util, VectorDeserializationFailure
 
 _little_endian_flag = 1  # we always serialize LE
@@ -713,7 +713,10 @@ class ShortType(_CassandraType):
 
 class TimeType(_CassandraType):
     typename = 'time'
-    serial_size = 8
+    # Time should be a fixed size 8 byte type but Cassandra 5.0 code marks it as
+    # variable size... and we have to match what the server expects since the server
+    # uses that specification to encode data of that type.
+    #serial_size = 8
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -1420,10 +1423,19 @@ class VectorType(_CassandraType):
     @classmethod
     def deserialize(cls, byts, protocol_version):
         serialized_size = getattr(cls.subtype, "serial_size", None)
-        if not serialized_size:
-            raise VectorDeserializationFailure("Cannot determine serialized size for vector with subtype %s" % cls.subtype.__name__)
-        indexes = (serialized_size * x for x in range(0, cls.vector_size))
-        return [cls.subtype.deserialize(byts[idx:idx + serialized_size], protocol_version) for idx in indexes]
+        if serialized_size is not None:
+            indexes = (serialized_size * x for x in range(0, cls.vector_size))
+            return [cls.subtype.deserialize(byts[idx:idx + serialized_size], protocol_version) for idx in indexes]
+
+        idx = 0
+        rv = []
+        while (idx < len(byts)):
+            size, bytes_read = uvint_unpack(byts[idx:])
+            print("Size: %d" % size)
+            idx += bytes_read
+            rv.append(cls.subtype.deserialize(byts[idx:idx + size], protocol_version))
+            idx += size
+        return rv
 
     @classmethod
     def serialize(cls, v, protocol_version):
