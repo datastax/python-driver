@@ -1431,7 +1431,6 @@ class VectorType(_CassandraType):
         rv = []
         while (idx < len(byts)):
             size, bytes_read = uvint_unpack(byts[idx:])
-            print("Size: %d" % size)
             idx += bytes_read
             rv.append(cls.subtype.deserialize(byts[idx:idx + size], protocol_version))
             idx += size
