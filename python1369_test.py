@@ -34,9 +34,18 @@ class Python1369Test(unittest.TestCase):
         for k,v in data.items():
             self.session.execute("insert into test.foo (i,j) values (%d,%s)" % (k,v))
 
+    def _populate_table_prepared(self, data):
+        ps = self.session.prepare("insert into test.foo (i,j) values (?,?)")
+        for k,v in data.items():
+            self.session.execute(ps, [k,v])
+
     def _create_and_populate_table(self, subtype="float", data={}):
         self._create_table(subtype)
         self._populate_table(data)
+
+    def _create_and_populate_table_preapred(self, subtype="float", data={}):
+        self._create_table(subtype)
+        self._populate_table_prepared(data)
 
     def _execute_test(self, expected, test_fn):
         rs = self.session.execute("select j from test.foo where i = 2")
@@ -47,33 +56,52 @@ class Python1369Test(unittest.TestCase):
             test_fn(observed[idx], expected[idx])
 
     def test_float_vector(self):
+        self.session.execute("drop table if exists test.foo")
         def test_fn(observed, expected):
             self.assertAlmostEqual(observed, expected, places=5)
         expected = [1.2, 3.4, 5.6]
         data = {1:[8, 2.3, 58], 2:expected, 5:[23, 18, 3.9]}
         self._create_and_populate_table(subtype="float", data=data)
         self._execute_test(expected, test_fn)
-        self.session.execute("drop table test.foo")
+
+    def test_float_vector_prepared(self):
+        self.session.execute("drop table if exists test.foo")
+        def test_fn(observed, expected):
+            self.assertAlmostEqual(observed, expected, places=5)
+        expected = [1.2, 3.4, 5.6]
+        data = {1:[8, 2.3, 58], 2:expected, 5:[23, 18, 3.9]}
+        self._create_and_populate_table_preapred(subtype="float", data=data)
+        self._execute_test(expected, test_fn)
 
     def test_varint_vector(self):
+        self.session.execute("drop table if exists test.foo")
         def test_fn(observed, expected):
             self.assertEqual(observed, expected)
         expected=[1, 3, 5]
         data = {1:[8, 2, 58], 2:expected, 5:[23, 18, 3]}
         self._create_and_populate_table(subtype="varint", data=data)
         self._execute_test(expected, test_fn)
-        self.session.execute("drop table test.foo")
+
+    def test_varint_vector_prepared(self):
+        self.session.execute("drop table if exists test.foo")
+        def test_fn(observed, expected):
+            self.assertEqual(observed, expected)
+        expected=[1, 3, 5]
+        data = {1:[8, 2, 58], 2:expected, 5:[23, 18, 3]}
+        self._create_and_populate_table_preapred(subtype="varint", data=data)
+        self._execute_test(expected, test_fn)
 
     def test_string_vector(self):
+        self.session.execute("drop table if exists test.foo")
         def test_fn(observed, expected):
             self.assertEqual(observed, expected)
         expected=["foo", "bar", "baz"]
         data = {1:["a","b","c"], 2:expected, 5:["x","y","z"]}
         self._create_and_populate_table(subtype="text", data=data)
         self._execute_test(expected, test_fn)
-        self.session.execute("drop table test.foo")
 
     def test_map_vector(self):
+        self.session.execute("drop table if exists test.foo")
         def test_fn(observed, expected):
             self.assertEqual(observed, expected)
         expected=[{"foo":1}, {"bar":2}, {"baz":3}]
@@ -82,9 +110,7 @@ class Python1369Test(unittest.TestCase):
         for k,v in data.items():
             self.session.execute("insert into test.foo (i,j) values (%s,%s)", (k,v))
         self._execute_test(expected, test_fn)
-        self.session.execute("drop table test.foo")
 
-    #@unittest.skip
     def test_vector_of_vector(self):
         def test_fn(observed, expected):
             self.assertEqual(observed, expected)

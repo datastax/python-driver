@@ -48,7 +48,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                int32_pack, int32_unpack, int64_pack, int64_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack, point_be, point_le,
-                               vints_pack, vints_unpack, uvint_unpack)
+                               vints_pack, vints_unpack, uvint_unpack, uvint_pack)
 from cassandra import util, VectorDeserializationFailure
 
 _little_endian_flag = 1  # we always serialize LE
@@ -1439,8 +1439,12 @@ class VectorType(_CassandraType):
     @classmethod
     def serialize(cls, v, protocol_version):
         buf = io.BytesIO()
+        serialized_size = getattr(cls.subtype, "serial_size", None)
         for item in v:
-            buf.write(cls.subtype.serialize(item, protocol_version))
+            item_bytes = cls.subtype.serialize(item, protocol_version)
+            if serialized_size is None:
+                buf.write(uvint_pack(len(item_bytes)))
+            buf.write(item_bytes)
         return buf.getvalue()
 
     @classmethod
