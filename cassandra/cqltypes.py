@@ -393,6 +393,9 @@ class _CassandraType(object, metaclass=CassandraTypeType):
         """
         return cls.cass_parameterized_type_with(cls.subtypes, full=full)
 
+    @classmethod
+    def serial_size(cls):
+        return None
 
 # it's initially named with a _ to avoid registering it as a real type, but
 # client programs may want to use the name still for isinstance(), etc
@@ -461,7 +464,6 @@ class UUIDType(_CassandraType):
 
 class BooleanType(_CassandraType):
     typename = 'boolean'
-    serial_size = 1
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -470,6 +472,10 @@ class BooleanType(_CassandraType):
     @staticmethod
     def serialize(truth, protocol_version):
         return int8_pack(truth)
+
+    @classmethod
+    def serial_size(cls):
+        return 1
 
 class ByteType(_CassandraType):
     typename = 'tinyint'
@@ -501,7 +507,6 @@ class AsciiType(_CassandraType):
 
 class FloatType(_CassandraType):
     typename = 'float'
-    serial_size = 4
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -511,10 +516,12 @@ class FloatType(_CassandraType):
     def serialize(byts, protocol_version):
         return float_pack(byts)
 
+    @classmethod
+    def serial_size(cls):
+        return 4
 
 class DoubleType(_CassandraType):
     typename = 'double'
-    serial_size = 8
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -524,10 +531,12 @@ class DoubleType(_CassandraType):
     def serialize(byts, protocol_version):
         return double_pack(byts)
 
+    @classmethod
+    def serial_size(cls):
+        return 8
 
 class LongType(_CassandraType):
     typename = 'bigint'
-    serial_size = 8
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -537,10 +546,12 @@ class LongType(_CassandraType):
     def serialize(byts, protocol_version):
         return int64_pack(byts)
 
+    @classmethod
+    def serial_size(cls):
+        return 8
 
 class Int32Type(_CassandraType):
     typename = 'int'
-    serial_size = 4
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -550,6 +561,9 @@ class Int32Type(_CassandraType):
     def serialize(byts, protocol_version):
         return int32_pack(byts)
 
+    @classmethod
+    def serial_size(cls):
+        return 4
 
 class IntegerType(_CassandraType):
     typename = 'varint'
@@ -653,7 +667,6 @@ class TimestampType(DateType):
 
 class TimeUUIDType(DateType):
     typename = 'timeuuid'
-    serial_size = 16
 
     def my_timestamp(self):
         return util.unix_time_from_uuid1(self.val)
@@ -669,6 +682,9 @@ class TimeUUIDType(DateType):
         except AttributeError:
             raise TypeError("Got a non-UUID object for a UUID value")
 
+    @classmethod
+    def serial_size(cls):
+        return 16
 
 class SimpleDateType(_CassandraType):
     typename = 'date'
@@ -700,7 +716,6 @@ class SimpleDateType(_CassandraType):
 
 class ShortType(_CassandraType):
     typename = 'smallint'
-    serial_size = 2
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -710,13 +725,18 @@ class ShortType(_CassandraType):
     def serialize(byts, protocol_version):
         return int16_pack(byts)
 
+    @classmethod
+    def serial_size(cls):
+        return 2
 
 class TimeType(_CassandraType):
     typename = 'time'
     # Time should be a fixed size 8 byte type but Cassandra 5.0 code marks it as
     # variable size... and we have to match what the server expects since the server
     # uses that specification to encode data of that type.
-    #serial_size = 8
+    #@classmethod
+    #def serial_size(cls):
+    #    return 8
 
     @staticmethod
     def deserialize(byts, protocol_version):
@@ -1414,6 +1434,11 @@ class VectorType(_CassandraType):
     subtype = None
 
     @classmethod
+    def serial_size(cls):
+        serialized_size = cls.subtype.serial_size()
+        return cls.vector_size * serialized_size if serialized_size is not None else None
+
+    @classmethod
     def apply_parameters(cls, params, names):
         assert len(params) == 2
         subtype = lookup_casstype(params[0])
@@ -1422,7 +1447,7 @@ class VectorType(_CassandraType):
 
     @classmethod
     def deserialize(cls, byts, protocol_version):
-        serialized_size = getattr(cls.subtype, "serial_size", None)
+        serialized_size = cls.subtype.serial_size()
         if serialized_size is not None:
             indexes = (serialized_size * x for x in range(0, cls.vector_size))
             return [cls.subtype.deserialize(byts[idx:idx + serialized_size], protocol_version) for idx in indexes]
@@ -1439,7 +1464,7 @@ class VectorType(_CassandraType):
     @classmethod
     def serialize(cls, v, protocol_version):
         buf = io.BytesIO()
-        serialized_size = getattr(cls.subtype, "serial_size", None)
+        serialized_size = cls.subtype.serial_size()
         for item in v:
             item_bytes = cls.subtype.serialize(item, protocol_version)
             if serialized_size is None:
