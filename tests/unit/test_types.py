@@ -196,6 +196,16 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(3, ctype.vector_size)
         self.assertEqual(FloatType, ctype.subtype)
 
+    def test_parse_casstype_vector_of_vectors(self):
+        inner_type = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)"
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
+        self.assertTrue(issubclass(ctype, VectorType))
+        self.assertEqual(3, ctype.vector_size)
+        sub_ctype = ctype.subtype
+        self.assertTrue(issubclass(sub_ctype, VectorType))
+        self.assertEqual(4, sub_ctype.vector_size)
+        self.assertEqual(FloatType, sub_ctype.subtype)
+
     def test_empty_value(self):
         self.assertEqual(str(EmptyValue()), 'EMPTY')
 
@@ -348,27 +358,32 @@ class TypeTests(unittest.TestCase):
         # UTF8 text
         self._round_trip_test(["abc", "def", "ghi", "jkl"], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.UTF8Type, 4)")
-        # Duration (containts varints)
-        self._round_trip_test([util.Duration(1,1,1), util.Duration(2,2,2), util.Duration(3,3,3)], \
-            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.DurationType, 3)")
-        # List (of otherwise serializable type)
-        self._round_trip_test([[3.4], [2.9], [41.6], [12.0]], \
-            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ListType(org.apache.cassandra.db.marshal.FloatType), 4)")
-        # Set (of otherwise serializable type)
-        self._round_trip_test([set([3.4]), set([2.9]), set([41.6]), set([12.0])], \
-            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.FloatType), 4)")
-        # Map (of otherwise serializable types)
-        self._round_trip_test([{1:3.4}, {2:2.9}, {3:41.6}, {4:12.0}], \
-                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.MapType \
-                    (org.apache.cassandra.db.marshal.Int32Type,org.apache.cassandra.db.marshal.FloatType), 4)")
         # Time is something of a weird one.  By rights it should be a fixed size type but C* code marks it as variable
         # size.  We're forced to follow the C* code base (since that's who'll be providing the data we're parsing) so
         # we match what they're doing.
         self._round_trip_test([datetime.time(1,1,1), datetime.time(2,2,2), datetime.time(3,3,3)], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.TimeType, 3)")
+        # Duration (containts varints)
+        self._round_trip_test([util.Duration(1,1,1), util.Duration(2,2,2), util.Duration(3,3,3)], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.DurationType, 3)")
+        # List (of otherwise serializable type)
+        self._round_trip_test([[3.4], [2.9], [41.6], [12.0]], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ListType \
+                (org.apache.cassandra.db.marshal.FloatType), 4)")
+        # Set (of otherwise serializable type)
+        self._round_trip_test([set([3.4]), set([2.9]), set([41.6]), set([12.0])], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.SetType \
+                (org.apache.cassandra.db.marshal.FloatType), 4)")
+        # Map (of otherwise serializable types)
+        self._round_trip_test([{1:3.4}, {2:2.9}, {3:41.6}, {4:12.0}], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.MapType \
+                    (org.apache.cassandra.db.marshal.Int32Type,org.apache.cassandra.db.marshal.FloatType), 4)")
+        # Vector of vectors
+        self._round_trip_test([[3.4], [2.9], [41.6], [12.0]], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.VectorType \
+                (org.apache.cassandra.db.marshal.FloatType,2), 4)")
 
-
-    def _round_trip_test(self, data, ctype_str, compare_fn=None):
+    def _round_trip_test(self, data, ctype_str):
         ctype = parse_casstype_args(ctype_str)
         data_bytes = ctype.serialize(data, 0)
         serialized_size = getattr(ctype.subtype, "serial_size", None)
@@ -379,9 +394,17 @@ class TypeTests(unittest.TestCase):
         for idx in range(0,len(data)):
             self._round_trip_compare_fn(data[idx], result[idx])
 
+    # parse_casstype_args() is tested above... we're explicitly concerned about cql_parapmeterized_type() output here
     def test_vector_cql_parameterized_type(self):
+        # Base vector functionality
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
         self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<float, 4>")
+
+        # Test vector-of-vectors
+        inner_type = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)"
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
+        inner_parsed_type = "org.apache.cassandra.db.marshal.VectorType<float, 4>"
+        self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<%s, 3>" % (inner_parsed_type))
 
 ZERO = datetime.timedelta(0)
 

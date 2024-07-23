@@ -1449,4 +1449,4 @@ class VectorType(_CassandraType):
 
     @classmethod
     def cql_parameterized_type(cls):
-        return "%s<%s, %s>" % (cls.typename, cls.subtype.typename, cls.vector_size)
+        return "%s<%s, %s>" % (cls.typename, cls.subtype.cql_parameterized_type(), cls.vector_size)
