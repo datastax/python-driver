@@ -378,10 +378,17 @@ class TypeTests(unittest.TestCase):
         self._round_trip_test([{1:3.4}, {2:2.9}, {3:41.6}, {4:12.0}], \
                 "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.MapType \
                     (org.apache.cassandra.db.marshal.Int32Type,org.apache.cassandra.db.marshal.FloatType), 4)")
-        # Vector of vectors
-        self._round_trip_test([[3.4], [2.9], [41.6], [12.0]], \
+
+    def test_vector_of_vectors(self):
+        # Fixed size subytpes of subtypes
+        self._round_trip_test([[1.2, 3.4], [5.6, 7.8], [9.10, 11.12], [13.14, 15.16]], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.VectorType \
                 (org.apache.cassandra.db.marshal.FloatType,2), 4)")
+
+        # subytpes of subtypes without a fixed size
+        self._round_trip_test([["one", "two"], ["three", "four"], ["five", "six"], ["seven", "eight"]], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.VectorType \
+                (org.apache.cassandra.db.marshal.AsciiType,2), 4)")
 
     def _round_trip_test(self, data, ctype_str):
         ctype = parse_casstype_args(ctype_str)
