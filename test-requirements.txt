@@ -9,6 +9,6 @@ twisted[tls]
 gevent
 eventlet
 cython>=0.20,<0.30
-packaging
+packaging>=22
 futurist
 asynctest
