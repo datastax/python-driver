@@ -20,7 +20,7 @@ import uuid
 from binascii import unhexlify
 
 import cassandra
-from cassandra import util, VectorDeserializationFailure
+from cassandra import util
 from cassandra.cqltypes import (
     CassandraType, DateRangeType, DateType, DecimalType,
     EmptyValue, LongType, SetType, UTF8Type,

@@ -49,7 +49,7 @@ from cassandra.marshal import (int8_pack, int8_unpack, int16_pack, int16_unpack,
                                float_pack, float_unpack, double_pack, double_unpack,
                                varint_pack, varint_unpack, point_be, point_le,
                                vints_pack, vints_unpack, uvint_unpack, uvint_pack)
-from cassandra import util, VectorDeserializationFailure
+from cassandra import util
 
 _little_endian_flag = 1  # we always serialize LE
 import ipaddress
