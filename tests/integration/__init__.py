@@ -566,8 +566,10 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 if Version(cassandra_version) >= Version('2.2'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     if Version(cassandra_version) >= Version('3.0'):
-                        CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-                        if Version(cassandra_version) >= Version('4.0-a'):
+                        # The config.yml option below is deprecated in C* 4.0 per CASSANDRA-17280
+                        if Version(cassandra_version) < Version('4.0'):
+                            CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                        if Version(cassandra_version) >= Version('4.0'):
                             CCM_CLUSTER.set_configuration_options({
                                 'enable_materialized_views': True,
                                 'enable_sasi_indexes': True,
