@@ -1052,6 +1052,6 @@ class Cassandra41CCMCluster(CCMCluster):
     def _compute_config(self, k, v):
         return (self._get_config_key(k,v), self._get_config_val(k, v))
 
-    def set_configuration_options(self, values=None, delete_empty=False, delete_always=False):
+    def set_configuration_options(self, values=None, *args, **kwargs):
         new_values = {self._get_config_key(k,v):self._get_config_val(k, v) for (k,v) in values.items()}
-        super(Cassandra41CCMCluster, self).set_configuration_options(values=new_values, delete_empty=delete_empty, delete_always=delete_always)
+        super(Cassandra41CCMCluster, self).set_configuration_options(values=new_values, *args, **kwargs)
