@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import os
 from cassandra.cluster import Cluster
 
@@ -561,7 +562,8 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
 
                 CCM_CLUSTER.set_dse_configuration_options(dse_options)
             else:
-                CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
+                ccm_cluster_clz = CCMCluster if Version(cassandra_version) < Version('4.1') else Cassandra41CCMCluster
+                CCM_CLUSTER = ccm_cluster_clz(path, cluster_name, **ccm_options)
                 CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
                 if Version(cassandra_version) >= Version('2.2'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
@@ -1013,3 +1015,43 @@ class TestCluster(object):
             kwargs['allow_beta_protocol_version'] = cls.DEFAULT_ALLOW_BETA
         return Cluster(**kwargs)
 
+# Subclass of CCMCluster (i.e. ccmlib.cluster.Cluster) which transparently performs
+# conversion of cassandra.yml directives into something matching the new syntax
+# introduced by CASSANDRA-15234
+class Cassandra41CCMCluster(CCMCluster):
+    __test__ = False
+    IN_MS_REGEX = re.compile("^(.+)_in_ms$")
+    IN_KB_REGEX = re.compile("^(.+)_in_kb$")
+    ENABLE_REGEX = re.compile("^enable_(.+)$")
+
+    @classmethod
+    def _get_config_key(clz, k, v):
+        if k.find('.'):
+            return k
+        m = clz.IN_MS_REGEX.match(k)
+        if m:
+            return m.group(1)
+        m = clz.ENABLE_REGEX.match(k)
+        if m:
+            return "%s_enabled" % (m.group(1))
+        m = clz.IN_KB_REGEX.match(k)
+        if m:
+            return m.group(1)
+        return k
+
+    @classmethod
+    def _get_config_val(clz, k, v):
+        m = clz.IN_MS_REGEX.match(k)
+        if m:
+            return "%sms" % (v)
+        m = clz.IN_KB_REGEX.match(k)
+        if m:
+            return "%sKiB" % (v)
+        return v
+
+    def _compute_config(self, k, v):
+        return (self._get_config_key(k,v), self._get_config_val(k, v))
+
+    def set_configuration_options(self, values=None, delete_empty=False, delete_always=False):
+        new_values = {self._get_config_key(k,v):self._get_config_val(k, v) for (k,v) in values.items()}
+        super(Cassandra41CCMCluster, self).set_configuration_options(values=new_values, delete_empty=delete_empty, delete_always=delete_always)
