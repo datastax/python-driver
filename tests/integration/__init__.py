@@ -1020,38 +1020,33 @@ class TestCluster(object):
 # introduced by CASSANDRA-15234
 class Cassandra41CCMCluster(CCMCluster):
     __test__ = False
-    IN_MS_REGEX = re.compile("^(.+)_in_ms$")
-    IN_KB_REGEX = re.compile("^(.+)_in_kb$")
-    ENABLE_REGEX = re.compile("^enable_(.+)$")
+    IN_MS_REGEX = re.compile('^(\w+)_in_ms$')
+    IN_KB_REGEX = re.compile('^(\w+)_in_kb$')
+    ENABLE_REGEX = re.compile('^enable_(\w+)$')
 
-    @classmethod
-    def _get_config_key(clz, k, v):
-        if k.find('.'):
+    def _get_config_key(self, k, v):
+        if "." in k:
             return k
-        m = clz.IN_MS_REGEX.match(k)
+        m = self.IN_MS_REGEX.match(k)
         if m:
             return m.group(1)
-        m = clz.ENABLE_REGEX.match(k)
+        m = self.ENABLE_REGEX.search(k)
         if m:
             return "%s_enabled" % (m.group(1))
-        m = clz.IN_KB_REGEX.match(k)
+        m = self.IN_KB_REGEX.match(k)
         if m:
             return m.group(1)
         return k
 
-    @classmethod
-    def _get_config_val(clz, k, v):
-        m = clz.IN_MS_REGEX.match(k)
+    def _get_config_val(self, k, v):
+        m = self.IN_MS_REGEX.match(k)
         if m:
             return "%sms" % (v)
-        m = clz.IN_KB_REGEX.match(k)
+        m = self.IN_KB_REGEX.match(k)
         if m:
             return "%sKiB" % (v)
         return v
 
-    def _compute_config(self, k, v):
-        return (self._get_config_key(k,v), self._get_config_val(k, v))
-
     def set_configuration_options(self, values=None, *args, **kwargs):
-        new_values = {self._get_config_key(k,v):self._get_config_val(k, v) for (k,v) in values.items()}
+        new_values = {self._get_config_key(k, str(v)):self._get_config_val(k, str(v)) for (k,v) in values.items()}
         super(Cassandra41CCMCluster, self).set_configuration_options(values=new_values, *args, **kwargs)
