@@ -571,12 +571,20 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                         # The config.yml option below is deprecated in C* 4.0 per CASSANDRA-17280
                         if Version(cassandra_version) < Version('4.0'):
                             CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-                        if Version(cassandra_version) >= Version('4.0'):
+                        else:
+                            # Cassandra version >= 4.0
                             CCM_CLUSTER.set_configuration_options({
                                 'enable_materialized_views': True,
                                 'enable_sasi_indexes': True,
                                 'enable_transient_replication': True,
                             })
+                            if Version(cassandra_version) >= Version('4.1'):
+                                # Larger value here needed for tests.integration.cqlengine.query.test_queryset.
+                                # For some reason C* 4.1 and 5.0 fail with an error saying the batch size is
+                                # too big.  Working assumption is that prior to 4.0 this value wasn't being
+                                # checked properly.
+                                CCM_CLUSTER.set_configuration_options({'batch_size_fail_threshold': '250KiB'})
+
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)
                 CCM_CLUSTER.populate(nodes, ipformat=ipformat, use_single_interface=use_single_interface)
