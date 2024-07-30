@@ -1375,11 +1375,21 @@ class TestModelQueryWithFetchSize(BaseCassEngTestCase):
         super(TestModelQueryWithFetchSize, cls).tearDownClass()
         drop_table(TestModelSmall)
 
-    @execute_count(9)
+    @execute_count(19)
     def test_defaultFetchSize(self):
+        # Use smaller batch sizes to avoid hitting the max.  We trigger an InvalidRequest
+        # response for Cassandra 4.1.x and 5.0.x if we just do the whole thing as one
+        # large batch.  We're just using this to populate values for a test, however,
+        # so shifting to smaller batches should be fine.
+        for i in range(0, 5000, 500):
+            with BatchQuery() as b:
+                range_max = i + 500
+                for j in range(i, range_max):
+                    TestModelSmall.batch(b).create(test_id=j)
         with BatchQuery() as b:
-            for i in range(5100):
+            for i in range(5000, 5100):
                 TestModelSmall.batch(b).create(test_id=i)
+
         self.assertEqual(len(TestModelSmall.objects.fetch_size(1)), 5100)
         self.assertEqual(len(TestModelSmall.objects.fetch_size(500)), 5100)
         self.assertEqual(len(TestModelSmall.objects.fetch_size(4999)), 5100)

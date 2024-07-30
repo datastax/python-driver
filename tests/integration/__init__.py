@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import os
 from cassandra.cluster import Cluster
 
@@ -627,18 +628,24 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                     # This allows `test_metadata_with_quoted_identifiers` to run
                     CCM_CLUSTER.set_configuration_options({'strict_is_not_null_in_views': False})
                 else:
-                    CCM_CLUSTER = CCMCluster(path, cluster_name, **ccm_options)
+                    ccm_cluster_clz = CCMCluster if Version(cassandra_version) < Version(
+                        '4.1') else Cassandra41CCMCluster
+                    CCM_CLUSTER = ccm_cluster_clz(path, cluster_name, **ccm_options)
                     CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
                 if Version(cassandra_version) >= Version('2.2'):
                     CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
                     if Version(cassandra_version) >= Version('3.0'):
-                        CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-                        if Version(cassandra_version) >= Version('4.0-a'):
+                        # The config.yml option below is deprecated in C* 4.0 per CASSANDRA-17280
+                        if Version(cassandra_version) < Version('4.0'):
+                            CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                        else:
+                            # Cassandra version >= 4.0
                             CCM_CLUSTER.set_configuration_options({
                                 'enable_materialized_views': True,
                                 'enable_sasi_indexes': True,
                                 'enable_transient_replication': True,
                             })
+
                 common.switch_cluster(path, cluster_name)
                 CCM_CLUSTER.set_configuration_options(configuration_options)
                 # Since scylla CCM doesn't yet support this options, we skip it
@@ -1111,3 +1118,38 @@ class TestCluster(object):
             kwargs['allow_beta_protocol_version'] = cls.DEFAULT_ALLOW_BETA
         return Cluster(**kwargs)
 
+# Subclass of CCMCluster (i.e. ccmlib.cluster.Cluster) which transparently performs
+# conversion of cassandra.yml directives into something matching the new syntax
+# introduced by CASSANDRA-15234
+class Cassandra41CCMCluster(CCMCluster):
+    __test__ = False
+    IN_MS_REGEX = re.compile('^(\w+)_in_ms$')
+    IN_KB_REGEX = re.compile('^(\w+)_in_kb$')
+    ENABLE_REGEX = re.compile('^enable_(\w+)$')
+
+    def _get_config_key(self, k, v):
+        if "." in k:
+            return k
+        m = self.IN_MS_REGEX.match(k)
+        if m:
+            return m.group(1)
+        m = self.ENABLE_REGEX.search(k)
+        if m:
+            return "%s_enabled" % (m.group(1))
+        m = self.IN_KB_REGEX.match(k)
+        if m:
+            return m.group(1)
+        return k
+
+    def _get_config_val(self, k, v):
+        m = self.IN_MS_REGEX.match(k)
+        if m:
+            return "%sms" % (v)
+        m = self.IN_KB_REGEX.match(k)
+        if m:
+            return "%sKiB" % (v)
+        return v
+
+    def set_configuration_options(self, values=None, *args, **kwargs):
+        new_values = {self._get_config_key(k, str(v)):self._get_config_val(k, str(v)) for (k,v) in values.items()}
+        super(Cassandra41CCMCluster, self).set_configuration_options(values=new_values, *args, **kwargs)
