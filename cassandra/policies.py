@@ -364,46 +364,39 @@ class TokenAwarePolicy(LoadBalancingPolicy):
         return self._child_policy.distance(*args, **kwargs)
 
     def make_query_plan(self, working_keyspace=None, query=None):
-        if query and query.keyspace:
-            keyspace = query.keyspace
-        else:
-            keyspace = working_keyspace
+        keyspace = query.keyspace if query and query.keyspace else working_keyspace
 
         child = self._child_policy
-        if query is None:
+        if query is None or query.routing_key is None or keyspace is None:
             for host in child.make_query_plan(keyspace, query):
                 yield host
-        else:
-            routing_key = query.routing_key
-            if routing_key is None or keyspace is None:
-                for host in child.make_query_plan(keyspace, query):
-                    yield host
-            else:
-                replicas = []
-                if self._tablets_routing_v1:
-                    tablet = self._cluster_metadata._tablets.get_tablet_for_key(keyspace, query.table, self._cluster_metadata.token_map.token_class.from_key(routing_key))
+            return
 
-                    if tablet is not None:
-                        replicas_mapped = set(map(lambda r: r[0], tablet.replicas))
-                        child_plan = child.make_query_plan(keyspace, query)
+        replicas = []
+        if self._tablets_routing_v1:
+            tablet = self._cluster_metadata._tablets.get_tablet_for_key(
+                keyspace, query.table, self._cluster_metadata.token_map.token_class.from_key(query.routing_key))
 
-                        replicas = [host for host in child_plan if host.host_id in replicas_mapped]
+            if tablet is not None:
+                replicas_mapped = set(map(lambda r: r[0], tablet.replicas))
+                child_plan = child.make_query_plan(keyspace, query)
 
-                if replicas == []:
-                    replicas = self._cluster_metadata.get_replicas(keyspace, routing_key)
+                replicas = [host for host in child_plan if host.host_id in replicas_mapped]
 
-                if self.shuffle_replicas:
-                    shuffle(replicas)
-                for replica in replicas:
-                    if replica.is_up and \
-                            child.distance(replica) == HostDistance.LOCAL:
-                        yield replica
+        if not replicas:
+            replicas = self._cluster_metadata.get_replicas(keyspace, query.routing_key)
 
-                for host in child.make_query_plan(keyspace, query):
-                    # skip if we've already listed this host
-                    if host not in replicas or \
-                            child.distance(host) == HostDistance.REMOTE:
-                        yield host
+        if self.shuffle_replicas:
+            shuffle(replicas)
+
+        for replica in replicas:
+            if replica.is_up and child.distance(replica) == HostDistance.LOCAL:
+                yield replica
+
+        for host in child.make_query_plan(keyspace, query):
+            # skip if we've already listed this host
+            if host not in replicas or child.distance(host) == HostDistance.REMOTE:
+                yield host
 
     def on_up(self, *args, **kwargs):
         return self._child_policy.on_up(*args, **kwargs)

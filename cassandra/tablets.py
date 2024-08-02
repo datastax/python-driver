@@ -1,6 +1,7 @@
 # Experimental, this interface and use may change
 from threading import Lock
 
+
 class Tablet(object):
     """
     Represents a single ScyllaDB tablet.
@@ -11,7 +12,7 @@ class Tablet(object):
     last_token = 0
     replicas = None
 
-    def __init__(self, first_token = 0, last_token = 0, replicas = None):
+    def __init__(self, first_token=0, last_token=0, replicas=None):
         self.first_token = first_token
         self.last_token = last_token
         self.replicas = replicas
@@ -28,9 +29,10 @@ class Tablet(object):
     @staticmethod
     def from_row(first_token, last_token, replicas):
         if Tablet._is_valid_tablet(replicas):
-            tablet = Tablet(first_token, last_token,replicas)
+            tablet = Tablet(first_token, last_token, replicas)
             return tablet
         return None
+
 
 # Experimental, this interface and use may change
 class Tablets(object):
@@ -43,10 +45,10 @@ class Tablets(object):
     
     def get_tablet_for_key(self, keyspace, table, t):
         tablet = self._tablets.get((keyspace, table), [])
-        if tablet == []:
+        if not tablet:
             return None
         
-        id = bisect_left(tablet, t.value, key = lambda tablet: tablet.last_token)
+        id = bisect_left(tablet, t.value, key=lambda tablet: tablet.last_token)
         if id < len(tablet) and t.value > tablet[id].first_token:
             return tablet[id]
         return None
@@ -55,13 +57,13 @@ class Tablets(object):
         with self._lock:
             tablets_for_table = self._tablets.setdefault((keyspace, table), [])
 
-            # find first overlaping range 
-            start = bisect_left(tablets_for_table, tablet.first_token, key = lambda t: t.first_token)
+            # find first overlapping range
+            start = bisect_left(tablets_for_table, tablet.first_token, key=lambda t: t.first_token)
             if start > 0 and tablets_for_table[start - 1].last_token > tablet.first_token:
                 start = start - 1
 
-            # find last overlaping range 
-            end = bisect_left(tablets_for_table, tablet.last_token, key = lambda t: t.last_token)
+            # find last overlapping range
+            end = bisect_left(tablets_for_table, tablet.last_token, key=lambda t: t.last_token)
             if end < len(tablets_for_table) and tablets_for_table[end].first_token >= tablet.last_token:
                 end = end - 1
 
@@ -69,6 +71,7 @@ class Tablets(object):
                 del tablets_for_table[start:end + 1]
 
             tablets_for_table.insert(start, tablet)
+
 
 # bisect.bisect_left implementation from Python 3.11, needed untill support for
 # Python < 3.10 is dropped, it is needed to use `key` to extract last_token from
@@ -97,11 +100,11 @@ def bisect_left(a, x, lo=0, hi=None, *, key=None):
                 lo = mid + 1
             else:
                 hi = mid
-    else:
-        while lo < hi:
-            mid = (lo + hi) // 2
-            if key(a[mid]) < x:
-                lo = mid + 1
-            else:
-                hi = mid
+        return
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if key(a[mid]) < x:
+            lo = mid + 1
+        else:
+            hi = mid
     return lo
