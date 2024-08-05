@@ -18,6 +18,9 @@ Load Balancing
 .. autoclass:: DCAwareRoundRobinPolicy
    :members:
 
+.. autoclass:: RackAwareRoundRobinPolicy
+   :members:
+
 .. autoclass:: WhiteListRoundRobinPolicy
    :members:
 

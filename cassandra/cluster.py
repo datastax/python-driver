@@ -492,7 +492,8 @@ class ProfileManager(object):
 
     def distance(self, host):
         distances = set(p.load_balancing_policy.distance(host) for p in self.profiles.values())
-        return HostDistance.LOCAL if HostDistance.LOCAL in distances else \
+        return HostDistance.LOCAL_RACK if HostDistance.LOCAL_RACK in distances else \
+            HostDistance.LOCAL if HostDistance.LOCAL in distances else \
             HostDistance.REMOTE if HostDistance.REMOTE in distances else \
             HostDistance.IGNORED
 
@@ -609,7 +610,7 @@ class Cluster(object):
 
     Defaults to loopback interface.
 
-    Note: When using :class:`.DCAwareLoadBalancingPolicy` with no explicit
+    Note: When using :class:`.DCAwareRoundRobinPolicy` with no explicit
     local_dc set (as is the default), the DC is chosen from an arbitrary
     host in contact_points. In this case, contact_points should contain
     only nodes from a single, local DC.
@@ -1369,21 +1370,25 @@ class Cluster(object):
         self._user_types = defaultdict(dict)
 
         self._min_requests_per_connection = {
+            HostDistance.LOCAL_RACK: DEFAULT_MIN_REQUESTS,
             HostDistance.LOCAL: DEFAULT_MIN_REQUESTS,
             HostDistance.REMOTE: DEFAULT_MIN_REQUESTS
         }
 
         self._max_requests_per_connection = {
+            HostDistance.LOCAL_RACK: DEFAULT_MAX_REQUESTS,
             HostDistance.LOCAL: DEFAULT_MAX_REQUESTS,
             HostDistance.REMOTE: DEFAULT_MAX_REQUESTS
         }
 
         self._core_connections_per_host = {
+            HostDistance.LOCAL_RACK: DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST,
             HostDistance.LOCAL: DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST,
             HostDistance.REMOTE: DEFAULT_MIN_CONNECTIONS_PER_REMOTE_HOST
         }
 
         self._max_connections_per_host = {
+            HostDistance.LOCAL_RACK: DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST,
             HostDistance.LOCAL: DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST,
             HostDistance.REMOTE: DEFAULT_MAX_CONNECTIONS_PER_REMOTE_HOST
         }
