@@ -109,7 +109,7 @@ else:
         return snappy.decompress(byts)
     locally_supported_compressions['snappy'] = (snappy.compress, decompress)
 
-DRIVER_NAME, DRIVER_VERSION = 'Scylla Python Driver', sys.modules['cassandra'].__version__
+DRIVER_NAME, DRIVER_VERSION = 'ScyllaDB Python Driver', sys.modules['cassandra'].__version__
 
 PROTOCOL_VERSION_MASK = 0x7f
 
