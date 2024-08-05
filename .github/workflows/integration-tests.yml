@@ -38,5 +38,5 @@ jobs:
     - name: Test tablets
       run: |
         export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
-        export SCYLLA_VERSION='unstable/master:2024-01-17T17:56:00Z'
+        export SCYLLA_VERSION='release:6.0.2'
         ./ci/run_integration_test.sh tests/integration/experiments/
