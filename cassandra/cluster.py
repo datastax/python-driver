@@ -2696,6 +2696,8 @@ class Session(object):
                     {"column_encryption_policy": self.cluster.column_encryption_policy})
             except AttributeError:
                 log.info("Unable to set column encryption policy for session")
+            raise Exception(
+                "column_encryption_policy is temporary disabled, until https://github.com/scylladb/python-driver/issues/365 is sorted out")
 
         if self.cluster.monitor_reporting_enabled:
             cc_host = self.cluster.get_control_connection_host()

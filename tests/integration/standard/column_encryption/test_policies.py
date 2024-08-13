@@ -25,6 +25,7 @@ from cassandra.column_encryption.policies import AES256ColumnEncryptionPolicy, \
 def setup_module():
     use_singledc()
 
+@unittest.skip("Skip until https://github.com/scylladb/python-driver/issues/365 is sorted out")
 class ColumnEncryptionPolicyTest(unittest.TestCase):
 
     def _recreate_keyspace(self, session):

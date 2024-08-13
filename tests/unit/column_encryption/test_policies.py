@@ -19,6 +19,7 @@ from cassandra.policies import ColDesc
 from cassandra.column_encryption.policies import AES256ColumnEncryptionPolicy, \
     AES256_BLOCK_SIZE_BYTES, AES256_KEY_SIZE_BYTES
 
+@unittest.skip("Skip until https://github.com/scylladb/python-driver/issues/365 is sorted out")
 class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
 
     def _random_block(self):
