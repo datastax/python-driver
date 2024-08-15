@@ -75,8 +75,7 @@ If you would like to contribute, please feel free to send a pull request.
 
 Getting Help
 ------------
-Your best options for getting help with the driver are the
-`mailing list <https://groups.google.com/forum/#!forum/scylladb-users>`_
+You can ask questions on `ScyllaDB Community Forum <https://forum.scylladb.com/>`_
 and the Scylla Users `Slack channel <https://scylladb-users.slack.com>`_.
 
 License
