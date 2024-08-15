@@ -40,7 +40,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                greaterthancass21, assert_startswith, greaterthanorequalcass40,
                                greaterthanorequaldse67, lessthancass40,
                                TestCluster, DSE_VERSION, requires_java_udf, requires_composite_type,
-                               requires_collection_indexes, xfail_scylla)
+                               requires_collection_indexes, SCYLLA_VERSION)
 
 from tests.util import wait_until
 
@@ -531,14 +531,14 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             tablemeta = self.get_table_metadata()
             self.assertIn('(full(b))', tablemeta.export_as_string())
 
-    #TODO: Fix Scylla or test
-    @xfail_scylla('Scylla prints `compression = {}` instead of `compression = {\'enabled\': \'false\'}`.')
     def test_compression_disabled(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
         create_statement += " WITH compression = {}"
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
-        expected = "compression = {}" if CASSANDRA_VERSION < Version("3.0") else "compression = {'enabled': 'false'}"
+        expected = "compression = {'enabled': 'false'}"
+        if SCYLLA_VERSION is not None or CASSANDRA_VERSION < Version("3.0"):
+            expected = "compression = {}"
         self.assertIn(expected, tablemeta.export_as_string())
 
     def test_non_size_tiered_compaction(self):
