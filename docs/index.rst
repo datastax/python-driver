@@ -89,8 +89,8 @@ Getting Help
 ------------
 Visit the :doc:`FAQ section <faq>` in this documentation.
 
-Please send questions to the Scylla `user list <https://groups.google.com/forum/#!forum/scylladb-users>`_.
-
+Please send questions to `ScyllaDB Community Forum <https://forum.scylladb.com/>`_
+and the Scylla Users `Slack channel <https://scylladb-users.slack.com>`_.
 
 Reporting Issues
 ----------------
