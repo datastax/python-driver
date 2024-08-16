@@ -91,6 +91,7 @@ class TestTwistedConnection(unittest.TestCase):
     def setUp(self):
         if twistedreactor is None:
             raise unittest.SkipTest("Twisted libraries not available")
+        twistedreactor.TwistedConnection._loop._cleanup()
         twistedreactor.TwistedConnection.initialize_reactor()
         self.reactor_cft_patcher = patch(
             'twisted.internet.reactor.callFromThread')
@@ -109,7 +110,6 @@ class TestTwistedConnection(unittest.TestCase):
         Verify that __init__() works correctly.
         """
         self.mock_reactor_cft.assert_called_with(self.obj_ut.add_connection)
-        self.obj_ut._loop._cleanup()
         self.mock_reactor_run.assert_called_with(installSignalHandlers=False)
 
     def test_client_connection_made(self):
