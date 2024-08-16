@@ -185,10 +185,10 @@ if os.getenv('DSE_VERSION', None):  # we are testing against DSE
     DSE_CRED = os.getenv('DSE_CREDS', None)
     CASSANDRA_VERSION = _get_cass_version_from_dse(DSE_VERSION.base_version)
     CCM_VERSION = DSE_VERSION.base_version
-else:  # we are testing against Cassandra or DDAC
+else:  # we are testing against Cassandra,DDAC or Scylla
     if SCYLLA_VERSION:
         cv_string = SCYLLA_VERSION
-        mcv_string = os.getenv('MAPPED_SCYLLA_VERSION', None)
+        mcv_string = os.getenv('MAPPED_SCYLLA_VERSION', '3.11.4') # Assume that scylla matches cassandra `3.11.4` behavior
     else:
         cv_string = os.getenv('CASSANDRA_VERSION', None)
         mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)

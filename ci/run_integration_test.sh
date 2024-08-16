@@ -36,6 +36,5 @@ ccm remove
 
 # run test
 
-export MAPPED_SCYLLA_VERSION=3.11.4
 PROTOCOL_VERSION=4  pytest -rf --import-mode append $*
 
