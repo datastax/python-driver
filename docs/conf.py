@@ -65,7 +65,7 @@ autoclass_content = 'both'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build', 'cloud.rst', 'core_graph.rst', 'classic_graph.rst', 'geo_types.rst', 'graph.rst', 'graph_fluent.rst']
+exclude_patterns = ['_build']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'

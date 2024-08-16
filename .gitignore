@@ -54,3 +54,13 @@ docs.yaml
 doxyfile
 tox.ini
 test-datastax-requirements.txt
+docs/api/cassandra/datastax/graph/fluent/index.rst
+docs/api/cassandra/datastax/graph/fluent/predicates.rst
+docs/api/cassandra/datastax/graph/fluent/query.rst
+docs/api/cassandra/datastax/graph/index.rst
+docs/api/cassandra/graph.rst
+docs/classic_graph.rst
+docs/core_graph.rst
+docs/geo_types.rst
+docs/graph.rst
+docs/graph_fluent.rst

@@ -12,10 +12,6 @@ are not required anymore::
 
     pip install scylla-driver
 
-If you need the Graph *Fluent* API (features provided by dse-graph)::
-
-    pip install scylla-driver[graph]
-
 See :doc:`installation` for more details.
 
 Import from the cassandra module
@@ -39,24 +35,6 @@ need to change only the first module of your import statements, not the submodul
 Also note that the cassandra.hosts module doesn't exist in scylla-driver. This
 module is named cassandra.pool.
 
-dse-graph
-^^^^^^^^^
-
-dse-graph features are now built into scylla-driver. The only change you need
-to do is your import statements:
-
-.. code-block:: python
-
-    from dse_graph import ..
-    from dse_graph.query import ..
-
-    # becomes
-
-    from cassandra.datastax.graph.fluent import ..
-    from cassandra.datastax.graph.fluent.query import ..
-
-See :mod:`~.datastax.graph.fluent`.
-
 Session.execute and Session.execute_async API
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -72,7 +50,6 @@ Deprecations
 
 These changes are optional, but recommended:
 
-* Importing from `cassandra.graph` is deprecated. Consider importing from `cassandra.datastax.graph`.
 * Use :class:`~.policies.DefaultLoadBalancingPolicy` instead of DSELoadBalancingPolicy.
 
 Upgrading to 3.0
