@@ -31,7 +31,7 @@ Running Unit Tests
 ------------------
 Unit tests can be run like so::
 
-    python -m pytest --import-mode append tests/unit -k 'not (test_connection_initialization or test_cloud)'
+    python -m pytest --import-mode append tests/unit
     EVENT_LOOP_MANAGER=gevent python -m pytest --import-mode append tests/unit/io/test_geventreactor.py
     EVENT_LOOP_MANAGER=eventlet python -m pytest --import-mode append tests/unit/io/test_eventletreactor.py
 

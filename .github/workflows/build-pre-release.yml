@@ -3,7 +3,7 @@ name: Build pre release python versions
 on: [push, pull_request]
 
 env:
- CIBW_TEST_COMMAND_LINUX: "pytest --import-mode append {project}/tests/unit -k 'not (test_connection_initialization or test_cloud)'"
+ CIBW_TEST_COMMAND_LINUX: "pytest --import-mode append {project}/tests/unit"
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
  CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
