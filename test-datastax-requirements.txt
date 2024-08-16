@@ -1,3 +1,0 @@
--r test-requirements.txt
-kerberos
-gremlinpython==3.4.6

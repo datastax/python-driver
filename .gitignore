@@ -43,3 +43,14 @@ tests/unit/cython/bytesio_testhelper.c
 #iPython
 *.ipynb
 
+# Files from upstream that we don't need
+Jenkinsfile
+Jenkinsfile.bak
+appveyor.yml
+appveyor/appveyor.ps1
+appveyor/run_test.ps1
+build.yaml.bak
+docs.yaml
+doxyfile
+tox.ini
+test-datastax-requirements.txt
