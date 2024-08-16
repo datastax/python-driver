@@ -36,5 +36,5 @@ ccm remove
 
 # run test
 
-PROTOCOL_VERSION=4  pytest -rf --import-mode append $*
+PROTOCOL_VERSION=4  pytest -rf $*
 

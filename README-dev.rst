@@ -31,9 +31,9 @@ Running Unit Tests
 ------------------
 Unit tests can be run like so::
 
-    python -m pytest --import-mode append tests/unit
-    EVENT_LOOP_MANAGER=gevent python -m pytest --import-mode append tests/unit/io/test_geventreactor.py
-    EVENT_LOOP_MANAGER=eventlet python -m pytest --import-mode append tests/unit/io/test_eventletreactor.py
+    python -m pytest tests/unit
+    EVENT_LOOP_MANAGER=gevent python -m pytest tests/unit/io/test_geventreactor.py
+    EVENT_LOOP_MANAGER=eventlet python -m pytest tests/unit/io/test_eventletreactor.py
 
 You can run a specific test method like so::
 
