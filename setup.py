@@ -120,8 +120,14 @@ is_macos = sys.platform.startswith('darwin')
 murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
-libev_includes = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
-libev_libdirs = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
+def eval_env_var_as_array(varname):
+    val = os.environ.get(varname)
+    return None if not val else [v.strip() for v in val.split(',')]
+
+DEFAULT_LIBEV_INCLUDES = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
+DEFAULT_LIBEV_LIBDIRS = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
+libev_includes = eval_env_var_as_array('CASS_DRIVER_LIBEV_INCLUDES') or DEFAULT_LIBEV_INCLUDES
+libev_libdirs = eval_env_var_as_array('CASS_DRIVER_LIBEV_LIBS') or DEFAULT_LIBEV_LIBDIRS
 if is_macos:
     libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
     libev_libdirs.extend(['/opt/homebrew/lib'])
@@ -280,6 +286,7 @@ On OSX, via homebrew:
             self.extensions.append(murmur3_ext)
 
         if try_libev:
+            sys.stderr.write("Appending libev extension %s" % libev_ext)
             self.extensions.append(libev_ext)
 
         if try_cython:
