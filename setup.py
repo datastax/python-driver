@@ -120,8 +120,14 @@ is_macos = sys.platform.startswith('darwin')
 murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
-libev_includes = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
-libev_libdirs = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
+def eval_env_var_as_array(varname):
+    val = os.environ.get(varname)
+    return None if not val else [v.strip() for v in val.split(',')]
+
+DEFAULT_LIBEV_INCLUDES = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
+DEFAULT_LIBEV_LIBDIRS = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
+libev_includes = eval_env_var_as_array('CASS_DRIVER_LIBEV_INCLUDES') or DEFAULT_LIBEV_INCLUDES
+libev_libdirs = eval_env_var_as_array('CASS_DRIVER_LIBEV_LIBS') or DEFAULT_LIBEV_LIBDIRS
 if is_macos:
     libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
     libev_libdirs.extend(['/opt/homebrew/lib'])
@@ -165,7 +171,7 @@ elif not is_supported_arch:
 
 try_extensions = "--no-extensions" not in sys.argv and is_supported_platform and is_supported_arch and not os.environ.get('CASS_DRIVER_NO_EXTENSIONS')
 try_murmur3 = try_extensions and "--no-murmur3" not in sys.argv
-try_libev = try_extensions and "--no-libev" not in sys.argv and not is_pypy and not is_windows
+try_libev = try_extensions and "--no-libev" not in sys.argv and not is_pypy and not os.environ.get('CASS_DRIVER_NO_LIBEV')
 try_cython = try_extensions and "--no-cython" not in sys.argv and not is_pypy and not os.environ.get('CASS_DRIVER_NO_CYTHON')
 try_cython &= 'egg_info' not in sys.argv  # bypass setup_requires for pip egg_info calls, which will never have --install-option"--no-cython" coming fomr pip
 
@@ -280,6 +286,7 @@ On OSX, via homebrew:
             self.extensions.append(murmur3_ext)
 
         if try_libev:
+            sys.stderr.write("Appending libev extension %s" % libev_ext)
             self.extensions.append(libev_ext)
 
         if try_cython:
