@@ -30,7 +30,7 @@ import com.datastax.jenkins.drivers.python.Slack
 
 slack = new Slack()
 
-DEFAULT_CASSANDRA = ['3.0', '3.11', '4.0']
+DEFAULT_CASSANDRA = ['3.0', '3.11', '4.0', '4.1', '5.0-beta1']
 DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30']
 DEFAULT_RUNTIME = ['3.8.16', '3.9.16', '3.10.11', '3.11.3', '3.12.0']
 DEFAULT_CYTHON = ["True", "False"]
@@ -558,6 +558,10 @@ pipeline {
                           <td>Apache CassandraⓇ v4.0.x</td>
                         </tr>
                         <tr>
+                          <td><strong>5.0-beta1</strong></td>
+                          <td>Apache CassandraⓇ v5.0-beta1</td>
+                        </tr>
+                        <tr>
                           <td><strong>dse-5.1.35</strong></td>
                           <td>DataStax Enterprise v5.1.x</td>
                         </tr>
@@ -644,7 +648,7 @@ pipeline {
     parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
       # These schedules will run with and without Cython enabled for Python 3.8.16 and 3.12.0
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.16 3.12.0;CI_SCHEDULE_SERVER_VERSION=3.11 4.0 dse-5.1.35 dse-6.8.30
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.16 3.12.0;CI_SCHEDULE_SERVER_VERSION=3.11 4.0 5.0-beta1 dse-5.1.35 dse-6.8.30
     """ : "")
   }
 
