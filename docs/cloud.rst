@@ -38,6 +38,20 @@ the default temporary directory of the system will be used as base dir.
   }
   ...
 
+connect_timeout
++++++++++++++++++++
+cloud_config.connect_timeout controls the timeout for the request connection against the astradb metadata service in seconds. Increase this value if your error message suggests a timeout in `get_cloud_config`, increase this value.
+
+
+.. code:: python
+
+  cloud_config = {
+        'secure_connect_bundle': '/path/to/secure-connect-dbname.zip',
+        'connect_timeout': 120
+  }
+  ...
+
+
 Astra Differences
 ==================
 In most circumstances, the client code for interacting with an Astra cluster will be the same as interacting with any other Cassandra cluster. The exceptions being:
