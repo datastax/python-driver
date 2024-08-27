@@ -40,7 +40,7 @@ the default temporary directory of the system will be used as base dir.
 
 connect_timeout
 +++++++++++++++++++
-cloud_config.connect_timeout controls the timeout for the request connection against the astradb metadata service in seconds. Increase this value if your error message suggests a timeout in `get_cloud_config`, increase this value.
+`cloud_config.connect_timeout` controls the timeout for the request connection against the Astra DB metadata service in seconds. Increase this value if the error message suggests a timeout in `get_cloud_config`.
 
 
 .. code:: python
