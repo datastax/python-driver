@@ -17,6 +17,7 @@ import unittest
 from datetime import datetime
 import ipaddress
 import math
+import random
 from packaging.version import Version
 
 import cassandra
@@ -31,7 +32,7 @@ from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, execute_until_pass, notprotocolv1, \
     BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequaldse51, \
-    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster
+    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster, greaterthanorequalcass50
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_all_samples, get_collection_sample
 
@@ -1291,3 +1292,58 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
         finally:
             session.cluster.shutdown()
+
+@greaterthanorequalcass50
+class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
+
+    def _get_first_j(self, rs):
+        rows = rs.all()
+        self.assertEqual(len(rows), 1)
+        return rows[0].j
+
+    def _get_row_simple(self, idx, subtype):
+        rs = self.session.execute("select j from {0}.{1} where i = {2}".format(self.keyspace_name, subtype, idx))
+        return self._get_first_j(rs)
+
+    def _get_row_prepared(self, idx, subtype):
+        cql = "select j from {0}.{1} where i = ?".format(self.keyspace_name, subtype)
+        ps = self.session.prepare(cql)
+        rs = self.session.execute(ps, [idx])
+        return self._get_first_j(rs)
+
+    def _round_trip_test(self, subtype, vector_fn, test_fn):
+        ddl = """CREATE TABLE {0}.{1} (
+                    i int PRIMARY KEY,
+                    j vector<{1}, 3>)""".format(self.keyspace_name, subtype)
+        self.session.execute(ddl)
+
+        cql = "insert into {0}.{1} (i,j) values (%d,%s)".format(self.keyspace_name, subtype)
+        expected1 = vector_fn()
+        data1 = {1:vector_fn(), 2:expected1, 3:vector_fn()}
+        for k,v in data1.items():
+            # Attempt a set of inserts using the driver's support for positional params
+            self.session.execute(cql % (k,v))
+
+        cql = "insert into {0}.{1} (i,j) values (?,?)".format(self.keyspace_name, subtype)
+        expected2 = vector_fn()
+        ps = self.session.prepare(cql)
+        data2 = {4:vector_fn(), 5:expected2, 6:vector_fn()}
+        for k,v in data2.items():
+            # Add some additional rows via prepared statements
+            self.session.execute(ps, [k,v])
+
+        # Use prepared queries to gather data from the rows we added via simple queries and vice versa
+        observed1 = self._get_row_prepared(2, subtype)
+        for idx in range(0, 3):
+            test_fn(observed1[idx], expected1[idx])
+
+        observed2 = self._get_row_simple(5, subtype)
+        for idx in range(0, 3):
+            test_fn(observed2[idx], expected2[idx])
+
+    def test_vector_round_trip(self):
+        def _test_fn(observed, expected):
+            self.assertAlmostEqual(observed, expected, places=5)
+        def _random_float_vector():
+            return [random.uniform(0.0, 100.0) for i in range(3)]
+        self._round_trip_test("float", _random_float_vector, _test_fn)
