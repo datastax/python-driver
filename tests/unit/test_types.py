@@ -343,6 +343,17 @@ class TypeTests(unittest.TestCase):
         else:
             self.assertEqual(first,second)
 
+    def _round_trip_test(self, data, ctype_str):
+        ctype = parse_casstype_args(ctype_str)
+        data_bytes = ctype.serialize(data, 0)
+        serialized_size = ctype.subtype.serial_size()
+        if serialized_size:
+            self.assertEqual(serialized_size * len(data), len(data_bytes))
+        result = ctype.deserialize(data_bytes, 0)
+        self.assertEqual(len(data), len(result))
+        for idx in range(0,len(data)):
+            self._round_trip_compare_fn(data[idx], result[idx])
+
     def test_vector_round_trip_basic_types_with_serialized_size(self):
         self._round_trip_test([True, False, False, True], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.BooleanType, 4)")
@@ -442,17 +453,6 @@ class TypeTests(unittest.TestCase):
         self._round_trip_test([["one", "two"], ["three", "four"], ["five", "six"], ["seven", "eight"]], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.VectorType \
                 (org.apache.cassandra.db.marshal.AsciiType,2), 4)")
-
-    def _round_trip_test(self, data, ctype_str):
-        ctype = parse_casstype_args(ctype_str)
-        data_bytes = ctype.serialize(data, 0)
-        serialized_size = ctype.subtype.serial_size()
-        if serialized_size:
-            self.assertEqual(serialized_size * len(data), len(data_bytes))
-        result = ctype.deserialize(data_bytes, 0)
-        self.assertEqual(len(data), len(result))
-        for idx in range(0,len(data)):
-            self._round_trip_compare_fn(data[idx], result[idx])
 
     # parse_casstype_args() is tested above... we're explicitly concerned about cql_parapmeterized_type() output here
     def test_vector_cql_parameterized_type(self):
