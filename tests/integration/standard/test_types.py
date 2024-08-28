@@ -17,8 +17,11 @@ import unittest
 import ipaddress
 import math
 import random
+import string
+import socket
+import uuid
 
-from datetime import datetime
+from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 from functools import partial
 
@@ -1315,48 +1318,50 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         rs = self.session.execute(ps, [idx])
         return self._get_first_j(rs)
 
-    def _round_trip_test(self, subtype, subtype_fn, test_fn):
+    def _round_trip_test(self, subtype, subtype_fn, test_fn, use_positional_parameters=True):
 
-        table_name = subtype.replace("<","A").replace(">", "B") + "isH"
+        table_name = subtype.replace("<","A").replace(">", "B").replace(",", "C") + "isH"
+
+        def random_subtype_vector():
+            return [subtype_fn() for _ in range(3)]
 
         ddl = """CREATE TABLE {0}.{1} (
                     i int PRIMARY KEY,
                     j vector<{2}, 3>)""".format(self.keyspace_name, table_name, subtype)
         self.session.execute(ddl)
 
-        cql = "insert into {0}.{1} (i,j) values (%s,%s)".format(self.keyspace_name, table_name)
-        expected1 = subtype_fn()
-        data1 = {1:subtype_fn(), 2:expected1, 3:subtype_fn()}
-        for k,v in data1.items():
-            # Attempt a set of inserts using the driver's support for positional params
-            self.session.execute(cql, (k,v))
+        if use_positional_parameters:
+            cql = "insert into {0}.{1} (i,j) values (%s,%s)".format(self.keyspace_name, table_name)
+            expected1 = random_subtype_vector()
+            data1 = {1:random_subtype_vector(), 2:expected1, 3:random_subtype_vector()}
+            for k,v in data1.items():
+                # Attempt a set of inserts using the driver's support for positional params
+                self.session.execute(cql, (k,v))
 
         cql = "insert into {0}.{1} (i,j) values (?,?)".format(self.keyspace_name, table_name)
-        expected2 = subtype_fn()
+        expected2 = random_subtype_vector()
         ps = self.session.prepare(cql)
-        data2 = {4:subtype_fn(), 5:expected2, 6:subtype_fn()}
+        data2 = {4:random_subtype_vector(), 5:expected2, 6:random_subtype_vector()}
         for k,v in data2.items():
             # Add some additional rows via prepared statements
             self.session.execute(ps, [k,v])
 
         # Use prepared queries to gather data from the rows we added via simple queries and vice versa
-        observed1 = self._get_row_prepared(2, table_name)
-        for idx in range(0, 3):
-            test_fn(observed1[idx], expected1[idx])
+        if use_positional_parameters:
+            observed1 = self._get_row_prepared(2, table_name)
+            for idx in range(0, 3):
+                test_fn(observed1[idx], expected1[idx])
 
         observed2 = self._get_row_simple(5, table_name)
         for idx in range(0, 3):
             test_fn(observed2[idx], expected2[idx])
 
-    def _random_vector(self, subtype_fn):
-        return [subtype_fn() for i in range(3)]
-
     def test_vector_round_trip_integers(self):
-        self._round_trip_test("int", partial(self._random_vector, partial(random.randint, 0, 2 ** 31)), self.assertEqual)
-        self._round_trip_test("bigint", partial(self._random_vector, partial(random.randint, 0, 2 ** 63)), self.assertEqual)
-        self._round_trip_test("smallint", partial(self._random_vector, partial(random.randint, 0, 2 ** 15)), self.assertEqual)
-        self._round_trip_test("tinyint", partial(self._random_vector, partial(random.randint, 0, (2 ** 7) - 1)), self.assertEqual)
-        self._round_trip_test("varint", partial(self._random_vector, partial(random.randint, 0, 2 ** 63)), self.assertEqual)
+        self._round_trip_test("int", partial(random.randint, 0, 2 ** 31), self.assertEqual)
+        self._round_trip_test("bigint", partial(random.randint, 0, 2 ** 63), self.assertEqual)
+        self._round_trip_test("smallint", partial(random.randint, 0, 2 ** 15), self.assertEqual)
+        self._round_trip_test("tinyint", partial(random.randint, 0, (2 ** 7) - 1), self.assertEqual)
+        self._round_trip_test("varint", partial(random.randint, 0, 2 ** 63), self.assertEqual)
 
     def test_vector_round_trip_floating_point(self):
         _almost_equal_test_fn = partial(self.assertAlmostEqual, places=5)
@@ -1365,6 +1370,81 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
 
         # Max value here isn't really connected to max value for floating point nums in IEEE 754... it's used here
         # mainly as a convenient benchmark
-        self._round_trip_test("float", partial(self._random_vector, partial(random.uniform, 0.0, 100.0)), _almost_equal_test_fn)
-        self._round_trip_test("double", partial(self._random_vector, partial(random.uniform, 0.0, 100.0)), _almost_equal_test_fn)
-        self._round_trip_test("decimal", partial(self._random_vector, _random_decimal), _almost_equal_test_fn)
+        self._round_trip_test("float", partial(random.uniform, 0.0, 100.0), _almost_equal_test_fn)
+        self._round_trip_test("double", partial(random.uniform, 0.0, 100.0), _almost_equal_test_fn)
+        self._round_trip_test("decimal", _random_decimal, _almost_equal_test_fn)
+
+    def test_vector_round_trip_text(self):
+        def _random_string():
+            return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(24))
+
+        self._round_trip_test("ascii", _random_string, self.assertEqual)
+        self._round_trip_test("text", _random_string, self.assertEqual)
+
+    def test_vector_round_date_and_time(self):
+        _almost_equal_test_fn = partial(self.assertAlmostEqual, delta=timedelta(seconds=1))
+        def _random_datetime():
+            return datetime.today() - timedelta(hours=random.randint(0,18), days=random.randint(1,1000))
+        def _random_date():
+            return _random_datetime().date()
+        def _random_time():
+            return _random_datetime().time()
+
+        self._round_trip_test("date", _random_date, self.assertEqual)
+        self._round_trip_test("time", _random_time, self.assertEqual)
+        self._round_trip_test("timestamp", _random_datetime, _almost_equal_test_fn)
+
+    def test_vector_round_uuid(self):
+        self._round_trip_test("uuid", uuid.uuid1, self.assertEqual)
+        self._round_trip_test("timeuuid", uuid.uuid1, self.assertEqual)
+
+    def test_vector_round_trip_miscellany(self):
+        def _random_bytes():
+            return random.getrandbits(32).to_bytes(4,'big')
+        def _random_boolean():
+            return random.choice([True, False])
+        def _random_duration():
+            return Duration(random.randint(0,11), random.randint(0,11), random.randint(0,10000))
+        def _random_inet():
+            return socket.inet_ntoa(_random_bytes())
+
+        self._round_trip_test("boolean", _random_boolean, self.assertEqual)
+        self._round_trip_test("duration", _random_duration, self.assertEqual)
+        self._round_trip_test("inet", _random_inet, self.assertEqual)
+        self._round_trip_test("blob", _random_bytes, self.assertEqual)
+
+    def test_vector_round_trip_collections(self):
+        def _random_seq():
+            return [random.randint(0,100000) for _ in range(8)]
+        def _random_set():
+            return set(_random_seq())
+        def _random_map():
+            return {k:v for (k,v) in zip(_random_seq(), _random_seq())}
+
+        # Goal here is to test collections of both fixed and variable size subtypes
+        self._round_trip_test("list<int>", _random_seq, self.assertEqual)
+        self._round_trip_test("list<varint>", _random_seq, self.assertEqual)
+        self._round_trip_test("set<int>", _random_set, self.assertEqual)
+        self._round_trip_test("set<varint>", _random_set, self.assertEqual)
+        self._round_trip_test("map<int,int>", _random_map, self.assertEqual)
+        self._round_trip_test("map<int,varint>", _random_map, self.assertEqual)
+        self._round_trip_test("map<varint,int>", _random_map, self.assertEqual)
+        self._round_trip_test("map<varint,varint>", _random_map, self.assertEqual)
+
+    def test_vector_round_trip_vector_of_vectors(self):
+        def _random_vector():
+            return [random.randint(0,100000) for _ in range(2)]
+
+        self._round_trip_test("vector<int,2>", _random_vector, self.assertEqual)
+        self._round_trip_test("vector<varint,2>", _random_vector, self.assertEqual)
+
+    def test_vector_round_trip_tuples(self):
+        def _random_tuple():
+            return (random.randint(0,100000),random.randint(0,100000))
+
+        # Unfortunately we can't use positional parameters when inserting tuples because the driver will try to encode
+        # them as lists before sending them to the server... and that confuses the parsing logic.
+        self._round_trip_test("tuple<int,int>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+        self._round_trip_test("tuple<int,varint>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+        self._round_trip_test("tuple<varint,int>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+        self._round_trip_test("tuple<varint,varint>", _random_tuple, self.assertEqual, use_positional_parameters=False)
