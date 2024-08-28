@@ -724,10 +724,6 @@ class ShortType(_CassandraType):
     def serialize(byts, protocol_version):
         return int16_pack(byts)
 
-    @classmethod
-    def serial_size(cls):
-        return 2
-
 class TimeType(_CassandraType):
     typename = 'time'
     # Time should be a fixed size 8 byte type but Cassandra 5.0 code marks it as
