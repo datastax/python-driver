@@ -14,10 +14,14 @@
 
 import unittest
 
-from datetime import datetime
 import ipaddress
 import math
 import random
+
+from datetime import datetime
+from decimal import Decimal
+from functools import partial
+
 from packaging.version import Version
 
 import cassandra
@@ -1301,49 +1305,66 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self.assertEqual(len(rows), 1)
         return rows[0].j
 
-    def _get_row_simple(self, idx, subtype):
-        rs = self.session.execute("select j from {0}.{1} where i = {2}".format(self.keyspace_name, subtype, idx))
+    def _get_row_simple(self, idx, table_name):
+        rs = self.session.execute("select j from {0}.{1} where i = {2}".format(self.keyspace_name, table_name, idx))
         return self._get_first_j(rs)
 
-    def _get_row_prepared(self, idx, subtype):
-        cql = "select j from {0}.{1} where i = ?".format(self.keyspace_name, subtype)
+    def _get_row_prepared(self, idx, table_name):
+        cql = "select j from {0}.{1} where i = ?".format(self.keyspace_name, table_name)
         ps = self.session.prepare(cql)
         rs = self.session.execute(ps, [idx])
         return self._get_first_j(rs)
 
-    def _round_trip_test(self, subtype, vector_fn, test_fn):
+    def _round_trip_test(self, subtype, subtype_fn, test_fn):
+
+        table_name = subtype.replace("<","A").replace(">", "B") + "isH"
+
         ddl = """CREATE TABLE {0}.{1} (
                     i int PRIMARY KEY,
-                    j vector<{1}, 3>)""".format(self.keyspace_name, subtype)
+                    j vector<{2}, 3>)""".format(self.keyspace_name, table_name, subtype)
         self.session.execute(ddl)
 
-        cql = "insert into {0}.{1} (i,j) values (%d,%s)".format(self.keyspace_name, subtype)
-        expected1 = vector_fn()
-        data1 = {1:vector_fn(), 2:expected1, 3:vector_fn()}
+        cql = "insert into {0}.{1} (i,j) values (%s,%s)".format(self.keyspace_name, table_name)
+        expected1 = subtype_fn()
+        data1 = {1:subtype_fn(), 2:expected1, 3:subtype_fn()}
         for k,v in data1.items():
             # Attempt a set of inserts using the driver's support for positional params
-            self.session.execute(cql % (k,v))
+            self.session.execute(cql, (k,v))
 
-        cql = "insert into {0}.{1} (i,j) values (?,?)".format(self.keyspace_name, subtype)
-        expected2 = vector_fn()
+        cql = "insert into {0}.{1} (i,j) values (?,?)".format(self.keyspace_name, table_name)
+        expected2 = subtype_fn()
         ps = self.session.prepare(cql)
-        data2 = {4:vector_fn(), 5:expected2, 6:vector_fn()}
+        data2 = {4:subtype_fn(), 5:expected2, 6:subtype_fn()}
         for k,v in data2.items():
             # Add some additional rows via prepared statements
             self.session.execute(ps, [k,v])
 
         # Use prepared queries to gather data from the rows we added via simple queries and vice versa
-        observed1 = self._get_row_prepared(2, subtype)
+        observed1 = self._get_row_prepared(2, table_name)
         for idx in range(0, 3):
             test_fn(observed1[idx], expected1[idx])
 
-        observed2 = self._get_row_simple(5, subtype)
+        observed2 = self._get_row_simple(5, table_name)
         for idx in range(0, 3):
             test_fn(observed2[idx], expected2[idx])
 
-    def test_vector_round_trip(self):
-        def _test_fn(observed, expected):
-            self.assertAlmostEqual(observed, expected, places=5)
-        def _random_float_vector():
-            return [random.uniform(0.0, 100.0) for i in range(3)]
-        self._round_trip_test("float", _random_float_vector, _test_fn)
+    def _random_vector(self, subtype_fn):
+        return [subtype_fn() for i in range(3)]
+
+    def test_vector_round_trip_integers(self):
+        self._round_trip_test("int", partial(self._random_vector, partial(random.randint, 0, 2 ** 31)), self.assertEqual)
+        self._round_trip_test("bigint", partial(self._random_vector, partial(random.randint, 0, 2 ** 63)), self.assertEqual)
+        self._round_trip_test("smallint", partial(self._random_vector, partial(random.randint, 0, 2 ** 15)), self.assertEqual)
+        self._round_trip_test("tinyint", partial(self._random_vector, partial(random.randint, 0, (2 ** 7) - 1)), self.assertEqual)
+        self._round_trip_test("varint", partial(self._random_vector, partial(random.randint, 0, 2 ** 63)), self.assertEqual)
+
+    def test_vector_round_trip_floating_point(self):
+        _almost_equal_test_fn = partial(self.assertAlmostEqual, places=5)
+        def _random_decimal():
+            return Decimal(random.uniform(0.0, 100.0))
+
+        # Max value here isn't really connected to max value for floating point nums in IEEE 754... it's used here
+        # mainly as a convenient benchmark
+        self._round_trip_test("float", partial(self._random_vector, partial(random.uniform, 0.0, 100.0)), _almost_equal_test_fn)
+        self._round_trip_test("double", partial(self._random_vector, partial(random.uniform, 0.0, 100.0)), _almost_equal_test_fn)
+        self._round_trip_test("decimal", partial(self._random_vector, _random_decimal), _almost_equal_test_fn)
