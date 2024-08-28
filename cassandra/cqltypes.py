@@ -460,6 +460,9 @@ class UUIDType(_CassandraType):
         except AttributeError:
             raise TypeError("Got a non-UUID object for a UUID value")
 
+    @classmethod
+    def serial_size(cls):
+        return 16
 
 class BooleanType(_CassandraType):
     typename = 'boolean'
@@ -659,6 +662,9 @@ class DateType(_CassandraType):
 
         return int64_pack(int(timestamp))
 
+    @classmethod
+    def serial_size(cls):
+        return 8
 
 class TimestampType(DateType):
     pass
