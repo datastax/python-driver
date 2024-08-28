@@ -1448,3 +1448,31 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("tuple<int,varint>", _random_tuple, self.assertEqual, use_positional_parameters=False)
         self._round_trip_test("tuple<varint,int>", _random_tuple, self.assertEqual, use_positional_parameters=False)
         self._round_trip_test("tuple<varint,varint>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+
+    def test_vector_round_trip_udts(self):
+        def _udt_equal_test_fn(udt1, udt2):
+            self.assertEqual(udt1.a, udt2.a)
+            self.assertEqual(udt1.b, udt2.b)
+
+        self.session.execute("create type {}.fixed_type (a int, b int)".format(self.keyspace_name))
+        self.session.execute("create type {}.mixed_type_one (a int, b varint)".format(self.keyspace_name))
+        self.session.execute("create type {}.mixed_type_two (a varint, b int)".format(self.keyspace_name))
+        self.session.execute("create type {}.var_type (a varint, b varint)".format(self.keyspace_name))
+
+        class GeneralUDT:
+            def __init__(self, a, b):
+                self.a = a
+                self.b = b
+
+        self.cluster.register_user_type(self.keyspace_name,'fixed_type', GeneralUDT)
+        self.cluster.register_user_type(self.keyspace_name,'mixed_type_one', GeneralUDT)
+        self.cluster.register_user_type(self.keyspace_name,'mixed_type_two', GeneralUDT)
+        self.cluster.register_user_type(self.keyspace_name,'var_type', GeneralUDT)
+
+        def _random_udt():
+            return GeneralUDT(random.randint(0,100000),random.randint(0,100000))
+
+        self._round_trip_test("fixed_type", _random_udt, _udt_equal_test_fn)
+        self._round_trip_test("mixed_type_one", _random_udt, _udt_equal_test_fn)
+        self._round_trip_test("mixed_type_two", _random_udt, _udt_equal_test_fn)
+        self._round_trip_test("var_type", _random_udt, _udt_equal_test_fn)
