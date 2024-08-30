@@ -319,6 +319,8 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cql_quote('test'), "'test'")
         self.assertEqual(cql_quote(0), '0')
 
+
+class VectorTests(unittest.TestCase):
     def _normalize_set(self, val):
         if isinstance(val, set) or isinstance(val, util.SortedSet):
             return frozenset([self._normalize_set(v) for v in val])
@@ -465,6 +467,35 @@ class TypeTests(unittest.TestCase):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
         inner_parsed_type = "org.apache.cassandra.db.marshal.VectorType<float, 4>"
         self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<%s, 3>" % (inner_parsed_type))
+
+    def test_vector_deserialization_fixed_size_too_small(self):
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        ctype_four_bytes = ctype_four.serialize([1.2, 3.4, 5.6, 7.8], 0)
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
+        with self.assertRaisesRegex(ValueError, "Expected vector of type float and dimension 5 to have serialized size 20; observed serialized size of 16 instead"):
+            ctype_five.deserialize(ctype_four_bytes, 0)
+
+    def test_vector_deserialization_fixed_size_too_big(self):
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
+        ctype_five_bytes = ctype_five.serialize([1.2, 3.4, 5.6, 7.8, 9.10], 0)
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        with self.assertRaisesRegex(ValueError, "Expected vector of type float and dimension 4 to have serialized size 16; observed serialized size of 20 instead"):
+            ctype_four.deserialize(ctype_five_bytes, 0)
+
+    def test_vector_deserialization_variable_size_too_small(self):
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        ctype_four_bytes = ctype_four.serialize([1, 2, 3, 4], 0)
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
+        with self.assertRaisesRegex(ValueError, "Error reading additional data during vector deserialization after successfully adding 4 elements"):
+            ctype_five.deserialize(ctype_four_bytes, 0)
+
+    def test_vector_deserialization_variable_size_too_big(self):
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
+        ctype_five_bytes = ctype_five.serialize([1, 2, 3, 4, 5], 0)
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        with self.assertRaisesRegex(ValueError, "Additional bytes remaining after vector deserialization completed"):
+            ctype_four.deserialize(ctype_five_bytes, 0)
+
 
 ZERO = datetime.timedelta(0)
 

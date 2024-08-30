@@ -1450,16 +1450,29 @@ class VectorType(_CassandraType):
     def deserialize(cls, byts, protocol_version):
         serialized_size = cls.subtype.serial_size()
         if serialized_size is not None:
+            expected_byte_size = serialized_size * cls.vector_size
+            if len(byts) != expected_byte_size:
+                raise ValueError(
+                    "Expected vector of type {0} and dimension {1} to have serialized size {2}; observed serialized size of {3} instead"\
+                    .format(cls.subtype.typename, cls.vector_size, expected_byte_size, len(byts)))
             indexes = (serialized_size * x for x in range(0, cls.vector_size))
             return [cls.subtype.deserialize(byts[idx:idx + serialized_size], protocol_version) for idx in indexes]
 
         idx = 0
         rv = []
-        while (idx < len(byts)):
-            size, bytes_read = uvint_unpack(byts[idx:])
-            idx += bytes_read
-            rv.append(cls.subtype.deserialize(byts[idx:idx + size], protocol_version))
-            idx += size
+        while (len(rv) < cls.vector_size):
+            try:
+                size, bytes_read = uvint_unpack(byts[idx:])
+                idx += bytes_read
+                rv.append(cls.subtype.deserialize(byts[idx:idx + size], protocol_version))
+                idx += size
+            except:
+                raise ValueError("Error reading additional data during vector deserialization after successfully adding {} elements"\
+                .format(len(rv)))
+
+        # If we have any additional data in the serialized vector treat that as an error as well
+        if idx < len(byts):
+            raise ValueError("Additional bytes remaining after vector deserialization completed")
         return rv
 
     @classmethod
