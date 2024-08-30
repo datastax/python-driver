@@ -1356,14 +1356,14 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         for idx in range(0, 3):
             test_fn(observed2[idx], expected2[idx])
 
-    def test_vector_round_trip_integers(self):
+    def test_round_trip_integers(self):
         self._round_trip_test("int", partial(random.randint, 0, 2 ** 31), self.assertEqual)
         self._round_trip_test("bigint", partial(random.randint, 0, 2 ** 63), self.assertEqual)
         self._round_trip_test("smallint", partial(random.randint, 0, 2 ** 15), self.assertEqual)
         self._round_trip_test("tinyint", partial(random.randint, 0, (2 ** 7) - 1), self.assertEqual)
         self._round_trip_test("varint", partial(random.randint, 0, 2 ** 63), self.assertEqual)
 
-    def test_vector_round_trip_floating_point(self):
+    def test_round_trip_floating_point(self):
         _almost_equal_test_fn = partial(self.assertAlmostEqual, places=5)
         def _random_decimal():
             return Decimal(random.uniform(0.0, 100.0))
@@ -1374,14 +1374,14 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("double", partial(random.uniform, 0.0, 100.0), _almost_equal_test_fn)
         self._round_trip_test("decimal", _random_decimal, _almost_equal_test_fn)
 
-    def test_vector_round_trip_text(self):
+    def test_round_trip_text(self):
         def _random_string():
             return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(24))
 
         self._round_trip_test("ascii", _random_string, self.assertEqual)
         self._round_trip_test("text", _random_string, self.assertEqual)
 
-    def test_vector_round_date_and_time(self):
+    def test_round_trip_date_and_time(self):
         _almost_equal_test_fn = partial(self.assertAlmostEqual, delta=timedelta(seconds=1))
         def _random_datetime():
             return datetime.today() - timedelta(hours=random.randint(0,18), days=random.randint(1,1000))
@@ -1394,11 +1394,11 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("time", _random_time, self.assertEqual)
         self._round_trip_test("timestamp", _random_datetime, _almost_equal_test_fn)
 
-    def test_vector_round_uuid(self):
+    def test_round_trip_uuid(self):
         self._round_trip_test("uuid", uuid.uuid1, self.assertEqual)
         self._round_trip_test("timeuuid", uuid.uuid1, self.assertEqual)
 
-    def test_vector_round_trip_miscellany(self):
+    def test_round_trip_miscellany(self):
         def _random_bytes():
             return random.getrandbits(32).to_bytes(4,'big')
         def _random_boolean():
@@ -1413,7 +1413,7 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("inet", _random_inet, self.assertEqual)
         self._round_trip_test("blob", _random_bytes, self.assertEqual)
 
-    def test_vector_round_trip_collections(self):
+    def test_round_trip_collections(self):
         def _random_seq():
             return [random.randint(0,100000) for _ in range(8)]
         def _random_set():
@@ -1431,14 +1431,14 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("map<varint,int>", _random_map, self.assertEqual)
         self._round_trip_test("map<varint,varint>", _random_map, self.assertEqual)
 
-    def test_vector_round_trip_vector_of_vectors(self):
+    def test_round_trip_vector_of_vectors(self):
         def _random_vector():
             return [random.randint(0,100000) for _ in range(2)]
 
         self._round_trip_test("vector<int,2>", _random_vector, self.assertEqual)
         self._round_trip_test("vector<varint,2>", _random_vector, self.assertEqual)
 
-    def test_vector_round_trip_tuples(self):
+    def test_round_trip_tuples(self):
         def _random_tuple():
             return (random.randint(0,100000),random.randint(0,100000))
 
@@ -1449,7 +1449,7 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("tuple<varint,int>", _random_tuple, self.assertEqual, use_positional_parameters=False)
         self._round_trip_test("tuple<varint,varint>", _random_tuple, self.assertEqual, use_positional_parameters=False)
 
-    def test_vector_round_trip_udts(self):
+    def test_round_trip_udts(self):
         def _udt_equal_test_fn(udt1, udt2):
             self.assertEqual(udt1.a, udt2.a)
             self.assertEqual(udt1.b, udt2.b)
