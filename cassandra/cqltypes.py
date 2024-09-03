@@ -1477,8 +1477,14 @@ class VectorType(_CassandraType):
 
     @classmethod
     def serialize(cls, v, protocol_version):
-        buf = io.BytesIO()
+        v_length = len(v)
+        if cls.vector_size != v_length:
+            raise ValueError(
+                "Expected sequence of size {0} for vector of type {1} and dimension {0}, observed sequence of length {2}"\
+                .format(cls.vector_size, cls.subtype.typename, v_length))
+
         serialized_size = cls.subtype.serial_size()
+        buf = io.BytesIO()
         for item in v:
             item_bytes = cls.subtype.serialize(item, protocol_version)
             if serialized_size is None:

@@ -468,6 +468,26 @@ class VectorTests(unittest.TestCase):
         inner_parsed_type = "org.apache.cassandra.db.marshal.VectorType<float, 4>"
         self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<%s, 3>" % (inner_parsed_type))
 
+    def test_serialization_fixed_size_too_small(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 5 for vector of type float and dimension 5, observed sequence of length 4"):
+            ctype.serialize([1.2, 3.4, 5.6, 7.8], 0)
+
+    def test_serialization_fixed_size_too_big(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 4 for vector of type float and dimension 4, observed sequence of length 5"):
+            ctype.serialize([1.2, 3.4, 5.6, 7.8, 9.10], 0)
+
+    def test_serialization_variable_size_too_small(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 5 for vector of type varint and dimension 5, observed sequence of length 4"):
+            ctype.serialize([1, 2, 3, 4], 0)
+
+    def test_serialization_variable_size_too_big(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 4 for vector of type varint and dimension 4, observed sequence of length 5"):
+            ctype.serialize([1, 2, 3, 4, 5], 0)
+
     def test_deserialization_fixed_size_too_small(self):
         ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
         ctype_four_bytes = ctype_four.serialize([1.2, 3.4, 5.6, 7.8], 0)
