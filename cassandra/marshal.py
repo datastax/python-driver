@@ -111,7 +111,6 @@ def vints_unpack(term):  # noqa
 
     return tuple(values)
 
-
 def vints_pack(values):
     revbytes = bytearray()
     values = [int(v) for v in values[::-1]]
@@ -143,3 +142,48 @@ def vints_pack(values):
 
     revbytes.reverse()
     return bytes(revbytes)
+
+def uvint_unpack(bytes):
+    first_byte = bytes[0]
+
+    if (first_byte & 128) == 0:
+        return (first_byte,1)
+
+    num_extra_bytes = 8 - (~first_byte & 0xff).bit_length()
+    rv = first_byte & (0xff >> num_extra_bytes)
+    for idx in range(1,num_extra_bytes + 1):
+        new_byte = bytes[idx]
+        rv <<= 8
+        rv |= new_byte & 0xff
+
+    return (rv, num_extra_bytes + 1)
+
+def uvint_pack(val):
+    rv = bytearray()
+    if val < 128:
+        rv.append(val)
+    else:
+        v = val
+        num_extra_bytes = 0
+        num_bits = v.bit_length()
+        # We need to reserve (num_extra_bytes+1) bits in the first byte
+        # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX' # 2 bits reserved
+        # ie. with 8 extra bytes, the first byte needs to be '11111111'  # 8 bits reserved
+        reserved_bits = num_extra_bytes + 1
+        while num_bits > (8-(reserved_bits)):
+            num_extra_bytes += 1
+            num_bits -= 8
+            reserved_bits = min(num_extra_bytes + 1, 8)
+            rv.append(v & 0xff)
+            v >>= 8
+
+        if num_extra_bytes > 8:
+            raise ValueError('Value %d is too big and cannot be encoded as vint' % val)
+
+        # We can now store the last bits in the first byte
+        n = 8 - num_extra_bytes
+        v |= (0xff >> n << n)
+        rv.append(abs(v))
+
+    rv.reverse()
+    return bytes(rv)
