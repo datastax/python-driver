@@ -40,8 +40,11 @@ the default temporary directory of the system will be used as base dir.
 
 connect_timeout
 +++++++++++++++++++
-`cloud_config.connect_timeout` controls the timeout for the request connection against the Astra DB metadata service in seconds. Increase this value if the error message suggests a timeout in `get_cloud_config`.
 
+As part of the process of connecting to Astra the Python driver will query a service to retrieve
+current information about your cluster.  You can control the connection timeout for this operation
+using *connect_timeout*.  If you observe errors in `read_metadata_info` you might consider increasing
+this parameter.  This timeout is specified in seconds.
 
 .. code:: python
 
@@ -50,7 +53,6 @@ connect_timeout
         'connect_timeout': 120
   }
   ...
-
 
 Astra Differences
 ==================
