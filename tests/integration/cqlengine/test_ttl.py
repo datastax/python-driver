@@ -179,7 +179,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         self.assertEqual(default_ttl, 0)
 
         with mock.patch.object(session, 'execute') as m:
-            TestTTLModel.objects(id=tid).update(text="aligators")
+            TestTTLModel.objects(id=tid).update(text="alligators")
 
         query = m.call_args[0][0].query_string
         self.assertNotIn("USING TTL", query)
@@ -197,7 +197,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         self.assertEqual(default_ttl, 20)
 
         with mock.patch.object(session, 'execute') as m:
-            TestTTLModel.objects(id=tid).update(text="aligators expired")
+            TestTTLModel.objects(id=tid).update(text="alligators expired")
 
         # Should not be set either
         query = m.call_args[0][0].query_string
@@ -228,7 +228,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         self.assertEqual(o._ttl, 3600)
 
         with mock.patch.object(session, 'execute') as m:
-            TestDefaultTTLModel.objects(id=tid).ttl(None).update(text="aligators expired")
+            TestDefaultTTLModel.objects(id=tid).ttl(None).update(text="alligators expired")
 
         query = m.call_args[0][0].query_string
         self.assertNotIn("USING TTL", query)

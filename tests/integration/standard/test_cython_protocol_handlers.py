@@ -234,7 +234,7 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
         begin_unset = max(s.execute('select primkey from %s' % (table,))[0]['primkey']) + 1
         keys_null = range(begin_unset, begin_unset + 10)
 
-        # scatter some emptry rows in here
+        # scatter some empty rows in here
         insert = "insert into %s (primkey) values (%%s)" % (table,)
         execute_concurrent_with_args(s, insert, ((k,) for k in keys_null))
 

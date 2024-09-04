@@ -107,11 +107,11 @@ class ClusterTests(unittest.TestCase):
                     test_fn(self.session, statement, parameters)
             validate_fn(num_statements, results)
 
-    def execute_concurrent_valiate_tuple(self, num_statements, results):
+    def execute_concurrent_validate_tuple(self, num_statements, results):
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
 
-    def execute_concurrent_valiate_dict(self, num_statements, results):
+    def execute_concurrent_validate_dict(self, num_statements, results):
             self.assertEqual(num_statements, len(results))
             self.assertEqual([(True, [{"v":i}]) for i in range(num_statements)], results)
 
@@ -138,7 +138,7 @@ class ClusterTests(unittest.TestCase):
         """
         Test to validate that generator based results are surfaced correctly
 
-        Repeatedly inserts data into a a table and attempts to query it. It then validates that the
+        Repeatedly inserts data into a table and attempts to query it. It then validates that the
         results are returned in the order expected
 
         @since 2.7.0
@@ -212,7 +212,7 @@ class ClusterTests(unittest.TestCase):
         """
         Test to validate that generator based results are surfaced correctly when paging is used
 
-        Inserts data into a a table and attempts to query it. It then validates that the
+        Inserts data into a table and attempts to query it. It then validates that the
         results are returned as expected (no order specified)
 
         @since 2.7.0
