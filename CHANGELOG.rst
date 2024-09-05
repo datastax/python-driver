@@ -1,3 +1,28 @@
+3.29.2
+======
+September 9, 2024
+
+Features
+--------
+* Convert to pytest for running unit and integration tests (PYTHON-1297)
+* Add support for Cassandra 4.1.x and 5.0 releases to CI (PYTHON-1393)
+* Extend driver vector support to arbitrary subtypes and fix handling of variable length types (PYTHON-1369)
+
+Bug Fixes
+---------
+* Python NumpyProtocolHandler does not work with NumPy 1.24.0 or greater (PYTHON-1359)
+* cibuildwheel appears to not be stripping Cython-generated shared objects (PYTHON-1387)
+* Windows build for Python 3.12 compiled without libev support (PYTHON-1386)
+
+Others
+------
+* Update README.rst with badges for version and license (PR 1210)
+* Remove dependency on old mock external module (PR 1201)
+* Removed future print_function, division, and with and some pre 3.7 handling (PR 1208)
+* Update geomet dependency (PR 1207)
+* Remove problematic escape sequences in some docstrings to avoid SyntaxWarning in Python 3.12 (PR 1205)
+* Use timezone-aware API to avoid deprecated warning (PR 1213)
+
 3.29.1
 ======
 March 19, 2024
