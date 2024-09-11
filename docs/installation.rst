@@ -239,7 +239,7 @@ through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X::
     $ brew install libev
 
 The libev extension can now be built for Windows as of Python driver version 3.29.2.  You can
-install libev using any Windows package manager.  For example, to install using `vcpkg <https://vcpkg.io>`_:
+install libev using any Windows package manager.  For example, to install using `vcpkg <https://vcpkg.io>`_::
 
     $ vcpkg install libev
 
