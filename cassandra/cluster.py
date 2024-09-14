@@ -37,6 +37,9 @@ import sys
 import time
 from threading import Lock, RLock, Thread, Event
 import uuid
+import os
+import urllib.request
+import json
 
 import weakref
 from weakref import WeakValueDictionary
@@ -1169,6 +1172,26 @@ class Cluster(object):
 
             uses_twisted = TwistedConnection and issubclass(self.connection_class, TwistedConnection)
             uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
+
+            # Check if we need to download the secure connect bundle
+            if 'db_id' in cloud and 'token' in cloud:
+                # download SCB if necessary
+                if 'secure_connect_bundle' not in cloud:
+                    bundle_path = f'astra-secure-connect-{cloud["db_id"]}.zip'
+                    if not os.path.exists(bundle_path):
+                        print('Downloading Secure Cloud Bundle')
+                        url = self._get_astra_bundle_url(cloud['db_id'], cloud['token'])
+                        try:
+                            with urllib.request.urlopen(url) as r:
+                                with open(bundle_path, 'wb') as f:
+                                    f.write(r.read())
+                        except urllib.error.URLError as e:
+                            raise Exception(f"Error downloading secure connect bundle: {str(e)}")
+                    cloud['secure_connect_bundle'] = bundle_path
+                # Set up auth_provider if not provided
+                if auth_provider is None:
+                    auth_provider = PlainTextAuthProvider('token', cloud['token'])
+
             cloud_config = dscloud.get_cloud_config(cloud, create_pyopenssl_context=uses_twisted or uses_eventlet)
 
             ssl_context = cloud_config.ssl_context
@@ -2183,6 +2206,29 @@ class Cluster(object):
         connection = self.control_connection._connection
         endpoint = connection.endpoint if connection else None
         return self.metadata.get_host(endpoint) if endpoint else None
+
+    @staticmethod
+    def _get_astra_bundle_url(db_id, token):
+        # set up the request
+        url = f"https://api.astra.datastax.com/v2/databases/{db_id}/secureBundleURL"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        req = urllib.request.Request(url, method="POST", headers=headers, data=b"")
+        try:
+            with urllib.request.urlopen(req) as response:
+                response_data = json.loads(response.read().decode())
+                # happy path
+                if 'downloadURL' in response_data:
+                    return response_data['downloadURL']
+                # handle errors
+                if 'errors' in response_data:
+                    raise Exception(response_data['errors'][0]['message'])
+                raise Exception('Unknown error in ' + str(response_data))
+        except urllib.error.URLError as e:
+            raise Exception(f"Error connecting to Astra API: {str(e)}")
 
     def refresh_schema_metadata(self, max_schema_agreement_wait=None):
         """
