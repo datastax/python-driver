@@ -40,6 +40,7 @@ import uuid
 import os
 import urllib.request
 import json
+from typing import Optional
 
 import weakref
 from weakref import WeakValueDictionary
@@ -1042,6 +1043,19 @@ class Cluster(object):
             'use_default_tempdir': True  # use the system temp dir for the zip extraction
         }
 
+        (or)
+
+        {
+            # Astra DB cluster UUID. Only if secure_connect_bundle is not provided
+            'db_id': 'db_id',
+
+            # required with db_id. Astra DB token
+            'token': 'AstraCS:change_me:change_me'
+
+            # optional with db_id & token. Astra DB region
+            'db_region': 'us-east1',
+        }
+
     The zip file will be temporarily extracted in the same directory to
     load the configuration and certificates.
     """
@@ -1174,13 +1188,17 @@ class Cluster(object):
             uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
 
             # Check if we need to download the secure connect bundle
-            if 'db_id' in cloud and 'token' in cloud:
+            if all(akey in cloud for akey in ('db_id', 'token')):
                 # download SCB if necessary
                 if 'secure_connect_bundle' not in cloud:
-                    bundle_path = f'astra-secure-connect-{cloud["db_id"]}.zip'
+                    bundle_path = f'astradb-scb-{cloud["db_id"]}'
+                    if 'db_region' in cloud:
+                        bundle_path += f'-{cloud["db_region"]}.zip'
+                    else:
+                        bundle_path += '.zip'
                     if not os.path.exists(bundle_path):
-                        print('Downloading Secure Cloud Bundle')
-                        url = self._get_astra_bundle_url(cloud['db_id'], cloud['token'])
+                        log.info('Downloading Secure Cloud Bundle...')
+                        url = self._get_astra_bundle_url(cloud['db_id'], cloud['token'], cloud["db_region"])
                         try:
                             with urllib.request.urlopen(url) as r:
                                 with open(bundle_path, 'wb') as f:
@@ -2208,21 +2226,51 @@ class Cluster(object):
         return self.metadata.get_host(endpoint) if endpoint else None
 
     @staticmethod
-    def _get_astra_bundle_url(db_id, token):
+    def _get_astra_bundle_url(db_id, token, db_region: Optional[str] = None):
+        """
+        Retrieves the secure connect bundle URL for an Astra DB cluster based on the provided 'db_id',
+        'db_region' (optional) and 'token'.
+
+        Args:
+            db_id (str): The Astra DB cluster UUID.
+            token (str): The Astra token.
+            db_region (optional str): The Astra DB cluster region.
+
+        Returns:
+            str: The secure connect bundle URL for the given inputs.
+
+        Raises:
+            URLError: If the request to the Astra DB API fails.
+        """
         # set up the request
-        url = f"https://api.astra.datastax.com/v2/databases/{db_id}/secureBundleURL"
+        url = f"https://api.astra.datastax.com/v2/databases/{db_id}/datacenters"
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
 
-        req = urllib.request.Request(url, method="POST", headers=headers, data=b"")
+        req = urllib.request.Request(url, method="GET", headers=headers, data=b"")
         try:
             with urllib.request.urlopen(req) as response:
                 response_data = json.loads(response.read().decode())
-                # happy path
-                if 'downloadURL' in response_data:
-                    return response_data['downloadURL']
+
+                if db_region is not None and len(db_region) > 0:
+                    for datacenter in response_data:
+                        if 'secureBundleUrl' in datacenter and datacenter['secureBundleUrl']:
+                            # happy path
+                            if db_region == datacenter['region']:
+                                return datacenter['secureBundleUrl']
+                            else:
+                                log.warning("Astra DB cluster region [%s] does not match input [%s]", datacenter['region'], db_region)
+                        else:
+                            raise ValueError("'secureBundleUrl' is missing from the Astra DB API response")
+                else:
+                    # Return just the primary region SCB URL
+                    if 'secureBundleUrl' in response_data[0] and response_data[0]['secureBundleUrl']:
+                        return response_data[0]['secureBundleUrl']
+                    else:
+                        raise ValueError("'secureBundleUrl' is missing from the Astra DB API response for the primary region")
+
                 # handle errors
                 if 'errors' in response_data:
                     raise Exception(response_data['errors'][0]['message'])
