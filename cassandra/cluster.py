@@ -1198,7 +1198,7 @@ class Cluster(object):
                         bundle_path += '.zip'
                     if not os.path.exists(bundle_path):
                         log.info('Downloading Secure Cloud Bundle...')
-                        url = self._get_astra_bundle_url(cloud['db_id'], cloud['token'], cloud["db_region"])
+                        url = self._get_astra_bundle_url(cloud['db_id'], cloud['token'], cloud.get("db_region"))
                         try:
                             with urllib.request.urlopen(url) as r:
                                 with open(bundle_path, 'wb') as f:
