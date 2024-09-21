@@ -1046,7 +1046,7 @@ class Cluster(object):
         (or)
 
         {
-            # Astra DB cluster UUID. Only if secure_connect_bundle is not provided
+            # Astra DB cluster UUID, used if secure_connect_bundle is not provided
             'db_id': 'db_id',
 
             # required with db_id. Astra DB token
@@ -1188,7 +1188,7 @@ class Cluster(object):
             uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
 
             # Check if we need to download the secure connect bundle
-            if all(akey in cloud for akey in ('db_id', 'token')):
+            if all(akey in cloud for akey in ['db_id', 'token']):
                 # download SCB if necessary
                 if 'secure_connect_bundle' not in cloud:
                     bundle_path = f'astradb-scb-{cloud["db_id"]}'
@@ -2233,7 +2233,7 @@ class Cluster(object):
 
         Args:
             db_id (str): The Astra DB cluster UUID.
-            token (str): The Astra token.
+            token (str): The Astra security token.
             db_region (optional str): The Astra DB cluster region.
 
         Returns:
