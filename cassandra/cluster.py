@@ -2240,9 +2240,9 @@ class Cluster(object):
             str: The secure connect bundle URL for the given inputs.
 
         Raises:
-            URLError: If the request to the Astra DB API fails.
+            ValueError: If the Astra DB API response is missing the download url or the specified db_region is not found.
+            Exception: If there's an error connecting to the Astra API or processing the response.
         """
-        # set up the request
         url = f"https://api.astra.datastax.com/v2/databases/{db_id}/datacenters"
         headers = {
             "Authorization": f"Bearer {token}",
@@ -2253,28 +2253,24 @@ class Cluster(object):
         try:
             with urllib.request.urlopen(req) as response:
                 response_data = json.loads(response.read().decode())
+                
+                # Convert list of responses to a dict keyed by region
+                datacenter_dict = {dc['region']: dc for dc in response_data if 'region' in dc}
 
-                if db_region is not None and len(db_region) > 0:
-                    for datacenter in response_data:
-                        if 'secureBundleUrl' in datacenter and datacenter['secureBundleUrl']:
-                            # happy path
-                            if db_region == datacenter['region']:
-                                return datacenter['secureBundleUrl']
-                            else:
-                                log.warning("Astra DB cluster region [%s] does not match input [%s]", datacenter['region'], db_region)
-                        else:
-                            raise ValueError("'secureBundleUrl' is missing from the Astra DB API response")
+                # Pull out the specified region, or the first one if not specified
+                if not datacenter_dict:
+                    raise ValueError("No valid datacenter information found in the Astra DB API response")
+                if db_region:
+                    if db_region not in datacenter_dict:
+                        raise ValueError(f"Astra DB region '{db_region}' not found in list of regions")
+                    datacenter = datacenter_dict[db_region]
                 else:
-                    # Return just the primary region SCB URL
-                    if 'secureBundleUrl' in response_data[0] and response_data[0]['secureBundleUrl']:
-                        return response_data[0]['secureBundleUrl']
-                    else:
-                        raise ValueError("'secureBundleUrl' is missing from the Astra DB API response for the primary region")
+                    # Use the first datacenter as the primary region
+                    datacenter = next(iter(datacenter_dict.values()))
 
-                # handle errors
-                if 'errors' in response_data:
-                    raise Exception(response_data['errors'][0]['message'])
-                raise Exception('Unknown error in ' + str(response_data))
+                if 'secureBundleUrl' not in datacenter or not datacenter['secureBundleUrl']:
+                    raise ValueError("'secureBundleUrl' is missing or empty in the Astra DB API response")
+                return datacenter['secureBundleUrl']
         except urllib.error.URLError as e:
             raise Exception(f"Error connecting to Astra API: {str(e)}")
 
