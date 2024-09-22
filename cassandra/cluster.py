@@ -81,7 +81,6 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
 from cassandra.marshal import int64_pack
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.util import _resolve_contact_points_to_string_map, Version
-from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args, execute_concurrent_async
 
 from cassandra.datastax.insights.reporter import MonitorReporter
 from cassandra.datastax.insights.util import version_supports_insights
@@ -2783,6 +2782,7 @@ class Session(object):
         block or attempt further synchronous requests, because no further IO will be processed until
         the consumer returns. This may also produce a deadlock in the IO event thread.
         """
+        from cassandra.concurrent import execute_concurrent
         return execute_concurrent(self, statements_and_parameters, concurrency, raise_on_first_error, results_generator, execution_profile)
 
     def execute_concurrent_with_args(self, statement, parameters, *args, **kwargs):
@@ -2797,6 +2797,7 @@ class Session(object):
             parameters = [(x,) for x in range(1000)]
             session.execute_concurrent_with_args(statement, parameters, concurrency=50)
         """
+        from cassandra.concurrent import execute_concurrent_with_args
         return execute_concurrent_with_args(self, statement, parameters, *args, **kwargs)
 
     def execute_concurrent_async(self, statements_and_parameters, concurrency=100, raise_on_first_error=False, execution_profile=EXEC_PROFILE_DEFAULT):
@@ -2813,6 +2814,7 @@ class Session(object):
         Returns:
             A `Future` object that will be completed when all operations are done.
         """
+        from cassandra.concurrent import execute_concurrent_async
         return execute_concurrent_async(self, statements_and_parameters, concurrency, raise_on_first_error, execution_profile)
 
     def execute_graph(self, query, parameters=None, trace=False, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT, execute_as=None):
