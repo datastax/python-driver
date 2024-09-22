@@ -13,15 +13,15 @@
 # limitations under the License.
 
 
+import logging
 from collections import namedtuple
+from concurrent.futures import Future
 from heapq import heappush, heappop
 from itertools import cycle
 from threading import Condition
-import sys
 
 from cassandra.cluster import ResultSet, EXEC_PROFILE_DEFAULT
 
-import logging
 log = logging.getLogger(__name__)
 
 
@@ -165,3 +165,47 @@ def execute_concurrent_with_args(session, statement, parameters, *args, **kwargs
     See :meth:`.Session.execute_concurrent_with_args`.
     """
     return execute_concurrent(session, zip(cycle((statement,)), parameters), *args, **kwargs)
+
+
+class ConcurrentExecutorFutureResults(ConcurrentExecutorListResults):
+    def __init__(self, session, statements_and_params, execution_profile, future):
+        super().__init__(session, statements_and_params, execution_profile)
+        self.future = future
+
+    def _put_result(self, result, idx, success):
+        super()._put_result(result, idx, success)
+        with self._condition:
+            if self._current == self._exec_count:
+                if self._exception and self._fail_fast:
+                    self.future.set_exception(self._exception)
+                else:
+                    sorted_results = [r[1] for r in sorted(self._results_queue)]
+                    self.future.set_result(sorted_results)
+
+
+def execute_concurrent_async(
+    session,
+    statements_and_parameters,
+    concurrency=100,
+    raise_on_first_error=False,
+    execution_profile=EXEC_PROFILE_DEFAULT
+):
+    """
+    See :meth:`.Session.execute_concurrent_async`.
+    """
+    # Create a Future object and initialize the custom ConcurrentExecutor with the Future
+    future = Future()
+    executor = ConcurrentExecutorFutureResults(
+        session=session,
+        statements_and_params=statements_and_parameters,
+        execution_profile=execution_profile,
+        future=future
+    )
+
+    # Execute concurrently
+    try:
+        executor.execute(concurrency=concurrency, fail_fast=raise_on_first_error)
+    except Exception as e:
+        future.set_exception(e)
+
+    return future

@@ -81,7 +81,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
 from cassandra.marshal import int64_pack
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.util import _resolve_contact_points_to_string_map, Version
-from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
+from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args, execute_concurrent_async
 
 from cassandra.datastax.insights.reporter import MonitorReporter
 from cassandra.datastax.insights.util import version_supports_insights
@@ -2798,6 +2798,22 @@ class Session(object):
             session.execute_concurrent_with_args(statement, parameters, concurrency=50)
         """
         return execute_concurrent_with_args(self, statement, parameters, *args, **kwargs)
+
+    def execute_concurrent_async(self, statements_and_parameters, concurrency=100, raise_on_first_error=False, execution_profile=EXEC_PROFILE_DEFAULT):
+        """
+        Asynchronously executes a sequence of (statement, parameters) tuples concurrently.
+
+        Args:
+            session: Cassandra session object.
+            statement_and_parameters: Iterable of (prepared CQL statement, bind parameters) tuples.
+            concurrency (int, optional): Number of concurrent operations. Default is 100.
+            raise_on_first_error (bool, optional): If True, execution stops on the first error. Default is True.
+            execution_profile (ExecutionProfile, optional): Execution profile to use. Default is EXEC_PROFILE_DEFAULT.
+
+        Returns:
+            A `Future` object that will be completed when all operations are done.
+        """
+        return execute_concurrent_async(self, statements_and_parameters, concurrency, raise_on_first_error, execution_profile)
 
     def execute_graph(self, query, parameters=None, trace=False, execution_profile=EXEC_PROFILE_GRAPH_DEFAULT, execute_as=None):
         """
