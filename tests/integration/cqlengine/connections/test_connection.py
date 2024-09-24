@@ -102,7 +102,7 @@ class SeveralConnectionsTest(BaseCassEngTestCase):
     def test_connection_session_switch(self):
         """
         Test to ensure that when the default keyspace is changed in a session and that session,
-        is set in the connection class, that the new defaul keyspace is honored.
+        is set in the connection class, that the new default keyspace is honored.
 
         @since 3.1
         @jira_ticket PYTHON-486
