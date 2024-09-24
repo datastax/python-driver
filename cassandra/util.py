@@ -640,7 +640,7 @@ class SortedSet(object):
             # could not compare a[mid] with x
             # start scanning to find insertion point while swallowing type errors
             lo = 0
-            compared_one = False  # flag is used to determine whether uncomparables are grouped at the front or back
+            compared_one = False  # flag is used to determine whether un-comparables are grouped at the front or back
             while lo < hi:
                 try:
                     if a[lo] == x or a[lo] >= x: break
@@ -1393,7 +1393,7 @@ class DateRangePrecision(object):
         if precision_idx <= cls._to_int(DateRangePrecision.MINUTE):
             replace_kwargs['second'] = default_dt.second
         if precision_idx <= cls._to_int(DateRangePrecision.SECOND):
-            # truncate to nearest 1000 so we deal in ms, not us
+            # truncate to nearest 1000, so we deal in ms, not us
             replace_kwargs['microsecond'] = (default_dt.microsecond // 1000) * 1000
         if precision_idx == cls._to_int(DateRangePrecision.MILLISECOND):
             replace_kwargs['microsecond'] = int(round(dt.microsecond, -3))
@@ -1402,7 +1402,7 @@ class DateRangePrecision(object):
     @classmethod
     def round_up_to_precision(cls, ms, precision):
         # PYTHON-912: this is the only case in which we can't take as upper bound
-        # datetime.datetime.max because the month from ms may be February and we'd
+        # datetime.datetime.max because the month from ms may be February, and we'd
         # be setting 31 as the month day
         if precision == cls.MONTH:
             date_ms = utc_datetime_from_ms_timestamp(ms)

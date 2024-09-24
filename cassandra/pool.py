@@ -666,7 +666,7 @@ class HostConnectionPool(object):
                 # wait_for_conn will increment in_flight on the conn
                 least_busy, request_id = self._wait_for_conn(timeout)
 
-            # if we have too many requests on this connection but we still
+            # if we have too many requests on this connection, but we still
             # have space to open a new connection against this host, go ahead
             # and schedule the creation of a new connection
             if least_busy.in_flight >= max_reqs and len(self._connections) < max_conns:
@@ -716,7 +716,7 @@ class HostConnectionPool(object):
             with self._lock:
                 new_connections = self._connections[:] + [conn]
                 self._connections = new_connections
-            log.debug("Added new connection (%s) to pool for host %s, signaling availablility",
+            log.debug("Added new connection (%s) to pool for host %s, signaling availability",
                       id(conn), self.host)
             self._signal_available_conn()
             return True

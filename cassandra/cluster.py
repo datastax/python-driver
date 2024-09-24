@@ -101,7 +101,7 @@ try:
     from cassandra.io.eventletreactor import EventletConnection
 # PYTHON-1364
 #
-# At the moment eventlet initialization is chucking AttributeErrors due to it's dependence on pyOpenSSL
+# At the moment eventlet initialization is chucking AttributeErrors due to its dependence on pyOpenSSL
 # and some changes in Python 3.12 which have some knock-on effects there.
 except (ImportError, AttributeError):
     EventletConnection = None
@@ -174,7 +174,7 @@ if not conn_class:
 DefaultConnection = conn_class
 
 # Forces load of utf8 encoding module to avoid deadlock that occurs
-# if code that is being imported tries to import the module in a seperate
+# if code that is being imported tries to import the module in a separate
 # thread.
 # See http://bugs.python.org/issue10923
 "".encode('utf8')
@@ -1024,7 +1024,7 @@ class Cluster(object):
 
     application_version = ''
     """
-    A string identifiying this application's version to Insights
+    A string identifying this application's version to Insights
     """
 
     cloud = None
@@ -1154,7 +1154,7 @@ class Cluster(object):
                  column_encryption_policy=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
-        extablishing connection pools or refreshing metadata.
+        establishing connection pools or refreshing metadata.
 
         Any of the mutable Cluster attributes may be set as keyword arguments to the constructor.
         """
@@ -1461,7 +1461,7 @@ class Cluster(object):
         for.
 
         `klass` should be a class with attributes whose names match the
-        fields of the user-defined type.  The constructor must accepts kwargs
+        fields of the user-defined type.  The constructor must accept kwargs
         for each of the fields in the UDT.
 
         This method should only be called after the type has been created
@@ -3168,7 +3168,7 @@ class Session(object):
                     continue
 
                 if request_id is None:
-                    # the error has already been logged by ResponsFuture
+                    # the error has already been logged by ResponseFuture
                     log.debug("Failed to prepare query for host %s: %r",
                               host, future._errors.get(host))
                     continue
@@ -3965,7 +3965,7 @@ class ControlConnection(object):
         elif change_type == "DOWN":
             # Note that there is a slight risk we can receive the event late and thus
             # mark the host down even though we already had reconnected successfully.
-            # But it is unlikely, and don't have too much consequence since we'll try reconnecting
+            # This is unlikely, and will not have much consequence because we'll try reconnecting
             # right away, so we favor the detection to make the Host.is_up more accurate.
             if host is not None:
                 # this will be run by the scheduler
@@ -4447,7 +4447,7 @@ class ResponseFuture(object):
             # PYTHON-836, the speculative queries must be after
             # the query is sent from the main thread, otherwise the
             # query from the main thread may raise NoHostAvailable
-            # if the _query_plan has been exhausted by the specualtive queries.
+            # if the _query_plan has been exhausted by the speculative queries.
             # This also prevents a race condition accessing the iterator.
             # We reschedule this call until the main thread has succeeded
             # making a query
@@ -4559,7 +4559,7 @@ class ResponseFuture(object):
 
         Ensure the future is complete before trying to access this property
         (call :meth:`.result()`, or after callback is invoked).
-        Otherwise it may throw if the response has not been received.
+        Otherwise, it may throw if the response has not been received.
         """
         # TODO: When timers are introduced, just make this wait
         if not self._event.is_set():
@@ -4575,7 +4575,7 @@ class ResponseFuture(object):
 
         Ensure the future is complete before trying to access this property
         (call :meth:`.result()`, or after callback is invoked).
-        Otherwise it may throw if the response has not been received.
+        Otherwise, it may throw if the response has not been received.
 
         :return: :ref:`custom_payload`.
         """
@@ -5285,7 +5285,7 @@ class ResultSet(object):
         try:
             self.response_future._continuous_paging_session.cancel()
         except AttributeError:
-            raise DriverException("Attempted to cancel paging with no active session. This is only for requests with ContinuousdPagingOptions.")
+            raise DriverException("Attempted to cancel paging with no active session. This is only for requests with ContinuousPagingOptions.")
 
     @property
     def was_applied(self):
@@ -5296,7 +5296,7 @@ class ResultSet(object):
         a :class:`.query.BatchStatement` containing LWT. In the latter case either all the batch
         succeeds or fails.
 
-        Only valid when one of the of the internal row factories is in use.
+        Only valid when one of the internal row factories is in use.
         """
         if self.response_future.row_factory not in (named_tuple_factory, dict_factory, tuple_factory):
             raise RuntimeError("Cannot determine LWT result with row factory %s" % (self.response_future.row_factory,))
