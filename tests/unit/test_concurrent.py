@@ -40,7 +40,7 @@ class MockResponseResponseFuture():
     _col_names = None
     _col_types = None
 
-    # a list pending callbacks, these will be prioritized in reverse or normal orderd
+    # a list pending callbacks, these will be prioritized in reverse or normal order
     pending_callbacks = PriorityQueue()
 
     def __init__(self, reverse):
@@ -179,7 +179,7 @@ class ConcurrencyTest((unittest.TestCase)):
         This utility method will execute submit various statements for execution using the ConcurrentExecutorListResults,
         then invoke a separate thread to execute the callback associated with the futures registered
         for those statements. The parameters will toggle various timing, and ordering changes.
-        Finally it will validate that the results were returned in the order they were submitted
+        Finally, it will validate that the results were returned in the order they were submitted
         :param reverse: Execute the callbacks in the opposite order that they were submitted
         :param slowdown: Cause intermittent queries to perform slowly
         """
@@ -203,7 +203,7 @@ class ConcurrencyTest((unittest.TestCase)):
         This utility method will execute submit various statements for execution using the ConcurrentExecutorGenResults,
         then invoke a separate thread to execute the callback associated with the futures registered
         for those statements. The parameters will toggle various timing, and ordering changes.
-        Finally it will validate that the results were returned in the order they were submitted
+        Finally, it will validate that the results were returned in the order they were submitted
         :param reverse: Execute the callbacks in the opposite order that they were submitted
         :param slowdown: Cause intermittent queries to perform slowly
         """
@@ -232,7 +232,7 @@ class ConcurrencyTest((unittest.TestCase)):
             self.assertTrue(success)
             current_time_added = list(result)[0]
 
-            #Windows clock granularity makes this equal most of the times
+            # Windows clock granularity makes this equal most of the time
             if "Windows" in platform.system():
                 self.assertLessEqual(last_time_added, current_time_added)
             else:

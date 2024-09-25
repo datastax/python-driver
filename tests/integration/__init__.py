@@ -699,7 +699,7 @@ def drop_keyspace_shutdown_cluster(keyspace_name, session, cluster):
     try:
         execute_with_long_wait_retry(session, "DROP KEYSPACE {0}".format(keyspace_name))
     except:
-        log.warning("Error encountered when droping keyspace {0}".format(keyspace_name))
+        log.warning("Error encountered when dropping keyspace {0}".format(keyspace_name))
         ex_type, ex, tb = sys.exc_info()
         log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
         del tb

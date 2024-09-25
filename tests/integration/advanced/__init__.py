@@ -88,7 +88,7 @@ def use_singledc_wth_graph_and_spark(start=True):
 
 def use_cluster_with_graph(num_nodes):
     """
-    This is a  work around to account for the fact that spark nodes will conflict over master assignment
+    This is a  workaround to account for the fact that spark nodes will conflict over master assignment
     when started all at once.
     """
     if USE_CASS_EXTERNAL:
@@ -125,7 +125,7 @@ def use_cluster_with_graph(num_nodes):
 
 class BasicGeometricUnitTestCase(BasicKeyspaceUnitTestCase):
     """
-    This base test class is used by all the geomteric tests. It contains class level teardown and setup
+    This base test class is used by all the geometric tests. It contains class level teardown and setup
     methods. It also contains the test fixtures used by those tests
     """
 

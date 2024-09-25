@@ -199,9 +199,7 @@ class DeleteWithTimestampTest(BaseTimestampTest):
 
         TestTimestampModel.get(id=uid).should.be.ok
 
-        # delete the in past, should not affect the object created above
+        # delete in the past, should not affect the object created above
         TestTimestampModel.objects(id=uid).timestamp(timedelta(seconds=-60)).delete()
 
         TestTimestampModel.get(id=uid)
-
-

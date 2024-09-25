@@ -110,9 +110,9 @@ class CloudSchemaTests(CloudProxyCluster):
         self.check_and_wait_for_agreement(session, rs, True)
         cluster.shutdown()
 
-    def check_and_wait_for_agreement(self, session, rs, exepected):
+    def check_and_wait_for_agreement(self, session, rs, expected):
         # Wait for RESULT_KIND_SCHEMA_CHANGE message to arrive
         time.sleep(1)
-        self.assertEqual(rs.response_future.is_schema_agreed, exepected)
+        self.assertEqual(rs.response_future.is_schema_agreed, expected)
         if not rs.response_future.is_schema_agreed:
             session.cluster.control_connection.wait_for_schema_agreement(wait_time=1000)

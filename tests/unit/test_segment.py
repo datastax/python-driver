@@ -24,6 +24,7 @@ from cassandra.connection import segment_codec_no_compression, segment_codec_lz4
 def to_bits(b):
     return '{:08b}'.format(b)
 
+
 class SegmentCodecTest(unittest.TestCase):
 
     small_msg = b'b' * 50
@@ -38,12 +39,12 @@ class SegmentCodecTest(unittest.TestCase):
             data = data[:5]
             bits = ''.join([to_bits(b) for b in reversed(data)])
             # return the compressed payload length, the uncompressed payload length,
-            # the self contained flag and the padding as bits
+            # the self-contained flag and the padding as bits
             return bits[23:40] + bits[6:23] + bits[5:6] + bits[:5]
         else:  # uncompressed
             data = data[:3]
             bits = ''.join([to_bits(b) for b in reversed(data)])
-            # return the payload length, the self contained flag and
+            # return the payload length, the self-contained flag and
             # the padding as bits
             return bits[7:24] + bits[6:7] + bits[:6]
 
@@ -88,7 +89,7 @@ class SegmentCodecTest(unittest.TestCase):
         self.assertEqual(
             self._header_to_bits(buffer.getvalue()),
             ("11111111111111111"
-             "0"  # not self contained
+             "0"  # not self-contained
              "000000"))
 
     @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')
@@ -112,7 +113,7 @@ class SegmentCodecTest(unittest.TestCase):
             self._header_to_bits(buffer.getvalue()),
             ("{:017b}".format(compressed_length) +
              "11111111111111111"
-             "0"  # not self contained
+             "0"  # not self-contained
              "00000"))
 
     def test_decode_uncompressed_header(self):

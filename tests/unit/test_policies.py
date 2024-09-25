@@ -202,7 +202,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         local_hosts = set(h for h in hosts if h.datacenter == "dc1")
         remote_hosts = set(h for h in hosts if h.datacenter != "dc1")
 
-        # allow all of the remote hosts to be used
+        # allow all the remote hosts to be used
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=2)
         policy.populate(Mock(), hosts)
         qplan = list(policy.make_query_plan())

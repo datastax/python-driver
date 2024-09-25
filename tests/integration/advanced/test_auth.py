@@ -67,7 +67,7 @@ class BasicDseAuthTest(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         """
-        This will setup the necessary infrastructure to run our authentication tests. It requres the ADS_HOME environment variable
+        This will setup the necessary infrastructure to run our authentication tests. It requires the ADS_HOME environment variable
         and our custom embedded apache directory server jar in order to run.
         """
         if not DSE_VERSION:
@@ -86,7 +86,7 @@ class BasicDseAuthTest(unittest.TestCase):
         self.charlie_keytab = os.path.join(self.conf_file_dir, "charlie.keytab")
         actual_jar = os.path.join(ADS_HOME, "embedded-ads.jar")
 
-        # Create configuration directories if they don't already exists
+        # Create configuration directories if they don't already exist
         if not os.path.exists(self.conf_file_dir):
             os.makedirs(self.conf_file_dir)
         if not os.path.exists(actual_jar):
@@ -175,7 +175,7 @@ class BasicDseAuthTest(unittest.TestCase):
         auth_provider = DSEGSSAPIAuthProvider(service='dse', qops=["auth"])
         self.assertRaises(NoHostAvailable, self.connect_and_query, auth_provider)
 
-    def test_should_not_athenticate_without_ticket(self):
+    def test_should_not_authenticate_without_ticket(self):
         """
         This tests will attempt to authenticate with a user that is valid but has no ticket
         @since 3.20

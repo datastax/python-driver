@@ -100,7 +100,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         m = TestIfExistsModel.get(id=id)
         self.assertEqual(m.text, 'changed_again')
 
-        m = TestIfExistsModel(id=uuid4(), count=44)  # do not exists
+        m = TestIfExistsModel(id=uuid4(), count=44)  # do not exist
         with self.assertRaises(LWTException) as assertion:
             m.if_exists().update()
 
@@ -155,7 +155,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_mixed_update_if_exists_success(self):
         """
-        Tests that batch update with with one bad query will still fail with LWTException
+        Tests that batch update with one bad query will still fail with LWTException
 
         @since 3.1
         @jira_ticket PYTHON-432
@@ -177,7 +177,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_delete_if_exists(self):
         """
-        Tests that delete with if_exists work, and throw proper LWT exception when they are are not applied
+        Tests that delete with if_exists work, and throws proper LWT exception when they are not applied
 
         @since 3.1
         @jira_ticket PYTHON-432
@@ -193,7 +193,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         q = TestIfExistsModel.objects(id=id)
         self.assertEqual(len(q), 0)
 
-        m = TestIfExistsModel(id=uuid4(), count=44)  # do not exists
+        m = TestIfExistsModel(id=uuid4(), count=44)  # do not exist
         with self.assertRaises(LWTException) as assertion:
             m.if_exists().delete()
 
@@ -212,7 +212,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_delete_if_exists_success(self):
         """
-        Tests that batch deletes with if_exists work, and throw proper LWTException when they are are not applied
+        Tests that batch deletes with if_exists work, and throws proper LWTException when they are not applied
 
         @since 3.1
         @jira_ticket PYTHON-432
@@ -243,7 +243,7 @@ class IfExistsUpdateTests(BaseIfExistsTest):
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_delete_mixed(self):
         """
-        Tests that batch deletes  with multiple queries and throw proper LWTException when they are are not all applicable
+        Tests that batch deletes  with multiple queries and throws proper LWTException when they are not all applicable
 
         @since 3.1
         @jira_ticket PYTHON-432
@@ -309,4 +309,3 @@ class IfExistWithCounterTest(BaseIfExistsWithCounterTest):
         id = uuid4()
         with self.assertRaises(IfExistsWithCounterColumn):
             TestIfExistsWithCounterModel.if_exists()
-
