@@ -117,22 +117,22 @@ class ClusterTests(unittest.TestCase):
 
     def test_execute_concurrent(self):
         self.execute_concurrent_base(self.execute_concurrent_helper, \
-            self.execute_concurrent_valiate_tuple)
+            self.execute_concurrent_validate_tuple)
 
     def test_execute_concurrent_with_args(self):
         self.execute_concurrent_base(self.execute_concurrent_args_helper, \
-            self.execute_concurrent_valiate_tuple, \
+            self.execute_concurrent_validate_tuple, \
                 zip_args=False)
 
     def test_execute_concurrent_with_execution_profile(self):
         def run_fn(*args, **kwargs):
             return self.execute_concurrent_helper(*args, execution_profile=EXEC_PROFILE_DICT, **kwargs)
-        self.execute_concurrent_base(run_fn, self.execute_concurrent_valiate_dict)
+        self.execute_concurrent_base(run_fn, self.execute_concurrent_validate_dict)
 
     def test_execute_concurrent_with_args_and_execution_profile(self):
         def run_fn(*args, **kwargs):
             return self.execute_concurrent_args_helper(*args, execution_profile=EXEC_PROFILE_DICT, **kwargs)
-        self.execute_concurrent_base(run_fn, self.execute_concurrent_valiate_dict, zip_args=False)
+        self.execute_concurrent_base(run_fn, self.execute_concurrent_validate_dict, zip_args=False)
 
     def test_execute_concurrent_with_args_generator(self):
         """

@@ -36,7 +36,7 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
 
     def _create_policy(self, key, iv = None):
         cl_policy = AES256ColumnEncryptionPolicy()
-        col_desc = ColDesc('foo', ' bar', 'encrypted')
+        col_desc = ColDesc('foo',' bar','encrypted')
         cl_policy.add_column(col_desc, key, "int")
         return (col_desc, cl_policy)
 
