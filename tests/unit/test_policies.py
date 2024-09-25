@@ -303,7 +303,7 @@ class DCAwareRoundRobinPolicyTest(unittest.TestCase):
         policy = DCAwareRoundRobinPolicy("dc1", used_hosts_per_remote_dc=3)
         policy.populate(Mock(), hosts)
 
-        # The general concept here is to change thee internal state of the
+        # The general concept here is to change the internal state of the
         # policy during plan generation. In this case we use a grey-box
         # approach that changes specific things during known phases of the
         # generator.
@@ -1196,7 +1196,7 @@ class DowngradingConsistencyRetryPolicyTest(unittest.TestCase):
                 query=None, consistency=ONE, write_type=write_type,
                 required_responses=1, received_responses=2, retry_num=0)
             self.assertEqual(retry, RetryPolicy.IGNORE)
-            # retrhow if we can't be sure we have a replica
+            # rethrow if we can't be sure we have a replica
             retry, consistency = policy.on_write_timeout(
                 query=None, consistency=ONE, write_type=write_type,
                 required_responses=1, received_responses=0, retry_num=0)

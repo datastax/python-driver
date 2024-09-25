@@ -241,7 +241,7 @@ class PreparedStatementTests(unittest.TestCase):
         @since 2.6.0
 
         @jira_ticket PYTHON-317
-        @expected_result UNSET_VALUE is implicitly added to bind parameters, and properly encoded, leving unset values unaffected.
+        @expected_result UNSET_VALUE is implicitly added to bind parameters, and properly encoded, leaving unset values unaffected.
 
         @test_category prepared_statements:binding
         """
@@ -464,7 +464,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @since 3.12
         @jira_ticket PYTHON-808
 
-        The query id from the prepared statment must have changed
+        The query id from the prepared statement must have changed
         """
         prepared_statement = self.session.prepare("SELECT * from {} WHERE a = ?".format(self.table_name))
         id_before = prepared_statement.result_metadata_id
@@ -552,7 +552,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
     def test_id_is_not_updated_conditional_v4(self):
         """
         Test that verifies that the result_metadata and the
-        result_metadata_id are udpated correctly in conditional statements
+        result_metadata_id are updated correctly in conditional statements
         in protocol V4
 
         @since 3.13
@@ -567,7 +567,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
     def test_id_is_not_updated_conditional_v5(self):
         """
         Test that verifies that the result_metadata and the
-        result_metadata_id are udpated correctly in conditional statements
+        result_metadata_id are updated correctly in conditional statements
         in protocol V5
         @since 3.13
         @jira_ticket PYTHON-847
@@ -581,7 +581,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
     def test_id_is_not_updated_conditional_dsev1(self):
         """
         Test that verifies that the result_metadata and the
-        result_metadata_id are udpated correctly in conditional statements
+        result_metadata_id are updated correctly in conditional statements
         in protocol DSE V1
 
         @since 3.13
@@ -596,7 +596,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
     def test_id_is_not_updated_conditional_dsev2(self):
         """
         Test that verifies that the result_metadata and the
-        result_metadata_id are udpated correctly in conditional statements
+        result_metadata_id are updated correctly in conditional statements
         in protocol DSE V2
 
         @since 3.13
