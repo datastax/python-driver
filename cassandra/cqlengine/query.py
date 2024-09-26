@@ -938,7 +938,7 @@ class AbstractQuerySet(object):
 
     def allow_filtering(self):
         """
-        Enables the (usually) unwise practive of querying on a clustering key without also defining a partition key
+        Enables the (usually) unwise practice of querying on a clustering key without also defining a partition key
         """
         clone = copy.deepcopy(self)
         clone._allow_filtering = True
@@ -1417,7 +1417,7 @@ class DMLQuery(object):
         prior to calling this.
         """
         if self.instance is None:
-            raise CQLEngineException("DML Query intance attribute is None")
+            raise CQLEngineException("DML Query instance attribute is None")
         assert type(self.instance) == self.model
         null_clustering_key = False if len(self.instance._clustering_keys) == 0 else True
         static_changed_only = True
@@ -1429,7 +1429,7 @@ class DMLQuery(object):
         updated_columns = set()
         # get defined fields and their column names
         for name, col in self.model._columns.items():
-            # if clustering key is null, don't include non static columns
+            # if clustering key is null, don't include non-static columns
             if null_clustering_key and not col.static and not col.partition_key:
                 continue
             if not col.is_primary_key:
@@ -1448,7 +1448,7 @@ class DMLQuery(object):
 
         if statement.assignments:
             for name, col in self.model._primary_keys.items():
-                # only include clustering key if clustering key is not null, and non static columns are changed to avoid cql error
+                # only include clustering key if clustering key is not null, and non-static columns are changed to avoid cql error
                 if (null_clustering_key or static_changed_only) and (not col.partition_key):
                     continue
                 statement.add_where(col, EqualsOperator(), getattr(self.instance, name))
@@ -1468,7 +1468,7 @@ class DMLQuery(object):
         prior to calling this.
         """
         if self.instance is None:
-            raise CQLEngineException("DML Query intance attribute is None")
+            raise CQLEngineException("DML Query instance attribute is None")
         assert type(self.instance) == self.model
 
         nulled_fields = set()

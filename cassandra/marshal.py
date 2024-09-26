@@ -122,8 +122,8 @@ def vints_pack(values):
             num_extra_bytes = 0
             num_bits = v.bit_length()
             # We need to reserve (num_extra_bytes+1) bits in the first byte
-            # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX' # 2 bits reserved
-            # ie. with 8 extra bytes, the first byte needs to be '11111111'  # 8 bits reserved
+            # i.e. with 1 extra byte, the first byte needs to be something like '10XXXXXX' # 2 bits reserved
+            # i.e. with 8 extra bytes, the first byte needs to be '11111111'  # 8 bits reserved
             reserved_bits = num_extra_bytes + 1
             while num_bits > (8-(reserved_bits)):
                 num_extra_bytes += 1
@@ -167,8 +167,8 @@ def uvint_pack(val):
         num_extra_bytes = 0
         num_bits = v.bit_length()
         # We need to reserve (num_extra_bytes+1) bits in the first byte
-        # ie. with 1 extra byte, the first byte needs to be something like '10XXXXXX' # 2 bits reserved
-        # ie. with 8 extra bytes, the first byte needs to be '11111111'  # 8 bits reserved
+        # i.e. with 1 extra byte, the first byte needs to be something like '10XXXXXX' # 2 bits reserved
+        # i.e. with 8 extra bytes, the first byte needs to be '11111111'  # 8 bits reserved
         reserved_bits = num_extra_bytes + 1
         while num_bits > (8-(reserved_bits)):
             num_extra_bytes += 1

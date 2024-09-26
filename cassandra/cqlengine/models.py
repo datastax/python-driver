@@ -183,7 +183,7 @@ class TimestampDescriptor(object):
 
 class IfNotExistsDescriptor(object):
     """
-    return a query set descriptor with a if_not_exists flag specified
+    return a query set descriptor with an if_not_exists flag specified
     """
     def __get__(self, instance, model):
         if instance:
@@ -201,7 +201,7 @@ class IfNotExistsDescriptor(object):
 
 class IfExistsDescriptor(object):
     """
-    return a query set descriptor with a if_exists flag specified
+    return a query set descriptor with an if_exists flag specified
     """
     def __get__(self, instance, model):
         if instance:
@@ -398,7 +398,7 @@ class BaseModel(object):
         self._values = {}
         for name, column in self._columns.items():
             # Set default values on instantiation. Thanks to this, we don't have
-            # to wait anylonger for a call to validate() to have CQLengine set
+            # to wait any longer for a call to validate() to have CQLengine set
             # default columns values.
             column_default = column.get_default() if column.has_default else None
             value = values.get(name, column_default)
