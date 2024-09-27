@@ -11,13 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import datetime
 import unittest
 
 from cassandra.metadata import (
     KeyspaceMetadata, TableMetadataDSE68,
-    VertexMetadata, EdgeMetadata
+    VertexMetadata, EdgeMetadata, SchemaParserV22, _SchemaParser
 )
+from cassandra.protocol import ResultMessage, RESULT_KIND_ROWS
 
 
 class GraphMetadataToCQLTests(unittest.TestCase):
@@ -136,3 +137,44 @@ class GraphMetadataToCQLTests(unittest.TestCase):
             'FROM from_label((pk1, pk2), c1, c2) ',
             tm.as_cql_query()
         )
+
+
+class SchemaParsersTests(unittest.TestCase):
+    def test_metadata_query_metadata_timeout(self):
+        class FakeConnection:
+            def __init__(self):
+                self.queries = []
+
+            def wait_for_responses(self, *msgs, **kwargs):
+                self.queries.extend(msgs)
+                local_response = ResultMessage(kind=RESULT_KIND_ROWS)
+                local_response.column_names = []
+                local_response.parsed_rows = []
+
+                return [[local_response, local_response] for _ in msgs]
+
+        for schemaClass in get_all_schema_parser_classes(_SchemaParser):
+            conn = FakeConnection()
+            p = schemaClass(conn, 2.0, 1000, None)
+            p._query_all()
+
+            for q in conn.queries:
+                if "USING TIMEOUT" in q.query:
+                    self.fail(f"<{schemaClass.__name__}> query `{q.query}` contains `USING TIMEOUT`, while should not")
+
+            conn = FakeConnection()
+            p = schemaClass(conn, 2.0, 1000, datetime.timedelta(seconds=2))
+            p._query_all()
+
+            for q in conn.queries:
+                if "USING TIMEOUT 2000ms" not in q.query:
+                    self.fail(f"{schemaClass.__name__} query `{q.query}` does not contain `USING TIMEOUT 2000ms`")
+
+
+def get_all_schema_parser_classes(cl):
+    for child in cl.__subclasses__():
+        if not child.__name__.startswith('SchemaParser') or child.__module__ != 'cassandra.metadata':
+            continue
+        yield child
+        for c in get_all_schema_parser_classes(child):
+            yield c

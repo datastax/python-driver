@@ -15,7 +15,7 @@ import unittest
 
 import datetime
 
-from cassandra.util import Date, Time, Duration, Version
+from cassandra.util import Date, Time, Duration, Version, maybe_add_timeout_to_query
 
 
 class DateTests(unittest.TestCase):
@@ -287,3 +287,15 @@ class VersionTests(unittest.TestCase):
         self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0.0-SNAPSHOT1'))
 
         self.assertTrue(Version('4.0.0-alpha1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))
+
+
+class FunctionTests(unittest.TestCase):
+    def test_maybe_add_timeout_to_query(self):
+        self.assertEqual(
+            "SELECT * FROM HOSTS",
+            maybe_add_timeout_to_query("SELECT * FROM HOSTS", None)
+        )
+        self.assertEqual(
+            "SELECT * FROM HOSTS USING TIMEOUT 1000ms",
+            maybe_add_timeout_to_query("SELECT * FROM HOSTS", datetime.timedelta(seconds=1))
+        )
