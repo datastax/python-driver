@@ -43,6 +43,7 @@ from cassandra.util import OrderedDict, Version
 from cassandra.pool import HostDistance
 from cassandra.connection import EndPoint
 from cassandra.tablets import Tablets
+from cassandra.util import maybe_add_timeout_to_query
 
 log = logging.getLogger(__name__)
 
@@ -2005,7 +2006,8 @@ class _SchemaParser(object):
         return result[0] if result else None
 
     def _query_build_rows(self, query_string, build_func):
-        query = QueryMessage(query=query_string, consistency_level=ConsistencyLevel.ONE, fetch_size=self.fetch_size)
+        query = QueryMessage(query=maybe_add_timeout_to_query(query_string, self.metadata_request_timeout),
+                             consistency_level=ConsistencyLevel.ONE, fetch_size=self.fetch_size)
         responses = self.connection.wait_for_responses((query), timeout=self.timeout, fail_on_error=False)
         (success, response) = responses[0]
         results = self._handle_results(success, response, expected_failures=(InvalidRequest), query_msg=query)
@@ -2105,9 +2107,18 @@ class SchemaParserV22(_SchemaParser):
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
         where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col,), (keyspace, table), _encoder)
-        cf_query = QueryMessage(query=self._SELECT_COLUMN_FAMILIES + where_clause, consistency_level=cl)
-        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
-        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl)
+        cf_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_COLUMN_FAMILIES + where_clause, self.metadata_request_timeout),
+            consistency_level=cl,
+        )
+        col_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_COLUMNS + where_clause, self.metadata_request_timeout),
+            consistency_level=cl,
+        )
+        triggers_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_TRIGGERS + where_clause, self.metadata_request_timeout),
+            consistency_level=cl,
+        )
         (cf_success, cf_result), (col_success, col_result), (triggers_success, triggers_result) \
             = self.connection.wait_for_responses(cf_query, col_query, triggers_query, timeout=self.timeout, fail_on_error=False)
         table_result = self._handle_results(cf_success, cf_result)
@@ -2421,13 +2432,34 @@ class SchemaParserV22(_SchemaParser):
     def _query_all(self):
         cl = ConsistencyLevel.ONE
         queries = [
-            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMN_FAMILIES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl)
+            QueryMessage(
+                query=maybe_add_timeout_to_query(self._SELECT_KEYSPACES, self.metadata_request_timeout),
+                consistency_level=cl,
+            ),
+            QueryMessage(
+                query=maybe_add_timeout_to_query(self._SELECT_COLUMN_FAMILIES, self.metadata_request_timeout),
+                consistency_level=cl,
+            ),
+            QueryMessage(
+                query=maybe_add_timeout_to_query(self._SELECT_COLUMNS, self.metadata_request_timeout),
+                consistency_level=cl,
+            ),
+            QueryMessage(
+                query=maybe_add_timeout_to_query(self._SELECT_TYPES, self.metadata_request_timeout),
+                consistency_level=cl,
+            ),
+            QueryMessage(
+                query=maybe_add_timeout_to_query(self._SELECT_FUNCTIONS, self.metadata_request_timeout),
+                consistency_level=cl,
+            ),
+            QueryMessage(
+                query=maybe_add_timeout_to_query(self._SELECT_AGGREGATES, self.metadata_request_timeout),
+                consistency_level=cl,
+            ),
+            QueryMessage(
+                query=maybe_add_timeout_to_query(self._SELECT_TRIGGERS, self.metadata_request_timeout),
+                consistency_level=cl,
+            )
         ]
 
         ((ks_success, ks_result),
@@ -2593,16 +2625,27 @@ class SchemaParserV3(SchemaParserV22):
         cl = ConsistencyLevel.ONE
         fetch_size = self.fetch_size
         where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
-        cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl, fetch_size=fetch_size)
-        col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl, fetch_size=fetch_size)
-        indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl, fetch_size=fetch_size)
-        triggers_query = QueryMessage(query=self._SELECT_TRIGGERS + where_clause, consistency_level=cl, fetch_size=fetch_size)
-        scylla_query = QueryMessage(query=self._SELECT_SCYLLA + where_clause, consistency_level=cl, fetch_size=fetch_size)
+        cf_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_TABLES + where_clause, self.metadata_request_timeout),
+            consistency_level=cl, fetch_size=fetch_size)
+        col_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_COLUMNS + where_clause, self.metadata_request_timeout),
+            consistency_level=cl, fetch_size=fetch_size)
+        indexes_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_INDEXES + where_clause, self.metadata_request_timeout),
+            consistency_level=cl, fetch_size=fetch_size)
+        triggers_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_TRIGGERS + where_clause, self.metadata_request_timeout),
+            consistency_level=cl, fetch_size=fetch_size)
+        scylla_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_SCYLLA + where_clause, self.metadata_request_timeout),
+            consistency_level=cl, fetch_size=fetch_size)
 
         # in protocol v4 we don't know if this event is a view or a table, so we look for both
         where_clause = bind_params(" WHERE keyspace_name = %s AND view_name = %s", (keyspace, table), _encoder)
-        view_query = QueryMessage(query=self._SELECT_VIEWS + where_clause,
-                                  consistency_level=cl, fetch_size=fetch_size)
+        view_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_VIEWS + where_clause, self.metadata_request_timeout),
+            consistency_level=cl, fetch_size=fetch_size)
         ((cf_success, cf_result), (col_success, col_result),
          (indexes_sucess, indexes_result), (triggers_success, triggers_result),
          (view_success, view_result),
@@ -2774,16 +2817,26 @@ class SchemaParserV3(SchemaParserV22):
         cl = ConsistencyLevel.ONE
         fetch_size = self.fetch_size
         queries = [
-            QueryMessage(query=self._SELECT_KEYSPACES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TABLES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMNS, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TYPES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_FUNCTIONS, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_AGGREGATES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TRIGGERS, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_INDEXES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIEWS, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_SCYLLA, fetch_size=fetch_size, consistency_level=cl)
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_KEYSPACES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TABLES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_COLUMNS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TYPES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_FUNCTIONS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_AGGREGATES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TRIGGERS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_INDEXES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIEWS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_SCYLLA, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
         ]
 
         ((ks_success, ks_result),
@@ -2874,19 +2927,31 @@ class SchemaParserV4(SchemaParserV3):
         fetch_size = self.fetch_size
         queries = [
             # copied from V3
-            QueryMessage(query=self._SELECT_KEYSPACES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TABLES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMNS, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TYPES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_FUNCTIONS, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_AGGREGATES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TRIGGERS, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_INDEXES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIEWS, fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_KEYSPACES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TABLES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_COLUMNS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TYPES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_FUNCTIONS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_AGGREGATES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TRIGGERS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_INDEXES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIEWS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
             # V4-only queries
-            QueryMessage(query=self._SELECT_VIRTUAL_KEYSPACES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIRTUAL_TABLES, fetch_size=fetch_size, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIRTUAL_COLUMNS, fetch_size=fetch_size, consistency_level=cl)
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIRTUAL_KEYSPACES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIRTUAL_TABLES, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIRTUAL_COLUMNS, self.metadata_request_timeout),
+                         fetch_size=fetch_size, consistency_level=cl),
         ]
 
         responses = self.connection.wait_for_responses(
@@ -3010,8 +3075,14 @@ class SchemaParserDSE68(SchemaParserDSE67):
         table_meta = super(SchemaParserDSE68, self).get_table(keyspaces, keyspace, table)
         cl = ConsistencyLevel.ONE
         where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
-        vertices_query = QueryMessage(query=self._SELECT_VERTICES + where_clause, consistency_level=cl)
-        edges_query = QueryMessage(query=self._SELECT_EDGES + where_clause, consistency_level=cl)
+        vertices_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_VERTICES + where_clause, self.metadata_request_timeout),
+            consistency_level=cl,
+        )
+        edges_query = QueryMessage(
+            query=maybe_add_timeout_to_query(self._SELECT_EDGES + where_clause, self.metadata_request_timeout),
+            consistency_level=cl,
+        )
 
         (vertices_success, vertices_result), (edges_success, edges_result) \
             = self.connection.wait_for_responses(vertices_query, edges_query, timeout=self.timeout, fail_on_error=False)
@@ -3092,21 +3163,22 @@ class SchemaParserDSE68(SchemaParserDSE67):
         cl = ConsistencyLevel.ONE
         queries = [
             # copied from v4
-            QueryMessage(query=self._SELECT_KEYSPACES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TABLES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_COLUMNS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TYPES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_FUNCTIONS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_AGGREGATES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_TRIGGERS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_INDEXES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIEWS, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIRTUAL_KEYSPACES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIRTUAL_TABLES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_VIRTUAL_COLUMNS, consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_KEYSPACES, self.metadata_request_timeout),
+                         consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TABLES, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_COLUMNS, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TYPES, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_FUNCTIONS, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_AGGREGATES, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_TRIGGERS, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_INDEXES, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIEWS, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIRTUAL_KEYSPACES, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIRTUAL_TABLES, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VIRTUAL_COLUMNS, self.metadata_request_timeout), consistency_level=cl),
             # dse6.8 only
-            QueryMessage(query=self._SELECT_VERTICES, consistency_level=cl),
-            QueryMessage(query=self._SELECT_EDGES, consistency_level=cl)
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_VERTICES, self.metadata_request_timeout), consistency_level=cl),
+            QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_EDGES, self.metadata_request_timeout), consistency_level=cl)
         ]
 
         responses = self.connection.wait_for_responses(

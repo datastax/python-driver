@@ -83,7 +83,7 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
 from cassandra.marshal import int64_pack
 from cassandra.tablets import Tablet, Tablets
 from cassandra.timestamps import MonotonicTimestampGenerator
-from cassandra.util import _resolve_contact_points_to_string_map, Version
+from cassandra.util import _resolve_contact_points_to_string_map, Version, maybe_add_timeout_to_query
 
 from cassandra.datastax.insights.reporter import MonitorReporter
 from cassandra.datastax.insights.util import version_supports_insights
@@ -3725,8 +3725,10 @@ class ControlConnection(object):
 
             sel_peers = self._get_peers_query(self.PeersQueryType.PEERS, connection)
             sel_local = self._SELECT_LOCAL if self._token_meta_enabled else self._SELECT_LOCAL_NO_TOKENS
-            peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
-            local_query = QueryMessage(query=sel_local, consistency_level=ConsistencyLevel.ONE)
+            peers_query = QueryMessage(query=maybe_add_timeout_to_query(sel_peers, self._metadata_request_timeout),
+                                       consistency_level=ConsistencyLevel.ONE)
+            local_query = QueryMessage(query=maybe_add_timeout_to_query(sel_local, self._metadata_request_timeout),
+                                       consistency_level=ConsistencyLevel.ONE)
             (peers_success, peers_result), (local_success, local_result) = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout, fail_on_error=False)
 
@@ -3737,7 +3739,8 @@ class ControlConnection(object):
                 # error with the peers v2 query, fallback to peers v1
                 self._uses_peers_v2 = False
                 sel_peers = self._get_peers_query(self.PeersQueryType.PEERS, connection)
-                peers_query = QueryMessage(query=sel_peers, consistency_level=ConsistencyLevel.ONE)
+                peers_query = QueryMessage(query=maybe_add_timeout_to_query(sel_peers, self._metadata_request_timeout),
+                                           consistency_level=ConsistencyLevel.ONE)
                 peers_result = connection.wait_for_response(
                     peers_query, timeout=self._timeout)
 
@@ -3881,8 +3884,10 @@ class ControlConnection(object):
             else:
                 log.debug("[control connection] Refreshing node list and token map")
                 sel_local = self._SELECT_LOCAL
-            peers_query = QueryMessage(query=sel_peers, consistency_level=cl)
-            local_query = QueryMessage(query=sel_local, consistency_level=cl)
+            peers_query = QueryMessage(query=maybe_add_timeout_to_query(sel_peers, self._metadata_request_timeout),
+                                       consistency_level=cl)
+            local_query = QueryMessage(query=maybe_add_timeout_to_query(sel_local, self._metadata_request_timeout),
+                                       consistency_level=cl)
             peers_result, local_result = connection.wait_for_responses(
                 peers_query, local_query, timeout=self._timeout)
 
@@ -3937,8 +3942,9 @@ class ControlConnection(object):
                         # local rpc_address has not been queried yet, try to fetch it
                         # separately, which might fail because C* < 2.1.6 doesn't have rpc_address
                         # in system.local. See CASSANDRA-9436.
-                        local_rpc_address_query = QueryMessage(query=self._SELECT_LOCAL_NO_TOKENS_RPC_ADDRESS,
-                                                               consistency_level=ConsistencyLevel.ONE)
+                        local_rpc_address_query = QueryMessage(
+                            query=maybe_add_timeout_to_query(self._SELECT_LOCAL_NO_TOKENS_RPC_ADDRESS, self._metadata_request_timeout),
+                            consistency_level=ConsistencyLevel.ONE)
                         success, local_rpc_address_result = connection.wait_for_response(
                             local_rpc_address_query, timeout=self._timeout, fail_on_error=False)
                         if success:
@@ -4173,8 +4179,10 @@ class ControlConnection(object):
             select_peers_query = self._get_peers_query(self.PeersQueryType.PEERS_SCHEMA, connection)
 
             while elapsed < total_timeout:
-                peers_query = QueryMessage(query=select_peers_query, consistency_level=cl)
-                local_query = QueryMessage(query=self._SELECT_SCHEMA_LOCAL, consistency_level=cl)
+                peers_query = QueryMessage(query=maybe_add_timeout_to_query(select_peers_query, self._metadata_request_timeout),
+                                           consistency_level=cl)
+                local_query = QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_SCHEMA_LOCAL, self._metadata_request_timeout),
+                                           consistency_level=cl)
                 try:
                     timeout = min(self._timeout, total_timeout - elapsed)
                     peers_result, local_result = connection.wait_for_responses(
