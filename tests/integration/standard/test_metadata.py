@@ -243,7 +243,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             cc,
             self.cluster.metadata.get_host(cc.host).release_version,
             self.cluster.metadata.get_host(cc.host).dse_version,
-            1
+            1,
+            None,
         )
 
         for option in tablemeta.options:
@@ -1968,7 +1969,8 @@ class BadMetaTest(unittest.TestCase):
             connection,
             cls.cluster.metadata.get_host(connection.host).release_version,
             cls.cluster.metadata.get_host(connection.host).dse_version,
-            timeout=20
+            20,
+            None,
         ).__class__
         cls.cluster.control_connection.reconnect = Mock()
 

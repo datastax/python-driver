@@ -19,6 +19,7 @@ This module houses the main classes you will interact with,
 from __future__ import absolute_import
 
 import atexit
+import datetime
 from binascii import hexlify
 from collections import defaultdict
 from collections.abc import Mapping
@@ -1033,6 +1034,12 @@ class Cluster(object):
     or to disable the shardaware port (advanced shardaware)
     """
 
+    metadata_request_timeout = datetime.timedelta(seconds=2)
+    """
+    Timeout for all queries used by driver it self.
+    Supported only by Scylla clusters.
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -1148,7 +1155,9 @@ class Cluster(object):
                  client_id=None,
                  cloud=None,
                  scylla_cloud=None,
-                 shard_aware_options=None):
+                 shard_aware_options=None,
+                 metadata_request_timeout=None,
+                 ):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         extablishing connection pools or refreshing metadata.
@@ -1240,6 +1249,8 @@ class Cluster(object):
         self.no_compact = no_compact
 
         self.auth_provider = auth_provider
+        if metadata_request_timeout is not None:
+            self.metadata_request_timeout = metadata_request_timeout
 
         if load_balancing_policy is not None:
             if isinstance(load_balancing_policy, type):
@@ -3549,6 +3560,7 @@ class ControlConnection(object):
     _is_shutdown = False
     _timeout = None
     _protocol_version = None
+    _metadata_request_timeout = None
 
     _schema_event_refresh_window = None
     _topology_event_refresh_window = None
@@ -3648,7 +3660,7 @@ class ControlConnection(object):
         (conn, _) = self._connect_host_in_lbp()
         if conn is not None:
             return conn
-        
+
         # Try to re-resolve hostnames as a fallback when all hosts are unreachable
         self._cluster._resolve_hostnames()
 
@@ -3693,7 +3705,10 @@ class ControlConnection(object):
         # If sharding information is available, it's a ScyllaDB cluster, so do not use peers_v2 table.
         if connection.features.sharding_info is not None:
             self._uses_peers_v2 = False
-        
+
+        # Cassandra does not support "USING TIMEOUT"
+        self._metadata_request_timeout = None if connection.features.sharding_info is None \
+            else datetime.timedelta(seconds=self._cluster.control_connection_timeout)
         self._tablets_routing_v1 = connection.features.tablets_routing_v1
 
         # use weak references in both directions
@@ -3830,7 +3845,12 @@ class ControlConnection(object):
             log.debug("Skipping schema refresh due to lack of schema agreement")
             return False
 
-        self._cluster.metadata.refresh(connection, self._timeout, fetch_size=self._schema_meta_page_size, **kwargs)
+        self._cluster.metadata.refresh(
+            connection,
+            self._timeout,
+            fetch_size=self._schema_meta_page_size,
+            metadata_request_timeout=self._metadata_request_timeout,
+            **kwargs)
 
         return True
 

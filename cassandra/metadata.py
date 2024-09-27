@@ -134,11 +134,12 @@ class Metadata(object):
         """
         return "\n\n".join(ks.export_as_string() for ks in self.keyspaces.values())
 
-    def refresh(self, connection, timeout, target_type=None, change_type=None, fetch_size=None, **kwargs):
+    def refresh(self, connection, timeout, target_type=None, change_type=None, fetch_size=None,
+                metadata_request_timeout=None, **kwargs):
 
         server_version = self.get_host(connection.original_endpoint).release_version
         dse_version = self.get_host(connection.original_endpoint).dse_version
-        parser = get_schema_parser(connection, server_version, dse_version, timeout, fetch_size)
+        parser = get_schema_parser(connection, server_version, dse_version, timeout, metadata_request_timeout, fetch_size)
 
         if not target_type:
             self._rebuild_all(parser)
@@ -1946,11 +1947,11 @@ class TriggerMetadata(object):
 
 
 class _SchemaParser(object):
-
-    def __init__(self, connection, timeout, fetch_size):
+    def __init__(self, connection, timeout, fetch_size, metadata_request_timeout):
         self.connection = connection
         self.timeout = timeout
         self.fetch_size = fetch_size
+        self.metadata_request_timeout = metadata_request_timeout
 
     def _handle_results(self, success, result, expected_failures=tuple(), query_msg=None, timeout=None):
         """
@@ -2054,8 +2055,8 @@ class SchemaParserV22(_SchemaParser):
         "compression",
         "default_time_to_live")
 
-    def __init__(self, connection, timeout, fetch_size):
-        super(SchemaParserV22, self).__init__(connection, timeout, fetch_size)
+    def __init__(self, connection, timeout, fetch_size, metadata_request_timeout):
+        super(SchemaParserV22, self).__init__(connection, timeout, fetch_size, metadata_request_timeout)
         self.keyspaces_result = []
         self.tables_result = []
         self.columns_result = []
@@ -2575,8 +2576,8 @@ class SchemaParserV3(SchemaParserV22):
         'read_repair_chance',
         'speculative_retry')
 
-    def __init__(self, connection, timeout, fetch_size):
-        super(SchemaParserV3, self).__init__(connection, timeout, fetch_size)
+    def __init__(self, connection, timeout, fetch_size, metadata_request_timeout):
+        super(SchemaParserV3, self).__init__(connection, timeout, fetch_size, metadata_request_timeout)
         self.indexes_result = []
         self.keyspace_table_index_rows = defaultdict(lambda: defaultdict(list))
         self.keyspace_view_rows = defaultdict(list)
@@ -2860,8 +2861,8 @@ class SchemaParserV4(SchemaParserV3):
     _SELECT_VIRTUAL_TABLES = 'SELECT * from system_virtual_schema.tables'
     _SELECT_VIRTUAL_COLUMNS = 'SELECT * from system_virtual_schema.columns'
 
-    def __init__(self, connection, timeout, fetch_size):
-        super(SchemaParserV4, self).__init__(connection, timeout, fetch_size)
+    def __init__(self, connection, timeout, fetch_size, metadata_request_timeout):
+        super(SchemaParserV4, self).__init__(connection, timeout, fetch_size, metadata_request_timeout)
         self.virtual_keyspaces_rows = defaultdict(list)
         self.virtual_tables_rows = defaultdict(list)
         self.virtual_columns_rows = defaultdict(lambda: defaultdict(list))
@@ -2995,8 +2996,8 @@ class SchemaParserDSE68(SchemaParserDSE67):
 
     _table_metadata_class = TableMetadataDSE68
 
-    def __init__(self, connection, timeout, fetch_size):
-        super(SchemaParserDSE68, self).__init__(connection, timeout, fetch_size)
+    def __init__(self, connection, timeout, fetch_size, metadata_request_timeout):
+        super(SchemaParserDSE68, self).__init__(connection, timeout, fetch_size, metadata_request_timeout)
         self.keyspace_table_vertex_rows = defaultdict(lambda: defaultdict(list))
         self.keyspace_table_edge_rows = defaultdict(lambda: defaultdict(list))
 
@@ -3361,25 +3362,25 @@ class EdgeMetadata(object):
         self.to_clustering_columns = to_clustering_columns
 
 
-def get_schema_parser(connection, server_version, dse_version, timeout, fetch_size=None):
+def get_schema_parser(connection, server_version, dse_version, timeout, metadata_request_timeout, fetch_size=None):
     version = Version(server_version)
     if dse_version:
         v = Version(dse_version)
         if v >= Version('6.8.0'):
-            return SchemaParserDSE68(connection, timeout, fetch_size)
+            return SchemaParserDSE68(connection, timeout, fetch_size, metadata_request_timeout)
         elif v >= Version('6.7.0'):
-            return SchemaParserDSE67(connection, timeout, fetch_size)
+            return SchemaParserDSE67(connection, timeout, fetch_size, metadata_request_timeout)
         elif v >= Version('6.0.0'):
-            return SchemaParserDSE60(connection, timeout, fetch_size)
+            return SchemaParserDSE60(connection, timeout, fetch_size, metadata_request_timeout)
 
     if version >= Version('4-a'):
-        return SchemaParserV4(connection, timeout, fetch_size)
+        return SchemaParserV4(connection, timeout, fetch_size, metadata_request_timeout)
     elif version >= Version('3.0.0'):
-        return SchemaParserV3(connection, timeout, fetch_size)
+        return SchemaParserV3(connection, timeout, fetch_size, metadata_request_timeout)
     else:
         # we could further specialize by version. Right now just refactoring the
         # multi-version parser we have as of C* 2.2.0rc1.
-        return SchemaParserV22(connection, timeout, fetch_size)
+        return SchemaParserV22(connection, timeout, fetch_size, metadata_request_timeout)
 
 
 def _cql_from_cass_type(cass_type):

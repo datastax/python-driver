@@ -618,7 +618,7 @@ class IndexTest(unittest.TestCase):
         column_meta.table.name = 'table_name_here'
         column_meta.table.keyspace_name = 'keyspace_name_here'
         column_meta.table.columns = {column_meta.name: column_meta}
-        parser = get_schema_parser(Mock(), '2.1.0', None, 0.1)
+        parser = get_schema_parser(Mock(), '2.1.0', None, 0.1, None)
 
         row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
         index_meta = parser._build_index_metadata(column_meta, row)
