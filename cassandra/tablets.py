@@ -1,4 +1,3 @@
-# Experimental, this interface and use may change
 from threading import Lock
 
 
@@ -34,7 +33,6 @@ class Tablet(object):
         return None
 
 
-# Experimental, this interface and use may change
 class Tablets(object):
     _lock = None
     _tablets = {}

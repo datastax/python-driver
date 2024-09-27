@@ -506,7 +506,7 @@ def start_cluster_wait_for_up(cluster):
 
 
 def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, set_keyspace=True, ccm_options=None,
-                configuration_options=None, dse_options=None, use_single_interface=USE_SINGLE_INTERFACE, use_tablets=False):
+                configuration_options=None, dse_options=None, use_single_interface=USE_SINGLE_INTERFACE):
     configuration_options = configuration_options or {}
     dse_options = dse_options or {}
     workloads = workloads or []
@@ -616,10 +616,7 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                     # CDC is causing an issue (can't start cluster with multiple seeds)
                     # Selecting only features we need for tests, i.e. anything but CDC.
                     CCM_CLUSTER = CCMScyllaCluster(path, cluster_name, **ccm_options)
-                    if use_tablets:
-                        CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf', 'consistent-topology-changes', 'tablets'], 'start_native_transport': True})
-                    else:
-                        CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf'], 'start_native_transport': True})
+                    CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf'], 'start_native_transport': True})
 
                     CCM_CLUSTER.set_configuration_options({'skip_wait_for_gossip_to_settle': 0})
                     # Permit IS NOT NULL restriction on non-primary key columns of a materialized view

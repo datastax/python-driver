@@ -9,7 +9,7 @@ from tests.integration import PROTOCOL_VERSION, use_cluster
 from tests.unit.test_host_connection_pool import LOGGER
 
 def setup_module():
-    use_cluster('tablets', [3], start=True, use_tablets=True)
+    use_cluster('tablets', [3], start=True)
 
 class TestTabletsIntegration(unittest.TestCase):
     @classmethod
