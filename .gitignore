@@ -14,7 +14,6 @@ dist
 nosetests.xml
 cover/
 docs/_build/
-docs/poetry.lock
 tests/integration/ccm
 setuptools*.tar.gz
 setuptools*.egg

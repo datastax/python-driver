@@ -3,6 +3,7 @@ name = "python-driver-docs"
 version = "0.1.0"
 description = "ScyllaDB Python Driver Docs"
 authors = ["Python Driver Contributors"]
+package-mode = false
 
 [tool.poetry.dependencies]
 eventlet = "^0.33.3"
@@ -10,19 +11,18 @@ futures = "2.2.0"
 geomet = ">=0.1,<0.3"
 gevent = "^23.9.1"
 gremlinpython = "3.4.7"
-python = "^3.9"
-pyyaml = "6.0.1"
-pygments = "2.15.1"
+python = "^3.10"
+pygments = "^2.18.0"
 recommonmark = "0.7.1"
 redirects_cli ="~0.1.2"
-sphinx-autobuild = "2021.3.14"
-sphinx-sitemap = "2.5.1"
-sphinx-scylladb-theme = "~1.7.2"
-sphinx-multiversion-scylla = "~0.3.1"
-Sphinx = "7.2.6"
+sphinx-autobuild = "^2024.4.19"
+sphinx-sitemap = "^2.6.0"
+sphinx-scylladb-theme = "^1.8.1"
+sphinx-multiversion-scylla = "^0.3.1"
+Sphinx = "^7.3.7"
 scales = "^1.0.9"
 six = ">=1.9"
 
 [build-system]
-requires = ["poetry>=0.12"]
+requires = ["poetry>=1.8.0"]
 build-backend = "poetry.masonry.api"
