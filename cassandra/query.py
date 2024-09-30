@@ -254,8 +254,8 @@ class Statement(object):
     table = None
     """
     The string name of the table this query acts on. This is used when the tablet
-    experimental feature is enabled and in the same time :class`~.TokenAwarePolicy`
-    is configured in the profile load balancing policy.
+    feature is enabled and in the same time :class`~.TokenAwarePolicy` is configured
+    in the profile load balancing policy.
     """
 
     custom_payload = None

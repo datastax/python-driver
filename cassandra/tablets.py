@@ -1,11 +1,10 @@
-# Experimental, this interface and use may change
 from threading import Lock
 
 
 class Tablet(object):
     """
     Represents a single ScyllaDB tablet.
-    It stores information about each replica, its host and shard, 
+    It stores information about each replica, its host and shard,
     and the token interval in the format (first_token, last_token].
     """
     first_token = 0
@@ -34,7 +33,6 @@ class Tablet(object):
         return None
 
 
-# Experimental, this interface and use may change
 class Tablets(object):
     _lock = None
     _tablets = {}
@@ -42,12 +40,12 @@ class Tablets(object):
     def __init__(self, tablets):
         self._tablets = tablets
         self._lock = Lock()
-    
+
     def get_tablet_for_key(self, keyspace, table, t):
         tablet = self._tablets.get((keyspace, table), [])
         if not tablet:
             return None
-        
+
         id = bisect_left(tablet, t.value, key=lambda tablet: tablet.last_token)
         if id < len(tablet) and t.value > tablet[id].first_token:
             return tablet[id]

@@ -9,7 +9,7 @@ from tests.integration import PROTOCOL_VERSION, use_cluster
 from tests.unit.test_host_connection_pool import LOGGER
 
 def setup_module():
-    use_cluster('tablets', [3], start=True, use_tablets=True)
+    use_cluster('tablets', [3], start=True)
 
 class TestTabletsIntegration(unittest.TestCase):
     @classmethod
@@ -20,7 +20,7 @@ class TestTabletsIntegration(unittest.TestCase):
         cls.session = cls.cluster.connect()
         cls.create_ks_and_cf(cls)
         cls.create_data(cls.session)
-    
+
     @classmethod
     def teardown_class(cls):
         cls.cluster.shutdown()
@@ -32,7 +32,7 @@ class TestTabletsIntegration(unittest.TestCase):
         for event in events:
             LOGGER.info("TRACE EVENT: %s %s %s", event.source, event.thread_name, event.description)
             host_set.add(event.source)
-        
+
         self.assertEqual(len(host_set), 1)
         self.assertIn('locally', "\n".join([event.description for event in events]))
 
@@ -43,7 +43,7 @@ class TestTabletsIntegration(unittest.TestCase):
         for event in events:
             LOGGER.info("TRACE EVENT: %s %s", event.source, event.activity)
             host_set.add(event.source)
-        
+
         self.assertEqual(len(host_set), 1)
         self.assertIn('locally', "\n".join([event.activity for event in events]))
 
@@ -54,7 +54,7 @@ class TestTabletsIntegration(unittest.TestCase):
         for event in events:
             LOGGER.info("TRACE EVENT: %s %s %s", event.source, event.thread_name, event.description)
             shard_set.add(event.thread_name)
-            
+
         self.assertEqual(len(shard_set), 1)
         self.assertIn('locally', "\n".join([event.description for event in events]))
 
@@ -65,10 +65,10 @@ class TestTabletsIntegration(unittest.TestCase):
         for event in events:
             LOGGER.info("TRACE EVENT: %s %s", event.thread, event.activity)
             shard_set.add(event.thread)
-            
+
         self.assertEqual(len(shard_set), 1)
         self.assertIn('locally', "\n".join([event.activity for event in events]))
-    
+
     def create_ks_and_cf(self):
         self.session.execute(
             """
@@ -79,8 +79,8 @@ class TestTabletsIntegration(unittest.TestCase):
             """
             CREATE KEYSPACE test1
             WITH replication = {
-                'class': 'NetworkTopologyStrategy', 
-                'replication_factor': 1 
+                'class': 'NetworkTopologyStrategy',
+                'replication_factor': 1
             } AND tablets = {
                 'initial': 8
             }
@@ -90,14 +90,14 @@ class TestTabletsIntegration(unittest.TestCase):
             """
             CREATE TABLE test1.table1 (pk int, ck int, v int, PRIMARY KEY (pk, ck));
             """)
-        
+
     @staticmethod
     def create_data(session):
         prepared = session.prepare(
             """
             INSERT INTO test1.table1 (pk, ck, v) VALUES (?, ?, ?)
             """)
-        
+
         for i in range(50):
             bound = prepared.bind((i, i%5, i%2))
             session.execute(bound)
