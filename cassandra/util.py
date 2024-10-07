@@ -29,6 +29,7 @@ import socket
 import sys
 import time
 import uuid
+from typing import Optional
 
 _HAS_GEOMET = True
 try:
@@ -1801,3 +1802,12 @@ class Version(object):
                 (is_major_ge and is_minor_ge and is_patch_ge and is_build_gt) or
                 (is_major_ge and is_minor_ge and is_patch_ge and is_build_ge and is_prerelease_gt)
                 )
+
+
+def maybe_add_timeout_to_query(stmt: str, metadata_request_timeout: Optional[datetime.timedelta]) -> str:
+    if metadata_request_timeout is None:
+        return stmt
+    ms = int(metadata_request_timeout / datetime.timedelta(milliseconds=1))
+    if ms == 0:
+        return stmt
+    return f"{stmt} USING TIMEOUT {ms}ms"

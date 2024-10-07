@@ -522,7 +522,7 @@ class ClusterTests(unittest.TestCase):
         def patched_wait_for_responses(*args, **kwargs):
             # When selecting schema version, replace the real schema UUID with an unexpected UUID
             response = original_wait_for_responses(*args, **kwargs)
-            if len(args) > 2 and hasattr(args[2], "query") and args[2].query == "SELECT schema_version FROM system.local WHERE key='local'":
+            if len(args) > 2 and hasattr(args[2], "query") and "SELECT schema_version FROM system.local WHERE key='local'" in args[2].query:
                 new_uuid = uuid4()
                 response[1].parsed_rows[0] = (new_uuid,)
             return response

@@ -26,7 +26,7 @@ import time
 import warnings
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.util import unix_time_from_uuid1
+from cassandra.util import unix_time_from_uuid1, maybe_add_timeout_to_query
 from cassandra.encoder import Encoder
 import cassandra.encoder
 from cassandra.protocol import _UNSET_VALUE
@@ -998,8 +998,9 @@ class QueryTrace(object):
                     "Trace information was not available within %f seconds. Consider raising Session.max_trace_wait." % (max_wait,))
 
             log.debug("Attempting to fetch trace info for trace ID: %s", self.trace_id)
+            metadata_request_timeout = self._session.cluster.control_connection and self._session.cluster.control_connection._metadata_request_timeout
             session_results = self._execute(
-                SimpleStatement(self._SELECT_SESSIONS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(maybe_add_timeout_to_query(self._SELECT_SESSIONS_FORMAT, metadata_request_timeout), consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
 
             # PYTHON-730: There is race condition that the duration mutation is written before started_at the for fast queries
             session_row = session_results.one() if session_results else None
@@ -1024,7 +1025,11 @@ class QueryTrace(object):
             log.debug("Attempting to fetch trace events for trace ID: %s", self.trace_id)
             time_spent = time.time() - start
             event_results = self._execute(
-                SimpleStatement(self._SELECT_EVENTS_FORMAT, consistency_level=query_cl), (self.trace_id,), time_spent, max_wait)
+                SimpleStatement(maybe_add_timeout_to_query(self._SELECT_EVENTS_FORMAT, metadata_request_timeout),
+                                consistency_level=query_cl),
+                (self.trace_id,),
+                time_spent,
+                max_wait)
             log.debug("Fetched trace events for trace ID: %s", self.trace_id)
             self.events = tuple(TraceEvent(r.activity, r.event_id, r.source, r.source_elapsed, r.thread)
                                 for r in event_results)

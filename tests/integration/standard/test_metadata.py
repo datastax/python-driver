@@ -25,11 +25,13 @@ from mock import Mock, patch
 import pytest
 
 from cassandra import AlreadyExists, SignatureDescriptor, UserFunctionDescriptor, UserAggregateDescriptor
+from cassandra.connection import Connection
 
 from cassandra.encoder import Encoder
 from cassandra.metadata import (IndexMetadata, Token, murmur3, Function, Aggregate, protect_name, protect_names,
                                 RegisteredTableExtension, _RegisteredExtensionType, get_schema_parser,
                                 group_keys_by_replica, NO_VALID_REPLICA)
+from cassandra.protocol import QueryMessage, ProtocolHandler
 from cassandra.util import SortedSet
 
 from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, execute_until_pass,
@@ -243,7 +245,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             cc,
             self.cluster.metadata.get_host(cc.host).release_version,
             self.cluster.metadata.get_host(cc.host).dse_version,
-            1
+            1,
+            None,
         )
 
         for option in tablemeta.options:
@@ -1330,6 +1333,38 @@ class TokenMetadataTest(unittest.TestCase):
         cluster.shutdown()
 
 
+class MetadataTimeoutTest(unittest.TestCase):
+    """
+    Test of TokenMap creation and other behavior.
+    """
+    def test_timeout(self):
+        cluster = TestCluster()
+        cluster.metadata_request_timeout = None
+
+        stmts = []
+
+        class ConnectionWrapper(cluster.connection_class):
+            def __init__(self, *args, **kwargs):
+                super(ConnectionWrapper, self).__init__(*args, **kwargs)
+
+            def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message,
+                         decoder=ProtocolHandler.decode_message, result_metadata=None):
+                if isinstance(msg, QueryMessage):
+                    stmts.append(msg.query)
+                return super(ConnectionWrapper, self).send_msg(msg, request_id, cb, encoder, decoder, result_metadata)
+
+        cluster.connection_class = ConnectionWrapper
+        s = cluster.connect()
+        s.execute('SELECT now() FROM system.local')
+        s.shutdown()
+
+        for stmt in stmts:
+            if "SELECT now() FROM system.local" in stmt:
+                continue
+            if "USING TIMEOUT 2000ms" not in stmt:
+                self.fail(f"query `{stmt}` does not contain `USING TIMEOUT 2000ms`")
+
+
 class KeyspaceAlterMetadata(unittest.TestCase):
     """
     Test verifies that table metadata is preserved on keyspace alter
@@ -1968,7 +2003,8 @@ class BadMetaTest(unittest.TestCase):
             connection,
             cls.cluster.metadata.get_host(connection.host).release_version,
             cls.cluster.metadata.get_host(connection.host).dse_version,
-            timeout=20
+            20,
+            None,
         ).__class__
         cls.cluster.control_connection.reconnect = Mock()
 
