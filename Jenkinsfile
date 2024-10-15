@@ -52,13 +52,8 @@ matrices = [
     "RUNTIME": DEFAULT_RUNTIME,
     "CYTHON": DEFAULT_CYTHON
   ],
-  "HCD": [
-    "SERVER": DEFAULT_HCD,
-    "RUNTIME": DEFAULT_RUNTIME,
-    "CYTHON": DEFAULT_CYTHON
-  ],
   "SMOKE": [
-    "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(1),
+    "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(2) + DEFAULT_HCD.takeRight(1),
     "RUNTIME": DEFAULT_RUNTIME.take(1) + DEFAULT_RUNTIME.takeRight(1),
     "CYTHON": ["True"]
   ]
@@ -233,9 +228,7 @@ CCM_BRANCH=${DSE_FIXED_VERSION}
 DSE_BRANCH=${DSE_FIXED_VERSION}
 ENVIRONMENT_EOF
       '''
-  }
-
-  if (env.CASSANDRA_VERSION.split('-')[0] == 'hcd') {
+  } else if (env.CASSANDRA_VERSION.split('-')[0] == 'hcd') {
     env.HCD_FIXED_VERSION = env.CASSANDRA_VERSION.split('-')[1]
     sh label: 'Update environment for DataStax Enterprise', script: '''#!/bin/bash -le
         cat >> ${HOME}/environment.txt << ENVIRONMENT_EOF
