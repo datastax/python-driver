@@ -185,7 +185,7 @@ class Metrics(object):
     def set_stats_name(self, stats_name):
         """
         Set the metrics stats name.
-        The stats_name is a string used to access the metris through scales: scales.getStats()[<stats_name>]
+        The stats_name is a string used to access the metrics through scales: scales.getStats()[<stats_name>]
         Default is 'cassandra-<num>'.
         """
 

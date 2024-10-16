@@ -88,7 +88,7 @@ class Connection(object):
         return instance
 
     def setup(self):
-        """Setup the connection"""
+        """Set up the connection"""
         global cluster, session
 
         if 'username' in self.cluster_options or 'password' in self.cluster_options:
@@ -134,7 +134,7 @@ class Connection(object):
 
     def handle_lazy_connect(self):
 
-        # if lazy_connect is False, it means the cluster is setup and ready
+        # if lazy_connect is False, it means the cluster is set up and ready
         # No need to acquire the lock
         if not self.lazy_connect:
             return
@@ -280,7 +280,7 @@ def set_session(s):
     try:
         conn = get_connection()
     except CQLEngineException:
-        # no default connection set; initalize one
+        # no default connection set; initialize one
         register_connection('default', session=s, default=True)
         conn = get_connection()
     else:
@@ -316,7 +316,7 @@ def setup(
         retry_connect=False,
         **kwargs):
     """
-    Setup a the driver connection used by the mapper
+    Set up the driver connection used by the mapper
 
     :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`)
     :param str default_keyspace: The default keyspace to use
