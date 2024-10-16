@@ -38,7 +38,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                get_supported_protocol_versions, greaterthancass20,
                                greaterthancass21, assert_startswith, greaterthanorequalcass40,
                                greaterthanorequaldse67, lessthancass40,
-                               TestCluster, DSE_VERSION)
+                               TestCluster, DSE_VERSION, HCD_VERSION)
 
 
 log = logging.getLogger(__name__)
@@ -2078,10 +2078,15 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
+        compaction = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"]
+        if HCD_VERSION:
+            self.assertIn("UnifiedCompactionStrategy", compaction)
+        else:
+            self.assertIn("SizeTieredCompactionStrategy", compaction)
 
         self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.keyspace_name))
-        self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
+        compaction = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"]
+        self.assertIn("LeveledCompactionStrategy", compaction)
 
     def test_materialized_view_metadata_drop(self):
         """

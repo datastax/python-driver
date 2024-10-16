@@ -40,6 +40,7 @@ from cassandra import ProtocolVersion
 
 try:
     from ccmlib.dse_cluster import DseCluster
+    from ccmlib.hcd_cluster import HcdCluster
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
@@ -147,6 +148,10 @@ def _get_cass_version_from_dse(dse_version):
     return Version(cass_ver)
 
 
+def _get_cass_version_from_hcd(hcd_version):
+    return Version("4.0.11")
+
+
 def _get_dse_version_from_cass(cass_version):
     if cass_version.startswith('2.1'):
         dse_ver = "4.8.15"
@@ -166,13 +171,18 @@ KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
 SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
 CLOUD_PROXY_PATH = os.getenv('CLOUD_PROXY_PATH', None)
 
-# Supported Clusters: Cassandra, DDAC, DSE
+# Supported Clusters: Cassandra, DDAC, DSE, HCD
 DSE_VERSION = None
+HCD_VERSION = None
 if os.getenv('DSE_VERSION', None):  # we are testing against DSE
     DSE_VERSION = Version(os.getenv('DSE_VERSION', None))
     DSE_CRED = os.getenv('DSE_CREDS', None)
     CASSANDRA_VERSION = _get_cass_version_from_dse(DSE_VERSION.base_version)
     CCM_VERSION = DSE_VERSION.base_version
+elif os.getenv('HCD_VERSION', None):  # we are testing against HCD
+    HCD_VERSION = Version(os.getenv('HCD_VERSION', None))
+    CASSANDRA_VERSION = _get_cass_version_from_hcd(HCD_VERSION.base_version)
+    CCM_VERSION = HCD_VERSION.base_version
 else:  # we are testing against Cassandra or DDAC
     cv_string = os.getenv('CASSANDRA_VERSION', None)
     mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
@@ -196,6 +206,9 @@ if DSE_VERSION:
         if DSE_CRED:
             log.info("Using DSE credentials file located at {0}".format(DSE_CRED))
             CCM_KWARGS['dse_credentials_file'] = DSE_CRED
+elif HCD_VERSION:
+    log.info('Using HCD version: %s', HCD_VERSION)
+    CCM_KWARGS['version'] = HCD_VERSION
 elif CASSANDRA_DIR:
     log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
     CCM_KWARGS['install_dir'] = CASSANDRA_DIR
@@ -464,8 +477,9 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
     dse_options = dse_options or {}
     workloads = workloads or []
     dse_cluster = True if DSE_VERSION else False
+    hcd_cluster = True if HCD_VERSION else False
 
-    if ccm_options is None and DSE_VERSION:
+    if ccm_options is None and (DSE_VERSION or HCD_VERSION):
         ccm_options = {"version": CCM_VERSION}
     elif ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
@@ -563,6 +577,18 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
                 CCM_CLUSTER.populate(nodes, ipformat=ipformat)
 
                 CCM_CLUSTER.set_dse_configuration_options(dse_options)
+            elif hcd_cluster:
+                CCM_CLUSTER = HcdCluster(path, cluster_name, **ccm_options)
+                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+                CCM_CLUSTER.set_configuration_options({'batch_size_warn_threshold_in_kb': 5})
+                CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+                CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                CCM_CLUSTER.set_configuration_options({'enable_materialized_views': True})
+                CCM_CLUSTER.set_configuration_options({'enable_sasi_indexes': True})
+                CCM_CLUSTER.set_configuration_options({'enable_transient_replication': True})
+                common.switch_cluster(path, cluster_name)
+                CCM_CLUSTER.set_configuration_options(configuration_options)
+                CCM_CLUSTER.populate(nodes, ipformat=ipformat, use_single_interface=use_single_interface)
             else:
                 ccm_cluster_clz = CCMCluster if Version(cassandra_version) < Version('4.1') else Cassandra41CCMCluster
                 CCM_CLUSTER = ccm_cluster_clz(path, cluster_name, **ccm_options)
