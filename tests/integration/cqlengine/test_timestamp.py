@@ -68,15 +68,15 @@ class CreateWithTimestampTest(BaseTimestampTest):
     def test_timestamp_is_set_on_model_queryset(self):
         delta = timedelta(seconds=30)
         tmp = TestTimestampModel.timestamp(delta)
-        tmp._timestamp.should.equal(delta)
+        assert tmp._timestamp == delta
 
     def test_non_batch_syntax_integration(self):
         tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).create(count=1)
-        tmp.should.be.ok
+        assert tmp
 
     def test_non_batch_syntax_with_tll_integration(self):
         tmp = TestTimestampModel.timestamp(timedelta(seconds=30)).ttl(30).create(count=1)
-        tmp.should.be.ok
+        assert tmp
 
     def test_non_batch_syntax_unit(self):
 
@@ -129,7 +129,7 @@ class DeleteWithTimestampTest(BaseTimestampTest):
         uid = uuid4()
         tmp = TestTimestampModel.create(id=uid, count=1)
 
-        TestTimestampModel.get(id=uid).should.be.ok
+        assert TestTimestampModel.get(id=uid)
 
         tmp.timestamp(timedelta(seconds=5)).delete()
 
@@ -143,15 +143,15 @@ class DeleteWithTimestampTest(BaseTimestampTest):
 
         # calling .timestamp sets the TS on the model
         tmp.timestamp(timedelta(seconds=5))
-        tmp._timestamp.should.be.ok
+        assert tmp._timestamp
 
         # calling save clears the set timestamp
         tmp.save()
-        tmp._timestamp.shouldnt.be.ok
+        assert not tmp._timestamp
 
         tmp.timestamp(timedelta(seconds=5))
         tmp.update()
-        tmp._timestamp.shouldnt.be.ok
+        assert not tmp._timestamp
 
     def test_blind_delete(self):
         """
@@ -160,7 +160,7 @@ class DeleteWithTimestampTest(BaseTimestampTest):
         uid = uuid4()
         tmp = TestTimestampModel.create(id=uid, count=1)
 
-        TestTimestampModel.get(id=uid).should.be.ok
+        assert TestTimestampModel.get(id=uid)
 
         TestTimestampModel.objects(id=uid).timestamp(timedelta(seconds=5)).delete()
 
@@ -179,7 +179,7 @@ class DeleteWithTimestampTest(BaseTimestampTest):
         uid = uuid4()
         tmp = TestTimestampModel.create(id=uid, count=1)
 
-        TestTimestampModel.get(id=uid).should.be.ok
+        assert TestTimestampModel.get(id=uid)
 
         plus_five_seconds = datetime.now() + timedelta(seconds=5)
 
@@ -197,7 +197,7 @@ class DeleteWithTimestampTest(BaseTimestampTest):
         uid = uuid4()
         tmp = TestTimestampModel.create(id=uid, count=1)
 
-        TestTimestampModel.get(id=uid).should.be.ok
+        assert TestTimestampModel.get(id=uid)
 
         # delete in the past, should not affect the object created above
         TestTimestampModel.objects(id=uid).timestamp(timedelta(seconds=-60)).delete()
