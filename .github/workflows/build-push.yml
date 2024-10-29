@@ -40,6 +40,9 @@ jobs:
           - os: macos-latest
             platform: all
 
+          - os: macos-13
+            platform: all
+
           - os: macos-latest
             platform: PyPy
 
@@ -103,7 +106,7 @@ jobs:
       - name: Overwrite for MacOs
         if: runner.os == 'MacOs' && matrix.platform == 'all'
         run: |
-          echo "CIBW_BUILD=cp37* cp38*" >> $GITHUB_ENV
+          echo "CIBW_BUILD=cp38* cp39* cp310* cp311* cp312*" >> $GITHUB_ENV
           echo "CIBW_BEFORE_TEST_MACOS=pip install -r {project}/test-requirements.txt pytest" >> $GITHUB_ENV
 
       - name: Overwrite for MacOs PyPy
