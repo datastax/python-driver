@@ -74,7 +74,7 @@ class DocCommand(Command):
 
             try:
                 os.makedirs(path)
-            except:
+            except OSError:
                 pass
 
         if has_subprocess:
@@ -82,7 +82,7 @@ class DocCommand(Command):
             # http://docs.cython.org/src/userguide/special_methods.html#docstrings
             import glob
             for f in glob.glob("cassandra/*.so"):
-                print("Removing '%s' to allow docs to run on pure python modules." %(f,))
+                print("Removing '%s' to allow docs to run on pure python modules." % (f,))
                 os.unlink(f)
 
             # Build io extension to make import and docstrings work
@@ -114,15 +114,18 @@ class BuildFailed(Exception):
     def __init__(self, ext):
         self.ext = ext
 
+
 is_windows = sys.platform.startswith('win32')
 is_macos = sys.platform.startswith('darwin')
 
 murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
+
 def eval_env_var_as_array(varname):
     val = os.environ.get(varname)
     return None if not val else [v.strip() for v in val.split(',')]
+
 
 DEFAULT_LIBEV_INCLUDES = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
 DEFAULT_LIBEV_LIBDIRS = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
@@ -338,7 +341,7 @@ def pre_build_check():
             # We must be able to initialize the compiler if it has that method
             if hasattr(compiler, "initialize"):
                 compiler.initialize()
-        except:
+        except OSError:
             return False
 
         executables = []
@@ -383,7 +386,7 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = ['geomet>=0.1,<0.3']
+    dependencies = ['geomet>=1.1']
 
     _EXTRAS_REQUIRE = {
         'graph': ['gremlinpython==3.4.6'],
