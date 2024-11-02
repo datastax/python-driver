@@ -382,12 +382,12 @@ class VectorTests(unittest.TestCase):
         # UTF8 text
         self._round_trip_test(["abc", "def", "ghi", "jkl"], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.UTF8Type, 4)")
-        # Time is something of a weird one.  By rights it should be a fixed size type but C* code marks it as variable
+        # Time is something of a weird one.  By rights, it should be a fixed size type but C* code marks it as variable
         # size.  We're forced to follow the C* code base (since that's who'll be providing the data we're parsing) so
         # we match what they're doing.
         self._round_trip_test([datetime.time(1,1,1), datetime.time(2,2,2), datetime.time(3,3,3)], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.TimeType, 3)")
-        # Duration (containts varints)
+        # Duration (contains varints)
         self._round_trip_test([util.Duration(1,1,1), util.Duration(2,2,2), util.Duration(3,3,3)], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.DurationType, 3)")
 
@@ -456,7 +456,7 @@ class VectorTests(unittest.TestCase):
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.VectorType \
                 (org.apache.cassandra.db.marshal.AsciiType,2), 4)")
 
-    # parse_casstype_args() is tested above... we're explicitly concerned about cql_parapmeterized_type() output here
+    # parse_casstype_args() is tested above... we're explicitly concerned about cql_parameterized_type() output here
     def test_cql_parameterized_type(self):
         # Base vector functionality
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
@@ -914,7 +914,7 @@ class DateRangeDeserializationTests(unittest.TestCase):
                                                999,
                                      lambda original_value, i: original_value + i * 900 * 50 * 60 * 24)
 
-    @unittest.skip("This is currently failig, see PYTHON-912")
+    @unittest.skip("This is currently failing, see PYTHON-912")
     def test_deserialize_date_range_month(self):
         """
         Test rounding from DateRange for months
@@ -931,7 +931,7 @@ class DateRangeDeserializationTests(unittest.TestCase):
             but with the microseconds set to 999999, seconds to 59, minutes to 59, hours to 23
             and days 28, 29, 30 or 31 depending on the month.
             The way to do this is to add one month and leave the date at YEAR-MONTH-01 00:00:00 000000.
-            Then substract one millisecond.
+            Then subtract one millisecond.
             """
             dt = datetime.datetime.fromtimestamp(seconds / 1000.0, tz=utc_timezone)
             dt = dt + datetime.timedelta(days=32)
@@ -958,7 +958,7 @@ class DateRangeDeserializationTests(unittest.TestCase):
             but with the microseconds set to 999999, seconds to 59, minutes to 59, hours to 23
             days 28, 29, 30 or 31 depending on the month and months to 12.
             The way to do this is to add one year and leave the date at YEAR-01-01 00:00:00 000000.
-            Then substract one millisecond.
+            Then subtract one millisecond.
             """
             dt = datetime.datetime.fromtimestamp(seconds / 1000.0, tz=utc_timezone)
             dt = dt + datetime.timedelta(days=370)
@@ -980,14 +980,14 @@ class DateRangeDeserializationTests(unittest.TestCase):
         lower_value upper_value which are given as a value that represents seconds since the epoch.
         We want to make sure the lower_value is correctly rounded down and the upper value is correctly rounded up.
         In the case of rounding down we verify that the rounded down value
-        has the appropriate fields set to the minimum they could possible have. That is
+        has the appropriate fields set to the minimum they could possibly have. That is
         1 for months, 1 for days, 0 for hours, 0 for minutes, 0 for seconds, 0 for microseconds.
         We use the generic function truncate_date which depends on truncate_kwargs for this
 
         In the case of rounding up we verify that the rounded up value has the appropriate fields set
-        to the maximum they could possible have. This is calculated by round_up_truncated_upper_value
+        to the maximum they could possibly have. This is calculated by round_up_truncated_upper_value
         which input is the truncated value from before. It is passed as an argument as the way
-        of calculating this is is different for every precision.
+        of calculating this is different for every precision.
 
         :param truncate_kwargs: determine what values to truncate in truncate_date
         :param precision: :class:`~util.DateRangePrecision`

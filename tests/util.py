@@ -40,7 +40,7 @@ def wait_until_not_raised(condition, delay, max_attempts):
     doesn't raise an exception and the amount of attempts < maxAttempts.
     :param condition: a function
     :param delay: the delay in second
-    :param max_attempts: the maximum number of attemps. So the timeout
+    :param max_attempts: the maximum number of attempts. So the timeout
                          of this function will be delay*max_attempts
     """
     def wrapped_condition():

@@ -70,12 +70,12 @@ class BaseContPagingTests():
 
         cls.select_all_statement = "SELECT * FROM {0}.{0}".format(cls.ks_name)
 
-    def test_continous_paging(self):
+    def test_continuous_paging(self):
         """
         Test to ensure that various continuous paging schemes return the full set of results.
         @since 3.20
         @jira_ticket PYTHON-615
-        @expected_result various continous paging options should fetch all the results
+        @expected_result various continuous paging options should fetch all the results
 
         @test_category queries
         """
@@ -131,9 +131,9 @@ class BaseContPagingTests():
         self.session_with_profiles.default_fetch_size = 1
         # This combination should fetch one result a second. We should see a very few results
         results = self.session_with_profiles.execute_async(self.select_all_statement, execution_profile= "SLOW")
-        result_set =results.result()
+        result_set = results.result()
         result_set.cancel_continuous_paging()
-        result_lst =list(result_set)
+        result_lst = list(result_set)
         self.assertLess(len(result_lst), 2, "Cancel should have aborted fetch immediately")
 
     def test_con_paging_verify_writes(self):
@@ -183,7 +183,7 @@ class BaseContPagingTests():
 
     def test_can_get_results_when_no_more_pages(self):
         """
-        Test to validate that the resutls can be fetched when
+        Test to validate that the results can be fetched when
         has_more_pages is False
         @since 3.20
         @jira_ticket PYTHON-946

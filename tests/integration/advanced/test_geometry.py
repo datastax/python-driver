@@ -35,7 +35,7 @@ class AbstractGeometricTypeTest():
 
     def test_should_insert_simple(self):
         """
-        This tests will attempt to insert a point, polygon, or line, using simple inline formating.
+        This tests will attempt to insert a point, polygon, or line, using simple inline formatting.
         @since 3.20
         @jira_ticket PYTHON-456
         @test_category dse geometric

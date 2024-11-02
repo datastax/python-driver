@@ -95,7 +95,7 @@ class MessageTest(unittest.TestCase):
 
     def test_continuous_paging(self):
         """
-        Test to check continuous paging throws an Exception if it's not supported and the correct valuesa
+        Test to check continuous paging throws an Exception if it's not supported and the correct values
         are written to the buffer if the option is enabled.
 
         @since DSE 2.0b3 GRAPH 1.0b1

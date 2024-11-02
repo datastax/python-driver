@@ -158,7 +158,6 @@ class TestConditional(BaseCassEngTestCase):
         second_row.delete()
         b.execute()
 
-
     def test_delete_conditional(self):
         # DML path
         t = TestConditionalModel.if_not_exists().create(text='something', count=5)

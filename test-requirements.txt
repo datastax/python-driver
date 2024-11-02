@@ -1,7 +1,7 @@
 -r requirements.txt
 scales
 pytest
-ccm>=2.1.2
+ccm>=3.1.5
 pytz
 sure
 pure-sasl

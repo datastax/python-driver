@@ -51,7 +51,7 @@ class DateTests(unittest.TestCase):
         max_builtin = Date(datetime.date(9999, 12, 31))
         self.assertEqual(Date(min_builtin.days_from_epoch), min_builtin)
         self.assertEqual(Date(max_builtin.days_from_epoch), max_builtin)
-        # just proving we can construct with on offset outside buildin range
+        # just proving we can construct with on offset outside builtin range
         self.assertEqual(Date(min_builtin.days_from_epoch - 1).days_from_epoch,
                          min_builtin.days_from_epoch - 1)
         self.assertEqual(Date(max_builtin.days_from_epoch + 1).days_from_epoch,
@@ -191,7 +191,7 @@ class DurationTests(unittest.TestCase):
         second = Duration(1000, 10000, 2345345)
         self.assertEqual(first, second)
 
-        first = Duration(12, 0 , 100)
+        first = Duration(12, 0, 100)
         second = Duration(nanoseconds=100, months=12)
         self.assertEqual(first, second)
 

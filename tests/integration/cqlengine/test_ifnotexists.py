@@ -198,4 +198,3 @@ class IfNotExistWithCounterTest(BaseIfNotExistsWithCounterTest):
         id = uuid4()
         with self.assertRaises(IfNotExistsWithCounterColumn):
             TestIfNotExistsWithCounterModel.if_not_exists()
-

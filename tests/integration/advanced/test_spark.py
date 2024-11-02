@@ -30,7 +30,7 @@ def setup_module():
 @requiredse
 class SparkLBTests(BasicGraphUnitTestCase):
     """
-    Test to validate that analtics query can run in a multi-node enviroment. Also check to to ensure
+    Test to validate that analytics query can run in a multi-node environment. Also check to ensure
     that the master spark node is correctly targeted when OLAP queries are run
 
     @since 3.20
