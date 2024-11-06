@@ -29,9 +29,6 @@ if __name__ == '__main__' and sys.argv[1] == "eventlet_nosetests":
     from eventlet import monkey_patch
     monkey_patch()
 
-import ez_setup
-ez_setup.use_setuptools()
-
 from setuptools import setup
 from distutils.command.build_ext import build_ext
 from distutils.core import Extension
