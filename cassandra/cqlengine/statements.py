@@ -550,7 +550,7 @@ class BaseCQLStatement(UnicodeMixin):
 
     def add_conditional_clause(self, clause):
         """
-        Adds a iff clause to this statement
+        Adds an iff clause to this statement
 
         :param clause: The clause that will be added to the iff statement
         :type clause: ConditionalClause
@@ -575,7 +575,7 @@ class BaseCQLStatement(UnicodeMixin):
     @property
     def timestamp_normalized(self):
         """
-        we're expecting self.timestamp to be either a long, int, a datetime, or a timedelta
+        We're expecting self.timestamp to be either a long, int, a datetime, or a timedelta
         :return:
         """
         if not self.timestamp:

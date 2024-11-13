@@ -77,7 +77,7 @@ class Authenticator(object):
 
     3) When the server indicates that authentication is successful,
     :meth:`~.on_authentication_success` will be called a token string that
-    that the server may optionally have sent.
+    the server may optionally have sent.
 
     The exact nature of the negotiation between the client and server is specific
     to the authentication mechanism configured server-side.
@@ -90,7 +90,7 @@ class Authenticator(object):
 
     def initial_response(self):
         """
-        Returns an message to send to the server to initiate the SASL handshake.
+        Returns a message to send to the server to initiate the SASL handshake.
         :const:`None` may be returned to send an empty message.
         """
         return None

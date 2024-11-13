@@ -825,7 +825,7 @@ class Connection(object):
     @classmethod
     def handle_fork(cls):
         """
-        Called after a forking.  This should cleanup any remaining reactor state
+        Called after a forking.  This should clean up any remaining reactor state
         from the parent process.
         """
         pass
@@ -862,7 +862,7 @@ class Connection(object):
         ssl_context_opt_names = ['ssl_version', 'cert_reqs', 'check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']
         opts = {k:self.ssl_options.get(k, None) for k in ssl_context_opt_names if k in self.ssl_options}
 
-        # Python >= 3.10 requires either PROTOCOL_TLS_CLIENT or PROTOCOL_TLS_SERVER so we'll get ahead of things by always
+        # Python >= 3.10 requires either PROTOCOL_TLS_CLIENT or PROTOCOL_TLS_SERVER, so we'll get ahead of things by always
         # being explicit
         ssl_version = opts.get('ssl_version', None) or ssl.PROTOCOL_TLS_CLIENT
         cert_reqs = opts.get('cert_reqs', None) or ssl.CERT_REQUIRED
@@ -891,7 +891,7 @@ class Connection(object):
         opts = {k:self.ssl_options.get(k, None) for k in wrap_socket_opt_names if k in self.ssl_options}
 
         # PYTHON-1186: set the server_hostname only if the SSLContext has
-        # check_hostname enabled and it is not already provided by the EndPoint ssl options
+        # check_hostname enabled, and it is not already provided by the EndPoint ssl options
         #opts['server_hostname'] = self.endpoint.address
         if (self.ssl_context.check_hostname and 'server_hostname' not in opts):
             server_hostname = self.endpoint.address
@@ -1210,11 +1210,11 @@ class Connection(object):
 
             if not self._current_frame or pos < self._current_frame.end_pos:
                 if self._is_checksumming_enabled and self._io_buffer.readable_io_bytes():
-                    # We have a multi-segments message and we need to read more
+                    # We have a multi-segments message, and we need to read more
                     # data to complete the current cql frame
                     continue
 
-                # we don't have a complete header yet or we
+                # we don't have a complete header yet, or we
                 # already saw a header, but we don't have a
                 # complete message yet
                 return
@@ -1713,7 +1713,7 @@ class ConnectionHeartbeat(Thread):
                         else:
                             log.debug("Cannot send heartbeat message on connection (%s) to %s",
                                       id(connection), connection.endpoint)
-                            # make sure the owner sees this defunt/closed connection
+                            # make sure the owner sees this defunct/closed connection
                             owner.return_connection(connection)
                     self._raise_if_stopped()
 
