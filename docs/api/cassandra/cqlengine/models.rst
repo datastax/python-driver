@@ -103,7 +103,7 @@ Model
                 TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
             except LWTException as e:
                 # handle failure case
-                print e.existing  # dict containing LWT result fields
+                print(e.existing)  # dict containing LWT result fields)
 
         This method is supported on Cassandra 2.0 or later.
 
@@ -144,7 +144,7 @@ Model
                  t.iff(count=5).update('other text')
             except LWTException as e:
                 # handle failure case
-                print e.existing # existing object
+                print(e.existing) # existing object
 
     .. automethod:: get
 

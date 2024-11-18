@@ -16,7 +16,7 @@ import unittest
 
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, \
-    WhiteListRoundRobinPolicy, ExponentialBackoffRetryPolicy
+    WhiteListRoundRobinPolicy, ExponentialBackoffRetryPolicy, ColDesc
 from cassandra.pool import Host
 from cassandra.connection import DefaultEndPoint
 

@@ -12,21 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cassandra.bytesio cimport BytesIOReader
-from cassandra.deserializers cimport Deserializer
-
-cdef class ParseDesc:
-    cdef public object colnames
-    cdef public object coltypes
-    cdef public object column_encryption_policy
-    cdef public list coldescs
-    cdef Deserializer[::1] deserializers
-    cdef public int protocol_version
-    cdef Py_ssize_t rowsize
-
-cdef class ColumnParser:
-    cpdef parse_rows(self, BytesIOReader reader, ParseDesc desc)
-
-cdef class RowParser:
-    cpdef unpack_row(self, BytesIOReader reader, ParseDesc desc)
-
+try:
+    import cryptography
+    from cassandra.column_encryption._policies import *
+except ImportError:
+    # Cryptography is not installed
+    pass

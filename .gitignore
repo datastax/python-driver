@@ -3,6 +3,7 @@
 *.swo
 *.so
 *.egg
+*.eggs
 *.egg-info
 *.attr
 .tox

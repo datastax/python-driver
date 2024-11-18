@@ -226,12 +226,14 @@ def parse_casstype_args(typestring):
             else:
                 names.append(None)
 
-            ctype = lookup_casstype_simple(tok)
+            try:
+                ctype = int(tok)
+            except ValueError:
+                ctype = lookup_casstype_simple(tok)
             types.append(ctype)
 
     # return the first (outer) type, which will have all parameters applied
     return args[0][0][0]
-
 
 def lookup_casstype(casstype):
     """
@@ -286,7 +288,7 @@ class _CassandraType(object, metaclass=CassandraTypeType):
     """
 
     def __repr__(self):
-        return '<%s( %r )>' % (self.cql_parameterized_type(), self.val)
+        return '<%s>' % (self.cql_parameterized_type())
 
     @classmethod
     def from_binary(cls, byts, protocol_version):
@@ -1402,3 +1404,31 @@ class DateRangeType(CassandraType):
             buf.write(int8_pack(cls._encode_precision(bound.precision)))
 
         return buf.getvalue()
+
+class VectorType(_CassandraType):
+    typename = 'org.apache.cassandra.db.marshal.VectorType'
+    vector_size = 0
+    subtype = None
+
+    @classmethod
+    def apply_parameters(cls, params, names):
+        assert len(params) == 2
+        subtype = lookup_casstype(params[0])
+        vsize = params[1]
+        return type('%s(%s)' % (cls.cass_parameterized_type_with([]), vsize), (cls,), {'vector_size': vsize, 'subtype': subtype})
+
+    @classmethod
+    def deserialize(cls, byts, protocol_version):
+        indexes = (4 * x for x in range(0, cls.vector_size))
+        return [cls.subtype.deserialize(byts[idx:idx + 4], protocol_version) for idx in indexes]
+
+    @classmethod
+    def serialize(cls, v, protocol_version):
+        buf = io.BytesIO()
+        for item in v:
+            buf.write(cls.subtype.serialize(item, protocol_version))
+        return buf.getvalue()
+
+    @classmethod
+    def cql_parameterized_type(cls):
+        return "%s<%s, %s>" % (cls.typename, cls.subtype.typename, cls.vector_size)

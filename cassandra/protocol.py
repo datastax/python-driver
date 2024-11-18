@@ -27,9 +27,6 @@ from cassandra import (Unavailable, WriteTimeout, RateLimitReached, ReadTimeout,
                        AlreadyExists, InvalidRequest, Unauthorized,
                        UnsupportedOperation, UserFunctionDescriptor,
                        UserAggregateDescriptor, SchemaTargetType)
-from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
-                               uint8_pack, int8_unpack, uint64_pack, header_pack,
-                               v3_header_pack, uint32_pack, uint32_le_unpack, uint32_le_pack)
 from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 CounterColumnType, DateType, DecimalType,
                                 DoubleType, FloatType, Int32Type,
@@ -38,6 +35,10 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 UTF8Type, VarcharType, UUIDType, UserType,
                                 TupleType, lookup_casstype, SimpleDateType,
                                 TimeType, ByteType, ShortType, DurationType)
+from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
+                               uint8_pack, int8_unpack, uint64_pack, header_pack,
+                               v3_header_pack, uint32_pack, uint32_le_unpack, uint32_le_pack)
+from cassandra.policies import ColDesc
 from cassandra import WriteType
 from cassandra.cython_deps import HAVE_CYTHON, HAVE_NUMPY
 from cassandra import util
@@ -733,11 +734,11 @@ class ResultMessage(_MessageType):
     def __init__(self, kind):
         self.kind = kind
 
-    def recv(self, f, protocol_version, user_type_map, result_metadata):
+    def recv(self, f, protocol_version, user_type_map, result_metadata, column_encryption_policy):
         if self.kind == RESULT_KIND_VOID:
             return
         elif self.kind == RESULT_KIND_ROWS:
-            self.recv_results_rows(f, protocol_version, user_type_map, result_metadata)
+            self.recv_results_rows(f, protocol_version, user_type_map, result_metadata, column_encryption_policy)
         elif self.kind == RESULT_KIND_SET_KEYSPACE:
             self.new_keyspace = read_string(f)
         elif self.kind == RESULT_KIND_PREPARED:
@@ -748,32 +749,40 @@ class ResultMessage(_MessageType):
             raise DriverException("Unknown RESULT kind: %d" % self.kind)
 
     @classmethod
-    def recv_body(cls, f, protocol_version, protocol_features, user_type_map, result_metadata):
+    def recv_body(cls, f, protocol_version, protocol_features, user_type_map, result_metadata, column_encryption_policy):
         kind = read_int(f)
         msg = cls(kind)
-        msg.recv(f, protocol_version, user_type_map, result_metadata)
+        msg.recv(f, protocol_version, user_type_map, result_metadata, column_encryption_policy)
         return msg
 
-    def recv_results_rows(self, f, protocol_version, user_type_map, result_metadata):
+    def recv_results_rows(self, f, protocol_version, user_type_map, result_metadata, column_encryption_policy):
         self.recv_results_metadata(f, user_type_map)
         column_metadata = self.column_metadata or result_metadata
         rowcount = read_int(f)
         rows = [self.recv_row(f, len(column_metadata)) for _ in range(rowcount)]
         self.column_names = [c[2] for c in column_metadata]
         self.column_types = [c[3] for c in column_metadata]
+        col_descs = [ColDesc(md[0], md[1], md[2]) for md in column_metadata]
+
+        def decode_val(val, col_md, col_desc):
+            uses_ce = column_encryption_policy and column_encryption_policy.contains_column(col_desc)
+            col_type = column_encryption_policy.column_type(col_desc) if uses_ce else col_md[3]
+            raw_bytes = column_encryption_policy.decrypt(col_desc, val) if uses_ce else val
+            return col_type.from_binary(raw_bytes, protocol_version)
+
+        def decode_row(row):
+            return tuple(decode_val(val, col_md, col_desc) for val, col_md, col_desc in zip(row, column_metadata, col_descs))
+
         try:
-            self.parsed_rows = [
-                tuple(ctype.from_binary(val, protocol_version)
-                      for ctype, val in zip(self.column_types, row))
-                for row in rows]
+            self.parsed_rows = [decode_row(row) for row in rows]
         except Exception:
             for row in rows:
-                for i in range(len(row)):
+                for val, col_md, col_desc in zip(row, column_metadata, col_descs):
                     try:
-                        self.column_types[i].from_binary(row[i], protocol_version)
+                        decode_val(val, col_md, col_desc)
                     except Exception as e:
-                        raise DriverException('Failed decoding result column "%s" of type %s: %s' % (self.column_names[i],
-                                                                                                     self.column_types[i].cql_parameterized_type(),
+                        raise DriverException('Failed decoding result column "%s" of type %s: %s' % (col_md[2],
+                                                                                                     col_md[3].cql_parameterized_type(),
                                                                                                      str(e)))
 
     def recv_results_prepared(self, f, protocol_version, user_type_map):
@@ -1109,6 +1118,9 @@ class _ProtocolHandler(object):
     result decoding implementations.
     """
 
+    column_encryption_policy = None
+    """Instance of :class:`cassandra.policies.ColumnEncryptionPolicy` in use by this handler"""
+
     @classmethod
     def encode_message(cls, msg, stream_id, protocol_version, compressor, allow_beta_protocol_version):
         """
@@ -1203,7 +1215,7 @@ class _ProtocolHandler(object):
             log.warning("Unknown protocol flags set: %02x. May cause problems.", flags)
 
         msg_class = cls.message_types_by_opcode[opcode]
-        msg = msg_class.recv_body(body, protocol_version, protocol_features, user_type_map, result_metadata)
+        msg = msg_class.recv_body(body, protocol_version, protocol_features, user_type_map, result_metadata, cls.column_encryption_policy)
         msg.stream_id = stream_id
         msg.trace_id = trace_id
         msg.custom_payload = custom_payload

@@ -33,8 +33,8 @@ from cassandra.policies import (RackAwareRoundRobinPolicy, RoundRobinPolicy, Whi
                                 DowngradingConsistencyRetryPolicy, ConstantReconnectionPolicy,
                                 LoadBalancingPolicy, ConvictionPolicy, ReconnectionPolicy, FallthroughRetryPolicy,
                                 IdentityTranslator, EC2MultiRegionTranslator, HostFilterPolicy, ExponentialBackoffRetryPolicy)
-from cassandra.pool import Host
 from cassandra.connection import DefaultEndPoint, UnixSocketEndPoint
+from cassandra.pool import Host
 from cassandra.query import Statement
 
 
@@ -1579,4 +1579,3 @@ class HostFilterPolicyQueryPlanTest(unittest.TestCase):
         # Only the filtered replicas should be allowed
         self.assertEqual(set(query_plan), {Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy),
                                            Host(DefaultEndPoint("127.0.0.4"), SimpleConvictionPolicy)})
-

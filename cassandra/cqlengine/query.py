@@ -285,15 +285,15 @@ class ContextQuery(object):
 
             with ContextQuery(Automobile, keyspace='test2') as A:
                 A.objects.create(manufacturer='honda', year=2008, model='civic')
-                print len(A.objects.all())  # 1 result
+                print(len(A.objects.all()))  # 1 result
 
             with ContextQuery(Automobile, keyspace='test4') as A:
-                print len(A.objects.all())  # 0 result
+                print(len(A.objects.all()))  # 0 result
 
             # Multiple models
             with ContextQuery(Automobile, Automobile2, connection='cluster2') as (A, A2):
-                print len(A.objects.all())
-                print len(A2.objects.all())
+                print(len(A.objects.all()))
+                print(len(A2.objects.all()))
 
     """
 
@@ -808,11 +808,11 @@ class AbstractQuerySet(object):
 
             print("Normal")
             for comment in Comment.objects(photo_id=u):
-                print comment.comment_id
+                print(comment.comment_id)
 
             print("Reversed")
             for comment in Comment.objects(photo_id=u).order_by("-comment_id"):
-                print comment.comment_id
+                print(comment.comment_id)
         """
         if len(colnames) == 0:
             clone = copy.deepcopy(self)
