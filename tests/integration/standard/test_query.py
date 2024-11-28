@@ -647,7 +647,6 @@ class PrintStatementTests(unittest.TestCase):
 
         prepared = session.prepare('INSERT INTO test3rf.test (k, v) VALUES (?, ?)')
         prepared.consistency_level = ConsistencyLevel.ONE
-
         self.assertEqual(str(prepared),
                          '<PreparedStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", consistency=ONE>')
 
@@ -708,6 +707,17 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
 
     def test_prepared_statements(self):
         prepared = self.session.prepare("INSERT INTO test3rf.test (k, v) VALUES (?, ?)")
+
+        batch = BatchStatement(BatchType.LOGGED)
+        for i in range(10):
+            batch.add(prepared, (i, i))
+
+        self.session.execute(batch)
+        self.session.execute_async(batch).result()
+        self.confirm_results()
+
+    def test_prepare_async(self):
+        prepared = self.session.prepare_async("INSERT INTO test3rf.test (k, v) VALUES (?, ?)").result()
 
         batch = BatchStatement(BatchType.LOGGED)
         for i in range(10):
@@ -942,7 +952,7 @@ class LightweightTransactionTests(unittest.TestCase):
                 exception_type = type(result).__name__
                 if exception_type == "NoHostAvailable":
                     self.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
-                if exception_type in ["WriteTimeout", "WriteFailure", "ReadTimeout", "ReadFailure", "ErrorMessageSub"]:
+                if exception_type in ["WriteTimeout", "WriteFailure", "ReadTimeout", "ReadFailure", "ErrorMessageSub", "ErrorMessage"]:
                     if type(result).__name__ in ["WriteTimeout", "WriteFailure"]:
                         received_timeout = True
                     continue
