@@ -2910,7 +2910,7 @@ class Session(object):
 
         self.submit(query_future.send_request)
 
-    def prepare_async(self, query, custom_payload=None, keyspace=None):
+    def prepare_async(self, query, custom_payload=None, keyspace=None, prepare_on_all_hosts=None):
         """
         Prepare the given query and return a :class:`~.PrepareFuture`
         object.  You may also call :meth:`~.PrepareFuture.result()`
@@ -2929,14 +2929,16 @@ class Session(object):
             ... except Exception:
             ...     log.exception("Operation failed:")
         """
-        future = self._create_prepare_response_future(query, keyspace, custom_payload)
+        if prepare_on_all_hosts is None:
+            prepare_on_all_hosts = self.cluster.prepare_on_all_hosts
+        future = self._create_prepare_response_future(query, keyspace, custom_payload, prepare_on_all_hosts)
         future._protocol_handler = self.client_protocol_handler
         self._on_request(future)
         future.send_request()
         return future
 
-    def _create_prepare_response_future(self, query, keyspace, custom_payload):
-        return PrepareFuture(self, query, keyspace, custom_payload, self.default_timeout)
+    def _create_prepare_response_future(self, query, keyspace, custom_payload, prepare_on_all_hosts):
+        return PrepareFuture(self, query, keyspace, custom_payload, self.default_timeout, prepare_on_all_hosts)
 
     def _create_execute_response_future(self, query, parameters, trace, custom_payload,
                                         timeout, execution_profile=EXEC_PROFILE_DEFAULT,
@@ -3149,7 +3151,17 @@ class Session(object):
         `custom_payload` is a key value map to be passed along with the prepare
         message. See :ref:`custom_payload`.
         """
-        return self.prepare_async(query, custom_payload, keyspace).result()
+        future = self.prepare_async(query, custom_payload, keyspace, prepare_on_all_hosts=False)
+        response = future.result()
+        if self.cluster.prepare_on_all_hosts:
+            # prepare on all hosts in a synchronous way, not asynchronously
+            # as internally in prepare_async() (PrepareFuture)
+            host = future._current_host
+            try:
+                self.prepare_on_all_nodes(response.query_string, host, response.keyspace)
+            except Exception:
+                log.exception("Error preparing query on all hosts:")
+        return response
 
     def prepare_on_all_nodes(self, query, excluded_host, keyspace=None):
         """
@@ -5112,9 +5124,10 @@ class ResponseFuture(object):
 class PrepareFuture(ResponseFuture):
     _final_prepare_result = _NOT_SET
 
-    def __init__(self, session, query, keyspace, custom_payload, timeout):
+    def __init__(self, session, query, keyspace, custom_payload, timeout, prepare_on_all_hosts):
         super().__init__(session, PrepareMessage(query=query, keyspace=keyspace), None, timeout)
         self.query_string = query
+        self._prepare_on_all_hosts = prepare_on_all_hosts
         self._keyspace = keyspace
         self._custom_payload = custom_payload
 
@@ -5129,7 +5142,7 @@ class PrepareFuture(ResponseFuture):
         cluster.add_prepared(response.query_id, prepared_statement)
         self._final_prepare_result = prepared_statement
 
-        if cluster.prepare_on_all_hosts:
+        if self._prepare_on_all_hosts:
             # trigger asynchronous preparation of query on other C* nodes,
             # we are on event loop thread, so do not execute those synchronously
             session.submit(
