@@ -2928,6 +2928,10 @@ class Session(object):
             ...     prepared_statement = future.result()
             ... except Exception:
             ...     log.exception("Operation failed:")
+
+        When :meth:`~.Cluster.prepare_on_all_hosts` is enabled, method
+        attempts to prepare given query on all hosts, but does not wait
+        for their response.
         """
         if prepare_on_all_hosts is None:
             prepare_on_all_hosts = self.cluster.prepare_on_all_hosts
@@ -3147,6 +3151,11 @@ class Session(object):
 
         **Important**: PreparedStatements should be prepared only once.
         Preparing the same query more than once will likely affect performance.
+
+        When :meth:`~.Cluster.prepare_on_all_hosts` is enabled, method
+        attempts to prepare given query on all hosts and waits for each node to respond.
+        Preparing CQL query on other nodes may fail, but error is not propagated
+        to the caller.
 
         `custom_payload` is a key value map to be passed along with the prepare
         message. See :ref:`custom_payload`.
