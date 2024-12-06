@@ -528,6 +528,20 @@ class PreparedStatementArgTest(unittest.TestCase):
             session.execute(select_statement, (1, ), host=host)
         self.assertEqual(2, self.mock_handler.get_message_count('debug', "Re-preparing"))
 
+    def test_prepare_async_on_all_hosts(self):
+        """
+        Test to validate prepare_on_all_hosts flag is honored during prepare_async execution.
+        """
+        clus = TestCluster(prepare_on_all_hosts=True)
+        self.addCleanup(clus.shutdown)
+
+        session = clus.connect(wait_for_all_pools=True)
+        select_statement = session.prepare_async("SELECT k FROM test3rf.test WHERE k = ?").result()
+        time.sleep(1) # we have no way to know when prepared statements are asynchronously completed
+        for host in clus.metadata.all_hosts():
+            session.execute(select_statement, (1, ), host=host)
+        self.assertEqual(0, self.mock_handler.get_message_count('debug', "Re-preparing"))
+
     def test_prepare_batch_statement(self):
         """
         Test to validate a prepared statement used inside a batch statement is correctly handled
