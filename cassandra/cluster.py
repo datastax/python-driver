@@ -4088,8 +4088,8 @@ class ControlConnection(object):
             return False
 
         if "tokens" in row and not row.get("tokens"):
-            log.warning(
-                "Found an invalid row for peer - tokens is None (broadcast_rpc: %s, host_id: %s). Ignoring host." %
+            log.debug(
+                "Found a zero-token node - tokens is None (broadcast_rpc: %s, host_id: %s). Ignoring host." %
                 (broadcast_rpc, host_id))
             return False
 
