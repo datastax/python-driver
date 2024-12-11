@@ -1035,7 +1035,7 @@ class QueryTrace(object):
 
     def _execute(self, query, parameters, time_spent, max_wait):
         timeout = (max_wait - time_spent) if max_wait is not None else None
-        future = self._session._create_execute_response_future(query, parameters, trace=False, custom_payload=None, timeout=timeout)
+        future = self._session._create_response_future(query, parameters, trace=False, custom_payload=None, timeout=timeout)
         # in case the user switched the row factory, set it to namedtuple for this query
         future.row_factory = named_tuple_factory
         future.send_request()

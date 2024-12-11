@@ -2717,7 +2717,7 @@ class Session(object):
         if execute_as:
             custom_payload[_proxy_execute_key] = execute_as.encode()
 
-        future = self._create_execute_response_future(
+        future = self._create_response_future(
             query, parameters, trace, custom_payload, timeout,
             execution_profile, paging_state, host)
         future._protocol_handler = self.client_protocol_handler
@@ -2782,8 +2782,8 @@ class Session(object):
             custom_payload[_proxy_execute_key] = execute_as.encode()
         custom_payload[_request_timeout_key] = int64_pack(int(execution_profile.request_timeout * 1000))
 
-        future = self._create_execute_response_future(query, parameters=None, trace=trace, custom_payload=custom_payload,
-                                                      timeout=_NOT_SET, execution_profile=execution_profile)
+        future = self._create_response_future(query, parameters=None, trace=trace, custom_payload=custom_payload,
+                                              timeout=_NOT_SET, execution_profile=execution_profile)
 
         future.message.query_params = graph_parameters
         future._protocol_handler = self.client_protocol_handler
@@ -2885,9 +2885,9 @@ class Session(object):
 
     def _target_analytics_master(self, future):
         future._start_timer()
-        master_query_future = self._create_execute_response_future("CALL DseClientTool.getAnalyticsGraphServer()",
-                                                                   parameters=None, trace=False,
-                                                                   custom_payload=None, timeout=future.timeout)
+        master_query_future = self._create_response_future("CALL DseClientTool.getAnalyticsGraphServer()",
+                                                           parameters=None, trace=False,
+                                                           custom_payload=None, timeout=future.timeout)
         master_query_future.row_factory = tuple_factory
         master_query_future.send_request()
 
@@ -2910,11 +2910,11 @@ class Session(object):
 
         self.submit(query_future.send_request)
 
-    def prepare_async(self, query, custom_payload=None, keyspace=None, prepare_on_all_hosts=None):
+    def prepare_async(self, query, custom_payload=None, keyspace=None):
         """
-        Prepare the given query and return a :class:`~.PrepareFuture`
-        object.  You may also call :meth:`~.PrepareFuture.result()`
-        on the :class:`.PrepareFuture` to synchronously block for
+        Prepare the given query and return a :class:`~.ResponseFuture`
+        object.  You may also call :meth:`~.ResponseFuture.result()`
+        on the :class:`.ResponseFuture` to synchronously block for
         prepared statement object at any time.
 
         See :meth:`Session.prepare` for parameter definitions.
@@ -2928,25 +2928,43 @@ class Session(object):
             ...     prepared_statement = future.result()
             ... except Exception:
             ...     log.exception("Operation failed:")
-
-        When :meth:`~.Cluster.prepare_on_all_hosts` is enabled, method
-        attempts to prepare given query on all hosts, but does not wait
-        for their response.
         """
-        if prepare_on_all_hosts is None:
-            prepare_on_all_hosts = self.cluster.prepare_on_all_hosts
-        future = self._create_prepare_response_future(query, keyspace, custom_payload, prepare_on_all_hosts)
+        future = self._create_prepare_response_future(query, keyspace, custom_payload)
         future._protocol_handler = self.client_protocol_handler
         self._on_request(future)
         future.send_request()
         return future
 
-    def _create_prepare_response_future(self, query, keyspace, custom_payload, prepare_on_all_hosts):
-        return PrepareFuture(self, query, keyspace, custom_payload, self.default_timeout, prepare_on_all_hosts)
+    def _create_prepare_response_future(self, query, keyspace, custom_payload):
+        message = PrepareMessage(query=query, keyspace=keyspace)
+        future = ResponseFuture(self, message, query=None, timeout=self.default_timeout)
 
-    def _create_execute_response_future(self, query, parameters, trace, custom_payload,
-                                        timeout, execution_profile=EXEC_PROFILE_DEFAULT,
-                                        paging_state=None, host=None):
+        def _prepare_result_processor(future, response):
+            prepared_keyspace = keyspace if keyspace else None
+            prepared_statement = PreparedStatement.from_message(
+                response.query_id, response.bind_metadata, response.pk_indexes, self.cluster.metadata, query,
+                prepared_keyspace,
+                self._protocol_version, response.column_metadata, response.result_metadata_id,
+                self.cluster.column_encryption_policy)
+            prepared_statement.custom_payload = custom_payload
+            self.cluster.add_prepared(response.query_id, prepared_statement)
+            if self.cluster.prepare_on_all_hosts:
+                # prepare statement on all hosts
+                host = future._current_host
+                try:
+                    self.prepare_on_all_nodes(future.message.query, host, future.message.keyspace)
+                except Exception:
+                    log.exception("Error preparing query on all hosts:")
+
+            return prepared_statement
+
+        future._set_result_processor(_prepare_result_processor)
+        return future
+
+
+    def _create_response_future(self, query, parameters, trace, custom_payload,
+                                timeout, execution_profile=EXEC_PROFILE_DEFAULT,
+                                paging_state=None, host=None):
         """ Returns the ResponseFuture before calling send_request() on it """
 
         prepared_statement = None
@@ -3160,17 +3178,8 @@ class Session(object):
         `custom_payload` is a key value map to be passed along with the prepare
         message. See :ref:`custom_payload`.
         """
-        future = self.prepare_async(query, custom_payload, keyspace, prepare_on_all_hosts=False)
-        response = future.result()
-        if self.cluster.prepare_on_all_hosts:
-            # prepare on all hosts in a synchronous way, not asynchronously
-            # as internally in prepare_async() (PrepareFuture)
-            host = future._current_host
-            try:
-                self.prepare_on_all_nodes(response.query_string, host, response.keyspace)
-            except Exception:
-                log.exception("Error preparing query on all hosts:")
-        return response
+        future = self.prepare_async(query, custom_payload, keyspace)
+        return future.result()
 
     def prepare_on_all_nodes(self, query, excluded_host, keyspace=None):
         """
@@ -4345,6 +4354,7 @@ class ResponseFuture(object):
     _col_types = None
     _final_exception = None
     _query_traces = None
+    _result_processor = None
     _callbacks = None
     _errbacks = None
     _current_host = None
@@ -4976,9 +4986,19 @@ class ResponseFuture(object):
         """
         self._event.wait()
         if self._final_result is not _NOT_SET:
-            return ResultSet(self, self._final_result)
+            if self._result_processor is not None:
+                return self._result_processor(self, self._final_result)
+            else:
+                return ResultSet(self, self._final_result)
         else:
             raise self._final_exception
+
+    def _set_result_processor(self, result_processor):
+        """
+        Sets internal result processor which allows to control object
+        returned by :meth:`ResponseFuture.result()` method.
+        """
+        self._result_processor = result_processor
 
     def get_query_trace_ids(self):
         """
@@ -5129,49 +5149,6 @@ class ResponseFuture(object):
                % (self.query, self._req_id, result, self._final_exception, self.coordinator_host)
     __repr__ = __str__
 
-
-class PrepareFuture(ResponseFuture):
-    _final_prepare_result = _NOT_SET
-
-    def __init__(self, session, query, keyspace, custom_payload, timeout, prepare_on_all_hosts):
-        super().__init__(session, PrepareMessage(query=query, keyspace=keyspace), None, timeout)
-        self.query_string = query
-        self._prepare_on_all_hosts = prepare_on_all_hosts
-        self._keyspace = keyspace
-        self._custom_payload = custom_payload
-
-    def _set_final_result(self, response):
-        session = self.session
-        cluster = session.cluster
-        prepared_statement = PreparedStatement.from_message(
-            response.query_id, response.bind_metadata, response.pk_indexes, cluster.metadata, self.query_string,
-            self._keyspace, session._protocol_version, response.column_metadata, response.result_metadata_id,
-            cluster.column_encryption_policy)
-        prepared_statement.custom_payload = response.custom_payload
-        cluster.add_prepared(response.query_id, prepared_statement)
-        self._final_prepare_result = prepared_statement
-
-        if self._prepare_on_all_hosts:
-            # trigger asynchronous preparation of query on other C* nodes,
-            # we are on event loop thread, so do not execute those synchronously
-            session.submit(
-                session.prepare_on_all_nodes,
-                self.query_string, self._current_host, self._keyspace)
-
-        super()._set_final_result(response)
-
-    def result(self):
-        self._event.wait()
-        if self._final_prepare_result is not _NOT_SET:
-            return self._final_prepare_result
-        else:
-            raise self._final_exception
-
-    def __str__(self):
-        result = "(no result yet)" if self._final_result is _NOT_SET else self._final_result
-        return "<PrepareFuture: query='%s' request_id=%s result=%s exception=%s coordinator_host=%s>" \
-               % (self.query_string, self._req_id, result, self._final_exception, self.coordinator_host)
-    __repr__ = __str__
 
 class QueryExhausted(Exception):
     """

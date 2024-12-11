@@ -22,7 +22,7 @@ from packaging.version import Version
 from cassandra import InvalidRequest, DriverException
 
 from cassandra import ConsistencyLevel, ProtocolVersion
-from cassandra.cluster import PrepareFuture
+from cassandra.cluster import ResponseFuture
 from cassandra.query import PreparedStatement, UNSET_VALUE
 from tests.integration import (get_server_versions, greaterthanorequalcass40, greaterthanorequaldse50,
     requirecassandra, BasicSharedKeyspaceUnitTestCase)
@@ -152,7 +152,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             INSERT INTO cf0 (a, b, c) VALUES  (?, ?, ?)
             """)
-        self.assertIsInstance(prepared_future, PrepareFuture)
+        self.assertIsInstance(prepared_future, ResponseFuture)
         prepared = prepared_future.result()
         self.assertIsInstance(prepared, PreparedStatement)
 
@@ -163,7 +163,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM cf0 WHERE a=?
             """)
-        self.assertIsInstance(prepared_future, PrepareFuture)
+        self.assertIsInstance(prepared_future, ResponseFuture)
         prepared = prepared_future.result()
         self.assertIsInstance(prepared, PreparedStatement)
 
@@ -176,7 +176,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             INSERT INTO cf0 (a, b, c) VALUES  (?, ?, ?)
             """)
-        self.assertIsInstance(prepared_future, PrepareFuture)
+        self.assertIsInstance(prepared_future, ResponseFuture)
         prepared = prepared_future.result()
         self.assertIsInstance(prepared, PreparedStatement)
 
@@ -191,7 +191,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM cf0 WHERE a=?
             """)
-        self.assertIsInstance(prepared_future, PrepareFuture)
+        self.assertIsInstance(prepared_future, ResponseFuture)
         prepared = prepared_future.result()
         self.assertIsInstance(prepared, PreparedStatement)
 

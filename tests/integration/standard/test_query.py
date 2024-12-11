@@ -536,10 +536,9 @@ class PreparedStatementArgTest(unittest.TestCase):
         self.addCleanup(clus.shutdown)
 
         session = clus.connect(wait_for_all_pools=True)
-        select_statement = session.prepare_async("SELECT k FROM test3rf.test WHERE k = ?").result()
-        time.sleep(1) # we have no way to know when prepared statements are asynchronously completed
+        select_statement = session.prepare_async("SELECT k FROM test3rf.test WHERE k = ? AND v = ? ALLOW FILTERING").result()
         for host in clus.metadata.all_hosts():
-            session.execute(select_statement, (1, ), host=host)
+            session.execute(select_statement, (1, 1), host=host)
         self.assertEqual(0, self.mock_handler.get_message_count('debug', "Re-preparing"))
 
     def test_prepare_batch_statement(self):
