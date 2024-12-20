@@ -27,6 +27,7 @@ from cassandra.cqlengine.query import BatchType as cqlengine_BatchType
 
 
 class TestMultiKeyModel(Model):
+    __test__ = False
 
     partition = columns.Integer(primary_key=True)
     cluster = columns.Integer(primary_key=True)

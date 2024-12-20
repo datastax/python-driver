@@ -372,6 +372,8 @@ class InconsistentTable(BaseCassEngTestCase):
 
 
 class TestIndexSetModel(Model):
+    __test__ = False
+
     partition = columns.UUID(primary_key=True)
     int_set = columns.Set(columns.Integer, index=True)
     int_list = columns.List(columns.Integer, index=True)

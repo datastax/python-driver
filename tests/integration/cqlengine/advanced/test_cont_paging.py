@@ -28,6 +28,8 @@ from tests.integration import (DSE_VERSION, greaterthanorequaldse51,
 
 
 class TestMultiKeyModel(models.Model):
+    __test__ = False
+
     partition = columns.Integer(primary_key=True)
     cluster = columns.Integer(primary_key=True)
     count = columns.Integer(required=False)

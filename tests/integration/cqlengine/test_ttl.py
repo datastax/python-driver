@@ -29,6 +29,8 @@ from tests.integration import CASSANDRA_VERSION, greaterthancass20
 
 
 class TestTTLModel(Model):
+    __test__ = False
+
     id = columns.UUID(primary_key=True, default=lambda: uuid4())
     count = columns.Integer()
     text = columns.Text(required=False)
@@ -48,6 +50,8 @@ class BaseTTLTest(BaseCassEngTestCase):
 
 
 class TestDefaultTTLModel(Model):
+    __test__ = False
+
     __options__ = {'default_time_to_live': 20}
     id = columns.UUID(primary_key=True, default=lambda:uuid4())
     count = columns.Integer()

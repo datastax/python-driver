@@ -25,6 +25,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import PROTOCOL_VERSION
 
 class TestIfNotExistsModel(Model):
+    __test__ = False
 
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()
@@ -32,6 +33,7 @@ class TestIfNotExistsModel(Model):
 
 
 class TestIfNotExistsWithCounterModel(Model):
+    __test__ = False
 
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     likes   = columns.Counter()

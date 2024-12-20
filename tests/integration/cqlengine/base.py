@@ -22,6 +22,7 @@ from cassandra.cqlengine import columns
 from uuid import uuid4
 
 class TestQueryUpdateModel(Model):
+    __test__ = False
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     cluster = columns.Integer(primary_key=True)

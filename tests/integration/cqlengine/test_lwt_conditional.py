@@ -27,12 +27,16 @@ from tests.integration import greaterthancass20
 
 
 class TestConditionalModel(Model):
+    __test__ = False
+
     id = columns.UUID(primary_key=True, default=uuid4)
     count = columns.Integer()
     text = columns.Text(required=False)
 
 
 class TestUpdateModel(Model):
+    __test__ = False
+
     partition = columns.Integer(primary_key=True)
     cluster = columns.Integer(primary_key=True)
     value = columns.Integer(required=False)

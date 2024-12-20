@@ -29,6 +29,7 @@ from tests.integration.cqlengine import DEFAULT_KEYSPACE, setup_connection
 
 
 class TestConnectModel(Model):
+    __test__ = False
 
     id = columns.Integer(primary_key=True)
     keyspace = columns.Text()

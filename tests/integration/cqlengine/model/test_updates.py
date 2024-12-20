@@ -25,6 +25,7 @@ from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.usertype import UserType
 
 class TestUpdateModel(Model):
+    __test__ = False
 
     partition   = columns.UUID(primary_key=True, default=uuid4)
     cluster     = columns.UUID(primary_key=True, default=uuid4)

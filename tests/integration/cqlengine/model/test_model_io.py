@@ -36,6 +36,7 @@ from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
 class TestModel(Model):
+    __test__ = False
 
     id = columns.UUID(primary_key=True, default=lambda: uuid4())
     count = columns.Integer()
@@ -44,6 +45,8 @@ class TestModel(Model):
 
 
 class TestModelSave(Model):
+    __test__ = False
+
     partition = columns.UUID(primary_key=True, default=uuid4)
     cluster = columns.Integer(primary_key=True)
     count = columns.Integer(required=False)
@@ -302,6 +305,7 @@ class TestModelIO(BaseCassEngTestCase):
 
 
 class TestMultiKeyModel(Model):
+    __test__ = False
 
     partition = columns.Integer(primary_key=True)
     cluster = columns.Integer(primary_key=True)
@@ -658,6 +662,7 @@ class TestQueryQuoting(BaseCassEngTestCase):
 
 
 class TestQueryModel(Model):
+    __test__ = False
 
     test_id = columns.UUID(primary_key=True, default=uuid4)
     date = columns.Date(primary_key=True)

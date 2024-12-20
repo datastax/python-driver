@@ -22,6 +22,8 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from mock import patch
 
 class TestMultiKeyModel(Model):
+    __test__ = False
+
     partition   = columns.Integer(primary_key=True)
     cluster     = columns.Integer(primary_key=True)
     count       = columns.Integer(required=False)

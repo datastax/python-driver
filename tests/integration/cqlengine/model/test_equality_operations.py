@@ -21,6 +21,7 @@ from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
 class TestModel(Model):
+    __test__ = False
 
     id      = columns.UUID(primary_key=True, default=lambda:uuid4())
     count   = columns.Integer()

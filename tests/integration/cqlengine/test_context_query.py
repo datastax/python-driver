@@ -20,7 +20,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
 class TestModel(Model):
-
+    __test__ = False
     __keyspace__ = 'ks1'
 
     partition = columns.Integer(primary_key=True)
