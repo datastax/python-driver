@@ -65,7 +65,7 @@ class NameTupleFactory(BasicSharedKeyspaceUnitTestCase):
 
         query = "SELECT v1 AS duplicate, v2 AS duplicate, v3 AS duplicate from {0}.{1}".format(self.ks_name, self.function_table_name)
         rs = self.session.execute(query)
-        row = rs[0]
+        row = rs.one()
         self.assertTrue(hasattr(row, 'duplicate'))
         self.assertTrue(hasattr(row, 'duplicate_'))
         self.assertTrue(hasattr(row, 'duplicate__'))
@@ -93,8 +93,9 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
     def test_tuple_factory(self):
         result = self._results_from_row_factory(tuple_factory)
         self.assertIsInstance(result, ResultSet)
-        self.assertIsInstance(result[0], tuple)
+        self.assertIsInstance(result.one(), tuple)
 
+        result = result.all()
         for row in result:
             self.assertEqual(row[0], row[1])
 
@@ -106,7 +107,7 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
     def test_named_tuple_factory(self):
         result = self._results_from_row_factory(named_tuple_factory)
         self.assertIsInstance(result, ResultSet)
-        result = list(result)
+        result = result.all()
 
         for row in result:
             self.assertEqual(row.k, row.v)
@@ -119,8 +120,9 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
     def _test_dict_factory(self, row_factory, row_type):
         result = self._results_from_row_factory(row_factory)
         self.assertIsInstance(result, ResultSet)
-        self.assertIsInstance(result[0], row_type)
+        self.assertIsInstance(result.one(), row_type)
 
+        result = result.all()
         for row in result:
             self.assertEqual(row['k'], row['v'])
 

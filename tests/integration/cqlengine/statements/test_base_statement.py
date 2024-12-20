@@ -61,7 +61,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
     def _verify_statement(self, original):
         st = SelectStatement(self.table_name)
         result = execute(st)
-        response = result[0]
+        response = result.one()
 
         for assignment in original.assignments:
             self.assertEqual(response[assignment.field], assignment.value)

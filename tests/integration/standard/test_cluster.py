@@ -899,7 +899,7 @@ class ClusterTests(unittest.TestCase):
 
             # use a copied instance and override the row factory
             # assert last returned value can be accessed as a namedtuple so we can prove something different
-            named_tuple_row = rs[0]
+            named_tuple_row = rs.one()
             self.assertIsInstance(named_tuple_row, tuple)
             self.assertTrue(named_tuple_row.release_version)
 
@@ -910,13 +910,13 @@ class ClusterTests(unittest.TestCase):
                 rs = session.execute(query, execution_profile=tmp_profile)
                 queried_hosts.add(rs.response_future._current_host)
             self.assertEqual(queried_hosts, expected_hosts)
-            tuple_row = rs[0]
+            tuple_row = rs.one()
             self.assertIsInstance(tuple_row, tuple)
             with self.assertRaises(AttributeError):
                 tuple_row.release_version
 
             # make sure original profile is not impacted
-            self.assertTrue(session.execute(query, execution_profile='node1')[0].release_version)
+            self.assertTrue(session.execute(query, execution_profile='node1').one().release_version)
 
     def test_setting_lbp_legacy(self):
         cluster = TestCluster()
@@ -1390,7 +1390,7 @@ class ContextManagementTest(unittest.TestCase):
             with cluster.connect() as session:
                 self.assertFalse(cluster.is_shutdown)
                 self.assertFalse(session.is_shutdown)
-                self.assertTrue(session.execute('select release_version from system.local')[0])
+                self.assertTrue(session.execute('select release_version from system.local').one())
             self.assertTrue(session.is_shutdown)
         self.assertTrue(cluster.is_shutdown)
 
@@ -1408,7 +1408,7 @@ class ContextManagementTest(unittest.TestCase):
             session = cluster.connect()
             self.assertFalse(cluster.is_shutdown)
             self.assertFalse(session.is_shutdown)
-            self.assertTrue(session.execute('select release_version from system.local')[0])
+            self.assertTrue(session.execute('select release_version from system.local').one())
         self.assertTrue(session.is_shutdown)
         self.assertTrue(cluster.is_shutdown)
 
@@ -1428,7 +1428,7 @@ class ContextManagementTest(unittest.TestCase):
             self.assertFalse(cluster.is_shutdown)
             self.assertFalse(session.is_shutdown)
             self.assertFalse(unmanaged_session.is_shutdown)
-            self.assertTrue(session.execute('select release_version from system.local')[0])
+            self.assertTrue(session.execute('select release_version from system.local').one())
         self.assertTrue(session.is_shutdown)
         self.assertFalse(cluster.is_shutdown)
         self.assertFalse(unmanaged_session.is_shutdown)
@@ -1551,7 +1551,7 @@ class BetaProtocolTest(unittest.TestCase):
         cluster = Cluster(protocol_version=cassandra.ProtocolVersion.V6, allow_beta_protocol_version=True)
         session = cluster.connect()
         self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.V6)
-        self.assertTrue(session.execute("select release_version from system.local")[0])
+        self.assertTrue(session.execute("select release_version from system.local").one())
         cluster.shutdown()
 
 

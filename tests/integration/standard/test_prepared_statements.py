@@ -229,7 +229,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind((1,))
         results = self.session.execute(bound)
-        self.assertEqual(results[0].v, None)
+        self.assertEqual(results.one().v, None)
 
     def test_unset_values(self):
         """
@@ -272,7 +272,7 @@ class PreparedStatementTests(unittest.TestCase):
         for params, expected in bind_expected:
             self.session.execute(insert, params)
             results = self.session.execute(select, (0,))
-            self.assertEqual(results[0], expected)
+            self.assertEqual(results.one(), expected)
 
         self.assertRaises(ValueError, self.session.execute, select, (UNSET_VALUE, 0, 0))
 
@@ -297,7 +297,7 @@ class PreparedStatementTests(unittest.TestCase):
         bound = prepared.bind(None)
         bound.consistency_level = ConsistencyLevel.ALL
         results = self.session.execute(bound)
-        self.assertEqual(results[0].v, 0)
+        self.assertEqual(results.one().v, 0)
 
     def test_none_values_dicts(self):
         """
@@ -322,7 +322,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind({'k': 1})
         results = self.session.execute(bound)
-        self.assertEqual(results[0].v, None)
+        self.assertEqual(results.one().v, None)
 
     def test_async_binding(self):
         """
@@ -346,7 +346,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         future = self.session.execute_async(prepared, (873,))
         results = future.result()
-        self.assertEqual(results[0].v, None)
+        self.assertEqual(results.one().v, None)
 
     def test_async_binding_dicts(self):
         """
@@ -369,7 +369,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         future = self.session.execute_async(prepared, {'k': 873})
         results = future.result()
-        self.assertEqual(results[0].v, None)
+        self.assertEqual(results.one().v, None)
 
     def test_raise_error_on_prepared_statement_execution_dropped_table(self):
         """
@@ -616,7 +616,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         def check_result_and_metadata(expected):
             self.assertEqual(
-                session.execute(prepared_statement, (value, value, value))[0],
+                session.execute(prepared_statement, (value, value, value)).one(),
                 expected
             )
             self.assertEqual(prepared_statement.result_metadata_id, first_id)
