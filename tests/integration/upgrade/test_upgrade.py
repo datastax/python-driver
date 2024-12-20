@@ -56,7 +56,7 @@ class UpgradeTests(UpgradeBase):
             self.session.execute("INSERT INTO test3rf.test(k, v) VALUES (%s, 0)", (next(c), ), execution_profile="one")
             time.sleep(0.0001)
 
-        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all")[0][0]
+        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all").one()[0]
         self.assertEqual(total_number_of_inserted, next(c))
 
         self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
@@ -115,7 +115,7 @@ class UpgradeTestsMetadata(UpgradeBase):
             self.session.execute("INSERT INTO test3rf.test(k, v) VALUES (%s, 0)", (next(c),), execution_profile="one")
             time.sleep(0.0001)
 
-        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all")[0][0]
+        total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all").one()[0]
         self.assertEqual(total_number_of_inserted, next(c))
 
         self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
@@ -279,7 +279,7 @@ class UpgradeTestsPolicies(UpgradeBase):
                                  execution_profile='spec_ep_rr')
             time.sleep(0.0001)
 
-        total_number_of_inserted = session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all")[0][0]
+        total_number_of_inserted = session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all").one()[0]
         self.assertEqual(total_number_of_inserted, next(c))
 
         self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
