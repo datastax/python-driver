@@ -21,6 +21,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 
 
 class TestCounterModel(Model):
+    __test__ = False
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     cluster = columns.UUID(primary_key=True, default=uuid4)

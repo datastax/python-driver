@@ -62,6 +62,7 @@ class TzOffset(tzinfo):
 
 
 class TestModel(Model):
+    __test__ = False
 
     test_id = columns.Integer(primary_key=True)
     attempt_id = columns.Integer(primary_key=True)
@@ -104,6 +105,7 @@ class IndexedCollectionsTestModel(Model):
 
 
 class TestMultiClusteringModel(Model):
+    __test__ = False
 
     one = columns.Integer(primary_key=True)
     two = columns.Integer(primary_key=True)
@@ -1346,6 +1348,7 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
         list(DBFieldModel.objects.filter(c0=0, k0=0, k1=0).values_list('c0', 'v0'))
 
 class TestModelSmall(Model):
+    __test__ = False
 
     test_id = columns.Integer(primary_key=True)
 

@@ -26,7 +26,7 @@ from tests.integration import local, CASSANDRA_IP, TestCluster
 
 
 class TestModel(Model):
-
+    __test__ = False
     __keyspace__ = 'ks1'
 
     partition = columns.Integer(primary_key=True)

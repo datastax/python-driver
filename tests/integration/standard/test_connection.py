@@ -95,6 +95,8 @@ class ConnectionTimeoutTest(unittest.TestCase):
 
 
 class TestHostListener(HostStateListener):
+    __test__ = False
+
     host_down = None
 
     def on_down(self, host):

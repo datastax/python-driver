@@ -22,11 +22,13 @@ from cassandra.cqlengine import columns
 
 
 class TestModel(Model):
+    __test__ = False
 
     id = columns.Integer(primary_key=True)
     clustering_key = columns.Integer(primary_key=True, clustering_order='desc')
 
 class TestClusteringComplexModel(Model):
+    __test__ = False
 
     id = columns.Integer(primary_key=True)
     clustering_key = columns.Integer(primary_key=True, clustering_order='desc')

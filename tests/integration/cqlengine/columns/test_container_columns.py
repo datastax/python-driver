@@ -35,6 +35,8 @@ log = logging.getLogger(__name__)
 
 
 class TestSetModel(Model):
+    __test__ = False
+
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_set = columns.Set(columns.Integer, required=False)
     text_set = columns.Set(columns.Text, required=False)
@@ -193,6 +195,7 @@ class TestSetColumn(BaseCassEngTestCase):
 
 
 class TestListModel(Model):
+    __test__ = False
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_list = columns.List(columns.Integer, required=False)
@@ -347,6 +350,8 @@ class TestListColumn(BaseCassEngTestCase):
 
 
 class TestMapModel(Model):
+    __test__ = False
+
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_map = columns.Map(columns.Integer, columns.UUID, required=False)
     text_map = columns.Map(columns.Text, columns.DateTime, required=False)
@@ -525,6 +530,7 @@ class TestMapColumn(BaseCassEngTestCase):
 
 
 class TestCamelMapModel(Model):
+    __test__ = False
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     camelMap = columns.Map(columns.Text, columns.Integer, required=False)
@@ -546,6 +552,7 @@ class TestCamelMapColumn(BaseCassEngTestCase):
 
 
 class TestTupleModel(Model):
+    __test__ = False
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_tuple = columns.Tuple(columns.Integer, columns.Integer, columns.Integer, required=False)
@@ -746,6 +753,7 @@ class TestTupleColumn(BaseCassEngTestCase):
 
 
 class TestNestedModel(Model):
+    __test__ = False
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     list_list = columns.List(columns.List(columns.Integer), required=False)

@@ -26,6 +26,7 @@ from tests.integration import PROTOCOL_VERSION
 
 
 class TestIfExistsModel(Model):
+    __test__ = False
 
     id = columns.UUID(primary_key=True, default=lambda: uuid4())
     count = columns.Integer()
@@ -33,6 +34,7 @@ class TestIfExistsModel(Model):
 
 
 class TestIfExistsModel2(Model):
+    __test__ = False
 
     id = columns.Integer(primary_key=True)
     count = columns.Integer(primary_key=True, required=False)
@@ -40,6 +42,7 @@ class TestIfExistsModel2(Model):
 
 
 class TestIfExistsWithCounterModel(Model):
+    __test__ = False
 
     id = columns.UUID(primary_key=True, default=lambda: uuid4())
     likes = columns.Counter()
