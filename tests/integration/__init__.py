@@ -299,6 +299,8 @@ def get_unsupported_lower_protocol():
     This is used to determine the lowest protocol version that is NOT
     supported by the version of C* running
     """
+    if SCYLLA_VERSION is not None:
+        return 2
     if CASSANDRA_VERSION >= Version('3.0'):
         return 2
     else:
@@ -310,6 +312,8 @@ def get_unsupported_upper_protocol():
     This is used to determine the highest protocol version that is NOT
     supported by the version of C* running
     """
+    if SCYLLA_VERSION is not None:
+        return 5
 
     if CASSANDRA_VERSION >= Version('4.0-a'):
         if DSE_VERSION:
@@ -817,6 +821,38 @@ def setup_keyspace(ipformat=None, wait=True, protocol_version=None, port=9042):
         raise
     finally:
         cluster.shutdown()
+
+
+def is_scylla_enterprise(version: Version) -> bool:
+    return version > Version('2000.1.1')
+
+
+def xfail_scylla_version_lt(reason, oss_scylla_version, ent_scylla_version, *args, **kwargs):
+    """
+    It is used to mark tests that are going to fail on certain scylla versions.
+    :param reason: message to fail test with
+    :param oss_scylla_version: str, oss version from which test supposed to succeed
+    :param ent_scylla_version: str, enterprise version from which test supposed to succeed. It should end with `.1.1`
+    """
+    if not reason.startswith("scylladb/scylladb#"):
+        raise ValueError('reason should start with scylladb/scylladb#<issue-id> to reference issue in scylla repo')
+
+    if not isinstance(ent_scylla_version, str):
+        raise ValueError('ent_scylla_version should be a str')
+
+    if not ent_scylla_version.endswith("1.1"):
+        raise ValueError('ent_scylla_version should end with "1.1"')
+
+    if SCYLLA_VERSION is None:
+        return pytest.mark.skipif(False, reason="It is just a NoOP Decor, should not skip anything")
+
+    current_version = Version(get_scylla_version(SCYLLA_VERSION))
+
+    if is_scylla_enterprise(current_version):
+        return pytest.mark.xfail(current_version < Version(ent_scylla_version),
+                                 reason=reason, *args, **kwargs)
+
+    return pytest.mark.xfail(current_version < Version(oss_scylla_version), reason=reason, *args, **kwargs)
 
 
 class UpDownWaiter(object):

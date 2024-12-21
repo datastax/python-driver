@@ -288,7 +288,6 @@ class ClusterTests(unittest.TestCase):
 
         cluster.shutdown()
 
-    @xfail_scylla("Failing with scylla because there is option to create a cluster with 'lower bound' protocol")
     def test_invalid_protocol_negotation(self):
         """
         Test for protocol negotiation when explicit versions are set
