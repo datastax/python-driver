@@ -60,7 +60,7 @@ class AlterTableTest(BaseCassEngTestCase):
 
             __options__ = {'compaction': {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy',
                                           'bucket_high': '20',
-                                          'bucket_low': '10',
+                                          'bucket_low': '0.5',
                                           'max_threshold': '200',
                                           'min_threshold': '100',
                                           'min_sstable_size': '1000',
