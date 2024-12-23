@@ -133,7 +133,7 @@ class MetaDataRemovalTest(unittest.TestCase):
 
         # verify the un-existing host was filtered
         for host in self.cluster.metadata.all_hosts():
-            self.assertNotEquals(host.endpoint.address, '126.0.0.186')
+            self.assertNotEqual(host.endpoint.address, '126.0.0.186')
 
 
 class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):

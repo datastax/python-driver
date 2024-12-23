@@ -16,19 +16,25 @@ import os, socket, errno
 from ccmlib import common
 
 from cassandra.cluster import NoHostAvailable
-from cassandra.io.asyncorereactor import AsyncoreConnection
+
+try:
+    from cassandra.io.asyncorereactor import AsyncoreConnection
+except ImportError:
+    AsyncoreConnection = None
 
 from tests import is_monkey_patched
 from tests.integration import use_cluster, remove_cluster, TestCluster
 
+try:
+    from cassandra.io.libevreactor import LibevConnection
+except ImportError:
+    LibevConnection = None
+
+
 if is_monkey_patched():
-    LibevConnection = -1
-    AsyncoreConnection = -1
-else:
-    try:
-        from cassandra.io.libevreactor import LibevConnection
-    except ImportError:
-        LibevConnection = None
+    LibevConnection = None
+    AsyncoreConnection = None
+
 
 import unittest
 
@@ -102,7 +108,7 @@ class LibevConnectionTests(IPV6ConnectionTest, unittest.TestCase):
         if os.name == "nt":
             raise unittest.SkipTest("IPv6 is currently not supported under Windows")
 
-        if LibevConnection == -1:
+        if LibevConnection is None:
             raise unittest.SkipTest("Can't test libev with monkey patching")
         elif LibevConnection is None:
             raise unittest.SkipTest("Libev does not appear to be installed properly")
@@ -116,5 +122,5 @@ class AsyncoreConnectionTests(IPV6ConnectionTest, unittest.TestCase):
         if os.name == "nt":
             raise unittest.SkipTest("IPv6 is currently not supported under Windows")
 
-        if AsyncoreConnection == -1:
+        if AsyncoreConnection is None:
             raise unittest.SkipTest("Can't test asyncore with monkey patching")

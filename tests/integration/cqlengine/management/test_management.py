@@ -254,7 +254,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
 
         table_options = management._get_table_metadata(ModelWithTableProperties).options
 
-        self.assertDictContainsSubset(ModelWithTableProperties.__options__, table_options)
+        self.assertTrue(set(ModelWithTableProperties.__options__) <= set(table_options))
 
     def test_bogus_option_update(self):
         sync_table(ModelWithTableProperties)
