@@ -608,7 +608,7 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
         for model, expect in zip(q, expected_order):
             assert model.attempt_id == expect
 
-        q = q.order_by('-attempt_id')
+        q = q.order_by().order_by('-attempt_id')
         expected_order.reverse()
         for model, expect in zip(q, expected_order):
             assert model.attempt_id == expect

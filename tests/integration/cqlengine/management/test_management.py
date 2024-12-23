@@ -23,14 +23,15 @@ from cassandra.cqlengine.management import _get_table_metadata, sync_table, drop
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import DSE_VERSION, PROTOCOL_VERSION, greaterthancass20, requires_collection_indexes, MockLoggingHandler, CASSANDRA_VERSION
+from tests.integration import DSE_VERSION, PROTOCOL_VERSION, greaterthancass20, requires_collection_indexes, \
+    MockLoggingHandler, CASSANDRA_VERSION, SCYLLA_VERSION, xfail_scylla
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 from cassandra.cqlengine.usertype import UserType
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 
 
-INCLUDE_REPAIR = not CASSANDRA_VERSION >= Version('4-a')  # This should cover DSE 6.0+
+INCLUDE_REPAIR = (not CASSANDRA_VERSION >= Version('4-a')) and SCYLLA_VERSION is None  # This should cover DSE 6.0+
 
 
 class KeyspaceManagementTest(BaseCassEngTestCase):
@@ -429,6 +430,7 @@ class IndexTests(BaseCassEngTestCase):
 
     @greaterthancass20
     @requires_collection_indexes
+    @xfail_scylla("scylladb/scylladb#22019 - Scylla incorrectly reports target as keys(%s) for sets")
     def test_sync_indexed_set(self):
         """
         Tests that models that have container types with indices can be synced.
