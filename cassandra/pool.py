@@ -731,7 +731,11 @@ class HostConnection(object):
         else:
             conn = self._session.cluster.connection_factory(self.host.endpoint, host_conn=self, on_orphaned_stream_released=self.on_orphaned_stream_released)
 
-        log.debug("Received a connection %s for shard_id=%i on host %s", id(conn), conn.features.shard_id, self.host)
+        log.debug(
+            "Received a connection %s for shard_id=%i on host %s",
+            id(conn),
+            conn.features.shard_id if conn.features.shard_id is not None else -1,
+            self.host)
         if self.is_shutdown:
             log.debug("Pool for host %s is in shutdown, closing the new connection (%s)", self.host, id(conn))
             conn.close()
