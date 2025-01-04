@@ -1,7 +1,3 @@
-import time
-import unittest
-import pytest
-import os
 from cassandra.cluster import Cluster
 from cassandra.policies import ConstantReconnectionPolicy, RoundRobinPolicy, TokenAwarePolicy
 
@@ -11,7 +7,7 @@ from tests.unit.test_host_connection_pool import LOGGER
 def setup_module():
     use_cluster('tablets', [3], start=True)
 
-class TestTabletsIntegration(unittest.TestCase):
+class TestTabletsIntegration:
     @classmethod
     def setup_class(cls):
         cls.cluster = Cluster(contact_points=["127.0.0.1", "127.0.0.2", "127.0.0.3"], protocol_version=PROTOCOL_VERSION,
@@ -33,8 +29,8 @@ class TestTabletsIntegration(unittest.TestCase):
             LOGGER.info("TRACE EVENT: %s %s %s", event.source, event.thread_name, event.description)
             host_set.add(event.source)
 
-        self.assertEqual(len(host_set), 1)
-        self.assertIn('locally', "\n".join([event.description for event in events]))
+        assert len(host_set) == 1
+        assert 'locally' in "\n".join([event.description for event in events])
 
         trace_id = results.response_future.get_query_trace_ids()[0]
         traces = self.session.execute("SELECT * FROM system_traces.events WHERE session_id = %s", (trace_id,))
@@ -44,8 +40,8 @@ class TestTabletsIntegration(unittest.TestCase):
             LOGGER.info("TRACE EVENT: %s %s", event.source, event.activity)
             host_set.add(event.source)
 
-        self.assertEqual(len(host_set), 1)
-        self.assertIn('locally', "\n".join([event.activity for event in events]))
+        assert len(host_set) == 1
+        assert 'locally' in "\n".join([event.activity for event in events])
 
     def verify_same_shard_in_tracing(self, results):
         traces = results.get_query_trace()
@@ -55,8 +51,8 @@ class TestTabletsIntegration(unittest.TestCase):
             LOGGER.info("TRACE EVENT: %s %s %s", event.source, event.thread_name, event.description)
             shard_set.add(event.thread_name)
 
-        self.assertEqual(len(shard_set), 1)
-        self.assertIn('locally', "\n".join([event.description for event in events]))
+        assert len(shard_set) == 1
+        assert 'locally' in "\n".join([event.description for event in events])
 
         trace_id = results.response_future.get_query_trace_ids()[0]
         traces = self.session.execute("SELECT * FROM system_traces.events WHERE session_id = %s", (trace_id,))
@@ -66,8 +62,8 @@ class TestTabletsIntegration(unittest.TestCase):
             LOGGER.info("TRACE EVENT: %s %s", event.thread, event.activity)
             shard_set.add(event.thread)
 
-        self.assertEqual(len(shard_set), 1)
-        self.assertIn('locally', "\n".join([event.activity for event in events]))
+        assert len(shard_set) == 1
+        assert 'locally' in "\n".join([event.activity for event in events])
 
     def create_ks_and_cf(self):
         self.session.execute(
@@ -110,7 +106,7 @@ class TestTabletsIntegration(unittest.TestCase):
 
         bound = prepared.bind([(2)])
         results = session.execute(bound, trace=True)
-        self.assertEqual(results, [(2, 2, 0)])
+        assert results == [(2, 2, 0)]
         if verify_in_tracing:
             self.verify_same_shard_in_tracing(results)
 
@@ -122,7 +118,7 @@ class TestTabletsIntegration(unittest.TestCase):
 
         bound = prepared.bind([(2)])
         results = session.execute(bound, trace=True)
-        self.assertEqual(results, [(2, 2, 0)])
+        assert results == [(2, 2, 0)]
         if verify_in_tracing:
             self.verify_same_host_in_tracing(results)
 
