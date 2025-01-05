@@ -26,6 +26,7 @@ from threading import RLock
 import struct
 import random
 import itertools
+from typing import Optional
 
 murmur3 = None
 try:
@@ -168,10 +169,13 @@ class Metadata(object):
         current_keyspaces = set()
         for keyspace_meta in parser.get_all_keyspaces():
             current_keyspaces.add(keyspace_meta.name)
-            old_keyspace_meta = self.keyspaces.get(keyspace_meta.name, None)
+            old_keyspace_meta: Optional[KeyspaceMetadata] = self.keyspaces.get(keyspace_meta.name, None)
             self.keyspaces[keyspace_meta.name] = keyspace_meta
             if old_keyspace_meta:
                 self._keyspace_updated(keyspace_meta.name)
+                for table_name in old_keyspace_meta.tables.keys():
+                    if table_name not in keyspace_meta.tables:
+                        self._table_removed(keyspace_meta.name, table_name)
             else:
                 self._keyspace_added(keyspace_meta.name)
 
@@ -265,6 +269,9 @@ class Metadata(object):
         except KeyError:
             pass
 
+    def _table_removed(self, keyspace, table):
+        self._tablets.drop_tablets(keyspace, table)
+
     def _keyspace_added(self, ksname):
         if self.token_map:
             self.token_map.rebuild_keyspace(ksname, build_if_absent=False)
@@ -272,10 +279,12 @@ class Metadata(object):
     def _keyspace_updated(self, ksname):
         if self.token_map:
             self.token_map.rebuild_keyspace(ksname, build_if_absent=False)
+        self._tablets.drop_tablets(ksname)
 
     def _keyspace_removed(self, ksname):
         if self.token_map:
             self.token_map.remove_keyspace(ksname)
+        self._tablets.drop_tablets(ksname)
 
     def rebuild_token_map(self, partitioner, token_map):
         """
@@ -340,11 +349,13 @@ class Metadata(object):
                 return host, True
 
     def remove_host(self, host):
+        self._tablets.drop_tablets_by_host_id(host.host_id)
         with self._hosts_lock:
             self._host_id_by_endpoint.pop(host.endpoint, False)
             return bool(self._hosts.pop(host.host_id, False))
 
     def remove_host_by_host_id(self, host_id, endpoint=None):
+        self._tablets.drop_tablets_by_host_id(host_id)
         with self._hosts_lock:
             if endpoint and self._host_id_by_endpoint[endpoint] == host_id:
                 self._host_id_by_endpoint.pop(endpoint, False)
