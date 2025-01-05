@@ -182,7 +182,7 @@ class HeartbeatTest(unittest.TestCase):
         while(retry < 300):
             retry += 1
             connections = self.fetch_connections(host, cluster)
-            if len(connections) is not 0:
+            if connections:
                 return connections
             time.sleep(.1)
         self.fail("No new connections found")
@@ -192,7 +192,7 @@ class HeartbeatTest(unittest.TestCase):
         while(retry < 100):
             retry += 1
             connections = self.fetch_connections(host, cluster)
-            if len(connections) is 0:
+            if not connections:
                 return
             time.sleep(.5)
         self.fail("Connections never cleared")
