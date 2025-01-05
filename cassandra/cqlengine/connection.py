@@ -316,14 +316,14 @@ def setup(
         retry_connect=False,
         **kwargs):
     """
-    Setup a the driver connection used by the mapper
+    Setup the driver connection used by the mapper
 
     :param list hosts: list of hosts, (``contact_points`` for :class:`cassandra.cluster.Cluster`)
     :param str default_keyspace: The default keyspace to use
     :param int consistency: The global default :class:`~.ConsistencyLevel` - default is the same as :attr:`.Session.default_consistency_level`
     :param bool lazy_connect: True if should not connect until first use
     :param bool retry_connect: True if we should retry to connect even if there was a connection failure initially
-    :param \*\*kwargs: Pass-through keyword arguments for :class:`cassandra.cluster.Cluster`
+    :param kwargs: Pass-through keyword arguments for :class:`cassandra.cluster.Cluster`
     """
 
     from cassandra.cqlengine import models
