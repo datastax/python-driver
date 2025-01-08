@@ -167,7 +167,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         client_ip = trace.client
 
         # Ip address should be in the local_host range
-        pat = re.compile("127.0.0.\d{1,3}")
+        pat = re.compile(r'127.0.0.\d{1,3}')
 
         # Ensure that ip is set
         self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
