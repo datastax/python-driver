@@ -59,10 +59,13 @@ if(cython_env == 'True'):
 thread_pool_executor_class = ThreadPoolExecutor
 
 if "gevent" in EVENT_LOOP_MANAGER:
-    import gevent.monkey
-    gevent.monkey.patch_all()
-    from cassandra.io.geventreactor import GeventConnection
-    connection_class = GeventConnection
+    try:
+        import gevent.monkey
+        gevent.monkey.patch_all()
+        from cassandra.io.geventreactor import GeventConnection
+        connection_class = GeventConnection
+    except ImportError:
+        connection_class = None
 elif "eventlet" in EVENT_LOOP_MANAGER:
     from eventlet import monkey_patch
     monkey_patch()

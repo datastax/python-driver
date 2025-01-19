@@ -27,10 +27,12 @@ jobs:
 
       - uses: actions/setup-python@v5
         name: Install Python
+        with:
+          python-version: '3.13'
 
       - name: Install cibuildwheel
         run: |
-          python3 -m pip install cibuildwheel==2.19.1
+          python3 -m pip install cibuildwheel==2.22.0
 
       - name: Overwrite for Linux 64
         if: runner.os == 'Linux' && matrix.platform == 'x86_64'
