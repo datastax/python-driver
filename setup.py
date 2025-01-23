@@ -44,13 +44,6 @@ try:
 except ImportError:
     has_subprocess = False
 
-from cassandra import __version__
-
-long_description = ""
-with open("README.rst") as f:
-    long_description = f.read()
-
-
 try:
     from nose.commands import nosetests
 except ImportError:
@@ -94,6 +87,7 @@ class DocCommand(Command):
             path = "docs/_build/doctest"
             mode = "doctest"
         else:
+            from cassandra import __version__
             path = "docs/_build/%s" % __version__
             mode = "html"
 
@@ -434,59 +428,8 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = [
-        'geomet>=0.1,<0.3',
-        'pyyaml > 5.0'
-    ]
-
-    _EXTRAS_REQUIRE = {
-        'graph': ['gremlinpython==3.4.6'],
-        'cle': ['cryptography>=35.0']
-    }
-
     setup(
-        name='scylla-driver',
-        version=__version__,
-        description='Scylla Driver for Apache Cassandra',
-        long_description=long_description,
-        long_description_content_type='text/x-rst',
-        url='https://github.com/scylladb/python-driver',
-        project_urls={
-            'Documentation': 'https://scylladb.github.io/python-driver/',
-            'Source': 'https://github.com/scylladb/python-driver/',
-            'Issues': 'https://github.com/scylladb/python-driver/issues',
-        },
-        author='ScyllaDB',
-        packages=[
-            'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
-            'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
-            'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud', 'cassandra.scylla',
-            'cassandra.column_encryption'
-        ],
-        keywords='cassandra,cql,orm,dse,graph',
-        include_package_data=True,
-        install_requires=dependencies,
-        extras_require=_EXTRAS_REQUIRE,
         tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
-        classifiers=[
-            'Development Status :: 5 - Production/Stable',
-            'Intended Audience :: Developers',
-            'License :: OSI Approved :: Apache Software License',
-            'Natural Language :: English',
-            'Operating System :: OS Independent',
-            'Programming Language :: Python',
-            'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.7',
-            'Programming Language :: Python :: 3.8',
-            'Programming Language :: Python :: 3.9',
-            'Programming Language :: Python :: 3.10',
-            'Programming Language :: Python :: 3.11',
-            'Programming Language :: Python :: 3.12',
-            'Programming Language :: Python :: 3.13',
-            'Programming Language :: Python :: Implementation :: CPython',
-            'Programming Language :: Python :: Implementation :: PyPy',
-            'Topic :: Software Development :: Libraries :: Python Modules'
-        ],
         **kw)
 
 
