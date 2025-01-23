@@ -13,11 +13,15 @@
 # limitations under the License.
 
 from __future__ import print_function
+
+import fnmatch
 import os
+import shutil
 import sys
 import json
 import warnings
 from pathlib import Path
+from sysconfig import get_config_vars
 
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     print("Running gevent tests")
@@ -29,12 +33,10 @@ if __name__ == '__main__' and sys.argv[1] == "eventlet_nosetests":
     from eventlet import monkey_patch
     monkey_patch()
 
-from setuptools import setup
-from distutils.command.build_ext import build_ext
-from distutils.core import Extension
-from distutils.errors import (CCompilerError, DistutilsPlatformError,
-                              DistutilsExecError)
-from distutils.cmd import Command
+from setuptools.command.build_ext import build_ext
+from setuptools import Extension, Command, setup
+from setuptools.errors import (CCompilerError, PlatformError,
+                              ExecError)
 
 try:
     import subprocess
@@ -226,6 +228,7 @@ class NoPatchExtension(Extension):
 
 
 class build_extensions(build_ext):
+    _needs_stub = False
 
     error_message = """
 ===============================================================================
@@ -281,7 +284,7 @@ On OSX, via homebrew:
         try:
             self._setup_extensions()
             build_ext.run(self)
-        except DistutilsPlatformError as exc:
+        except PlatformError as exc:
             sys.stderr.write('%s\n' % str(exc))
             warnings.warn(self.error_message % "C extensions.")
             if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
@@ -299,9 +302,9 @@ On OSX, via homebrew:
 
     def build_extension(self, ext):
         try:
-            build_ext.build_extension(self, ext)
-        except (CCompilerError, DistutilsExecError,
-                DistutilsPlatformError, IOError) as exc:
+            build_ext.build_extension(self, fix_extension_class(ext))
+        except (CCompilerError, ExecError,
+                PlatformError, IOError) as exc:
             sys.stderr.write('%s\n' % str(exc))
             name = "The %s extension" % (ext.name,)
             warnings.warn(self.error_message % (name,))
@@ -344,6 +347,13 @@ On OSX, via homebrew:
                 if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
                     raise
 
+
+def fix_extension_class(ext: Extension) -> Extension:
+    # Avoid bug in setuptools that requires _needs_stub
+    ext._needs_stub = False
+    return ext
+
+
 def pre_build_check():
     """
     Try to verify build tools
@@ -352,9 +362,9 @@ def pre_build_check():
         return True
 
     try:
-        from distutils.ccompiler import new_compiler
-        from distutils.sysconfig import customize_compiler
-        from distutils.dist import Distribution
+        from setuptools._distutils.ccompiler import new_compiler
+        from setuptools._distutils.sysconfig import customize_compiler
+        from setuptools.dist import Distribution
 
         # base build_ext just to emulate compiler option setup
         be = build_ext(Distribution())
@@ -384,9 +394,8 @@ def pre_build_check():
             executables = [getattr(compiler, exe) for exe in ('cc', 'linker')]
 
         if executables:
-            from distutils.spawn import find_executable
             for exe in executables:
-                if not find_executable(exe):
+                if not shutil.which(exe):
                     sys.stderr.write("Failed to find %s for compiler type %s.\n" % (exe, compiler.compiler_type))
                     return False
 
