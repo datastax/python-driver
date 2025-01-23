@@ -325,10 +325,14 @@ On OSX, via homebrew:
                                extra_compile_args=compile_args)
                         for m in cython_candidates],
                     nthreads=build_concurrency,
-                    exclude_failures=True))
+                    compiler_directives={'language_level': 3},
+                ))
 
-                self.extensions.extend(cythonize(NoPatchExtension("*", ["cassandra/*.pyx"], extra_compile_args=compile_args),
-                                                 nthreads=build_concurrency))
+                self.extensions.extend(cythonize(
+                    NoPatchExtension("*", ["cassandra/*.pyx"], extra_compile_args=compile_args),
+                    nthreads=build_concurrency,
+                    compiler_directives={'language_level': 3},
+                ))
             except Exception:
                 sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
 
