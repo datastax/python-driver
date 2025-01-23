@@ -667,9 +667,6 @@ initlibevwrapper(void)
     if (PyModule_AddObject(module, "Timer", (PyObject *)&libevwrapper_TimerType) == -1)
         INITERROR;
 
-    if (!PyEval_ThreadsInitialized()) {
-        PyEval_InitThreads();
-    }
 
 #if PY_MAJOR_VERSION >= 3
     return module;
