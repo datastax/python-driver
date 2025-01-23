@@ -204,7 +204,7 @@ try_cython &= 'egg_info' not in sys.argv  # bypass setup_requires for pip egg_in
 sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no-cython", "--no-extensions")]
 
 build_concurrency = int(os.environ.get('CASS_DRIVER_BUILD_CONCURRENCY', '0'))
-
+CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = bool(os.environ.get('CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST', 'no') == 'yes')
 
 class NoPatchExtension(Extension):
 
@@ -284,6 +284,9 @@ On OSX, via homebrew:
         except DistutilsPlatformError as exc:
             sys.stderr.write('%s\n' % str(exc))
             warnings.warn(self.error_message % "C extensions.")
+            if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
+                raise
+
 
     def build_extensions(self):
         if build_concurrency > 1:
@@ -302,6 +305,8 @@ On OSX, via homebrew:
             sys.stderr.write('%s\n' % str(exc))
             name = "The %s extension" % (ext.name,)
             warnings.warn(self.error_message % (name,))
+            if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
+                raise
 
     def _setup_extensions(self):
         # We defer extension setup until this command to leveraage 'setup_requires' pulling in Cython before we
@@ -326,6 +331,7 @@ On OSX, via homebrew:
                         for m in cython_candidates],
                     nthreads=build_concurrency,
                     compiler_directives={'language_level': 3},
+                    exclude_failures=not CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST,
                 ))
 
                 self.extensions.extend(cythonize(
@@ -335,7 +341,8 @@ On OSX, via homebrew:
                 ))
             except Exception:
                 sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
-
+                if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
+                    raise
 
 def pre_build_check():
     """
