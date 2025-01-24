@@ -168,6 +168,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: all
+          image: 'docker.io/tonistiigi/binfmt:desktop-v8.1.5'
         if: runner.os == 'Linux'
 
       - uses: actions/setup-python@v5
