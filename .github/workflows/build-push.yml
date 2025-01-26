@@ -28,10 +28,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
             platform: x86_64
 
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
             platform: PyPy
 
           - os: windows-latest
@@ -133,7 +133,7 @@ jobs:
   build_sdist:
     name: Build source distribution
     if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -153,7 +153,7 @@ jobs:
   build_wheels_extra_arch:
     if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
     # The host should always be linux
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     name: Build extra arch ${{ matrix.archs }} wheels
     strategy:
       fail-fast: false
@@ -193,7 +193,7 @@ jobs:
 
   upload_pypi:
     needs: [build_wheels, build_wheels_extra_arch, build_sdist]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write
 
