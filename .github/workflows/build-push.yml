@@ -40,7 +40,7 @@ jobs:
           - os: windows-latest
             platform: PyPy
 
-          - os: macos-latest
+          - os: macos-14
             platform: all
 
           - os: macos-13
@@ -112,8 +112,15 @@ jobs:
         run: |
           echo "CIBW_BUILD=cp39* cp310* cp311* cp312* cp313*" >> $GITHUB_ENV
           echo "CIBW_BEFORE_TEST_MACOS=pip install -r {project}/test-requirements.txt pytest" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> $GITHUB_ENV
-
+          if [ "${{ matrix.os }}" == "macos-13" ]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> $GITHUB_ENV;
+            echo "Enforcing target deployment for 13.0"
+          elif [ "${{ matrix.os }}" == "macos-14" ]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV;
+            echo "Enforcing target deployment for 14.0"
+          else
+            echo "Unknown macos version" && false;
+          fi
       - name: Overwrite for MacOs PyPy
         if: runner.os == 'MacOs' && matrix.platform == 'PyPy'
         run: |
