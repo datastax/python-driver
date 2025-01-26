@@ -34,7 +34,7 @@ jobs:
           - os: ubuntu-24.04
             platform: PyPy
 
-          - os: windows-latest
+          - os: windows-2022
             platform: win64
 
           - os: windows-latest
@@ -100,6 +100,7 @@ jobs:
         if: runner.os == 'Windows' && matrix.platform == 'win64'
         run: |
           echo "CIBW_BUILD=cp*win_amd64" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+          echo "CIBW_ENVIRONMENT_WINDOWS= CC=clang CXX=clang++" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
 
       - name: Overwrite for Windows PyPY
         if: runner.os == 'Windows' && matrix.platform == 'PyPy'
