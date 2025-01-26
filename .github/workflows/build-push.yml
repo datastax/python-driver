@@ -190,7 +190,7 @@ jobs:
 
       - name: Build wheels
         env:
-          CIBW_BUILD: "cp39* cp310* cp311* cp312*" # limit to specific version since it take much more time than jobs limit
+          CIBW_BUILD: "cp39* cp310* cp311* cp312* cp313*" # limit to specific version since it take much more time than jobs limit
         run: |
           python -m cibuildwheel --archs  ${{ matrix.archs }} --output-dir wheelhouse
 
