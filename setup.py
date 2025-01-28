@@ -13,11 +13,15 @@
 # limitations under the License.
 
 from __future__ import print_function
+
+import fnmatch
 import os
+import shutil
 import sys
 import json
 import warnings
 from pathlib import Path
+from sysconfig import get_config_vars
 
 if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
     print("Running gevent tests")
@@ -29,25 +33,16 @@ if __name__ == '__main__' and sys.argv[1] == "eventlet_nosetests":
     from eventlet import monkey_patch
     monkey_patch()
 
-from setuptools import setup
-from distutils.command.build_ext import build_ext
-from distutils.core import Extension
-from distutils.errors import (CCompilerError, DistutilsPlatformError,
-                              DistutilsExecError)
-from distutils.cmd import Command
+from setuptools.command.build_ext import build_ext
+from setuptools import Extension, Command, setup
+from setuptools.errors import (CCompilerError, PlatformError,
+                              ExecError)
 
 try:
     import subprocess
     has_subprocess = True
 except ImportError:
     has_subprocess = False
-
-from cassandra import __version__
-
-long_description = ""
-with open("README.rst") as f:
-    long_description = f.read()
-
 
 try:
     from nose.commands import nosetests
@@ -92,6 +87,7 @@ class DocCommand(Command):
             path = "docs/_build/doctest"
             mode = "doctest"
         else:
+            from cassandra import __version__
             path = "docs/_build/%s" % __version__
             mode = "html"
 
@@ -138,6 +134,31 @@ class BuildFailed(Exception):
         self.ext = ext
 
 
+def get_subdriname(directory_path):
+    try:
+        # List only subdirectories in the given directory
+        subdirectories = [name for dir in directory_path for name in os.listdir(dir)
+                          if os.path.isdir(os.path.join(directory_path, name))]
+        return subdirectories
+    except Exception:
+        return []
+
+def get_libev_headers_path():
+    libev_hb_paths = ["/opt/homebrew/Cellar/libev", os.path.expanduser('~/homebrew/Cellar/libev')]
+    for hb_path in libev_hb_paths:
+        if not os.path.exists(hb_path):
+            continue
+        versions = [dir for dir in get_subdriname(hb_path) if dir[0] in "0123456789"]
+        if not versions:
+            continue
+        picked_version = sorted(versions, reverse=True)[0]
+        resulted_path = os.path.join(hb_path, picked_version, 'include')
+        warnings.warn("found libev headers in '%s'" % resulted_path)
+        return [resulted_path]
+    warnings.warn("did not find libev headers in '%s'" % libev_hb_paths)
+    return []
+
+
 murmur3_ext = Extension('cassandra.cmurmur3',
                         sources=['cassandra/cmurmur3.c'])
 
@@ -146,7 +167,7 @@ is_macos = sys.platform.startswith('darwin')
 libev_includes = ['/usr/include/libev', '/usr/local/include', '/opt/local/include', '/usr/include']
 libev_libdirs = ['/usr/local/lib', '/opt/local/lib', '/usr/lib64']
 if is_macos:
-    libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
+    libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include'), *get_libev_headers_path()])
     libev_libdirs.extend(['/opt/homebrew/lib'])
 
 conan_envfile = Path(__file__).parent / 'build-release/conan/conandeps.env'
@@ -157,9 +178,9 @@ if conan_envfile.exists():
 
 libev_ext = Extension('cassandra.io.libevwrapper',
                       sources=['cassandra/io/libevwrapper.c'],
-                      include_dirs=['/usr/include/libev', '/usr/local/include', '/opt/local/include'],
+                      include_dirs=libev_includes+['/usr/include/libev', '/usr/local/include', '/opt/local/include'],
                       libraries=['ev'],
-                      library_dirs=['/usr/local/lib', '/opt/local/lib'])
+                      library_dirs=libev_libdirs+['/usr/local/lib', '/opt/local/lib'])
 
 platform_unsupported_msg = \
 """
@@ -204,7 +225,7 @@ try_cython &= 'egg_info' not in sys.argv  # bypass setup_requires for pip egg_in
 sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no-cython", "--no-extensions")]
 
 build_concurrency = int(os.environ.get('CASS_DRIVER_BUILD_CONCURRENCY', '0'))
-
+CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = bool(os.environ.get('CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST', 'no') == 'yes')
 
 class NoPatchExtension(Extension):
 
@@ -226,6 +247,7 @@ class NoPatchExtension(Extension):
 
 
 class build_extensions(build_ext):
+    _needs_stub = False
 
     error_message = """
 ===============================================================================
@@ -281,9 +303,12 @@ On OSX, via homebrew:
         try:
             self._setup_extensions()
             build_ext.run(self)
-        except DistutilsPlatformError as exc:
+        except PlatformError as exc:
             sys.stderr.write('%s\n' % str(exc))
             warnings.warn(self.error_message % "C extensions.")
+            if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
+                raise
+
 
     def build_extensions(self):
         if build_concurrency > 1:
@@ -296,12 +321,14 @@ On OSX, via homebrew:
 
     def build_extension(self, ext):
         try:
-            build_ext.build_extension(self, ext)
-        except (CCompilerError, DistutilsExecError,
-                DistutilsPlatformError, IOError) as exc:
+            build_ext.build_extension(self, fix_extension_class(ext))
+        except (CCompilerError, ExecError,
+                PlatformError, IOError) as exc:
             sys.stderr.write('%s\n' % str(exc))
             name = "The %s extension" % (ext.name,)
             warnings.warn(self.error_message % (name,))
+            if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
+                raise
 
     def _setup_extensions(self):
         # We defer extension setup until this command to leveraage 'setup_requires' pulling in Cython before we
@@ -325,12 +352,25 @@ On OSX, via homebrew:
                                extra_compile_args=compile_args)
                         for m in cython_candidates],
                     nthreads=build_concurrency,
-                    exclude_failures=True))
+                    compiler_directives={'language_level': 3},
+                    exclude_failures=not CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST,
+                ))
 
-                self.extensions.extend(cythonize(NoPatchExtension("*", ["cassandra/*.pyx"], extra_compile_args=compile_args),
-                                                 nthreads=build_concurrency))
+                self.extensions.extend(cythonize(
+                    NoPatchExtension("*", ["cassandra/*.pyx"], extra_compile_args=compile_args),
+                    nthreads=build_concurrency,
+                    compiler_directives={'language_level': 3},
+                ))
             except Exception:
                 sys.stderr.write("Failed to cythonize one or more modules. These will not be compiled as extensions (optional).\n")
+                if CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST:
+                    raise
+
+
+def fix_extension_class(ext: Extension) -> Extension:
+    # Avoid bug in setuptools that requires _needs_stub
+    ext._needs_stub = False
+    return ext
 
 
 def pre_build_check():
@@ -341,9 +381,9 @@ def pre_build_check():
         return True
 
     try:
-        from distutils.ccompiler import new_compiler
-        from distutils.sysconfig import customize_compiler
-        from distutils.dist import Distribution
+        from setuptools._distutils.ccompiler import new_compiler
+        from setuptools._distutils.sysconfig import customize_compiler
+        from setuptools.dist import Distribution
 
         # base build_ext just to emulate compiler option setup
         be = build_ext(Distribution())
@@ -373,9 +413,8 @@ def pre_build_check():
             executables = [getattr(compiler, exe) for exe in ('cc', 'linker')]
 
         if executables:
-            from distutils.spawn import find_executable
             for exe in executables:
-                if not find_executable(exe):
+                if not shutil.which(exe):
                     sys.stderr.write("Failed to find %s for compiler type %s.\n" % (exe, compiler.compiler_type))
                     return False
 
@@ -414,59 +453,8 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    dependencies = [
-        'geomet>=0.1,<0.3',
-        'pyyaml > 5.0'
-    ]
-
-    _EXTRAS_REQUIRE = {
-        'graph': ['gremlinpython==3.4.6'],
-        'cle': ['cryptography>=35.0']
-    }
-
     setup(
-        name='scylla-driver',
-        version=__version__,
-        description='Scylla Driver for Apache Cassandra',
-        long_description=long_description,
-        long_description_content_type='text/x-rst',
-        url='https://github.com/scylladb/python-driver',
-        project_urls={
-            'Documentation': 'https://scylladb.github.io/python-driver/',
-            'Source': 'https://github.com/scylladb/python-driver/',
-            'Issues': 'https://github.com/scylladb/python-driver/issues',
-        },
-        author='ScyllaDB',
-        packages=[
-            'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
-            'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
-            'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud', 'cassandra.scylla',
-            'cassandra.column_encryption'
-        ],
-        keywords='cassandra,cql,orm,dse,graph',
-        include_package_data=True,
-        install_requires=dependencies,
-        extras_require=_EXTRAS_REQUIRE,
         tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
-        classifiers=[
-            'Development Status :: 5 - Production/Stable',
-            'Intended Audience :: Developers',
-            'License :: OSI Approved :: Apache Software License',
-            'Natural Language :: English',
-            'Operating System :: OS Independent',
-            'Programming Language :: Python',
-            'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.7',
-            'Programming Language :: Python :: 3.8',
-            'Programming Language :: Python :: 3.9',
-            'Programming Language :: Python :: 3.10',
-            'Programming Language :: Python :: 3.11',
-            'Programming Language :: Python :: 3.12',
-            'Programming Language :: Python :: 3.13',
-            'Programming Language :: Python :: Implementation :: CPython',
-            'Programming Language :: Python :: Implementation :: PyPy',
-            'Topic :: Software Development :: Libraries :: Python Modules'
-        ],
         **kw)
 
 

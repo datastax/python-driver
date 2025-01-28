@@ -1,0 +1,81 @@
+[project]
+name = "scylla-driver"
+description = "Scylla Driver for Apache Cassandra"
+authors = [
+    {name = "ScyllaDB"},
+]
+keywords = ["cassandra", "cql", "orm", "dse", "graph"]
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: Apache Software License',
+    'Natural Language :: English',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Programming Language :: Python :: Implementation :: PyPy',
+    'Topic :: Software Development :: Libraries :: Python Modules'
+]
+dependencies = [
+    'geomet>=0.1,<0.3',
+    'pyyaml > 5.0'
+]
+dynamic = ["version", "readme"]
+
+[project.urls]
+"Homepage" = "https://github.com/scylladb/python-driver"
+"Documentation" = "https://scylladb.github.io/python-driver/"
+"Source" = "https://github.com/scylladb/python-driver/"
+"Issues" = "https://github.com/scylladb/python-driver/issues"
+
+[project.optional-dependencies]
+graph =  ['gremlinpython==3.4.6']
+cle = ['cryptography>=35.0']
+test = [
+    "pytest",
+    "mock>=2.0.0",
+    "PyYAML",
+    "pytz",
+    "sure",
+    "scales",
+    "pure-sasl",
+    "twisted[tls]; python_version >= '3.5'",
+    "twisted[tls]==19.2.1; python_version < '3.5'",
+    "gevent>=1.0; python_version < '3.13' and platform_machine != 'i686' and platform_machine != 'win32'",
+    "gevent==23.9.0; python_version < '3.13' and (platform_machine == 'i686' or platform_machine == 'win32')",
+    "eventlet>=0.33.3; python_version < '3.13'",
+    "cython",
+    "packaging",
+    "futurist; python_version >= '3.7'",
+    "asynctest; python_version >= '3.5'",
+    "pyyaml",
+]
+
+[tool.setuptools]
+include-package-data = true
+packages=[
+    'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
+    'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
+    'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud', 'cassandra.scylla',
+    'cassandra.column_encryption'
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "cassandra.__version__"}  # any module attribute compatible with ast.literal_eval
+readme = {file = "README.rst", content-type = "text/x-rst"}
+
+[build-system]
+requires = [
+    "setuptools>=42",
+    "Cython",
+]
+
+build-backend = "setuptools.build_meta"

@@ -12,7 +12,7 @@ env:
  CIBW_TEST_COMMAND_WINDOWS: "pytest {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor)\" "
  CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
  CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
- CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
+ CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST=yes CFLAGS='-g0 -O3'"
  CIBW_SKIP: cp36* cp37* pp*i686 *musllinux*
  CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
  CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux_2_28
@@ -28,19 +28,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
             platform: x86_64
 
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
             platform: PyPy
 
-          - os: windows-latest
+          - os: windows-2022
             platform: win64
 
           - os: windows-latest
             platform: PyPy
 
-          - os: macos-latest
+          - os: macos-14
             platform: all
 
           - os: macos-13
@@ -100,6 +100,7 @@ jobs:
         if: runner.os == 'Windows' && matrix.platform == 'win64'
         run: |
           echo "CIBW_BUILD=cp*win_amd64" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+          echo "CIBW_ENVIRONMENT_WINDOWS= CC=clang CXX=clang++" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
 
       - name: Overwrite for Windows PyPY
         if: runner.os == 'Windows' && matrix.platform == 'PyPy'
@@ -112,8 +113,15 @@ jobs:
         run: |
           echo "CIBW_BUILD=cp39* cp310* cp311* cp312* cp313*" >> $GITHUB_ENV
           echo "CIBW_BEFORE_TEST_MACOS=pip install -r {project}/test-requirements.txt pytest" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> $GITHUB_ENV
-
+          if [ "${{ matrix.os }}" == "macos-13" ]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> $GITHUB_ENV;
+            echo "Enforcing target deployment for 13.0"
+          elif [ "${{ matrix.os }}" == "macos-14" ]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV;
+            echo "Enforcing target deployment for 14.0"
+          else
+            echo "Unknown macos version" && false;
+          fi
       - name: Overwrite for MacOs PyPy
         if: runner.os == 'MacOs' && matrix.platform == 'PyPy'
         run: |
@@ -133,7 +141,7 @@ jobs:
   build_sdist:
     name: Build source distribution
     if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -153,7 +161,7 @@ jobs:
   build_wheels_extra_arch:
     if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build'))|| github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
     # The host should always be linux
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     name: Build extra arch ${{ matrix.archs }} wheels
     strategy:
       fail-fast: false
@@ -168,6 +176,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: all
+          image: 'docker.io/tonistiigi/binfmt:desktop-v8.1.5'
         if: runner.os == 'Linux'
 
       - uses: actions/setup-python@v5
@@ -181,7 +190,7 @@ jobs:
 
       - name: Build wheels
         env:
-          CIBW_BUILD: "cp39* cp310* cp311* cp312*" # limit to specific version since it take much more time than jobs limit
+          CIBW_BUILD: "cp39* cp310* cp311* cp312* cp313*" # limit to specific version since it take much more time than jobs limit
         run: |
           python -m cibuildwheel --archs  ${{ matrix.archs }} --output-dir wheelhouse
 
@@ -192,7 +201,7 @@ jobs:
 
   upload_pypi:
     needs: [build_wheels, build_wheels_extra_arch, build_sdist]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write
 
