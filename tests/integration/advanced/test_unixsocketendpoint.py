@@ -71,4 +71,4 @@ class UnixSocketTest(unittest.TestCase):
 
     def test_unix_socket_connection(self):
         s = self.cluster.connect()
-        s.execute('select * from system.local')
+        s.execute("select * from system.local where key='local'")

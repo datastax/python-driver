@@ -160,7 +160,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertEqual(len(no_token.metadata.token_map.token_to_host_owner), 0)
 
         # Do a simple query to ensure queries are working
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         no_schema_rs = no_schema_session.execute(query)
         no_token_rs = no_token_session.execute(query)
         self.assertIsNotNone(no_schema_rs.one())
@@ -1357,11 +1357,11 @@ class MetadataTimeoutTest(unittest.TestCase):
 
         cluster.connection_class = ConnectionWrapper
         s = cluster.connect()
-        s.execute('SELECT now() FROM system.local')
+        s.execute("SELECT now() FROM system.local WHERE key='local'")
         s.shutdown()
 
         for stmt in stmts:
-            if "SELECT now() FROM system.local" in stmt:
+            if "SELECT now() FROM system.local WHERE key='local'" in stmt:
                 continue
             if "USING TIMEOUT 2000ms" not in stmt:
                 self.fail(f"query `{stmt}` does not contain `USING TIMEOUT 2000ms`")

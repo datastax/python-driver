@@ -75,7 +75,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         Code coverage to ensure trace prints to string without error
         """
 
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         rs = self.session.execute(statement, trace=True)
 
@@ -104,7 +104,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
     def test_trace_id_to_resultset(self):
 
-        future = self.session.execute_async("SELECT * FROM system.local", trace=True)
+        future = self.session.execute_async("SELECT * FROM system.local WHERE key='local'", trace=True)
 
         # future should have the current trace
         rs = future.result()
@@ -123,7 +123,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
                 execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)}
         ) as cluster:
             s = cluster.connect()
-            query = "SELECT * FROM system.local"
+            query = "SELECT * FROM system.local WHERE key='local'"
             statement = SimpleStatement(query)
             rs = s.execute(statement, trace=True)
 
@@ -157,7 +157,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         """
 
         # Make simple query with trace enabled
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         response_future = self.session.execute_async(statement, trace=True)
         response_future.result()
@@ -182,7 +182,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         @expected_result Consistency Levels set on get_query_trace should be honored
         """
         # Execute a query
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         response_future = self.session.execute_async(statement, trace=True)
         response_future.result()
@@ -488,7 +488,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
             cluster = Cluster(protocol_version=proto_version, allow_beta_protocol_version=beta_flag)
 
             session = cluster.connect()
-            select_statement = session.prepare("SELECT * FROM system.local")
+            select_statement = session.prepare("SELECT * FROM system.local WHERE key='local'")
             if proto_version == 1:
                 self.assertEqual(select_statement.result_metadata, None)
             else:

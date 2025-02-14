@@ -157,7 +157,7 @@ class BasicDseAuthTest(unittest.TestCase):
         os.environ['KRB5_CONFIG'] = self.krb_conf
         self.cluster = TestCluster(auth_provider=auth_provider)
         self.session = self.cluster.connect()
-        query = query if query else "SELECT * FROM system.local"
+        query = query if query else "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         rs = self.session.execute(statement)
         return rs
@@ -529,4 +529,4 @@ class DseProxyAuthTest(BaseDseProxyAuthTest):
         @expected_result connect and query should be allowed
         """
         auth_provider = TransitionalModePlainTextAuthProvider()
-        self.assertIsNotNone(self.connect_and_query(auth_provider, query="SELECT * from system.local"))
+        self.assertIsNotNone(self.connect_and_query(auth_provider, query="SELECT * from system.local WHERE key='local'"))

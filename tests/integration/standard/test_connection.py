@@ -86,7 +86,7 @@ class ConnectionTimeoutTest(unittest.TestCase):
         @test_category connection timeout
         """
         futures = []
-        query = '''SELECT * FROM system.local'''
+        query = "SELECT * FROM system.local WHERE key='local'"
         for _ in range(100):
             futures.append(self.session.execute_async(query))
 
@@ -151,7 +151,7 @@ class HeartbeatTest(unittest.TestCase):
         current_host = ""
         count = 0
         while current_host != host and count < 100:
-            rs = self.session.execute_async("SELECT * FROM system.local", trace=False)
+            rs = self.session.execute_async("SELECT * FROM system.local WHERE key='local'", trace=False)
             rs.result()
             current_host = str(rs._current_host)
             count += 1

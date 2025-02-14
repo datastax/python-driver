@@ -78,7 +78,7 @@ class UpgradeTests(UpgradeBase):
             session = cluster.connect(wait_for_all_pools=True)
             queried_hosts = set()
             for _ in range(10):
-                results = session.execute("SELECT * from system.local")
+                results = session.execute("SELECT * from system.local WHERE key='local'")
                 self.assertGreater(len(results.current_rows), 0)
                 self.assertEqual(len(results.response_future.attempted_hosts), 1)
                 queried_hosts.add(results.response_future.attempted_hosts[0])
@@ -242,7 +242,7 @@ class UpgradeTestsAuthentication(UpgradeBaseAuth):
         session = cluster.connect(wait_for_all_pools=True)
         queried_hosts = set()
         for _ in range(10):
-            results = session.execute("SELECT * from system.local")
+            results = session.execute("SELECT * from system.local WHERE key='local'")
             self.assertGreater(len(results.current_rows), 0)
             self.assertEqual(len(results.response_future.attempted_hosts), 1)
             queried_hosts.add(results.response_future.attempted_hosts[0])

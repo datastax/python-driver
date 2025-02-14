@@ -52,7 +52,7 @@ class TestIpAddressChange(unittest.TestCase):
 
         def new_node_connectable():
             LOGGER.info(self.cluster.shard_aware_stats())
-            local_info = self.session.execute("SELECT * FROM system.local", execution_profile="new_node").one()
+            local_info = self.session.execute("SELECT * FROM system.local WHERE key='local'", execution_profile="new_node").one()
             LOGGER.debug(local_info._asdict())
             assert local_info.broadcast_address == new_ip
 

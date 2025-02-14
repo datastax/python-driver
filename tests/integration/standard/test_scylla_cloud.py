@@ -67,7 +67,7 @@ class ScyllaCloudConfigTests(TestCase):
                 cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
                 try:
                     with cluster.connect() as session:
-                        res = session.execute("SELECT * FROM system.local")
+                        res = session.execute("SELECT * FROM system.local WHERE key='local'")
                         assert res.all()
 
                         assert len(cluster.metadata._hosts) == 1
@@ -85,7 +85,7 @@ class ScyllaCloudConfigTests(TestCase):
                 cluster = Cluster(scylla_cloud=config, connection_class=connection_class)
                 try:
                     with cluster.connect() as session:
-                        res = session.execute("SELECT * FROM system.local")
+                        res = session.execute("SELECT * FROM system.local WHERE key='local'")
                         assert res.all()
                         assert len(cluster.metadata._hosts) == 3
                         assert len(cluster.metadata._host_id_by_endpoint) == 3

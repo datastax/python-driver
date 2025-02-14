@@ -62,7 +62,7 @@ class CloudTests(CloudProxyCluster):
 
         self.assertEqual(len(self.hosts_up()), 3)
         for host in self.cluster.metadata.all_hosts():
-            row = self.session.execute('SELECT * FROM system.local', host=host).one()
+            row = self.session.execute("SELECT * FROM system.local WHERE key='local'", host=host).one()
             self.assertEqual(row.host_id, host.host_id)
             self.assertEqual(row.rpc_address, host.broadcast_rpc_address)
 

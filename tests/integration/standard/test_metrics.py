@@ -377,7 +377,7 @@ class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
 
         ra = RequestAnalyzer(self.session)
         for _ in range(10):
-            self.session.execute("SELECT release_version FROM system.local")
+            self.session.execute("SELECT release_version FROM system.local WHERE key='local'")
 
         for _ in range(3):
             try:
@@ -392,7 +392,7 @@ class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
 
         # Make sure a poorly coded RA doesn't cause issues
         ra = RequestAnalyzer(self.session, throw_on_success=False, throw_on_fail=True)
-        self.session.execute("SELECT release_version FROM system.local")
+        self.session.execute("SELECT release_version FROM system.local WHERE key='local'")
         
         ra.remove_ra(self.session)
 

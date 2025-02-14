@@ -354,7 +354,7 @@ class ConnectivityTest(unittest.TestCase):
             # Attempt a query against that node. It should complete
             cluster2 = TestCluster(contact_points=all_contact_points)
             session2 = cluster2.connect()
-            session2.execute("SELECT * FROM system.local")
+            session2.execute("SELECT * FROM system.local WHERE key='local'")
         finally:
             cluster2.shutdown()
             start(node_to_stop)

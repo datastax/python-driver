@@ -589,15 +589,15 @@ class ClusterTests(unittest.TestCase):
         cluster = TestCluster()
         session = cluster.connect()
 
-        result = session.execute( "SELECT * FROM system.local", trace=True)
+        result = session.execute( "SELECT * FROM system.local WHERE key='local'", trace=True)
         self._check_trace(result.get_query_trace())
 
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         result = session.execute(statement, trace=True)
         self._check_trace(result.get_query_trace())
 
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         result = session.execute(statement)
         self.assertIsNone(result.get_query_trace())
@@ -612,7 +612,7 @@ class ClusterTests(unittest.TestCase):
         future.result()
         self.assertIsNone(future.get_query_trace())
 
-        prepared = session.prepare("SELECT * FROM system.local")
+        prepared = session.prepare("SELECT * FROM system.local WHERE key='local'")
         future = session.execute_async(prepared, parameters=(), trace=True)
         future.result()
         self._check_trace(future.get_query_trace())
@@ -636,7 +636,7 @@ class ClusterTests(unittest.TestCase):
         self.addCleanup(cluster.shutdown)
         session = cluster.connect()
 
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
 
         max_retry_count = 10
@@ -686,7 +686,7 @@ class ClusterTests(unittest.TestCase):
         cluster = TestCluster()
         session = cluster.connect()
 
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         future = session.execute_async(statement)
 
@@ -742,7 +742,7 @@ class ClusterTests(unittest.TestCase):
         with MockLoggingHandler().set_module_name(connection.__name__) as mock_handler:
             with TestCluster(auth_provider=auth_provider) as cluster:
                 session = cluster.connect()
-                self.assertIsNotNone(session.execute("SELECT * from system.local"))
+                self.assertIsNotNone(session.execute("SELECT * from system.local WHERE key='local'"))
 
             # Three conenctions to nodes plus the control connection
             auth_warning = mock_handler.get_message_count('warning', "An authentication challenge was not sent")
@@ -786,7 +786,7 @@ class ClusterTests(unittest.TestCase):
         self.assertTrue(all(c.is_idle for c in connections))
 
         # send messages on all connections
-        statements_and_params = [("SELECT release_version FROM system.local", ())] * len(cluster.metadata.all_hosts())
+        statements_and_params = [("SELECT release_version FROM system.local WHERE key='local'", ())] * len(cluster.metadata.all_hosts())
         results = execute_concurrent(session, statements_and_params)
         for success, result in results:
             self.assertTrue(success)
@@ -871,7 +871,7 @@ class ClusterTests(unittest.TestCase):
 
         @test_category config_profiles
         """
-        query = "select release_version from system.local"
+        query = "select release_version from system.local where key='local'"
         node1 = ExecutionProfile(
             load_balancing_policy=HostFilterPolicy(
                 RoundRobinPolicy(), lambda host: host.address == CASSANDRA_IP
@@ -942,7 +942,7 @@ class ClusterTests(unittest.TestCase):
 
         @test_category config_profiles
         """
-        query = "select release_version from system.local"
+        query = "select release_version from system.local where key='local'"
         rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
         rr2 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
         exec_profiles = {'rr1': rr1, 'rr2': rr2}
@@ -971,7 +971,7 @@ class ClusterTests(unittest.TestCase):
 
         @test_category config_profiles
         """
-        query = "select release_version from system.local"
+        query = "select release_version from system.local where key='local'"
         ta1 = ExecutionProfile()
         with TestCluster() as cluster:
             session = cluster.connect()
@@ -991,7 +991,7 @@ class ClusterTests(unittest.TestCase):
 
         @test_category config_profiles
         """
-        query = "select release_version from system.local"
+        query = "select release_version from system.local where key='local'"
         rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
         exec_profiles = {'rr1': rr1}
         with TestCluster(execution_profiles=exec_profiles) as cluster:
@@ -1018,7 +1018,7 @@ class ClusterTests(unittest.TestCase):
 
         @test_category config_profiles
         """
-        query = "select release_version from system.local"
+        query = "select release_version from system.local where key='local'"
         rr1 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
         rr2 = ExecutionProfile(load_balancing_policy=RoundRobinPolicy())
         exec_profiles = {'rr1': rr1, 'rr2': rr2}

@@ -69,20 +69,20 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         )
         session = cluster.connect(keyspace="custserdes")
 
-        result = session.execute("SELECT schema_version FROM system.local")
+        result = session.execute("SELECT schema_version FROM system.local WHERE key='local'")
         uuid_type = result.one()[0]
         self.assertEqual(type(uuid_type), uuid.UUID)
 
         # use our custom protocol handlder
         session.client_protocol_handler = CustomTestRawRowType
-        result_set = session.execute("SELECT schema_version FROM system.local")
+        result_set = session.execute("SELECT schema_version FROM system.local WHERE key='local'")
         raw_value = result_set.one()[0]
         self.assertTrue(isinstance(raw_value, bytes))
         self.assertEqual(len(raw_value), 16)
 
         # Ensure that we get normal uuid back when we re-connect
         session.client_protocol_handler = ProtocolHandler
-        result_set = session.execute("SELECT schema_version FROM system.local")
+        result_set = session.execute("SELECT schema_version FROM system.local WHERE key='local'")
         uuid_type = result_set.one()[0]
         self.assertEqual(type(uuid_type), uuid.UUID)
         cluster.shutdown()

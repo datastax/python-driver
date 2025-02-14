@@ -56,7 +56,7 @@ class CustomPayloadTests(unittest.TestCase):
         """
 
         # Create a simple query statement a
-        query = "SELECT * FROM system.local"
+        query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         # Validate that various types of custom payloads are sent and received okay
         self.validate_various_custom_payloads(statement=statement)

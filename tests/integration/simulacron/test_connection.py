@@ -464,14 +464,14 @@ class ConnectionTests(SimulacronBase):
         for host in cluster.metadata.all_hosts():
             self.assertIn(host, listener.hosts_marked_down)
 
-        self.assertRaises(NoHostAvailable, session.execute, "SELECT * from system.local")
+        self.assertRaises(NoHostAvailable, session.execute, "SELECT * from system.local WHERE key='local'")
 
         clear_queries()
         prime_request(AcceptConnections())
 
         time.sleep(idle_heartbeat_timeout + idle_heartbeat_interval + 2)
 
-        self.assertIsNotNone(session.execute("SELECT * from system.local"))
+        self.assertIsNotNone(session.execute("SELECT * from system.local WHERE key='local'"))
 
     def test_max_in_flight(self):
         """ Verify we don't exceed max_in_flight when borrowing connections or sending heartbeats """

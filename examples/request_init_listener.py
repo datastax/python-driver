@@ -68,8 +68,8 @@ session = Cluster().connect()
 # attach a listener to this session
 ra = RequestAnalyzer(session)
 
-session.execute("SELECT release_version FROM system.local")
-session.execute("SELECT release_version FROM system.local")
+session.execute("SELECT release_version FROM system.local WHERE key='local'")
+session.execute("SELECT release_version FROM system.local WHERE key='local'")
 
 print(ra)
 # 2 requests (0 errors)

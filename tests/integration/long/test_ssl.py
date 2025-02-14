@@ -193,7 +193,7 @@ class SSLConnectionTests(unittest.TestCase):
         # attempt a few simple commands.
 
         for i in range(8):
-            rs = session.execute("SELECT * FROM system.local")
+            rs = session.execute("SELECT * FROM system.local WHERE key='local'")
             time.sleep(10)
 
         cluster.shutdown()

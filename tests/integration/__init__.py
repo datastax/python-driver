@@ -87,7 +87,7 @@ def get_server_versions():
 
     c = TestCluster()
     s = c.connect()
-    row = s.execute('SELECT cql_version, release_version FROM system.local').one()
+    row = s.execute("SELECT cql_version, release_version FROM system.local WHERE key='local'").one()
 
     cass_version = _tuple_version(row.release_version)
     cql_version = _tuple_version(row.cql_version)
