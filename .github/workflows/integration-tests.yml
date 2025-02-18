@@ -1,12 +1,22 @@
 name: Integration tests
 
 on:
-  pull_request:
-    branches:
-     - master
   push:
     branches:
       - master
+      - 'branch-**'
+  pull_request:
+    paths-ignore:
+     - docs/*
+     - examples/*
+     - scripts/*
+     - .gitignore
+     - '*.rst'
+     - '*.ini'
+     - LICENSE
+     - .github/dependabot.yml
+     - .github/pull_request_template.md
+  workflow_dispatch:
 
 jobs:
   tests:

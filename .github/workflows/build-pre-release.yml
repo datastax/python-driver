@@ -1,49 +1,28 @@
-name: Build pre release python versions
+name: Test building on pre-release python version
 
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: 'Python version to run against'
+        required: true
+        type: string
 
-env:
- CIBW_TEST_COMMAND_LINUX: "pytest {project}/tests/unit"
- CIBW_BEFORE_TEST: "pip install -r {project}/test-requirements.txt"
- CIBW_BEFORE_BUILD_LINUX: "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
- CIBW_ENVIRONMENT: "CASS_DRIVER_BUILD_CONCURRENCY=2 CFLAGS='-g0 -O3'"
- CIBW_PRERELEASE_PYTHONS: True
- CIBW_SKIP: cp35* cp36* *musllinux*
- CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+      target:
+        type: string
+        description: "target os to build for: linux,macos,windows"
+        default: "linux,macos,windows"
+
+      cibw-skip:
+        type: string
+        description: 'CIBUILDWHEEL builds pattern to skip, goes to CIBW_SKIP env'
+        required: false
+        default: 'cp36* cp37* pp*i686 *musllinux*'
 
 jobs:
-  build_wheels:
-    name: Build wheels ${{ matrix.os }} (${{ matrix.platform }})
-    if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build')) || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-20.04
-            platform: x86_64
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        name: Install Python
-        with:
-          python-version: '3.13'
-
-      - name: Install cibuildwheel
-        run: |
-          python3 -m pip install cibuildwheel==2.22.0
-
-      - name: Overwrite for Linux 64
-        if: runner.os == 'Linux' && matrix.platform == 'x86_64'
-        run: |
-          echo "CIBW_BUILD=cp313*_x86_64" >> $GITHUB_ENV
-
-      - name: Build wheels
-        run: |
-          python3 -m cibuildwheel --output-dir wheelhouse
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-${{ matrix.os }}-${{ matrix.platform }}
-          path: ./wheelhouse/*.whl
+  build-and-publish:
+    uses: ./.github/workflows/lib-build-and-push.yml
+    with:
+      python-version: ${{ inputs.python-version }}
+      target: ${{ inputs.target }}
+      cibw-skip: ${{ inputs.cibw-skip }}
