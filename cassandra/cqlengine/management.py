@@ -256,7 +256,7 @@ def _sync_table(model, connection=None):
 
                 continue
 
-            if col.primary_key or col.primary_key:
+            if col.primary_key or col.partition_key:
                 msg = format_log_context("Cannot add primary key '{0}' (with db_field '{1}') to existing table {2}", keyspace=ks_name, connection=connection)
                 raise CQLEngineException(msg.format(model_name, db_name, cf_name))
 
