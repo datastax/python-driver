@@ -14,6 +14,7 @@
 import unittest
 
 import logging
+import socket
 
 from mock import patch, Mock
 
@@ -88,8 +89,9 @@ class ClusterTest(unittest.TestCase):
 
     def test_tuple_for_contact_points(self):
         cluster = Cluster(contact_points=[('localhost', 9045), ('127.0.0.2', 9046), '127.0.0.3'], port=9999)
+        localhost_addr = set([addr[0] for addr in [t for (_,_,_,_,t) in socket.getaddrinfo("localhost",80)]])
         for cp in cluster.endpoints_resolved:
-            if cp.address in ('::1', '127.0.0.1'):
+            if cp.address in localhost_addr:
                 self.assertEqual(cp.port, 9045)
             elif cp.address == '127.0.0.2':
                 self.assertEqual(cp.port, 9046)

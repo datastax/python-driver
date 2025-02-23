@@ -5,6 +5,7 @@ from unittest import TestCase
 from ccmlib.utils.ssl_utils import generate_ssl_stores
 from ccmlib.utils.sni_proxy import refresh_certs, start_sni_proxy, create_cloud_config, NodeInfo
 
+from cassandra import DependencyException
 from cassandra.policies import TokenAwarePolicy, RoundRobinPolicy, ConstantReconnectionPolicy
 from tests.integration import use_cluster, PROTOCOL_VERSION
 from cassandra.cluster import Cluster, TwistedConnection
@@ -15,14 +16,14 @@ supported_connection_classes = [TwistedConnection]
 try:
     from cassandra.io.libevreactor import LibevConnection
     supported_connection_classes += [LibevConnection]
-except ImportError:
+except DependencyException:
     pass
 
 
 try:
     from cassandra.io.asyncorereactor import AsyncoreConnection
     supported_connection_classes += [AsyncoreConnection]
-except ImportError:
+except DependencyException:
     pass
 
 #from cassandra.io.geventreactor import GeventConnection

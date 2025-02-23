@@ -16,10 +16,11 @@ import unittest
 import datetime
 import tempfile
 import time
+import uuid
 from binascii import unhexlify
 
 import cassandra
-from cassandra import util
+from cassandra import util, VectorDeserializationFailure
 from cassandra.cqltypes import (
     CassandraType, DateRangeType, DateType, DecimalType,
     EmptyValue, LongType, SetType, UTF8Type,
@@ -308,15 +309,67 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cql_quote('test'), "'test'")
         self.assertEqual(cql_quote(0), '0')
 
-    def test_vector_round_trip(self):
-        base = [3.4, 2.9, 41.6, 12.0]
-        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
-        base_bytes = ctype.serialize(base, 0)
-        self.assertEqual(16, len(base_bytes))
-        result = ctype.deserialize(base_bytes, 0)
-        self.assertEqual(len(base), len(result))
-        for idx in range(0,len(base)):
-            self.assertAlmostEqual(base[idx], result[idx], places=5)
+    def test_vector_round_trip_types_with_serialized_size(self):
+        # Test all the types which specify a serialized size... see PYTHON-1371 for details
+        self._round_trip_test([True, False, False, True], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.BooleanType, 4)")
+        self._round_trip_test([3.4, 2.9, 41.6, 12.0], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        self._round_trip_test([3.4, 2.9, 41.6, 12.0], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.DoubleType, 4)")
+        self._round_trip_test([3, 2, 41, 12], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.LongType, 4)")
+        self._round_trip_test([3, 2, 41, 12], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.Int32Type, 4)")
+        self._round_trip_test([uuid.uuid1(), uuid.uuid1(), uuid.uuid1(), uuid.uuid1()], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.TimeUUIDType, 4)")
+        self._round_trip_test([3, 2, 41, 12], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ShortType, 4)")
+        self._round_trip_test([datetime.time(1,1,1), datetime.time(2,2,2), datetime.time(3,3,3)], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.TimeType, 3)")
+
+    def test_vector_round_trip_types_without_serialized_size(self):
+        # Test all the types which do not specify a serialized size... see PYTHON-1371 for details
+        # Varints
+        with self.assertRaises(VectorDeserializationFailure):
+            self._round_trip_test([3, 2, 41, 12], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        # ASCII text
+        with self.assertRaises(VectorDeserializationFailure):
+            self._round_trip_test(["abc", "def", "ghi", "jkl"], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.AsciiType, 4)")
+        # UTF8 text
+        with self.assertRaises(VectorDeserializationFailure):
+            self._round_trip_test(["abc", "def", "ghi", "jkl"], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.UTF8Type, 4)")
+        # Duration (containts varints)
+        with self.assertRaises(VectorDeserializationFailure):
+            self._round_trip_test([util.Duration(1,1,1), util.Duration(2,2,2), util.Duration(3,3,3)], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.DurationType, 3)")
+        # List (of otherwise serializable type)
+        with self.assertRaises(VectorDeserializationFailure):
+            self._round_trip_test([[3.4], [2.9], [41.6], [12.0]], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ListType(org.apache.cassandra.db.marshal.FloatType), 4)")
+        # Set (of otherwise serializable type)
+        with self.assertRaises(VectorDeserializationFailure):
+            self._round_trip_test([set([3.4]), set([2.9]), set([41.6]), set([12.0])], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.FloatType), 4)")
+        # Map (of otherwise serializable types)
+        with self.assertRaises(VectorDeserializationFailure):
+            self._round_trip_test([{1:3.4}, {2:2.9}, {3:41.6}, {4:12.0}], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.MapType \
+                    (org.apache.cassandra.db.marshal.Int32Type,org.apache.cassandra.db.marshal.FloatType), 4)")
+
+    def _round_trip_test(self, data, ctype_str):
+        ctype = parse_casstype_args(ctype_str)
+        data_bytes = ctype.serialize(data, 0)
+        serialized_size = getattr(ctype.subtype, "serial_size", None)
+        if serialized_size:
+            self.assertEqual(serialized_size * len(data), len(data_bytes))
+        result = ctype.deserialize(data_bytes, 0)
+        self.assertEqual(len(data), len(result))
+        for idx in range(0,len(data)):
+            self.assertAlmostEqual(data[idx], result[idx], places=5)
 
     def test_vector_cql_parameterized_type(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")

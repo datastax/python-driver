@@ -54,7 +54,7 @@ try:
     from cassandra.io.libevreactor import LibevConnection
     have_libev = True
     supported_reactors.append(LibevConnection)
-except ImportError as exc:
+except cassandra.DependencyException as exc:
     pass
 
 have_asyncio = False

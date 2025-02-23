@@ -3,7 +3,7 @@ Installation
 
 Supported Platforms
 -------------------
-Python versions 3.6-3.11 are supported. Both CPython (the standard Python
+Python versions 3.6-3.12 are supported. Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.
@@ -26,7 +26,7 @@ To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print cassandra.__version__'
 
-It should print something like "3.27.0".
+It should print something like "3.29.0".
 
 (*Optional*) Compression Support
 --------------------------------
@@ -182,12 +182,15 @@ dependencies, then use install-option::
     sudo pip install --install-option="--no-cython"
 
 
+Supported Event Loops
+^^^^^^^^^^^^^^^^^^^^^
+For Python versions before 3.12 the driver uses the ``asyncore`` module for its default
+event loop.  Other event loops such as ``libev``, ``gevent`` and ``eventlet`` are also
+available via Python modules or C extensions.  Python 3.12 has removed ``asyncore`` entirely
+so for this platform one of these other event loops must be used.
+
 libev support
 ^^^^^^^^^^^^^
-The driver currently uses Python's ``asyncore`` module for its default
-event loop.  For better performance, ``libev`` is also supported through
-a C extension.
-
 If you're on Linux, you should be able to install libev
 through a package manager.  For example, on Debian/Ubuntu::
 

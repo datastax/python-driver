@@ -15,11 +15,12 @@
 import os, socket, errno
 from ccmlib import common
 
+from cassandra import DependencyException
 from cassandra.cluster import NoHostAvailable
 
 try:
     from cassandra.io.asyncorereactor import AsyncoreConnection
-except ImportError:
+except DependencyException:
     AsyncoreConnection = None
 
 from tests import is_monkey_patched
@@ -27,7 +28,7 @@ from tests.integration import use_cluster, remove_cluster, TestCluster
 
 try:
     from cassandra.io.libevreactor import LibevConnection
-except ImportError:
+except DependencyException:
     LibevConnection = None
 
 

@@ -15,11 +15,14 @@ import unittest
 
 from mock import patch
 import socket
+
+from cassandra import DependencyException
+
 try:
     import cassandra.io.asyncorereactor as asyncorereactor
     from cassandra.io.asyncorereactor import AsyncoreConnection
     ASYNCCORE_AVAILABLE = True
-except ImportError:
+except (ImportError, DependencyException):
     ASYNCCORE_AVAILABLE = False
     AsyncoreConnection = None
 

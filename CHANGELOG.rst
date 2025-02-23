@@ -1,3 +1,19 @@
+3.29.0
+======
+December 19, 2023
+
+Features
+--------
+* Add support for Python 3.9 through 3.12, drop support for 3.7 (PYTHON-1283)
+* Removal of dependency on six module (PR 1172)
+* Raise explicit exception when deserializing a vector with a subtype that isn’t a constant size (PYTHON-1371)
+
+Others
+------
+* Remove outdated Python pre-3.7 references (PR 1186)
+* Remove backup(.bak) files (PR 1185)
+* Fix doc typo in add_callbacks (PR 1177)
+
 3.28.0
 ======
 June 5, 2023
