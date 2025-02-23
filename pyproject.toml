@@ -77,3 +77,49 @@ requires = [
 ]
 
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_file = "cassandra/_version.py"
+tag_regex = '(?P<version>\d*?\.\d*?\.\d*?)-scylla'
+
+#### CI BUILDWHEEL CONFIG ####
+
+[tool.cibuildwheel]
+build-frontend = "build[uv]"
+environment = { CASS_DRIVER_BUILD_CONCURRENCY = "2", CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = "yes", CFLAGS = "-g0 -O3" }
+skip = ["cp2*", "cp36*", "pp36*", "cp37*", "pp37*", "*i686", "*musllinux*"]
+build = ["cp3*", "pp3*"]
+
+before-test = "pip install -r {project}/test-requirements.txt"
+
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+manylinux-pypy_x86_64-image = "manylinux_2_28"
+manylinux-pypy_aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.linux]
+
+before-build = "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
+test-command = [
+  "pytest {package}/tests/unit",
+  "EVENT_LOOP_MANAGER=gevent pytest {package}/tests/unit/io/test_geventreactor.py",
+]
+
+[tool.cibuildwheel.macos]
+build-frontend = "build"
+test-command = [
+    "pytest {project}/tests/unit -k 'not (test_multi_timer_validation or test_empty_connections or test_timer_cancellation)'"
+]
+
+[tool.cibuildwheel.windows]
+build-frontend = "build"
+test-command = [
+    "pytest {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor)\""
+]
+
+# TODO: set CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST to yes when https://github.com/scylladb/python-driver/issues/429 is fixed
+environment = { CASS_DRIVER_BUILD_CONCURRENCY = "2", CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = "no"}
+
+[[tool.cibuildwheel.overrides]]
+select = "pp*"
+test-command = []

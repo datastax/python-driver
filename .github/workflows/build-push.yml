@@ -26,4 +26,3 @@ jobs:
     with:
       upload: ${{ github.event_name == 'push' && endsWith(github.event.ref, 'scylla') }}
       python-version: '3.13'
-      target: linux,macos,windows

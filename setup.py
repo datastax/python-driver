@@ -14,24 +14,22 @@
 
 from __future__ import print_function
 
-import fnmatch
 import os
 import shutil
 import sys
 import json
 import warnings
 from pathlib import Path
-from sysconfig import get_config_vars
 
-if __name__ == '__main__' and sys.argv[1] == "gevent_nosetests":
-    print("Running gevent tests")
-    from gevent.monkey import patch_all
-    patch_all()
-
-if __name__ == '__main__' and sys.argv[1] == "eventlet_nosetests":
-    print("Running eventlet tests")
-    from eventlet import monkey_patch
-    monkey_patch()
+if __name__ == '__main__' and len(sys.argv) > 1:
+    if sys.argv[1] == "gevent_nosetests":
+        print("Running gevent tests")
+        from gevent.monkey import patch_all
+        patch_all()
+    elif sys.argv[1] == "eventlet_nosetests":
+        print("Running eventlet tests")
+        from eventlet import monkey_patch
+        monkey_patch()
 
 from setuptools.command.build_ext import build_ext
 from setuptools import Extension, Command, setup
@@ -57,7 +55,7 @@ else:
         description = "run nosetests with eventlet monkey patching"
 
 has_cqlengine = False
-if __name__ == '__main__' and sys.argv[1] == "install":
+if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == "install":
     try:
         import cqlengine
         has_cqlengine = True
@@ -453,9 +451,7 @@ def run_setup(extensions):
         else:
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
-    setup(
-        tests_require=['nose', 'mock>=2.0.0', 'PyYAML', 'pytz', 'sure'],
-        **kw)
+    setup(**kw)
 
 
 run_setup(None)
