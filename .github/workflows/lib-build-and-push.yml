@@ -41,7 +41,7 @@ jobs:
              was_added=1
            elif [[ "${target}" == "linux-aarch64" ]]; then
              [ -n "$was_added" ] && echo -n ","  >> /tmp/matrix.json
-             echo -n  '{"os":"ubuntu-20.04", "target": "linux-aarch64"}' >> /tmp/matrix.json
+             echo -n  '{"os":"ubuntu-24.04-arm", "target": "linux-aarch64"}' >> /tmp/matrix.json
              was_added=1
            elif [[ "${target}" == "windows" ]]; then
              [ -n "$was_added" ] && echo -n ","  >> /tmp/matrix.json
@@ -92,13 +92,6 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           choco install openssl --version=3.4.1 -f -y --no-progress
-
-      - name: Set up QEMU
-        if: matrix.target == 'linux-aarch64'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
-          image: 'docker.io/tonistiigi/binfmt:desktop-v8.1.5'
 
       - name: Install Conan
         if: runner.os == 'Windows'
