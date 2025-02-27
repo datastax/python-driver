@@ -12,14 +12,26 @@ on:
       python-version:
         description: 'Python version to run on'
         type: string
-        required: true
+        required: false
         default: "3.13"
 
       target:
-        description: "target os to build for: linux,macos,windows"
+        description: "Target os to build for: linux,macos,windows"
         type: string
         required: false
         default: "linux,macos-x86,macos-arm,windows,linux-aarch64"
+
+      target_tag:
+        description: "Publish particular tag"
+        type: string
+        required: false
+        default: ""
+
+      ignore_tests:
+        description: "Don't run tests"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   prepare-matrix:
@@ -72,6 +84,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout tag ${{ inputs.target_tag }}
+        if: inputs.target_tag != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_tag }}
+
+      - name: Disable tests
+        if: inputs.ignore_tests
+        shell: bash
+        run: |
+          echo "CIBW_TEST_COMMAND=\"\"" >> $GITHUB_ENV;
+          echo "CIBW_TEST_SKIP=*" >> $GITHUB_ENV;
+          echo "CIBW_SKIP=\"cp2* cp36* pp36* cp37* pp37* *i686 *musllinux*\"" >> $GITHUB_ENV;
+          echo "CIBW_BUILD=\"cp3* pp3*\"" >> $GITHUB_ENV;
+          echo "CIBW_BEFORE_TEST=\"\"" >> $GITHUB_ENV;
 
       - uses: actions/setup-python@v5
         name: Install Python

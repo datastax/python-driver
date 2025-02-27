@@ -1,0 +1,44 @@
+name: Build and upload to PyPi manually
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload to PyPI'
+        type: boolean
+        required: false
+        default: false
+
+      python-version:
+        description: 'Python version to run on'
+        type: string
+        required: false
+        default: "3.13"
+
+      target:
+        description: "Target os to build for: linux,macos,windows"
+        type: string
+        required: false
+        default: "linux,macos-x86,macos-arm,windows,linux-aarch64"
+
+      target_tag:
+        description: "Publish particular tag"
+        type: string
+        required: false
+        default: ""
+
+      ignore_tests:
+        description: "Don't run tests"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  build-and-publish:
+    uses: ./.github/workflows/lib-build-and-push.yml
+    with:
+      upload: ${{ inputs.upload }}
+      python-version: ${{ inputs.python-version }}
+      ignore_tests: ${{ inputs.ignore_tests }}
+      target_tag: ${{ inputs.target_tag }}
+      target: ${{ inputs.target }}

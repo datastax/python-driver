@@ -17,7 +17,6 @@ on:
      - LICENSE
      - .github/dependabot.yml
      - .github/pull_request_template.md
-  workflow_dispatch:
 
 jobs:
   build-and-publish:
@@ -25,4 +24,3 @@ jobs:
     uses: ./.github/workflows/lib-build-and-push.yml
     with:
       upload: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch'  ) && endsWith(github.event.ref, 'scylla') }}
-      python-version: '3.13'
