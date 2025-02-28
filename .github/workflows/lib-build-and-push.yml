@@ -95,11 +95,13 @@ jobs:
         if: inputs.ignore_tests
         shell: bash
         run: |
-          echo "CIBW_TEST_COMMAND=\"\"" >> $GITHUB_ENV;
+          echo "CIBW_TEST_COMMAND=true" >> $GITHUB_ENV;
+          echo "CIBW_TEST_COMMAND_WINDOWS=(exit 0)" >> $GITHUB_ENV;
           echo "CIBW_TEST_SKIP=*" >> $GITHUB_ENV;
-          echo "CIBW_SKIP=\"cp2* cp36* pp36* cp37* pp37* *i686 *musllinux*\"" >> $GITHUB_ENV;
-          echo "CIBW_BUILD=\"cp3* pp3*\"" >> $GITHUB_ENV;
-          echo "CIBW_BEFORE_TEST=\"\"" >> $GITHUB_ENV;
+          echo "CIBW_SKIP=cp2* cp36* pp36* cp37* pp37* *i686 *musllinux*" >> $GITHUB_ENV;
+          echo "CIBW_BUILD=cp3* pp3*" >> $GITHUB_ENV;
+          echo "CIBW_BEFORE_TEST=true" >> $GITHUB_ENV;
+          echo "CIBW_BEFORE_TEST_WINDOWS=(exit 0)" >> $GITHUB_ENV;
 
       - uses: actions/setup-python@v5
         name: Install Python
