@@ -5,22 +5,29 @@ on:
     branches:
       - master
       - 'branch-**'
-  pull_request:
-    branches:
-      - master
-    paths-ignore:
-     - docs/*
-     - examples/*
-     - .gitignore
-     - '*.rst'
-     - '*.ini'
-     - LICENSE
-     - .github/dependabot.yml
-     - .github/pull_request_template.md
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
-    if: "(!contains(github.event.pull_request.labels.*.name, 'disable-test-build')) || github.event_name == 'push' && endsWith(github.event.ref, 'scylla')"
+    name: "Build wheels"
     uses: ./.github/workflows/lib-build-and-push.yml
     with:
-      upload: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch'  ) && endsWith(github.event.ref, 'scylla') }}
+      upload: false
+
+  # TODO: Remove when https://github.com/pypa/gh-action-pypi-publish/issues/166 is fixed and update build-and-publish.with.upload to ${{ endsWith(github.event.ref, 'scylla') }}
+  publish:
+    name: "Publish wheels to PyPi"
+    if: ${{ endsWith(github.event.ref, 'scylla') }}
+    needs: build-and-publish
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

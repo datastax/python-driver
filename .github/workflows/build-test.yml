@@ -1,0 +1,23 @@
+name: Test wheels building
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+     - docs/*
+     - examples/*
+     - .gitignore
+     - '*.rst'
+     - '*.ini'
+     - LICENSE
+     - .github/dependabot.yml
+     - .github/pull_request_template.md
+
+jobs:
+  test-wheels-build:
+    name: "Test wheels building"
+    if: "!contains(github.event.pull_request.labels.*.name, 'disable-test-build')"
+    uses: ./.github/workflows/lib-build-and-push.yml
+    with:
+      upload: false
