@@ -61,13 +61,10 @@ if(cython_env == 'True'):
 thread_pool_executor_class = ThreadPoolExecutor
 
 if "gevent" in EVENT_LOOP_MANAGER:
-    try:
-        import gevent.monkey
-        gevent.monkey.patch_all()
-        from cassandra.io.geventreactor import GeventConnection
-        connection_class = GeventConnection
-    except ImportError:
-        connection_class = None
+    import gevent.monkey
+    gevent.monkey.patch_all()
+    from cassandra.io.geventreactor import GeventConnection
+    connection_class = GeventConnection
 elif "eventlet" in EVENT_LOOP_MANAGER:
     from eventlet import monkey_patch
     monkey_patch()
@@ -90,6 +87,9 @@ elif "twisted" in EVENT_LOOP_MANAGER:
 elif "asyncio" in EVENT_LOOP_MANAGER:
     from cassandra.io.asyncioreactor import AsyncioConnection
     connection_class = AsyncioConnection
+elif "libev" in EVENT_LOOP_MANAGER:
+    from cassandra.io.libevreactor import LibevConnection
+    connection_class = LibevConnection
 else:
     log.debug("Using default event loop (libev)")
     try:
