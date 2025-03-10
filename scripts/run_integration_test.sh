@@ -17,7 +17,8 @@ fi
 
 python3 -m venv .test-venv
 source .test-venv/bin/activate
-pip install -U pip wheel setuptools
+pip install --upgrade pip
+pip install -U wheel setuptools
 
 # install driver wheel
 pip install --ignore-installed -r test-requirements.txt pytest
