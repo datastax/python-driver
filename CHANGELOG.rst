@@ -1,3 +1,18 @@
+3.29.3
+======
+Mart 11, 2025
+
+Bug Fixes
+---------
+
+* Fix regression after #443 when _is_gevent_monkey_patched was broken (#452)
+
+Others
+------
+* Fix sync_table to raise error on adding partition key (#433)
+* Upgrade CICD Runners to ubuntu-24.04 (#451)
+* Make connection tests to fail when failed to import connection class from EVENT_LOOP_MANAGER
+
 3.29.2
 ======
 September 9, 2024
