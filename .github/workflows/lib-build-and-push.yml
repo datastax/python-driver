@@ -49,7 +49,7 @@ jobs:
           do
            if [[ "${target}" == "linux" ]]; then
              [ -n "$was_added" ] && echo -n ","  >> /tmp/matrix.json
-             echo -n '{"os":"ubuntu-20.04", "target": "linux"}' >> /tmp/matrix.json
+             echo -n '{"os":"ubuntu-24.04", "target": "linux"}' >> /tmp/matrix.json
              was_added=1
            elif [[ "${target}" == "linux-aarch64" ]]; then
              [ -n "$was_added" ] && echo -n ","  >> /tmp/matrix.json

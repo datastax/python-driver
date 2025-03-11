@@ -19,7 +19,7 @@ jobs:
     name: "Publish wheels to PyPi"
     if: ${{ endsWith(github.event.ref, 'scylla') }}
     needs: build-and-publish
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write
     steps:
