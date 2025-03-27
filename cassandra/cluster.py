@@ -4206,7 +4206,7 @@ class ControlConnection(object):
         delay = self._delay_for_event_type('schema_change', self._schema_event_refresh_window)
         self._cluster.scheduler.schedule_unique(delay, self.refresh_schema, **event)
 
-    def wait_for_schema_agreement(self, connection=None, preloaded_results=None, wait_time=None):
+    def wait_for_schema_agreement(self, target_connection=None, preloaded_results=None, wait_time=None):
 
         total_timeout = wait_time if wait_time is not None else self._cluster.max_schema_agreement_wait
         if total_timeout <= 0:
@@ -4220,8 +4220,7 @@ class ControlConnection(object):
             if self._is_shutdown:
                 return
 
-            if not connection:
-                connection = self._connection
+            connection = target_connection or self._connection
 
             if preloaded_results:
                 log.debug("[control connection] Attempting to use preloaded results for schema agreement")
@@ -4240,6 +4239,8 @@ class ControlConnection(object):
             select_peers_query = self._get_peers_query(self.PeersQueryType.PEERS_SCHEMA, connection)
 
             while elapsed < total_timeout:
+                connection = target_connection or self._connection
+
                 peers_query = QueryMessage(query=maybe_add_timeout_to_query(select_peers_query, self._metadata_request_timeout),
                                            consistency_level=cl)
                 local_query = QueryMessage(query=maybe_add_timeout_to_query(self._SELECT_SCHEMA_LOCAL, self._metadata_request_timeout),
