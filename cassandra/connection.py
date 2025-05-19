@@ -245,9 +245,9 @@ class DefaultEndPointFactory(EndPointFactory):
 class SniEndPoint(EndPoint):
     """SNI Proxy EndPoint implementation."""
 
-    def __init__(self, proxy_address, server_name, port=9042):
+    def __init__(self, proxy_address, server_name, port=9042, init_index=0):
         self._proxy_address = proxy_address
-        self._index = 0
+        self._index = init_index
         self._resolved_address = None  # resolved address
         self._port = port
         self._server_name = server_name
@@ -305,16 +305,24 @@ class SniEndPointFactory(EndPointFactory):
     def __init__(self, proxy_address, port):
         self._proxy_address = proxy_address
         self._port = port
+        # Initial lookup index to prevent all SNI endpoints to be resolved
+        # into the same starting IP address (which might not be available currently).
+        # If SNI resolves to 3 IPs, first endpoint will connect to first
+        # IP address, and subsequent resolutions to next IPs in round-robin
+        # fusion.
+        self._init_index = -1
 
     def create(self, row):
         host_id = row.get("host_id")
         if host_id is None:
             raise ValueError("No host_id to create the SniEndPoint")
 
-        return SniEndPoint(self._proxy_address, str(host_id), self._port)
+        self._init_index += 1
+        return SniEndPoint(self._proxy_address, str(host_id), self._port, self._init_index)
 
     def create_from_sni(self, sni):
-        return SniEndPoint(self._proxy_address, sni, self._port)
+        self._init_index += 1
+        return SniEndPoint(self._proxy_address, sni, self._port, self._init_index)
 
 
 @total_ordering
