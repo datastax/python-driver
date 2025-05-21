@@ -267,8 +267,7 @@ class SniEndPoint(EndPoint):
 
     def resolve(self):
         try:
-            resolved_addresses = socket.getaddrinfo(self._proxy_address, self._port,
-                                                    socket.AF_UNSPEC, socket.SOCK_STREAM)
+            resolved_addresses = self._resolve_proxy_addresses()
         except socket.gaierror:
             log.debug('Could not resolve sni proxy hostname "%s" '
                       'with port %d' % (self._proxy_address, self._port))
@@ -279,6 +278,10 @@ class SniEndPoint(EndPoint):
         self._index += 1
 
         return self._resolved_address, self._port
+
+    def _resolve_proxy_addresses(self):
+        return socket.getaddrinfo(self._proxy_address, self._port,
+                                  socket.AF_UNSPEC, socket.SOCK_STREAM)
 
     def __eq__(self, other):
         return (isinstance(other, SniEndPoint) and
