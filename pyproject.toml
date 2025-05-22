@@ -6,7 +6,6 @@ keywords = ["cassandra", "cql", "orm", "dse", "graph"]
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
-    'License :: OSI Approved :: Apache Software License',
     'Natural Language :: English',
     'Operating System :: OS Independent',
     'Programming Language :: Python',
@@ -21,6 +20,7 @@ classifiers = [
 ]
 dependencies = ['geomet>=1.1', 'pyyaml > 5.0']
 dynamic = ["version", "readme"]
+license = "Apache-2.0"
 
 [project.urls]
 "Homepage" = "https://github.com/scylladb/python-driver"
