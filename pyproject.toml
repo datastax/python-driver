@@ -1,9 +1,7 @@
 [project]
 name = "scylla-driver"
 description = "Scylla Driver for Apache Cassandra"
-authors = [
-    {name = "ScyllaDB"},
-]
+authors = [{ name = "ScyllaDB" }]
 keywords = ["cassandra", "cql", "orm", "dse", "graph"]
 classifiers = [
     'Development Status :: 5 - Production/Stable',
@@ -19,12 +17,9 @@ classifiers = [
     'Programming Language :: Python :: 3.13',
     'Programming Language :: Python :: Implementation :: CPython',
     'Programming Language :: Python :: Implementation :: PyPy',
-    'Topic :: Software Development :: Libraries :: Python Modules'
+    'Topic :: Software Development :: Libraries :: Python Modules',
 ]
-dependencies = [
-    'geomet>=1.1',
-    'pyyaml > 5.0'
-]
+dependencies = ['geomet>=1.1', 'pyyaml > 5.0']
 dynamic = ["version", "readme"]
 
 [project.urls]
@@ -34,7 +29,7 @@ dynamic = ["version", "readme"]
 "Issues" = "https://github.com/scylladb/python-driver/issues"
 
 [project.optional-dependencies]
-graph =  ['gremlinpython==3.4.6']
+graph = ['gremlinpython==3.4.6']
 cle = ['cryptography>=35.0']
 test = [
     "pytest",
@@ -56,22 +51,26 @@ test = [
 
 [tool.setuptools]
 include-package-data = true
-packages=[
-    'cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
-    'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
-    'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud', 'cassandra.scylla',
-    'cassandra.column_encryption'
+packages = [
+    'cassandra',
+    'cassandra.io',
+    'cassandra.cqlengine',
+    'cassandra.graph',
+    'cassandra.datastax',
+    'cassandra.datastax.insights',
+    'cassandra.datastax.graph',
+    'cassandra.datastax.graph.fluent',
+    'cassandra.datastax.cloud',
+    'cassandra.scylla',
+    'cassandra.column_encryption',
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "cassandra.__version__"}  # any module attribute compatible with ast.literal_eval
-readme = {file = "README.rst", content-type = "text/x-rst"}
+version = { attr = "cassandra.__version__" }                  # any module attribute compatible with ast.literal_eval
+readme = { file = "README.rst", content-type = "text/x-rst" }
 
 [build-system]
-requires = [
-    "setuptools>=42",
-    "Cython",
-]
+requires = ["setuptools>=42", "Cython"]
 
 build-backend = "setuptools.build_meta"
 
@@ -84,7 +83,17 @@ tag_regex = '(?P<version>\d*?\.\d*?\.\d*?)-scylla'
 [tool.cibuildwheel]
 build-frontend = "build[uv]"
 environment = { CASS_DRIVER_BUILD_CONCURRENCY = "2", CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = "yes", CFLAGS = "-g0 -O3" }
-skip = ["cp2*", "cp36*", "pp36*", "cp37*", "pp37*", "cp38*", "pp38*", "*i686", "*musllinux*"]
+skip = [
+    "cp2*",
+    "cp36*",
+    "pp36*",
+    "cp37*",
+    "pp37*",
+    "cp38*",
+    "pp38*",
+    "*i686",
+    "*musllinux*",
+]
 build = ["cp3*", "pp3*"]
 
 before-test = "pip install -r {project}/test-requirements.txt"
@@ -98,24 +107,24 @@ manylinux-pypy_aarch64-image = "manylinux_2_28"
 
 before-build = "rm -rf ~/.pyxbld && rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux && yum install -y libffi-devel libev libev-devel openssl openssl-devel"
 test-command = [
-  "pytest {package}/tests/unit",
-  "EVENT_LOOP_MANAGER=gevent pytest {package}/tests/unit/io/test_geventreactor.py",
+    "pytest {package}/tests/unit",
+    "EVENT_LOOP_MANAGER=gevent pytest {package}/tests/unit/io/test_geventreactor.py",
 ]
 
 [tool.cibuildwheel.macos]
 build-frontend = "build"
 test-command = [
-    "pytest {project}/tests/unit -k 'not (test_multi_timer_validation or test_empty_connections or test_timer_cancellation)'"
+    "pytest {project}/tests/unit -k 'not (test_multi_timer_validation or test_empty_connections or test_timer_cancellation)'",
 ]
 
 [tool.cibuildwheel.windows]
 build-frontend = "build"
 test-command = [
-    "pytest {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor)\""
+    "pytest {project}/tests/unit  -k \"not (test_deserialize_date_range_year or test_datetype or test_libevreactor)\"",
 ]
 
 # TODO: set CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST to yes when https://github.com/scylladb/python-driver/issues/429 is fixed
-environment = { CASS_DRIVER_BUILD_CONCURRENCY = "2", CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = "no"}
+environment = { CASS_DRIVER_BUILD_CONCURRENCY = "2", CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = "no" }
 
 [[tool.cibuildwheel.overrides]]
 select = "pp*"
