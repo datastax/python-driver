@@ -16,7 +16,7 @@ import os, socket, errno
 from ccmlib import common
 
 from cassandra.cluster import NoHostAvailable
-from cassandra.io.asyncorereactor import AsyncoreConnection
+from cassandra.io.asyncioreactor import AsyncioConnection
 
 from tests import is_monkey_patched
 from tests.integration import use_cluster, remove_cluster, TestCluster

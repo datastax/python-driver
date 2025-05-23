@@ -148,10 +148,10 @@ def _try_libev_import():
     except DependencyException as e:
         return (None, e)
 
-def _try_asyncore_import():
+def _try_asyncio_import():
     try:
-        from cassandra.io.asyncorereactor import AsyncoreConnection
-        return (AsyncoreConnection,None)
+        from cassandra.io.asyncioreactor import AsyncioConnection
+        return (AsyncioConnection,None)
     except DependencyException as e:
         return (None, e)
 
@@ -167,7 +167,7 @@ def _connection_reduce_fn(val,import_fn):
 
 log = logging.getLogger(__name__)
 
-conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncore_import)
+conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncio_import)
 (conn_class, excs) = reduce(_connection_reduce_fn, conn_fns, (None,[]))
 if not conn_class:
     raise DependencyException("Unable to load a default connection class", excs)
@@ -875,15 +875,15 @@ class Cluster(object):
     This determines what event loop system will be used for managing
     I/O with Cassandra.  These are the current options:
 
-    * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
+    * :class:`cassandra.io.asyncioreactor.AsyncioConnection`
     * :class:`cassandra.io.libevreactor.LibevConnection`
     * :class:`cassandra.io.eventletreactor.EventletConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching - see doc for details)
     * :class:`cassandra.io.twistedreactor.TwistedConnection`
     * EXPERIMENTAL: :class:`cassandra.io.asyncioreactor.AsyncioConnection`
 
-    By default, ``AsyncoreConnection`` will be used, which uses
-    the ``asyncore`` module in the Python standard library.
+    By default, ``AsyncioConnection`` will be used, which uses
+    the ``asyncio`` module in the Python standard library.
 
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
 

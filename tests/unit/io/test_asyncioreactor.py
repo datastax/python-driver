@@ -1,7 +1,6 @@
 AsyncioConnection, ASYNCIO_AVAILABLE = None, False
 try:
     from cassandra.io.asyncioreactor import AsyncioConnection
-    import asynctest
     ASYNCIO_AVAILABLE = True
 except (ImportError, SyntaxError):
     AsyncioConnection = None
@@ -11,6 +10,7 @@ from tests import is_monkey_patched, connection_class
 from tests.unit.io.utils import TimerCallback, TimerTestMixin
 
 from unittest.mock import patch
+from unittest.mock import AsyncMock
 
 import unittest
 import time
@@ -56,7 +56,7 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
         socket_patcher.start()
 
         old_selector = AsyncioConnection._loop._selector
-        AsyncioConnection._loop._selector = asynctest.TestSelector()
+        AsyncioConnection._loop._selector = AsyncMock()
 
         def reset_selector():
             AsyncioConnection._loop._selector = old_selector
