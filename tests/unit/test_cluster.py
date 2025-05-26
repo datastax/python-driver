@@ -16,12 +16,14 @@ import unittest
 import logging
 import socket
 
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException, ProtocolVersion
 from cassandra.cluster import _Scheduler, Session, Cluster, default_lbp_factory, \
-    ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT
+    ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT, ControlConnection
+from cassandra.connection import SniEndPoint, Connection
+from cassandra.datastax.cloud import CloudConfig
 from cassandra.pool import Host
 from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy, SimpleConvictionPolicy
 from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
@@ -30,6 +32,7 @@ from tests import connection_class
 
 
 log = logging.getLogger(__name__)
+
 
 class ExceptionTypeTest(unittest.TestCase):
 
@@ -85,6 +88,12 @@ class ExceptionTypeTest(unittest.TestCase):
         self.assertTrue(issubclass(UnsupportedOperation, DriverException))
 
 
+class MockOrderedPolicy(RoundRobinPolicy):
+    all_hosts = set()
+
+    def make_query_plan(self, working_keyspace=None, query=None):
+        return sorted(self.all_hosts, key=lambda x: x.endpoint.ssl_options['server_hostname'])
+
 class ClusterTest(unittest.TestCase):
 
     def test_tuple_for_contact_points(self):
@@ -118,6 +127,46 @@ class ClusterTest(unittest.TestCase):
         # max underflow, under min, overflow
         for n in (0, mn, 128):
             self.assertRaises(ValueError, c.set_max_requests_per_connection, d, n)
+
+    def _mocked_cloud_config(self, cloud_config, create_pyopenssl_context):
+        config = CloudConfig.from_dict({})
+        config.sni_host = 'proxy.datastax.com'
+        config.sni_port = 9042
+        # for 2e25021d-8d72-41a7-a247-3da85c5d92d2 we return IP 127.0.0.1 to which connection fails
+        config.host_ids = ['2e25021d-8d72-41a7-a247-3da85c5d92d2', '8c4b6ed7-f505-4226-b7a4-41f322520c1f']
+        return config
+
+    def _mocked_proxy_dns_resolution(self):
+        return [
+            (socket.AF_UNIX, socket.SOCK_STREAM, 0, None, ('127.0.0.1', 9042)),
+            (socket.AF_UNIX, socket.SOCK_STREAM, 0, None, ('127.0.0.2', 9042))
+        ]
+
+    def _mocked_try_connect(self, host):
+        address, port = host.endpoint.resolve()
+        if address == '127.0.0.1':
+            raise socket.error
+        return MagicMock(spec=Connection)
+
+    # Tests verifies that driver can connect to SNI endpoint even when one IP
+    # returned by the DNS resolution of SNI raises error. Mocked SNI resolution method
+    # returns two IPs. Trying to connect to the first one always fails
+    # with socket exception.
+    def test_sni_round_robin_dns_resolution(self):
+        with patch('cassandra.datastax.cloud.get_cloud_config', self._mocked_cloud_config):
+            with patch.object(SniEndPoint, '_resolve_proxy_addresses', self._mocked_proxy_dns_resolution):
+                cloud_config = {
+                    'secure_connect_bundle': '/path/to/secure-connect-dbname.zip'
+                }
+                cluster = Cluster(cloud=cloud_config)
+                lbp = MockOrderedPolicy()
+                cluster.load_balancing_policy = lbp
+                with patch.object(ControlConnection, '_try_connect', self._mocked_try_connect):
+                    for endpoint in cluster.endpoints_resolved:
+                        host, new = cluster.add_host(endpoint, signal=False)
+                        lbp.all_hosts.add(host)
+                    cluster.control_connection.connect()
+                cluster.shutdown()
 
 
 class SchedulerTest(unittest.TestCase):
