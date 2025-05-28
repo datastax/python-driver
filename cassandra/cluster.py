@@ -5405,8 +5405,8 @@ class ResultSet(object):
     @property
     def current_rows(self):
         """
-        The list of current page rows. May be empty if the result was empty,
-        or this is the last page.
+        The list of current page rows. May be empty; this does not mean
+        there is no more data. Use `has_more_pages()` for that.
         """
         return self._current_rows or []
 
