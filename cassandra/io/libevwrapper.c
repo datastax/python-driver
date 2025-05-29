@@ -665,9 +665,14 @@ initlibevwrapper(void)
     if (PyModule_AddObject(module, "Timer", (PyObject *)&libevwrapper_TimerType) == -1)
         INITERROR;
 
+#if PY_MAJOR_VERSION < 3 && PY_MINOR_VERSION < 7
+    // Since CPython 3.7, `Py_Initialize()` routing always initializes GIL.
+    // Routine `PyEval_ThreadsInitialized()` has been deprecated in CPython 3.7
+    // and completely removed in CPython 3.13.
     if (!PyEval_ThreadsInitialized()) {
         PyEval_InitThreads();
     }
+#endif
 
 #if PY_MAJOR_VERSION >= 3
     return module;
