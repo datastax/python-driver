@@ -3,8 +3,9 @@
     :target: https://opensource.org/licenses/Apache-2.0
 .. |version| image:: https://badge.fury.io/py/cassandra-driver.svg
     :target: https://badge.fury.io/py/cassandra-driver
+.. |pyversion| image:: https://img.shields.io/pypi/pyversions/cassandra-driver.svg
 
-|license| |version|
+|license| |version| |pyversion|
 
 DataStax Driver for Apache Cassandra
 ====================================
