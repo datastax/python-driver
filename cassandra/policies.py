@@ -27,7 +27,7 @@ from cassandra import WriteType as WT
 
 # This is done this way because WriteType was originally
 # defined here and in order not to break the API.
-# It may removed in the next mayor.
+# It may be removed in the next major.
 WriteType = WT
 
 from cassandra import ConsistencyLevel, OperationTimedOut
@@ -126,7 +126,7 @@ class LoadBalancingPolicy(HostStateListener):
 
     def make_query_plan(self, working_keyspace=None, query=None):
         """
-        Given a :class:`~.query.Statement` instance, return a iterable
+        Given a :class:`~.query.Statement` instance, return an iterable
         of :class:`.Host` instances which should be queried in that
         order.  A generator may work well for custom implementations
         of this method.
@@ -809,8 +809,8 @@ class RetryPolicy(object):
         `retry_num` counts how many times the operation has been retried, so
         the first time this method is called, `retry_num` will be 0.
 
-        By default, failed write operations will retried at most once, and
-        they will only be retried if the `write_type` was
+        By default, a failed write operations will be retried at most once, and
+        will only be retried if the `write_type` was
         :attr:`~.WriteType.BATCH_LOG`.
         """
         if retry_num != 0:
@@ -907,7 +907,7 @@ class DowngradingConsistencyRetryPolicy(RetryPolicy):
     policy unless you have understood the cases where this can happen and
     are ok with that. It is also recommended to subclass this class so
     that queries that required a consistency level downgrade can be
-    recorded (so that repairs can be made later, etc).
+    recorded (so that repairs can be made later, etc.).
 
     This policy implements the same retries as :class:`.RetryPolicy`,
     but on top of that, it also retries in the following cases:
@@ -1006,7 +1006,7 @@ class AddressTranslator(object):
     The driver discovers nodes using server metadata and topology change events. Normally,
     the endpoint defined by the server is the right way to connect to a node. In some environments,
     these addresses may not be reachable, or not preferred (public vs. private IPs in cloud environments,
-    suboptimal routing, etc). This interface allows for translating from server defined endpoints to
+    suboptimal routing, etc.). This interface allows for translating from server defined endpoints to
     preferred addresses for driver connections.
 
     *Note:* :attr:`~Cluster.contact_points` provided while creating the :class:`~.Cluster` instance are not
@@ -1036,7 +1036,7 @@ class EC2MultiRegionTranslator(AddressTranslator):
         Reverse DNS the public broadcast_address, then lookup that hostname to get the AWS-resolved IP, which
         will point to the private IP address within the same datacenter.
         """
-        # get family of this address so we translate to the same
+        # get family of this address, so we translate to the same
         family = socket.getaddrinfo(addr, 0, socket.AF_UNSPEC, socket.SOCK_STREAM)[0][0]
         host = socket.getfqdn(addr)
         for a in socket.getaddrinfo(host, 0, family, socket.SOCK_STREAM):

@@ -990,7 +990,7 @@ class QueryTrace(object):
         This can be used to query events from partial sessions.
 
         `query_cl` specifies a consistency level to use for polling the trace tables,
-        if it should be different than the session default.
+        if different from the session default.
         """
         attempt = 0
         start = time.time()
@@ -1014,7 +1014,7 @@ class QueryTrace(object):
             if is_complete:
                 log.debug("Fetched trace info for trace ID: %s", self.trace_id)
             else:
-                log.debug("Fetching parital trace info for trace ID: %s", self.trace_id)
+                log.debug("Fetching partial trace info for trace ID: %s", self.trace_id)
 
             self.request_type = session_row.request
             self.duration = timedelta(microseconds=session_row.duration) if is_complete else None
