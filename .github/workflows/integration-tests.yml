@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         java-version: [8]
-        python-version: ["3.8", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.11", "3.12", "3.13"]
         event_loop_manager: ["libev", "asyncio", "asyncore"]
         exclude:
           - python-version: "3.12"

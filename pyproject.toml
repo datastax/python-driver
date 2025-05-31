@@ -12,7 +12,6 @@ classifiers = [
     'Natural Language :: English',
     'Operating System :: OS Independent',
     'Programming Language :: Python',
-    'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
@@ -44,15 +43,14 @@ test = [
     "sure",
     "scales",
     "pure-sasl",
-    "twisted[tls]; python_version >= '3.5'",
-    "twisted[tls]==19.2.1; python_version < '3.5'",
+    "twisted[tls]",
     "gevent>=1.0; python_version < '3.13' and platform_machine != 'i686' and platform_machine != 'win32'",
     "gevent==23.9.0; python_version < '3.13' and (platform_machine == 'i686' or platform_machine == 'win32')",
     "eventlet>=0.33.3; python_version < '3.13'",
     "cython",
     "packaging",
-    "futurist; python_version >= '3.7'",
-    "asynctest; python_version >= '3.5'",
+    "futurist",
+    "asynctest",
     "pyyaml",
 ]
 
@@ -86,7 +84,7 @@ tag_regex = '(?P<version>\d*?\.\d*?\.\d*?)-scylla'
 [tool.cibuildwheel]
 build-frontend = "build[uv]"
 environment = { CASS_DRIVER_BUILD_CONCURRENCY = "2", CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = "yes", CFLAGS = "-g0 -O3" }
-skip = ["cp2*", "cp36*", "pp36*", "cp37*", "pp37*", "*i686", "*musllinux*"]
+skip = ["cp2*", "cp36*", "pp36*", "cp37*", "pp37*", "cp38*", "pp38*", "*i686", "*musllinux*"]
 build = ["cp3*", "pp3*"]
 
 before-test = "pip install -r {project}/test-requirements.txt"

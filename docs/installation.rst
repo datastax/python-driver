@@ -3,7 +3,7 @@ Installation
 
 Supported Platforms
 -------------------
-Python versions 3.6-3.12 are supported. Both CPython (the standard Python
+Python versions 3.9-3.13 are supported. Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.

@@ -4,7 +4,7 @@ A Python client driver for `Scylla <https://docs.scylladb.com>`_.
 This driver works exclusively with the Cassandra Query Language v3 (CQL3)
 and Cassandra's native protocol.
 
-The driver supports Python 3.6-3.12.
+The driver supports Python 3.9-3.13.
 
 This driver is open source under the
 `Apache v2 License <http://www.apache.org/licenses/LICENSE-2.0.html>`_.
