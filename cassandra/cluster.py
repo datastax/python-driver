@@ -29,6 +29,7 @@ from functools import partial, reduce, wraps
 from itertools import groupby, count, chain
 import json
 import logging
+from typing import Optional
 from warnings import warn
 from random import random
 import re
@@ -95,6 +96,7 @@ from cassandra.datastax.graph import (graph_object_row_factory, GraphOptions, Gr
 from cassandra.datastax.graph.query import _request_timeout_key, _GraphSONContextRowFactory
 from cassandra.datastax import cloud as dscloud
 from cassandra.scylla.cloud import CloudConfiguration
+from cassandra.application_info import ApplicationInfoBase
 
 try:
     from cassandra.io.twistedreactor import TwistedConnection
@@ -706,6 +708,19 @@ class Cluster(object):
     Setting this to :const:`False` disables compression.
     """
 
+    _application_info: Optional[ApplicationInfoBase] = None
+
+    @property
+    def application_info(self) -> Optional[ApplicationInfoBase]:
+        """
+        An instance of any subclass of :class:`.application_info.ApplicationInfoBase`.
+
+        Defaults to None
+
+        When set makes driver sends information about application that uses driver in startup frame
+        """
+        return self._application_info
+
     _auth_provider = None
     _auth_provider_callable = None
 
@@ -1204,6 +1219,7 @@ class Cluster(object):
                  shard_aware_options=None,
                  metadata_request_timeout=None,
                  column_encryption_policy=None,
+                 application_info:Optional[ApplicationInfoBase]=None
                  ):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
@@ -1328,6 +1344,12 @@ class Cluster(object):
             if isinstance(address_translator, type):
                 raise TypeError("address_translator should not be a class, it should be an instance of that class")
             self.address_translator = address_translator
+
+        if application_info is not None:
+            if not isinstance(application_info, ApplicationInfoBase):
+                raise TypeError(
+                    "application_info should be an instance of any ApplicationInfoBase class")
+            self._application_info = application_info
 
         if timestamp_generator is not None:
             if not callable(timestamp_generator):
@@ -1779,6 +1801,7 @@ class Cluster(object):
         kwargs_dict.setdefault('user_type_map', self._user_types)
         kwargs_dict.setdefault('allow_beta_protocol_version', self.allow_beta_protocol_version)
         kwargs_dict.setdefault('no_compact', self.no_compact)
+        kwargs_dict.setdefault('application_info', self.application_info)
 
         return kwargs_dict
 

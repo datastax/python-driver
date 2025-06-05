@@ -28,7 +28,9 @@ import ssl
 import weakref
 import random
 import itertools
+from typing import Optional
 
+from cassandra.application_info import ApplicationInfoBase
 from cassandra.protocol_features import ProtocolFeatures
 
 if 'gevent.monkey' in sys.modules:
@@ -761,8 +763,8 @@ class Connection(object):
     _is_checksumming_enabled = False
 
     _on_orphaned_stream_released = None
-
     features = None
+    _application_info: Optional[ApplicationInfoBase] = None
 
     @property
     def _iobuf(self):
@@ -774,7 +776,7 @@ class Connection(object):
                  cql_version=None, protocol_version=ProtocolVersion.MAX_SUPPORTED, is_control_connection=False,
                  user_type_map=None, connect_timeout=None, allow_beta_protocol_version=False, no_compact=False,
                  ssl_context=None, owning_pool=None, shard_id=None, total_shards=None,
-                 on_orphaned_stream_released=None):
+                 on_orphaned_stream_released=None, application_info: Optional[ApplicationInfoBase] = None):
         # TODO next major rename host to endpoint and remove port kwarg.
         self.endpoint = host if isinstance(host, EndPoint) else DefaultEndPoint(host, port)
 
@@ -797,6 +799,7 @@ class Connection(object):
         self._socket_writable = True
         self.orphaned_request_ids = set()
         self._on_orphaned_stream_released = on_orphaned_stream_released
+        self._application_info = application_info
 
         if ssl_options:
             self.ssl_options.update(self.endpoint.ssl_options or {})
@@ -1379,6 +1382,8 @@ class Connection(object):
         self._product_type = options_response.options.get('PRODUCT_TYPE', [None])[0]
 
         options = {}
+        if self._application_info:
+            self._application_info.add_startup_options(options)
         self.features.add_startup_options(options)
 
         if self.cql_version:
