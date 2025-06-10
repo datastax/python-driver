@@ -53,9 +53,6 @@ Contents
 :doc:`scylla-cloud`
     Connect to ScyllaDB Cloud
 
-:doc:`scylla-cloud-serverless`
-    Connect to ScyllaDB Cloud Serverless
-
 :doc:`faq`
     A collection of Frequently Asked Questions
 
@@ -79,7 +76,6 @@ Contents
    object-mapper
    dates-and-times
    scylla-cloud
-   scylla-cloud-serverless
    faq
 
 Getting Help
