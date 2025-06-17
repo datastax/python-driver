@@ -22,9 +22,8 @@ from unittest.mock import patch, Mock, MagicMock
 from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, RequestExecutionException, ReadTimeout, WriteTimeout, CoordinationFailure, ReadFailure, WriteFailure, FunctionFailure, AlreadyExists,\
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException, ProtocolVersion
 from cassandra.cluster import _Scheduler, Session, Cluster, default_lbp_factory, \
-    ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT, ControlConnection
-from cassandra.connection import SniEndPoint, Connection, SniEndPointFactory
-from cassandra.datastax.cloud import CloudConfig
+    ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT
+from cassandra.connection import SniEndPoint, SniEndPointFactory
 from cassandra.pool import Host
 from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy, SimpleConvictionPolicy
 from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
