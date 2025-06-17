@@ -50,6 +50,7 @@ dev = [
     "futurist",
     "asynctest",
     "pyyaml",
+    "ccm @ git+https://git@github.com/scylladb/scylla-ccm.git@master",
 ]
 
 [tool.setuptools]
