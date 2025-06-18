@@ -34,7 +34,7 @@ slack = new Slack()
 DEFAULT_CASSANDRA = ['3.0', '3.11', '4.0', '4.1', '5.0']
 DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30', 'dse-6.9.0']
 DEFAULT_HCD = ['hcd-1.0.0']
-DEFAULT_RUNTIME = ['3.8.16', '3.9.16', '3.10.11', '3.11.3', '3.12.0']
+DEFAULT_RUNTIME = ['3.9.23', '3.10.18', '3.11.13', '3.12.11', '3.13.5']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
