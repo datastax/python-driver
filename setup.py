@@ -390,7 +390,7 @@ def run_setup(extensions):
 
     _EXTRAS_REQUIRE = {
         'graph': ['gremlinpython==3.4.6'],
-        'cle': ['cryptography>=35.0']
+        'cle': ['cryptography>=42.0']
     }
 
     setup(
@@ -424,11 +424,11 @@ def run_setup(extensions):
             'Natural Language :: English',
             'Operating System :: OS Independent',
             'Programming Language :: Python',
-            'Programming Language :: Python :: 3.8',
             'Programming Language :: Python :: 3.9',
             'Programming Language :: Python :: 3.10',
             'Programming Language :: Python :: 3.11',
             'Programming Language :: Python :: 3.12',
+            'Programming Language :: Python :: 3.13',
             'Programming Language :: Python :: Implementation :: CPython',
             'Programming Language :: Python :: Implementation :: PyPy',
             'Topic :: Software Development :: Libraries :: Python Modules'
