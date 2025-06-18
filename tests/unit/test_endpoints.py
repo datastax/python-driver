@@ -65,3 +65,15 @@ class SniEndPointTest(unittest.TestCase):
         for i in range(10):
             (address, _) = endpoint.resolve()
             self.assertEqual(address, next(it))
+
+    def test_sni_resolution_start_index(self):
+        factory = SniEndPointFactory("proxy.datastax.com", 9999)
+        initial_index = factory._init_index
+
+        endpoint1 = factory.create_from_sni('sni1')
+        self.assertEqual(factory._init_index, initial_index + 1)
+        self.assertEqual(endpoint1._index, factory._init_index)
+
+        endpoint2 = factory.create_from_sni('sni2')
+        self.assertEqual(factory._init_index, initial_index + 2)
+        self.assertEqual(endpoint2._index, factory._init_index)

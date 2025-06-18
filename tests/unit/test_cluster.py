@@ -15,6 +15,7 @@ import unittest
 
 import logging
 import socket
+import uuid
 
 from unittest.mock import patch, Mock
 
@@ -22,6 +23,7 @@ from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, R
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException, ProtocolVersion
 from cassandra.cluster import _Scheduler, Session, Cluster, default_lbp_factory, \
     ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT
+from cassandra.connection import SniEndPoint, SniEndPointFactory
 from cassandra.pool import Host
 from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy, SimpleConvictionPolicy
 from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
@@ -30,6 +32,7 @@ from tests import connection_class
 
 
 log = logging.getLogger(__name__)
+
 
 class ExceptionTypeTest(unittest.TestCase):
 
@@ -85,6 +88,12 @@ class ExceptionTypeTest(unittest.TestCase):
         self.assertTrue(issubclass(UnsupportedOperation, DriverException))
 
 
+class MockOrderedPolicy(RoundRobinPolicy):
+    all_hosts = set()
+
+    def make_query_plan(self, working_keyspace=None, query=None):
+        return sorted(self.all_hosts, key=lambda x: x.endpoint.ssl_options['server_hostname'])
+
 class ClusterTest(unittest.TestCase):
 
     def test_tuple_for_contact_points(self):
@@ -118,6 +127,26 @@ class ClusterTest(unittest.TestCase):
         # max underflow, under min, overflow
         for n in (0, mn, 128):
             self.assertRaises(ValueError, c.set_max_requests_per_connection, d, n)
+
+    # Validate that at least the default LBP can create a query plan with end points that resolve
+    # to different addresses initially. This may not be exactly how things play out in practice
+    # (the control connection will muck with this even if nothing else does) but it should be
+    # a pretty good approximation.
+    def test_query_plan_for_sni_contains_unique_addresses(self):
+        node_cnt = 5
+        def _mocked_proxy_dns_resolution(self):
+            return [(socket.AF_UNIX, socket.SOCK_STREAM, 0, None, ('127.0.0.%s' % (i,), 9042)) for i in range(node_cnt)]
+
+        c = Cluster()
+        lbp = c.load_balancing_policy
+        lbp.local_dc = "dc1"
+        factory = SniEndPointFactory("proxy.foo.bar", 9042)
+        for host in (Host(factory.create({"host_id": uuid.uuid4().hex, "dc": "dc1"}), SimpleConvictionPolicy) for _ in range(node_cnt)):
+            lbp.on_up(host)
+        with patch.object(SniEndPoint, '_resolve_proxy_addresses', _mocked_proxy_dns_resolution):
+            addrs = [host.endpoint.resolve() for host in lbp.make_query_plan()]
+            # single SNI endpoint should be resolved to multiple unique IP addresses
+            self.assertEqual(len(addrs), len(set(addrs)))
 
 
 class SchedulerTest(unittest.TestCase):
