@@ -163,7 +163,7 @@ class OrderedMapTest(unittest.TestCase):
 
 class OrderedMapSerializedKeyTest(unittest.TestCase):
     def test_init(self):
-        om = OrderedMapSerializedKey(UTF8Type, 2)
+        om = OrderedMapSerializedKey(UTF8Type, 3)
         self.assertEqual(om, {})
 
     def test_normalized_lookup(self):

@@ -33,11 +33,6 @@ uint8_pack, uint8_unpack = _make_packer('>B')
 float_pack, float_unpack = _make_packer('>f')
 double_pack, double_unpack = _make_packer('>d')
 
-# Special case for cassandra header
-header_struct = struct.Struct('>BBbB')
-header_pack = header_struct.pack
-header_unpack = header_struct.unpack
-
 # in protocol version 3 and higher, the stream ID is two bytes
 v3_header_struct = struct.Struct('>BBhB')
 v3_header_pack = v3_header_struct.pack

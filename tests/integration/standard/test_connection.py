@@ -27,7 +27,6 @@ from cassandra import ConsistencyLevel, OperationTimedOut, DependencyException
 from cassandra.cluster import NoHostAvailable, ConnectionShutdown, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.protocol import QueryMessage
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy, HostStateListener
-from cassandra.pool import HostConnectionPool
 
 from tests import is_monkey_patched
 from tests.integration import use_singledc, get_node, CASSANDRA_IP, local, \
@@ -168,12 +167,8 @@ class HeartbeatTest(unittest.TestCase):
         holders = cluster.get_connection_holders()
         for conn in holders:
             if host == str(getattr(conn, 'host', '')):
-                if isinstance(conn, HostConnectionPool):
-                    if conn._connections is not None and (conn._connections):
-                        connections.extend(conn._connections)
-                else:
-                    if conn._connections and conn._connections:
-                        connections.extend(conn._connections.values())
+                if conn._connections and conn._connections:
+                    connections.extend(conn._connections.values())
         return connections
 
     def wait_for_connections(self, host, cluster):

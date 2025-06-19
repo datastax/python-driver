@@ -197,10 +197,11 @@ class ReactorTestMixin(object):
     def set_socket(self, connection, obj):
         return setattr(connection, self.socket_attr_name, obj)
 
-    def make_header_prefix(self, message_class, version=2, stream_id=0):
+    def make_header_prefix(self, message_class, version=3, stream_id=0):
         return bytes().join(map(uint8_pack, [
             0xff & (HEADER_DIRECTION_TO_CLIENT | version),
             0,  # flags (compression)
+            0,  # MSB for v3+ stream
             stream_id,
             message_class.opcode  # opcode
         ]))

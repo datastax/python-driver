@@ -37,23 +37,6 @@ If these do not suit your needs, you may need to create your own subclasses of
 :class:`~.AuthProvider` and :class:`~.Authenticator`.  You can use the Sasl classes
 as example implementations.
 
-Protocol v1 Authentication
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-When working with Cassandra 1.2 (or a higher version with
-:attr:`~.Cluster.protocol_version` set to ``1``), you will not pass in
-an :class:`~.AuthProvider` instance.  Instead, you should pass in a
-function that takes one argument, the IP address of a host, and returns
-a dict of credentials with a ``username`` and ``password`` key:
-
-.. code-block:: python
-
-    from cassandra.cluster import Cluster
-
-    def get_credentials(host_address):
-        return {'username': 'joe', 'password': '1234'}
-
-    cluster = Cluster(auth_provider=get_credentials, protocol_version=1)
-
 SSL
 ---
 SSL should be used when client encryption is enabled in Cassandra.

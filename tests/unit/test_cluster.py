@@ -105,20 +105,6 @@ class ClusterTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             Cluster(contact_points="not a sequence", protocol_version=4, connect_timeout=1)
 
-    def test_requests_in_flight_threshold(self):
-        d = HostDistance.LOCAL
-        mn = 3
-        mx = 5
-        c = Cluster(protocol_version=2)
-        c.set_min_requests_per_connection(d, mn)
-        c.set_max_requests_per_connection(d, mx)
-        # min underflow, max, overflow
-        for n in (-1, mx, 127):
-            self.assertRaises(ValueError, c.set_min_requests_per_connection, d, n)
-        # max underflow, under min, overflow
-        for n in (0, mn, 128):
-            self.assertRaises(ValueError, c.set_max_requests_per_connection, d, n)
-
     def test_port_str(self):
         """Check port passed as tring is converted and checked properly"""
         cluster = Cluster(contact_points=['127.0.0.1'], port='1111')
@@ -230,10 +216,6 @@ class ProtocolVersionTests(unittest.TestCase):
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V4)
         self.assertEqual(ProtocolVersion.V3,lower)
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V3)
-        self.assertEqual(ProtocolVersion.V2,lower)
-        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V2)
-        self.assertEqual(ProtocolVersion.V1, lower)
-        lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V1)
         self.assertEqual(0, lower)
 
         self.assertTrue(ProtocolVersion.uses_error_code_map(ProtocolVersion.DSE_V1))

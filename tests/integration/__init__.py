@@ -241,8 +241,6 @@ def get_default_protocol():
         return 4
     elif CASSANDRA_VERSION >= Version('2.1'):
         return 3
-    elif CASSANDRA_VERSION >= Version('2.0'):
-        return 2
     else:
         raise Exception("Running tests with an unsupported Cassandra version: {0}".format(CASSANDRA_VERSION))
 
@@ -260,10 +258,8 @@ def get_scylla_default_protocol():
 
 def get_supported_protocol_versions():
     """
-    1.2 -> 1
-    2.0 -> 2, 1
-    2.1 -> 3, 2, 1
-    2.2 -> 4, 3, 2, 1
+    2.1 -> 3
+    2.2 -> 4, 3
     3.X -> 4, 3
     3.10(C*) -> 5(beta),4,3
     3.10(DSE) -> DSE_V1,4,3
@@ -286,13 +282,11 @@ def get_supported_protocol_versions():
     elif CASSANDRA_VERSION >= Version('3.0'):
         return (3, 4)
     elif CASSANDRA_VERSION >= Version('2.2'):
-        return (1,2, 3, 4)
+        return (3, 4)
     elif CASSANDRA_VERSION >= Version('2.1'):
-        return (1, 2, 3)
-    elif CASSANDRA_VERSION >= Version('2.0'):
-        return (1, 2)
+        return (3)
     else:
-        return (1,)
+        return (3,)
 
 
 def get_unsupported_lower_protocol():
@@ -354,8 +348,6 @@ def local_decorator_creator():
 
 local = local_decorator_creator()
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
-lessthenprotocolv4 = unittest.skipUnless(PROTOCOL_VERSION < 4, 'Protocol versions 4 or greater not supported')
-lessthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION < 3, 'Protocol versions 3 or greater not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
 protocolv6 = unittest.skipUnless(6 in get_supported_protocol_versions(), 'Protocol versions less than 6 are not supported')
 

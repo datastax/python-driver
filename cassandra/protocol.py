@@ -36,7 +36,7 @@ from cassandra.cqltypes import (AsciiType, BytesType, BooleanType,
                                 TupleType, lookup_casstype, SimpleDateType,
                                 TimeType, ByteType, ShortType, DurationType)
 from cassandra.marshal import (int32_pack, int32_unpack, uint16_pack, uint16_unpack,
-                               uint8_pack, int8_unpack, uint64_pack, header_pack,
+                               uint8_pack, int8_unpack, uint64_pack,
                                v3_header_pack, uint32_pack, uint32_le_unpack, uint32_le_pack)
 from cassandra.policies import ColDesc
 from cassandra import WriteType
@@ -563,29 +563,13 @@ class _QueryMessage(_MessageType):
             flags |= _VALUES_FLAG  # also v2+, but we're only setting params internally right now
 
         if self.serial_consistency_level:
-            if protocol_version >= 2:
-                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
-            else:
-                raise UnsupportedOperation(
-                    "Serial consistency levels require the use of protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
-                    "to support serial consistency levels.")
+            flags |= _WITH_SERIAL_CONSISTENCY_FLAG
 
         if self.fetch_size:
-            if protocol_version >= 2:
-                flags |= _PAGE_SIZE_FLAG
-            else:
-                raise UnsupportedOperation(
-                    "Automatic query paging may only be used with protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
+            flags |= _PAGE_SIZE_FLAG
 
         if self.paging_state:
-            if protocol_version >= 2:
-                flags |= _WITH_PAGING_STATE_FLAG
-            else:
-                raise UnsupportedOperation(
-                    "Automatic query paging may only be used with protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
+            flags |= _WITH_PAGING_STATE_FLAG
 
         if self.timestamp is not None:
             flags |= _PROTOCOL_TIMESTAMP_FLAG
@@ -664,22 +648,7 @@ class ExecuteMessage(_QueryMessage):
                                              paging_state, timestamp, skip_meta, continuous_paging_options)
 
     def _write_query_params(self, f, protocol_version):
-        if protocol_version == 1:
-            if self.serial_consistency_level:
-                raise UnsupportedOperation(
-                    "Serial consistency levels require the use of protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2 "
-                    "to support serial consistency levels.")
-            if self.fetch_size or self.paging_state:
-                raise UnsupportedOperation(
-                    "Automatic query paging may only be used with protocol version "
-                    "2 or higher. Consider setting Cluster.protocol_version to 2.")
-            write_short(f, len(self.query_params))
-            for param in self.query_params:
-                write_value(f, param)
-            write_consistency_level(f, self.consistency_level)
-        else:
-            super(ExecuteMessage, self)._write_query_params(f, protocol_version)
+        super(ExecuteMessage, self)._write_query_params(f, protocol_version)
 
     def send_body(self, f, protocol_version):
         write_string(f, self.query_id)
@@ -853,8 +822,7 @@ class ResultMessage(_MessageType):
             coltype = self.read_type(f, user_type_map)
             bind_metadata.append(ColumnMetadata(colksname, colcfname, colname, coltype))
 
-        if protocol_version >= 2:
-            self.recv_results_metadata(f, user_type_map)
+        self.recv_results_metadata(f, user_type_map)
 
         self.bind_metadata = bind_metadata
         self.pk_indexes = pk_indexes
@@ -969,33 +937,31 @@ class BatchMessage(_MessageType):
                 write_value(f, param)
 
         write_consistency_level(f, self.consistency_level)
-        if protocol_version >= 3:
-            flags = 0
-            if self.serial_consistency_level:
-                flags |= _WITH_SERIAL_CONSISTENCY_FLAG
-            if self.timestamp is not None:
-                flags |= _PROTOCOL_TIMESTAMP_FLAG
-            if self.keyspace:
-                if ProtocolVersion.uses_keyspace_flag(protocol_version):
-                    flags |= _WITH_KEYSPACE_FLAG
-                else:
-                    raise UnsupportedOperation(
-                        "Keyspaces may only be set on queries with protocol version "
-                        "5 or higher. Consider setting Cluster.protocol_version to 5.")
-
-            if ProtocolVersion.uses_int_query_flags(protocol_version):
-                write_int(f, flags)
-            else:
-                write_byte(f, flags)
-
-            if self.serial_consistency_level:
-                write_consistency_level(f, self.serial_consistency_level)
-            if self.timestamp is not None:
-                write_long(f, self.timestamp)
-
+        flags = 0
+        if self.serial_consistency_level:
+            flags |= _WITH_SERIAL_CONSISTENCY_FLAG
+        if self.timestamp is not None:
+            flags |= _PROTOCOL_TIMESTAMP_FLAG
+        if self.keyspace:
             if ProtocolVersion.uses_keyspace_flag(protocol_version):
-                if self.keyspace is not None:
-                    write_string(f, self.keyspace)
+                flags |= _WITH_KEYSPACE_FLAG
+            else:
+                raise UnsupportedOperation(
+                    "Keyspaces may only be set on queries with protocol version "
+                    "5 or higher. Consider setting Cluster.protocol_version to 5.")
+        if ProtocolVersion.uses_int_query_flags(protocol_version):
+            write_int(f, flags)
+        else:
+            write_byte(f, flags)
+
+        if self.serial_consistency_level:
+            write_consistency_level(f, self.serial_consistency_level)
+        if self.timestamp is not None:
+            write_long(f, self.timestamp)
+
+        if ProtocolVersion.uses_keyspace_flag(protocol_version):
+            if self.keyspace is not None:
+                write_string(f, self.keyspace)
 
 
 known_event_types = frozenset((
@@ -1050,25 +1016,17 @@ class EventMessage(_MessageType):
     def recv_schema_change(cls, f, protocol_version):
         # "CREATED", "DROPPED", or "UPDATED"
         change_type = read_string(f)
-        if protocol_version >= 3:
-            target = read_string(f)
-            keyspace = read_string(f)
-            event = {'target_type': target, 'change_type': change_type, 'keyspace': keyspace}
-            if target != SchemaTargetType.KEYSPACE:
-                target_name = read_string(f)
-                if target == SchemaTargetType.FUNCTION:
-                    event['function'] = UserFunctionDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
-                elif target == SchemaTargetType.AGGREGATE:
-                    event['aggregate'] = UserAggregateDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
-                else:
-                    event[target.lower()] = target_name
-        else:
-            keyspace = read_string(f)
-            table = read_string(f)
-            if table:
-                event = {'target_type': SchemaTargetType.TABLE, 'change_type': change_type, 'keyspace': keyspace, 'table': table}
+        target = read_string(f)
+        keyspace = read_string(f)
+        event = {'target_type': target, 'change_type': change_type, 'keyspace': keyspace}
+        if target != SchemaTargetType.KEYSPACE:
+            target_name = read_string(f)
+            if target == SchemaTargetType.FUNCTION:
+                event['function'] = UserFunctionDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
+            elif target == SchemaTargetType.AGGREGATE:
+                event['aggregate'] = UserAggregateDescriptor(target_name, [read_string(f) for _ in range(read_short(f))])
             else:
-                event = {'target_type': SchemaTargetType.KEYSPACE, 'change_type': change_type, 'keyspace': keyspace}
+                event[target.lower()] = target_name
         return event
 
 
@@ -1164,8 +1122,7 @@ class _ProtocolHandler(object):
         """
         Write a CQL protocol frame header.
         """
-        pack = v3_header_pack if version >= 3 else header_pack
-        f.write(pack(version, flags, stream_id, opcode))
+        f.write(v3_header_pack(version, flags, stream_id, opcode))
         write_int(f, length)
 
     @classmethod

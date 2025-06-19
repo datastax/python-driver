@@ -41,7 +41,7 @@ from cassandra.connection import DefaultEndPoint
 from tests import notwindows, notasyncio
 from tests.integration import use_cluster, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
-    get_unsupported_upper_protocol, lessthanprotocolv3, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, \
+    get_unsupported_upper_protocol, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, \
     lessthanorequalcass40, DSE_VERSION, TestCluster, PROTOCOL_VERSION, xfail_scylla, incorrect_test
 from tests.integration.util import assert_quiescent_pool_state
 import sys
@@ -407,34 +407,6 @@ class ClusterTests(unittest.TestCase):
         cluster = TestCluster(contact_points=['127.1.2.9', '127.1.2.10'],
                               protocol_version=PROTOCOL_VERSION)
         self.assertRaises(NoHostAvailable, cluster.connect)
-
-    @lessthanprotocolv3
-    def test_cluster_settings(self):
-        """
-        Test connection setting getters and setters
-        """
-
-        cluster = TestCluster()
-
-        min_requests_per_connection = cluster.get_min_requests_per_connection(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MIN_REQUESTS, min_requests_per_connection)
-        cluster.set_min_requests_per_connection(HostDistance.LOCAL, min_requests_per_connection + 1)
-        self.assertEqual(cluster.get_min_requests_per_connection(HostDistance.LOCAL), min_requests_per_connection + 1)
-
-        max_requests_per_connection = cluster.get_max_requests_per_connection(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MAX_REQUESTS, max_requests_per_connection)
-        cluster.set_max_requests_per_connection(HostDistance.LOCAL, max_requests_per_connection + 1)
-        self.assertEqual(cluster.get_max_requests_per_connection(HostDistance.LOCAL), max_requests_per_connection + 1)
-
-        core_connections_per_host = cluster.get_core_connections_per_host(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MIN_CONNECTIONS_PER_LOCAL_HOST, core_connections_per_host)
-        cluster.set_core_connections_per_host(HostDistance.LOCAL, core_connections_per_host + 1)
-        self.assertEqual(cluster.get_core_connections_per_host(HostDistance.LOCAL), core_connections_per_host + 1)
-
-        max_connections_per_host = cluster.get_max_connections_per_host(HostDistance.LOCAL)
-        self.assertEqual(cassandra.cluster.DEFAULT_MAX_CONNECTIONS_PER_LOCAL_HOST, max_connections_per_host)
-        cluster.set_max_connections_per_host(HostDistance.LOCAL, max_connections_per_host + 1)
-        self.assertEqual(cluster.get_max_connections_per_host(HostDistance.LOCAL), max_connections_per_host + 1)
 
     def test_refresh_schema(self):
         cluster = TestCluster()
