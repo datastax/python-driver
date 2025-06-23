@@ -20,6 +20,7 @@ import tempfile
 import tarfile
 import optparse
 import subprocess
+from urllib.request import urlopen
 
 from distutils import log
 
@@ -148,10 +149,6 @@ def download_setuptools(version=DEFAULT_VERSION, download_base=DEFAULT_URL,
     """
     # making sure we use the absolute path
     to_dir = os.path.abspath(to_dir)
-    try:
-        from urllib.request import urlopen
-    except ImportError:
-        from urllib2 import urlopen
     tgz_name = "setuptools-%s.tar.gz" % version
     url = download_base + tgz_name
     saveto = os.path.join(to_dir, tgz_name)
