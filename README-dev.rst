@@ -15,7 +15,7 @@ Releasing
 Building the Docs
 =================
 
-To build and preview the documentation for the ScyllaDB Python driver locally, you must first manually install `python-driver`. 
+To build and preview the documentation for the ScyllaDB Python driver locally, you must first manually install `python-driver`.
 This is necessary for autogenerating the reference documentation of the driver.
 You can find detailed instructions on how to install the driver in the `Installation guide <https://python-driver.docs.scylladb.com/stable/installation.html#manual-installation>`_.
 
@@ -24,6 +24,14 @@ After installing the driver, you can build the documentation:
 - Install poetry: ``pip install poetry``
 - To preview docs in your browser: ``make -C docs preview``
 
+Tooling
+=======
+
+We recommend using `uv` tool for running tests, linters and basically everything else,
+since it makes Python tooling ecosystem mostly usable.
+To install it, see instructions at https://docs.astral.sh/uv/getting-started/installation/
+The rest of this document assumes you have `uv` installed.
+
 Tests
 =====
 
@@ -31,13 +39,13 @@ Running Unit Tests
 ------------------
 Unit tests can be run like so::
 
-    python -m pytest tests/unit
-    EVENT_LOOP_MANAGER=gevent python -m pytest tests/unit/io/test_geventreactor.py
-    EVENT_LOOP_MANAGER=eventlet python -m pytest tests/unit/io/test_eventletreactor.py
+    uv run pytest tests/unit
+    EVENT_LOOP_MANAGER=gevent uv run pytest tests/unit/io/test_geventreactor.py
+    EVENT_LOOP_MANAGER=eventlet uv run pytest tests/unit/io/test_eventletreactor.py
 
 You can run a specific test method like so::
 
-    python -m pytest tests/unit/test_connection.py::ConnectionTest::test_bad_protocol_version
+    uv run pytest tests/unit/test_connection.py::ConnectionTest::test_bad_protocol_version
 
 Running Integration Tests
 -------------------------
@@ -46,17 +54,17 @@ In order to run integration tests, you must specify a version to run using eithe
 * ``CASSANDRA_VERSION``
 environment variable::
 
-    SCYLLA_VERSION="release:5.1" python -m pytest tests/integration/standard tests/integration/cqlengine/
+    SCYLLA_VERSION="release:5.1" uv run pytest tests/integration/standard tests/integration/cqlengine/
 
 Or you can specify a scylla/cassandra directory (to test unreleased versions)::
 
-    SCYLLA_VERSION=/path/to/scylla pytest tests/integration/standard/
+    SCYLLA_VERSION=/path/to/scylla uv run pytest tests/integration/standard/
 
 Specifying the usage of an already running Scylla cluster
 ------------------------------------------------------------
 The test will start the appropriate Scylla clusters when necessary  but if you don't want this to happen because a Scylla cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example::
 
-    USE_CASS_EXTERNAL=1 SCYLLA_VERSION='release:5.1' pytest tests/integration/standard
+    USE_CASS_EXTERNAL=1 SCYLLA_VERSION='release:5.1' uv run pytest tests/integration/standard
 
 Specify a Protocol Version for Tests
 ------------------------------------
@@ -66,30 +74,29 @@ The protocol version defaults to:
 - 5 for Cassandra >= 4.0, 4 for Cassandra >= 2.2, 3 for Cassandra >= 2.1, 2 for Cassandra >= 2.0
 You can overwrite it with the ``PROTOCOL_VERSION`` environment variable::
 
-    PROTOCOL_VERSION=3 SCYLLA_VERSION="release:5.1" python -m pytest tests/integration/standard tests/integration/cqlengine/
+    PROTOCOL_VERSION=3 SCYLLA_VERSION="release:5.1" uv run pytest tests/integration/standard tests/integration/cqlengine/
 
 Seeing Test Logs in Real Time
 -----------------------------
 Sometimes it's useful to output logs for the tests as they run::
 
-    python -m pytest -s tests/unit/
+    uv run pytest -s tests/unit/
 
 Use tee to capture logs and see them on your terminal::
 
-    python -m pytest -s tests/unit/ 2>&1 | tee test.log
+    uv run pytest -s tests/unit/ 2>&1 | tee test.log
 
 
 Running the Benchmarks
 ======================
 There needs to be a version of cassandra running locally so before running the benchmarks, if ccm is installed:
-	
-	ccm create benchmark_cluster -v 3.0.1 -n 1 -s
+
+	uv run ccm create benchmark_cluster -v 3.0.1 -n 1 -s
 
 To run the benchmarks, pick one of the files under the ``benchmarks/`` dir and run it::
 
-    python benchmarks/future_batches.py
+    uv run benchmarks/future_batches.py
 
 There are a few options.  Use ``--help`` to see them all::
 
-    python benchmarks/future_batches.py --help
-
+    uv run benchmarks/future_batches.py --help
