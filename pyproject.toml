@@ -77,6 +77,13 @@ requires = ["setuptools>=42", "Cython"]
 
 build-backend = "setuptools.build_meta"
 
+[tool.pytest.ini_options]
+log_format = "%(asctime)s.%(msecs)03d %(levelname)s [%(module)s:%(lineno)s]: %(message)s"
+log_level = "DEBUG"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+xfail_strict = true
+addopts = "-rf"
+
 [tool.setuptools_scm]
 version_file = "cassandra/_version.py"
 tag_regex = '(?P<version>\d*?\.\d*?\.\d*?)-scylla'
