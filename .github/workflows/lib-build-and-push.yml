@@ -103,20 +103,14 @@ jobs:
           echo "CIBW_BEFORE_TEST=true" >> $GITHUB_ENV;
           echo "CIBW_BEFORE_TEST_WINDOWS=(exit 0)" >> $GITHUB_ENV;
 
-      - uses: actions/setup-python@v5
-        name: Install Python
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ inputs.python-version }}
-          allow-prereleases: 'true'
-
-      - name: Enable pip installing globally
-        if: runner.os == 'MacOs' || runner.os == 'Windows'
-        run: |
-          echo "PIP_BREAK_SYSTEM_PACKAGES=1" >> $GITHUB_ENV
 
       - name: Install cibuildwheel
         run: |
-          python3 -m pip install cibuildwheel==2.22.0
+          uv tool install 'cibuildwheel==2.22.0'
 
       - name: Install OpenSSL for Windows
         if: runner.os == 'Windows'
@@ -154,12 +148,12 @@ jobs:
         if: matrix.target != 'linux-aarch64'
         shell: bash
         run: |
-          GITHUB_WORKFLOW_REF="scylladb/python-driver/.github/workflows/lib-build-and-push.yml@refs/heads/master" python3 -m cibuildwheel --output-dir wheelhouse
+          GITHUB_WORKFLOW_REF="scylladb/python-driver/.github/workflows/lib-build-and-push.yml@refs/heads/master" cibuildwheel --output-dir wheelhouse
 
       - name: Build wheels for linux aarch64
         if: matrix.target == 'linux-aarch64'
         run: |
-          GITHUB_WORKFLOW_REF="scylladb/python-driver/.github/workflows/lib-build-and-push.yml@refs/heads/master" CIBW_BUILD="cp3*" python -m cibuildwheel --archs aarch64 --output-dir wheelhouse
+          GITHUB_WORKFLOW_REF="scylladb/python-driver/.github/workflows/lib-build-and-push.yml@refs/heads/master" CIBW_BUILD="cp3*" cibuildwheel --archs aarch64 --output-dir wheelhouse
 
       - uses: actions/upload-artifact@v4
         with:
@@ -172,14 +166,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        name: Install Python
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Build sdist
-        run: |
-          pip install build
-          python -m build --sdist
-          
+        run: uv build --sdist
+
       - uses: actions/upload-artifact@v4
         with:
           name: source-dist

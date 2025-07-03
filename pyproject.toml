@@ -105,8 +105,7 @@ skip = [
     "*musllinux*",
 ]
 build = ["cp3*", "pp3*"]
-
-before-test = "pip install -r {project}/test-requirements.txt"
+test-groups = ["dev"]
 
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
