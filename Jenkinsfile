@@ -31,10 +31,10 @@ import com.datastax.jenkins.drivers.python.Slack
 
 slack = new Slack()
 
-DEFAULT_CASSANDRA = ['3.0', '3.11', '4.0', '4.1', '5.0']
+DEFAULT_CASSANDRA = ['3.11', '4.0', '4.1', '5.0']
 DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30', 'dse-6.9.0']
 DEFAULT_HCD = ['hcd-1.0.0']
-DEFAULT_RUNTIME = ['3.8.16', '3.9.16', '3.10.11', '3.11.3', '3.12.0']
+DEFAULT_RUNTIME = ['3.9.23', '3.10.18', '3.11.13', '3.12.11', '3.13.5']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
@@ -674,8 +674,8 @@ pipeline {
   triggers {
     parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
-      # These schedules will run with and without Cython enabled for Python 3.8.16 and 3.12.0
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.16 3.12.0;CI_SCHEDULE_SERVER_VERSION=3.11 4.0 5.0 dse-5.1.35 dse-6.8.30 dse-6.9.0 hcd-1.0.0
+      # These schedules will run with and without Cython enabled for Python 3.9.23 and 3.13.5
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.9.23 3.13.5;CI_SCHEDULE_SERVER_VERSION=3.11 4.0 5.0 dse-5.1.35 dse-6.8.30 dse-6.9.0 hcd-1.0.0
     """ : "")
   }
 

@@ -166,7 +166,7 @@ it with the ``PROTOCOL_VERSION`` environment variable::
 
 Testing Multiple Python Versions
 --------------------------------
-Use tox to test all of Python 3.8 through 3.12 and pypy (this is what TravisCI runs)::
+Use tox to test all of Python 3.9 through 3.13 and pypy (this is what TravisCI runs)::
 
     tox
 
