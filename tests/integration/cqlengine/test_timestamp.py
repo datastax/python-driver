@@ -44,7 +44,7 @@ class BatchTest(BaseTimestampTest):
             with BatchQuery(timestamp=timedelta(seconds=30)) as b:
                 TestTimestampModel.batch(b).create(count=1)
 
-        "USING TIMESTAMP".should.be.within(m.call_args[0][0].query_string)
+        self.assertIn("USING TIMESTAMP", m.call_args[0][0].query_string)
 
 
 class CreateWithTimestampTest(BaseTimestampTest):
@@ -56,14 +56,14 @@ class CreateWithTimestampTest(BaseTimestampTest):
 
         query = m.call_args[0][0].query_string
 
-        query.should.match(r"INSERT.*USING TIMESTAMP")
-        query.should_not.match(r"TIMESTAMP.*INSERT")
+        self.assertRegex(query, r"INSERT.*USING TIMESTAMP")
+        self.assertNotRegex(query, r"TIMESTAMP.*INSERT")
 
     def test_timestamp_not_included_on_normal_create(self):
         with mock.patch.object(self.session, "execute") as m:
             TestTimestampModel.create(count=2)
 
-        "USING TIMESTAMP".shouldnt.be.within(m.call_args[0][0].query_string)
+        self.assertNotIn("USING TIMESTAMP", m.call_args[0][0].query_string)
 
     def test_timestamp_is_set_on_model_queryset(self):
         delta = timedelta(seconds=30)
@@ -85,7 +85,7 @@ class CreateWithTimestampTest(BaseTimestampTest):
 
         query = m.call_args[0][0].query_string
 
-        "USING TIMESTAMP".should.be.within(query)
+        self.assertIn("USING TIMESTAMP", query)
 
     def test_non_batch_syntax_with_ttl_unit(self):
 
@@ -95,7 +95,7 @@ class CreateWithTimestampTest(BaseTimestampTest):
 
         query = m.call_args[0][0].query_string
 
-        query.should.match(r"USING TTL \d* AND TIMESTAMP")
+        self.assertRegex(query, r"USING TTL \d* AND TIMESTAMP")
 
 
 class UpdateWithTimestampTest(BaseTimestampTest):
@@ -109,7 +109,7 @@ class UpdateWithTimestampTest(BaseTimestampTest):
         with mock.patch.object(self.session, "execute") as m:
             self.instance.timestamp(timedelta(seconds=30)).update(count=2)
 
-        "USING TIMESTAMP".should.be.within(m.call_args[0][0].query_string)
+        self.assertIn("USING TIMESTAMP", m.call_args[0][0].query_string)
 
     def test_instance_update_in_batch(self):
         with mock.patch.object(self.session, "execute") as m:
@@ -117,7 +117,7 @@ class UpdateWithTimestampTest(BaseTimestampTest):
                 self.instance.batch(b).timestamp(timedelta(seconds=30)).update(count=2)
 
         query = m.call_args[0][0].query_string
-        "USING TIMESTAMP".should.be.within(query)
+        self.assertIn("USING TIMESTAMP", query)
 
 
 class DeleteWithTimestampTest(BaseTimestampTest):
