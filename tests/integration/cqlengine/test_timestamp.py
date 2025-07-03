@@ -14,7 +14,6 @@
 
 from datetime import timedelta, datetime
 from unittest import mock
-import sure
 from uuid import uuid4
 
 from cassandra.cqlengine import columns

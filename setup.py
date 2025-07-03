@@ -413,7 +413,7 @@ def run_setup(extensions):
         include_package_data=True,
         install_requires=dependencies,
         extras_require=_EXTRAS_REQUIRE,
-        tests_require=['pytest', 'PyYAML', 'pytz', 'sure'],
+        tests_require=['pytest', 'PyYAML', 'pytz'],
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',
