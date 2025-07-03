@@ -44,14 +44,30 @@ jobs:
         java-version: ${{ matrix.java-version }}
         distribution: 'adopt'
 
-    - uses: actions/setup-python@v5
-      name: Install Python ${{ matrix.python-version }}
+    - name: Install libev
+      run: sudo apt-get install libev4 libev-dev
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
       with:
         python-version: ${{ matrix.python-version }}
-        allow-prereleases: true
+
+    # This is to get honest accounting of test time vs download time vs build time.
+    # Not strictly necessary for running tests.
+    - name: Build driver
+      run: uv sync
+
+    # This is to get honest accounting of test time vs download time vs build time.
+    # Not strictly necessary for running tests.
+    - name: Download Scylla
+      run: |
+        export SCYLLA_VERSION='release:6.2'
+        uv run ccm create scylla-driver-temp -n 1 --scylla --version ${SCYLLA_VERSION}
+        uv run ccm remove
 
     - name: Test with pytest
       run: |
         export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
         export SCYLLA_VERSION='release:6.2'
-        ./scripts/run_integration_test.sh tests/integration/standard/ tests/integration/cqlengine/
+        export PROTOCOL_VERSION=4
+        uv run pytest tests/integration/standard/ tests/integration/cqlengine/
