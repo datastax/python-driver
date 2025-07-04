@@ -77,6 +77,40 @@ requires = ["setuptools>=42", "Cython"]
 
 build-backend = "setuptools.build_meta"
 
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "setup.py" },
+    # Cythonized modules
+    { file = "cassandra/io/libevwrapper.c" },
+    { file = "cassandra/cmurmur3.c" },
+    { file = "cassandra/cluster.py" },
+    { file = "cassandra/concurrent.py" },
+    { file = "cassandra/connection.py" },
+    { file = "cassandra/cqltypes.py" },
+    { file = "cassandra/metadata.py" },
+    { file = "cassandra/pool.py" },
+    { file = "cassandra/protocol.py" },
+    { file = "cassandra/query.py" },
+    { file = "cassandra/util.py" },
+    { file = "cassandra/shard_info.py" },
+    { file = "cassandra/*.pyx" },
+    { file = "cassandra/*.pxd" },
+
+    # Env variables used in setup.py
+    { env = "CASS_DRIVER_LIBEV_INCLUDES" },
+    { env = "CASS_DRIVER_LIBEV_LIBS" },
+    { env = "CASS_DRIVER_NO_EXTENSIONS" },
+    { env = "CASS_DRIVER_NO_LIBEV" },
+    { env = "CASS_DRIVER_NO_CYTHON" },
+    { env = "CASS_DRIVER_BUILD_CONCURRENCY" },
+    { env = "CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST" },
+    { env = "CASS_DRIVER_ALLOWED_CYTHON_VERSION" },
+
+    # used by setuptools_scm
+    { git = { commit = true, tags = true } },
+]
+
 [tool.pytest.ini_options]
 log_format = "%(asctime)s.%(msecs)03d %(levelname)s [%(module)s:%(lineno)s]: %(message)s"
 log_level = "DEBUG"
