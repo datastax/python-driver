@@ -23,7 +23,7 @@ from cassandra.cqlengine.management import _get_table_metadata, sync_table, drop
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
-from tests.integration import DSE_VERSION, PROTOCOL_VERSION, greaterthancass20, requires_collection_indexes, \
+from tests.integration import PROTOCOL_VERSION, greaterthancass20, requires_collection_indexes, \
     MockLoggingHandler, CASSANDRA_VERSION, SCYLLA_VERSION, xfail_scylla
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel

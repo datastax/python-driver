@@ -19,7 +19,7 @@ from collections import defaultdict
 from packaging.version import Version
 
 from tests.integration import (get_node, get_cluster, wait_for_node_socket,
-                               DSE_VERSION, CASSANDRA_VERSION)
+                               CASSANDRA_VERSION)
 
 
 IP_FORMAT = '127.0.0.%s'
@@ -92,7 +92,7 @@ def force_stop(node):
 
 
 def decommission(node):
-    if (DSE_VERSION and DSE_VERSION >= Version("5.1")) or CASSANDRA_VERSION >= Version("4.0-a"):
+    if CASSANDRA_VERSION >= Version("4.0-a"):
         # CASSANDRA-12510
         get_node(node).decommission(force=True)
     else:

@@ -37,11 +37,11 @@ from cassandra.util import SortedSet
 from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, execute_until_pass,
                                BasicSegregatedKeyspaceUnitTestCase, BasicSharedKeyspaceUnitTestCase,
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
-                               greaterthanorequaldse51, greaterthanorequalcass30, lessthancass30, local,
+                               greaterthanorequalcass30, lessthancass30, local,
                                get_supported_protocol_versions, greaterthancass20,
                                greaterthancass21, assert_startswith, greaterthanorequalcass40,
-                               greaterthanorequaldse67, lessthancass40,
-                               TestCluster, DSE_VERSION, requires_java_udf, requires_composite_type,
+                               lessthancass40,
+                               TestCluster, requires_java_udf, requires_composite_type,
                                requires_collection_indexes, SCYLLA_VERSION, xfail_scylla, xfail_scylla_version_lt)
 
 from tests.util import wait_until
@@ -74,7 +74,7 @@ class HostMetaDataTests(BasicExistingKeyspaceUnitTestCase):
             self.assertIsNotNone(host.broadcast_rpc_address)
             self.assertIsNotNone(host.host_id)
 
-            if not DSE_VERSION and CASSANDRA_VERSION >= Version('4-a'):
+            if CASSANDRA_VERSION >= Version('4-a'):
                 self.assertIsNotNone(host.broadcast_port)
                 self.assertIsNotNone(host.broadcast_rpc_port)
 
@@ -1066,7 +1066,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         test for covering
         https://github.com/scylladb/python-driver/issues/174
         """
-        
+
         self.cluster.refresh_schema_metadata()
         keyspaces = [f"keyspace{idx}" for idx in range(15)]
 
@@ -2509,21 +2509,6 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         self.assertIsNotNone(value_column)
         self.assertEqual(value_column.name, 'the Value')
 
-    @greaterthanorequaldse51
-    def test_dse_workloads(self):
-        """
-        Test to ensure dse_workloads is populated appropriately.
-        Field added in DSE 5.1
-
-        @jira_ticket PYTHON-667
-        @expected_result dse_workloads set is set on host model
-
-        @test_category metadata
-        """
-        for host in self.cluster.metadata.all_hosts():
-            self.assertIsInstance(host.dse_workloads, SortedSet)
-            self.assertIn("Cassandra", host.dse_workloads)
-
 
 class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
     @classmethod
@@ -2588,31 +2573,3 @@ class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
                     ks.virtual,
                     'incorrect .virtual value for {}'.format(name)
                 )
-
-    @greaterthanorequalcass40
-    @greaterthanorequaldse67
-    def test_expected_keyspaces_exist_and_are_virtual(self):
-        for name in self.virtual_ks_names:
-            self.assertTrue(
-                self.cluster.metadata.keyspaces[name].virtual,
-                'incorrect .virtual value for {}'.format(name)
-            )
-
-    @greaterthanorequalcass40
-    @greaterthanorequaldse67
-    def test_virtual_keyspaces_have_expected_schema_structure(self):
-        self.maxDiff = None
-
-        ingested_virtual_ks_structure = defaultdict(dict)
-        for ks_name, ks in self.cluster.metadata.keyspaces.items():
-            if not ks.virtual:
-                continue
-            for tab_name, tab in ks.tables.items():
-                ingested_virtual_ks_structure[ks_name][tab_name] = set(
-                    tab.columns.keys()
-                )
-
-        # Identify a couple known values to verify we parsed the structure correctly
-        self.assertIn('table_name', ingested_virtual_ks_structure['system_virtual_schema']['tables'])
-        self.assertIn('type', ingested_virtual_ks_structure['system_virtual_schema']['columns'])
-        self.assertIn('total', ingested_virtual_ks_structure['system_views']['sstable_tasks'])

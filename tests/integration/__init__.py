@@ -44,7 +44,6 @@ from cassandra import ProtocolVersion
 
 try:
     import ccmlib
-    from ccmlib.dse_cluster import DseCluster
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib.scylla_cluster import ScyllaCluster as CCMScyllaCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
@@ -122,98 +121,32 @@ def cmd_line_args_to_dict(env_var):
             args[cmd_arg.lstrip('-')] = cmd_arg_value
     return args
 
-
-def _get_cass_version_from_dse(dse_version):
-    if dse_version.startswith('4.6') or dse_version.startswith('4.5'):
-        raise Exception("Cassandra Version 2.0 not supported anymore")
-    elif dse_version.startswith('4.7') or dse_version.startswith('4.8'):
-        cass_ver = "2.1"
-    elif dse_version.startswith('5.0'):
-        cass_ver = "3.0"
-    elif dse_version.startswith('5.1'):
-        # TODO: refactor this method to use packaging.Version everywhere
-        if Version(dse_version) >= Version('5.1.2'):
-            cass_ver = "3.11"
-        else:
-            cass_ver = "3.10"
-    elif dse_version.startswith('6.0'):
-        if dse_version == '6.0.0':
-            cass_ver = '4.0.0.2284'
-        elif dse_version == '6.0.1':
-            cass_ver = '4.0.0.2349'
-        else:
-            cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
-    elif Version(dse_version) >= Version('6.7'):
-        if dse_version == '6.7.0':
-            cass_ver = "4.0.0.67"
-        else:
-            cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
-    elif dse_version.startswith('6.8'):
-        if dse_version == '6.8.0':
-            cass_ver = "4.0.0.68"
-        else:
-            cass_ver = '4.0.0.' + ''.join(dse_version.split('.'))
-    else:
-        log.error("Unknown dse version found {0}, defaulting to 2.1".format(dse_version))
-        cass_ver = "2.1"
-    return Version(cass_ver)
-
-
-def _get_dse_version_from_cass(cass_version):
-    if cass_version.startswith('2.1'):
-        dse_ver = "4.8.15"
-    elif cass_version.startswith('3.0'):
-        dse_ver = "5.0.12"
-    elif cass_version.startswith('3.10') or cass_version.startswith('3.11'):
-        dse_ver = "5.1.7"
-    elif cass_version.startswith('4.0'):
-        dse_ver = "6.0"
-    else:
-        log.error("Unknown cassandra version found {0}, defaulting to 2.1".format(cass_version))
-        dse_ver = "2.1"
-    return dse_ver
-
 USE_CASS_EXTERNAL = bool(os.getenv('USE_CASS_EXTERNAL', False))
 KEEP_TEST_CLUSTER = bool(os.getenv('KEEP_TEST_CLUSTER', False))
 SIMULACRON_JAR = os.getenv('SIMULACRON_JAR', None)
-CLOUD_PROXY_PATH = os.getenv('CLOUD_PROXY_PATH', None)
 
-# Supported Clusters: Cassandra, DDAC, DSE, Scylla
-DSE_VERSION = None
+# Supported Clusters: Cassandra, Scylla
 SCYLLA_VERSION = os.getenv('SCYLLA_VERSION', None)
-if os.getenv('DSE_VERSION', None):  # we are testing against DSE
-    DSE_VERSION = Version(os.getenv('DSE_VERSION', None))
-    DSE_CRED = os.getenv('DSE_CREDS', None)
-    CASSANDRA_VERSION = _get_cass_version_from_dse(DSE_VERSION.base_version)
-    CCM_VERSION = DSE_VERSION.base_version
-else:  # we are testing against Cassandra,DDAC or Scylla
-    if SCYLLA_VERSION:
-        cv_string = SCYLLA_VERSION
-        mcv_string = os.getenv('MAPPED_SCYLLA_VERSION', '3.11.4') # Assume that scylla matches cassandra `3.11.4` behavior
-    else:
-        cv_string = os.getenv('CASSANDRA_VERSION', None)
-        mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
-    try:
-        cassandra_version = Version(cv_string)  # env var is set to test-dse for DDAC
-    except:
-        # fallback to MAPPED_CASSANDRA_VERSION
-        cassandra_version = Version(mcv_string)
+if SCYLLA_VERSION:
+    cv_string = SCYLLA_VERSION
+    mcv_string = os.getenv('MAPPED_SCYLLA_VERSION', '3.11.4') # Assume that scylla matches cassandra `3.11.4` behavior
+else:
+    cv_string = os.getenv('CASSANDRA_VERSION', None)
+    mcv_string = os.getenv('MAPPED_CASSANDRA_VERSION', None)
+try:
+    cassandra_version = Version(cv_string)  # env var is set to test-dse for DDAC
+except:
+    # fallback to MAPPED_CASSANDRA_VERSION
+    cassandra_version = Version(mcv_string)
 
-    CASSANDRA_VERSION = Version(mcv_string) if mcv_string else cassandra_version
-    CCM_VERSION = mcv_string if mcv_string else cv_string
+CASSANDRA_VERSION = Version(mcv_string) if mcv_string else cassandra_version
+CCM_VERSION = mcv_string if mcv_string else cv_string
 
 CASSANDRA_IP = os.getenv('CLUSTER_IP', '127.0.0.1')
 CASSANDRA_DIR = os.getenv('CASSANDRA_DIR', None)
 
 CCM_KWARGS = {}
-if DSE_VERSION:
-    log.info('Using DSE version: %s', DSE_VERSION)
-    if not CASSANDRA_DIR:
-        CCM_KWARGS['version'] = DSE_VERSION
-        if DSE_CRED:
-            log.info("Using DSE credentials file located at {0}".format(DSE_CRED))
-            CCM_KWARGS['dse_credentials_file'] = DSE_CRED
-elif CASSANDRA_DIR:
+if CASSANDRA_DIR:
     log.info("Using Cassandra dir: %s", CASSANDRA_DIR)
     CCM_KWARGS['install_dir'] = CASSANDRA_DIR
 elif os.getenv('SCYLLA_VERSION'):
@@ -228,15 +161,9 @@ ALLOW_BETA_PROTOCOL = False
 
 def get_default_protocol():
     if CASSANDRA_VERSION >= Version('4.0-a'):
-        if DSE_VERSION:
-            return ProtocolVersion.DSE_V2
-        else:
-            return ProtocolVersion.V5
+        return ProtocolVersion.V5
     if CASSANDRA_VERSION >= Version('3.10'):
-        if DSE_VERSION:
-            return ProtocolVersion.DSE_V1
-        else:
-            return 4
+        return 4
     if CASSANDRA_VERSION >= Version('2.2'):
         return 4
     elif CASSANDRA_VERSION >= Version('2.1'):
@@ -262,23 +189,14 @@ def get_supported_protocol_versions():
     2.2 -> 4, 3
     3.X -> 4, 3
     3.10(C*) -> 5(beta),4,3
-    3.10(DSE) -> DSE_V1,4,3
     4.0(C*) -> 6(beta),5,4,3
-    4.0(DSE) -> DSE_v2, DSE_V1,4,3
 `   """
     if CASSANDRA_VERSION >= Version('4.0-beta5'):
-        if not DSE_VERSION:
-            return (3, 4, 5, 6)
+        return (3, 4, 5, 6)
     if CASSANDRA_VERSION >= Version('4.0-a'):
-        if DSE_VERSION:
-            return (3, 4, ProtocolVersion.DSE_V1, ProtocolVersion.DSE_V2)
-        else:
-            return (3, 4, 5)
+       return (3, 4, 5)
     elif CASSANDRA_VERSION >= Version('3.10'):
-        if DSE_VERSION:
-            return (3, 4, ProtocolVersion.DSE_V1)
-        else:
-            return (3, 4)
+        return (3, 4)
     elif CASSANDRA_VERSION >= Version('3.0'):
         return (3, 4)
     elif CASSANDRA_VERSION >= Version('2.2'):
@@ -311,15 +229,9 @@ def get_unsupported_upper_protocol():
         return 5
 
     if CASSANDRA_VERSION >= Version('4.0-a'):
-        if DSE_VERSION:
-            return None
-        else:
-            return ProtocolVersion.DSE_V1
+        return ProtocolVersion.DSE_V1
     if CASSANDRA_VERSION >= Version('3.10'):
-        if DSE_VERSION:
-            return ProtocolVersion.DSE_V2
-        else:
-            return 5
+        return 5
     if CASSANDRA_VERSION >= Version('2.2'):
         return 5
     elif CASSANDRA_VERSION >= Version('2.1'):
@@ -364,14 +276,6 @@ lessthanorequalcass40 = unittest.skipUnless(CASSANDRA_VERSION <= Version('4.0'),
 lessthancass40 = unittest.skipUnless(CASSANDRA_VERSION < Version('4.0'), 'Cassandra version less than 4.0 required')
 lessthancass30 = unittest.skipUnless(CASSANDRA_VERSION < Version('3.0'), 'Cassandra version less then 3.0 required')
 
-greaterthanorequaldse68 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.8'), "DSE 6.8 or greater required for this test")
-greaterthanorequaldse67 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.7'), "DSE 6.7 or greater required for this test")
-greaterthanorequaldse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('6.0'), "DSE 6.0 or greater required for this test")
-greaterthanorequaldse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('5.1'), "DSE 5.1 or greater required for this test")
-greaterthanorequaldse50 = unittest.skipUnless(DSE_VERSION and DSE_VERSION >= Version('5.0'), "DSE 5.0 or greater required for this test")
-lessthandse51 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('5.1'), "DSE version less than 5.1 required")
-lessthandse60 = unittest.skipUnless(DSE_VERSION and DSE_VERSION < Version('6.0'), "DSE version less than 6.0 required")
-
 # pytest.mark.xfail instead of unittest.expectedFailure because
 # 1. unittest doesn't skip setUpClass when used on class and we need it sometimes
 # 2. unittest doesn't have conditional xfail, and I prefer to use pytest than custom decorator
@@ -393,10 +297,6 @@ pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is 
 requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "asyncore" in EVENT_LOOP_MANAGER,
                                                "This test is not suitible for environments with large clock granularity")
 requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
-requirecassandra = unittest.skipIf(DSE_VERSION, "Cassandra required")
-notdse = unittest.skipIf(DSE_VERSION, "DSE not supported")
-requiredse = unittest.skipUnless(DSE_VERSION, "DSE required")
-requirescloudproxy = unittest.skipIf(CLOUD_PROXY_PATH is None, "Cloud Proxy path hasn't been specified")
 
 libevtest = unittest.skipUnless(EVENT_LOOP_MANAGER=="libev", "Test timing designed for libev loop")
 
@@ -508,15 +408,11 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
     configuration_options = configuration_options or {}
     dse_options = dse_options or {}
     workloads = workloads or []
-    dse_cluster = True if DSE_VERSION else False
 
-    if ccm_options is None and DSE_VERSION:
-        ccm_options = {"version": CCM_VERSION}
-    elif ccm_options is None:
+    if ccm_options is None:
         ccm_options = CCM_KWARGS.copy()
 
     cassandra_version = ccm_options.get('version', CCM_VERSION)
-    dse_version = ccm_options.get('version', DSE_VERSION)
 
     global CCM_CLUSTER
     if USE_CASS_EXTERNAL:
@@ -562,88 +458,41 @@ def use_cluster(cluster_name, nodes, ipformat=None, start=True, workloads=None, 
             if os.path.exists(cluster_path):
                 shutil.rmtree(cluster_path)
 
-            if dse_cluster:
-                CCM_CLUSTER = DseCluster(path, cluster_name, **ccm_options)
-                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-                CCM_CLUSTER.set_configuration_options({'batch_size_warn_threshold_in_kb': 5})
-                if Version(dse_version) >= Version('5.0'):
-                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                    CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-                if Version(dse_version) >= Version('5.1'):
-                    # For Inet4Address
-                    CCM_CLUSTER.set_dse_configuration_options({
-                        'graph': {
-                            'gremlin_server': {
-                                'scriptEngines': {
-                                    'gremlin-groovy': {
-                                        'config': {
-                                            'sandbox_rules': {
-                                                'whitelist_packages': ['java.net']
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    })
-                if 'spark' in workloads:
-                    if Version(dse_version) >= Version('6.8'):
-                        config_options = {
-                            "resource_manager_options": {
-                                "worker_options": {
-                                    "cores_total": 0.1,
-                                    "memory_total": "64M"
-                                }
-                            }
-                        }
-                    else:
-                        config_options = {"initial_spark_worker_resources": 0.1}
+            if SCYLLA_VERSION:
+                # `experimental: True` enable all experimental features.
+                # CDC is causing an issue (can't start cluster with multiple seeds)
+                # Selecting only features we need for tests, i.e. anything but CDC.
+                CCM_CLUSTER = CCMScyllaCluster(path, cluster_name, **ccm_options)
+                CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf'], 'start_native_transport': True})
 
-                    if Version(dse_version) >= Version('6.7'):
-                        log.debug("Disabling AlwaysON SQL for a DSE 6.7 Cluster")
-                        config_options['alwayson_sql_options'] = {'enabled': False}
-                    CCM_CLUSTER.set_dse_configuration_options(config_options)
-                common.switch_cluster(path, cluster_name)
-                CCM_CLUSTER.set_configuration_options(configuration_options)
-                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
-
-                CCM_CLUSTER.set_dse_configuration_options(dse_options)
+                CCM_CLUSTER.set_configuration_options({'skip_wait_for_gossip_to_settle': 0})
+                # Permit IS NOT NULL restriction on non-primary key columns of a materialized view
+                # This allows `test_metadata_with_quoted_identifiers` to run
+                CCM_CLUSTER.set_configuration_options({'strict_is_not_null_in_views': False})
             else:
-                if SCYLLA_VERSION:
-                    # `experimental: True` enable all experimental features.
-                    # CDC is causing an issue (can't start cluster with multiple seeds)
-                    # Selecting only features we need for tests, i.e. anything but CDC.
-                    CCM_CLUSTER = CCMScyllaCluster(path, cluster_name, **ccm_options)
-                    CCM_CLUSTER.set_configuration_options({'experimental_features': ['lwt', 'udf'], 'start_native_transport': True})
+                ccm_cluster_clz = CCMCluster if Version(cassandra_version) < Version(
+                    '4.1') else Cassandra41CCMCluster
+                CCM_CLUSTER = ccm_cluster_clz(path, cluster_name, **ccm_options)
+                CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
+            if Version(cassandra_version) >= Version('2.2'):
+                CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
+                if Version(cassandra_version) >= Version('3.0'):
+                    # The config.yml option below is deprecated in C* 4.0 per CASSANDRA-17280
+                    if Version(cassandra_version) < Version('4.0'):
+                        CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
+                    else:
+                        # Cassandra version >= 4.0
+                        CCM_CLUSTER.set_configuration_options({
+                            'enable_materialized_views': True,
+                            'enable_sasi_indexes': True,
+                            'enable_transient_replication': True,
+                        })
 
-                    CCM_CLUSTER.set_configuration_options({'skip_wait_for_gossip_to_settle': 0})
-                    # Permit IS NOT NULL restriction on non-primary key columns of a materialized view
-                    # This allows `test_metadata_with_quoted_identifiers` to run
-                    CCM_CLUSTER.set_configuration_options({'strict_is_not_null_in_views': False})
-                else:
-                    ccm_cluster_clz = CCMCluster if Version(cassandra_version) < Version(
-                        '4.1') else Cassandra41CCMCluster
-                    CCM_CLUSTER = ccm_cluster_clz(path, cluster_name, **ccm_options)
-                    CCM_CLUSTER.set_configuration_options({'start_native_transport': True})
-                if Version(cassandra_version) >= Version('2.2'):
-                    CCM_CLUSTER.set_configuration_options({'enable_user_defined_functions': True})
-                    if Version(cassandra_version) >= Version('3.0'):
-                        # The config.yml option below is deprecated in C* 4.0 per CASSANDRA-17280
-                        if Version(cassandra_version) < Version('4.0'):
-                            CCM_CLUSTER.set_configuration_options({'enable_scripted_user_defined_functions': True})
-                        else:
-                            # Cassandra version >= 4.0
-                            CCM_CLUSTER.set_configuration_options({
-                                'enable_materialized_views': True,
-                                'enable_sasi_indexes': True,
-                                'enable_transient_replication': True,
-                            })
-
-                common.switch_cluster(path, cluster_name)
-                CCM_CLUSTER.set_configuration_options(configuration_options)
-                # Since scylla CCM doesn't yet support this options, we skip it
-                # , use_single_interface=use_single_interface)
-                CCM_CLUSTER.populate(nodes, ipformat=ipformat)
+            common.switch_cluster(path, cluster_name)
+            CCM_CLUSTER.set_configuration_options(configuration_options)
+            # Since scylla CCM doesn't yet support this options, we skip it
+            # , use_single_interface=use_single_interface)
+            CCM_CLUSTER.populate(nodes, ipformat=ipformat)
     try:
         jvm_args = []
 

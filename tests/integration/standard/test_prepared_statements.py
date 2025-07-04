@@ -23,8 +23,8 @@ from cassandra import InvalidRequest, DriverException
 
 from cassandra import ConsistencyLevel, ProtocolVersion
 from cassandra.query import PreparedStatement, UNSET_VALUE
-from tests.integration import (get_server_versions, greaterthanorequalcass40, greaterthanorequaldse50,
-    requirecassandra, BasicSharedKeyspaceUnitTestCase)
+from tests.integration import (get_server_versions, greaterthanorequalcass40,
+    BasicSharedKeyspaceUnitTestCase)
 
 import logging
 
@@ -563,7 +563,6 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 9)
 
-    @requirecassandra
     def test_id_is_not_updated_conditional_v5(self):
         """
         Test that verifies that the result_metadata and the
@@ -573,36 +572,6 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         @jira_ticket PYTHON-847
         """
         cluster = TestCluster(protocol_version=ProtocolVersion.V5)
-        session = cluster.connect()
-        self.addCleanup(cluster.shutdown)
-        self._test_updated_conditional(session, 10)
-
-    @greaterthanorequaldse50
-    def test_id_is_not_updated_conditional_dsev1(self):
-        """
-        Test that verifies that the result_metadata and the
-        result_metadata_id are udpated correctly in conditional statements
-        in protocol DSE V1
-
-        @since 3.13
-        @jira_ticket PYTHON-847
-        """
-        cluster = TestCluster(protocol_version=ProtocolVersion.DSE_V1)
-        session = cluster.connect()
-        self.addCleanup(cluster.shutdown)
-        self._test_updated_conditional(session, 10)
-
-    @greaterthanorequaldse50
-    def test_id_is_not_updated_conditional_dsev2(self):
-        """
-        Test that verifies that the result_metadata and the
-        result_metadata_id are udpated correctly in conditional statements
-        in protocol DSE V2
-
-        @since 3.13
-        @jira_ticket PYTHON-847
-        """
-        cluster = TestCluster(protocol_version=ProtocolVersion.DSE_V2)
         session = cluster.connect()
         self.addCleanup(cluster.shutdown)
         self._test_updated_conditional(session, 10)

@@ -13,7 +13,7 @@
 # limitations under the License
 import unittest
 
-from tests.integration import requiredse, CASSANDRA_VERSION, DSE_VERSION, SIMULACRON_JAR, PROTOCOL_VERSION
+from tests.integration import CASSANDRA_VERSION, SIMULACRON_JAR, PROTOCOL_VERSION
 from tests.integration.simulacron.utils import (
     clear_queries,
     start_and_prime_singledc,
@@ -26,7 +26,7 @@ from cassandra.cluster import Cluster
 from packaging.version import Version
 
 
-PROTOCOL_VERSION = min(4, PROTOCOL_VERSION if (DSE_VERSION is None or DSE_VERSION >= Version('5.0')) else 3)
+PROTOCOL_VERSION = min(4, PROTOCOL_VERSION)
 
 
 def teardown_package():
@@ -61,22 +61,3 @@ class SimulacronCluster(SimulacronBase):
         if cls.cluster:
             cls.cluster.shutdown()
         stop_simulacron()
-
-
-@requiredse
-class DseSimulacronCluster(SimulacronBase):
-
-    simulacron_cluster = None
-    cluster, connect = None, True
-    nodes_per_dc = 1
-
-    @classmethod
-    def setUpClass(cls):
-        if DSE_VERSION is None and SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"):
-            return
-
-        cls.simulacron_cluster = start_and_prime_cluster_defaults(dse_version=DSE_VERSION,
-                                                                  nodes_per_dc=cls.nodes_per_dc)
-        if cls.connect:
-            cls.cluster = Cluster(protocol_version=PROTOCOL_VERSION, compression=False)
-            cls.session = cls.cluster.connect(wait_for_all_pools=True)

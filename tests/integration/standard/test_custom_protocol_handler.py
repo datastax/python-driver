@@ -21,8 +21,8 @@ from cassandra.cluster import (ResponseFuture, ExecutionProfile, EXEC_PROFILE_DE
 from cassandra import ProtocolVersion, ConsistencyLevel
 
 from tests.integration import use_singledc, drop_keyspace_shutdown_cluster, \
-    greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequaldse51, greaterthanorequalcass3_10, \
-    TestCluster, greaterthanorequalcass40, requirecassandra
+    greaterthanorequalcass30, execute_with_long_wait_retry, greaterthanorequalcass3_10, \
+    TestCluster, greaterthanorequalcass40
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES
 from tests.integration.standard.utils import create_table_with_all_types, get_all_primitive_params
 
@@ -121,7 +121,6 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         cluster.shutdown()
 
     @unittest.expectedFailure
-    @requirecassandra
     @greaterthanorequalcass40
     def test_protocol_divergence_v5_fail_by_continuous_paging(self):
         """
@@ -169,7 +168,6 @@ class CustomProtocolHandlerTest(unittest.TestCase):
                                                         int_flag=True)
 
     @unittest.expectedFailure
-    @requirecassandra
     @greaterthanorequalcass40
     def test_protocol_v5_uses_flag_int(self):
         """
@@ -183,21 +181,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V5, uses_int_query_flag=True, beta=True,
                                                         int_flag=True)
 
-    @greaterthanorequaldse51
-    def test_protocol_dsev1_uses_flag_int(self):
-        """
-        Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for DSE_V1
-
-        @jira_ticket PYTHON-694
-        @expected_result the fetch_size=1 parameter will be honored
-
-        @test_category connection
-        """
-        self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.DSE_V1, uses_int_query_flag=True,
-                                                        int_flag=True)
-
     @unittest.expectedFailure
-    @requirecassandra
     @greaterthanorequalcass40
     def test_protocol_divergence_v5_fail_by_flag_uses_int(self):
         """
@@ -209,19 +193,6 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         @test_category connection
         """
         self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.V5, uses_int_query_flag=False, beta=True,
-                                                        int_flag=False)
-
-    @greaterthanorequaldse51
-    def test_protocol_divergence_dsev1_fail_by_flag_uses_int(self):
-        """
-        Test to validate that the _PAGE_SIZE_FLAG is treated correctly using write_uint for DSE_V1
-
-        @jira_ticket PYTHON-694
-        @expected_result the fetch_size=1 parameter will be honored
-
-        @test_category connection
-        """
-        self._protocol_divergence_fail_by_flag_uses_int(ProtocolVersion.DSE_V1, uses_int_query_flag=False,
                                                         int_flag=False)
 
     def _send_query_message(self, session, timeout, **kwargs):

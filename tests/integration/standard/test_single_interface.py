@@ -19,12 +19,12 @@ from cassandra.query import SimpleStatement
 
 from packaging.version import Version
 from tests.integration import use_singledc, PROTOCOL_VERSION, \
-    remove_cluster, greaterthanorequalcass40, notdse, \
-    CASSANDRA_VERSION, DSE_VERSION, TestCluster, DEFAULT_SINGLE_INTERFACE_PORT
+    remove_cluster, greaterthanorequalcass40, \
+    CASSANDRA_VERSION, TestCluster, DEFAULT_SINGLE_INTERFACE_PORT
 
 
 def setup_module():
-    if not DSE_VERSION and CASSANDRA_VERSION >= Version('4-a'):
+    if CASSANDRA_VERSION >= Version('4-a'):
         remove_cluster()
         use_singledc(use_single_interface=True)
 
@@ -32,7 +32,6 @@ def teardown_module():
     remove_cluster()
 
 
-@notdse
 @greaterthanorequalcass40
 class SingleInterfaceTest(unittest.TestCase):
 

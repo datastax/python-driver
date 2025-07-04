@@ -42,7 +42,7 @@ from tests import notwindows, notasyncio
 from tests.integration import use_cluster, get_server_versions, CASSANDRA_VERSION, \
     execute_until_pass, execute_with_long_wait_retry, get_node, MockLoggingHandler, get_unsupported_lower_protocol, \
     get_unsupported_upper_protocol, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, \
-    lessthanorequalcass40, DSE_VERSION, TestCluster, PROTOCOL_VERSION, xfail_scylla, incorrect_test
+    lessthanorequalcass40, TestCluster, PROTOCOL_VERSION, xfail_scylla, incorrect_test
 from tests.integration.util import assert_quiescent_pool_state
 import sys
 
@@ -255,13 +255,7 @@ class ClusterTests(unittest.TestCase):
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version
         # Make sure the correct protocol was selected by default
-        if DSE_VERSION and DSE_VERSION >= Version("6.0"):
-            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.DSE_V2)
-            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.DSE_V2)
-        elif DSE_VERSION and DSE_VERSION >= Version("5.1"):
-            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.DSE_V1)
-            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.DSE_V1)
-        elif CASSANDRA_VERSION >= Version('4.0-beta5'):
+        if CASSANDRA_VERSION >= Version('4.0-beta5'):
             self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V5)
             self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V5)
         elif CASSANDRA_VERSION >= Version('4.0-a'):

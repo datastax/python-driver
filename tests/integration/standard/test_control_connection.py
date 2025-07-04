@@ -20,7 +20,7 @@ import unittest
 
 
 from cassandra.protocol import ConfigurationException
-from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster, greaterthanorequalcass40, notdse
+from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster, greaterthanorequalcass40
 from tests.integration.datatype_utils import update_datatypes
 
 
@@ -102,7 +102,6 @@ class ControlConnectionTests(unittest.TestCase):
 
     # TODO: enable after https://github.com/scylladb/python-driver/issues/121 is fixed
     @unittest.skip('Fails on scylla due to the broadcast_rpc_port is None')
-    @notdse
     @greaterthanorequalcass40
     def test_control_connection_port_discovery(self):
         """

@@ -18,7 +18,7 @@ from packaging.version import Version
 
 import cassandra
 from tests.integration.simulacron import SimulacronCluster, SimulacronBase
-from tests.integration import (requiressimulacron, PROTOCOL_VERSION, DSE_VERSION, MockLoggingHandler)
+from tests.integration import (requiressimulacron, PROTOCOL_VERSION, MockLoggingHandler)
 from tests.integration.simulacron.utils import prime_query, start_and_prime_singledc
 
 from cassandra import (WriteTimeout, WriteType,
@@ -26,7 +26,7 @@ from cassandra import (WriteTimeout, WriteType,
 from cassandra.cluster import Cluster, ControlConnection
 
 
-PROTOCOL_VERSION = min(4, PROTOCOL_VERSION if (DSE_VERSION is None or DSE_VERSION >= Version('5.0')) else 3)
+PROTOCOL_VERSION = min(4, PROTOCOL_VERSION)
 
 @requiressimulacron
 class ClusterTests(SimulacronCluster):
@@ -89,7 +89,7 @@ class DuplicateRpcTest(SimulacronCluster):
 
     def test_duplicate(self):
         with MockLoggingHandler().set_module_name(cassandra.cluster.__name__) as mock_handler:
-            address_column = "native_transport_address" if DSE_VERSION and DSE_VERSION > Version("6.0") else "rpc_address"
+            address_column = "rpc_address"
             rows = [
                 {"peer": "127.0.0.1", "data_center": "dc", "host_id": "dontcare1", "rack": "rack1",
                 "release_version": "3.11.4", address_column: "127.0.0.1", "schema_version": "dontcare", "tokens": "1"},

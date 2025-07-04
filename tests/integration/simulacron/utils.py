@@ -20,7 +20,7 @@ from urllib.request import build_opener, Request, HTTPHandler
 from cassandra.metadata import SchemaParserV4, SchemaParserDSE68
 
 from tests.util import wait_until_not_raised
-from tests.integration import CASSANDRA_VERSION, SIMULACRON_JAR, DSE_VERSION
+from tests.integration import CASSANDRA_VERSION, SIMULACRON_JAR
 
 DEFAULT_CLUSTER = "python_simulacron_cluster"
 
@@ -122,12 +122,6 @@ class SimulacronClient(object):
         system_local_row = {}
         system_local_row["cql_version"] = CASSANDRA_VERSION.base_version
         system_local_row["release_version"] = CASSANDRA_VERSION.base_version + "-SNAPSHOT"
-        if DSE_VERSION:
-            system_local_row["dse_version"] = DSE_VERSION.base_version
-        column_types = {"cql_version": "ascii", "release_version": "ascii"}
-        system_local = PrimeQuery("SELECT cql_version, release_version FROM system.local WHERE key='local'",
-                                  rows=[system_local_row],
-                                  column_types=column_types)
 
         self.submit_request(system_local)
 

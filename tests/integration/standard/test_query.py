@@ -26,7 +26,7 @@ from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DE
 from cassandra.policies import HostDistance, RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspaceUnitTestCase, \
     greaterthanprotocolv3, MockLoggingHandler, get_supported_protocol_versions, local, get_cluster, setup_keyspace, \
-    USE_CASS_EXTERNAL, greaterthanorequalcass40, DSE_VERSION, TestCluster, requirecassandra, xfail_scylla
+    USE_CASS_EXTERNAL, greaterthanorequalcass40, TestCluster, xfail_scylla
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
 
@@ -1403,7 +1403,6 @@ class QueryKeyspaceTests(BaseKeyspaceTests):
         """
         self._check_set_keyspace_in_statement(self.session)
 
-    @requirecassandra
     @greaterthanorequalcass40
     def test_setting_keyspace_and_session(self):
         """
@@ -1572,7 +1571,7 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
             # We wait for cluster._prepare_all_queries to be called
             time.sleep(5)
             self.assertEqual(1, mock_handler.get_message_count('debug', 'Preparing all known prepared statements'))
-            
+
             results = self.session.execute(prepared_statement, (1,), execution_profile="only_first")
             self.assertEqual(results.one(), (1, ))
 

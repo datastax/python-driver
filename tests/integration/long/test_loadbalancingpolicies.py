@@ -30,7 +30,7 @@ from cassandra.policies import (
 )
 from cassandra.query import SimpleStatement
 
-from tests.integration import use_singledc, use_multidc, remove_cluster, TestCluster, greaterthanorequalcass40, notdse
+from tests.integration import use_singledc, use_multidc, remove_cluster, TestCluster, greaterthanorequalcass40
 from tests.integration.long.utils import (wait_for_up, create_schema,
                                           CoordinatorStats, force_stop,
                                           wait_for_down, decommission, start,
@@ -614,7 +614,6 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
         self.coordinator_stats.assert_query_count_equals(self, 3, 12)
 
-    @notdse
     @greaterthanorequalcass40
     def test_token_aware_with_transient_replication(self):
         """
