@@ -206,6 +206,9 @@ try_cython &= 'egg_info' not in sys.argv  # bypass setup_requires for pip egg_in
 sys.argv = [a for a in sys.argv if a not in ("--no-murmur3", "--no-libev", "--no-cython", "--no-extensions")]
 
 build_concurrency = int(os.environ.get('CASS_DRIVER_BUILD_CONCURRENCY', '0'))
+if build_concurrency == 0:
+    build_concurrency = None
+
 CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST = bool(os.environ.get('CASS_DRIVER_BUILD_EXTENSIONS_ARE_MUST', 'no') == 'yes')
 
 class NoPatchExtension(Extension):
@@ -292,7 +295,7 @@ On OSX, via homebrew:
 
 
     def build_extensions(self):
-        if build_concurrency > 1:
+        if build_concurrency is None or build_concurrency > 1:
             self.check_extensions_list(self.extensions)
 
             import multiprocessing.pool
@@ -430,7 +433,6 @@ def run_setup(extensions):
             sys.stderr.write("Bypassing Cython setup requirement\n")
 
     setup(**kw)
-
 
 run_setup(None)
 

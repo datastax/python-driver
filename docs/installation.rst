@@ -76,6 +76,9 @@ threads used to build the driver and any C extensions:
     $ # installing from pip
     $ CASS_DRIVER_BUILD_CONCURRENCY=8 pip install scylla-driver
 
+Note that by default (when CASS_DRIVER_BUILD_CONCURRENCY is not specified), concurrency will be equal to the number of
+logical cores on your machine.
+
 OSX Installation Error
 ^^^^^^^^^^^^^^^^^^^^^^
 If you're installing on OSX and have XCode 5.1 installed, you may see an error like this::
