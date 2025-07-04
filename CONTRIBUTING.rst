@@ -35,6 +35,11 @@ since it makes Python tooling ecosystem mostly usable.
 To install it, see instructions at https://docs.astral.sh/uv/getting-started/installation/
 The rest of this document assumes you have `uv` installed.
 
+It is also strongly recommended to use C/C++-caching tool like ccache or sccache.
+When modifying driver files, rebuilding Cython modules is often necessary.
+Without caching, each such rebuild may take over a minute. Caching usually brings it
+down to about 2-3 seconds.
+
 Building the Docs
 =================
 
