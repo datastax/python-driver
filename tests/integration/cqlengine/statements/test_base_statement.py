@@ -65,7 +65,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
 
         for assignment in original.assignments:
             self.assertEqual(response[assignment.field], assignment.value)
-        self.assertEqual(len(response), 7)
+        self.assertEqual(len(response), 8)
 
     def test_insert_statement_execute(self):
         """
@@ -92,6 +92,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         st.add_assignment(Column(db_field='text_set'), set(("foo_update", "bar_update")))
         st.add_assignment(Column(db_field='text_list'), ["foo_update", "bar_update"])
         st.add_assignment(Column(db_field='text_map'), {"foo": '3', "bar": '4'})
+        st.add_assignment(Column(db_field='bin_map'), {123: b'3', 456: b'4'})
 
         execute(st)
         self._verify_statement(st)
@@ -150,6 +151,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         st.add_assignment(Column(db_field='text_set'), set(("foo", "bar")))
         st.add_assignment(Column(db_field='text_list'), ["foo", "bar"])
         st.add_assignment(Column(db_field='text_map'), {"foo": '1', "bar": '2'})
+        st.add_assignment(Column(db_field='bin_map'), {123: b'1', 456: b'2'})
 
         execute(st)
         self._verify_statement(st)
