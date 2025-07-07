@@ -680,7 +680,7 @@ pipeline {
   }
 
   environment {
-    OS_VERSION = 'ubuntu/bionic64/python-driver'
+    OS_VERSION = 'ubuntu/focal64/python-driver'
     CCM_ENVIRONMENT_SHELL = '/usr/local/bin/ccm_environment.sh'
     CCM_MAX_HEAP_SIZE = '1536M'
     JABBA_SHELL = '/usr/lib/jabba/jabba.sh'
