@@ -5,15 +5,12 @@ import pytest
 from cassandra.cluster import Cluster
 from cassandra.policies import ConstantReconnectionPolicy, RoundRobinPolicy, TokenAwarePolicy
 
-from tests.integration import PROTOCOL_VERSION, use_cluster
+from tests.integration import PROTOCOL_VERSION, use_cluster, get_cluster
 from tests.unit.test_host_connection_pool import LOGGER
 
-CCM_CLUSTER = None
 
 def setup_module():
-    global CCM_CLUSTER
-
-    CCM_CLUSTER = use_cluster('tablets', [3], start=True)
+    use_cluster('tablets', [3], start=True)
 
 
 class TestTabletsIntegration:
@@ -193,7 +190,7 @@ class TestTabletsIntegration:
     def test_tablets_invalidation_decommission_non_cc_node(self):
         def decommission_non_cc_node(rec):
             # Drop and recreate ks and table to trigger tablets invalidation
-            for node in CCM_CLUSTER.nodes.values():
+            for node in get_cluster().nodes.values():
                 if self.cluster.control_connection._connection.endpoint.address == node.network_interfaces["storage"][0]:
                     # Ignore node that control connection is connected to
                     continue
