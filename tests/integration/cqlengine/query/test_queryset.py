@@ -131,8 +131,8 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        self.assertIsInstance(op, statements.WhereClause)
-        self.assertIsInstance(op.operator, operators.GreaterThanOrEqualOperator)
+        assert isinstance(op, statements.WhereClause)
+        assert isinstance(op.operator, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_query_expression_parsing(self):
@@ -149,8 +149,8 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         assert len(query2._where) == 2
 
         op = query2._where[1]
-        self.assertIsInstance(op, statements.WhereClause)
-        self.assertIsInstance(op.operator, operators.GreaterThanOrEqualOperator)
+        assert isinstance(op, statements.WhereClause)
+        assert isinstance(op.operator, operators.GreaterThanOrEqualOperator)
         assert op.value == 1
 
     def test_using_invalid_column_names_in_filter_kwargs_raises_error(self):

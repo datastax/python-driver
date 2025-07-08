@@ -141,7 +141,7 @@ class ConnectionTests(SimulacronBase):
 
         for f in futures:
             f._event.wait()
-            self.assertIsInstance(f._final_exception, OperationTimedOut)
+            assert isinstance(f._final_exception, OperationTimedOut)
 
         prime_request(PrimeOptions(then=NO_THEN))
 
@@ -418,7 +418,7 @@ class ConnectionTests(SimulacronBase):
 
         for f in futures:
             f._event.wait()
-            self.assertIsInstance(f._final_exception, OperationTimedOut)
+            assert isinstance(f._final_exception, OperationTimedOut)
 
         assert listener.hosts_marked_down == []
         assert_quiescent_pool_state(self, cluster)

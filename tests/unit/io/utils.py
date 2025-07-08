@@ -331,7 +331,7 @@ class ReactorTestMixin(object):
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
         self.assertTrue(c.connected_event.is_set())
-        self.assertIsInstance(c.last_error, ProtocolError)
+        assert isinstance(c.last_error, ProtocolError)
 
     def test_error_message_on_startup(self):
         c = self.make_connection()
@@ -355,7 +355,7 @@ class ReactorTestMixin(object):
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, ConnectionException)
+        assert isinstance(c.last_error, ConnectionException)
         self.assertTrue(c.connected_event.is_set())
 
     def test_socket_error_on_write(self):
@@ -367,7 +367,7 @@ class ReactorTestMixin(object):
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, socket_error)
+        assert isinstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
 
     def test_blocking_on_write(self):
@@ -416,7 +416,7 @@ class ReactorTestMixin(object):
 
         # make sure it errored correctly
         self.assertTrue(c.is_defunct)
-        self.assertIsInstance(c.last_error, socket_error)
+        assert isinstance(c.last_error, socket_error)
         self.assertTrue(c.connected_event.is_set())
 
     def test_partial_header_read(self):

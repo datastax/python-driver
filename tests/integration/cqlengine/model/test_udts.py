@@ -458,7 +458,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         john = TheModel.objects.first()
         assert john.id == id
         info = john.info
-        self.assertIsInstance(info, db_field_different)
+        assert isinstance(info, db_field_different)
         assert info.age == age
         assert info.name == name
         # also excercise the db_Field mapping

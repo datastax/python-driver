@@ -79,11 +79,11 @@ class EndPointTests(SimulacronCluster):
         assert len(hosts) == 3
         for host in hosts:
             self.assertIsNotNone(host.endpoint)
-            self.assertIsInstance(host.endpoint, DefaultEndPoint)
+            assert isinstance(host.endpoint, DefaultEndPoint)
             assert host.address == host.endpoint.address
             assert host.broadcast_rpc_address == host.endpoint.address
 
-        self.assertIsInstance(self.cluster.control_connection._connection.endpoint, DefaultEndPoint)
+        assert isinstance(self.cluster.control_connection._connection.endpoint, DefaultEndPoint)
         self.assertIsNotNone(self.cluster.control_connection._connection.endpoint)
         endpoints = [host.endpoint for host in hosts]
         assert self.cluster.control_connection._connection.endpoint in endpoints
@@ -101,12 +101,12 @@ class EndPointTests(SimulacronCluster):
         assert len(hosts) == 3
         for host in hosts:
             self.assertIsNotNone(host.endpoint)
-            self.assertIsInstance(host.endpoint, AddressEndPoint)
+            assert isinstance(host.endpoint, AddressEndPoint)
             assert str(host.endpoint) == host.endpoint.address
             assert host.address == host.endpoint.address
             assert host.broadcast_rpc_address == host.endpoint.address
 
-        self.assertIsInstance(cluster.control_connection._connection.endpoint, AddressEndPoint)
+        assert isinstance(cluster.control_connection._connection.endpoint, AddressEndPoint)
         self.assertIsNotNone(cluster.control_connection._connection.endpoint)
         endpoints = [host.endpoint for host in hosts]
         assert cluster.control_connection._connection.endpoint in endpoints

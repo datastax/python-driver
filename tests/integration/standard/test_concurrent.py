@@ -291,7 +291,7 @@ class ClusterTests(unittest.TestCase):
         for i, (success, result) in enumerate(results):
             if i == 57:
                 self.assertFalse(success)
-                self.assertIsInstance(result, InvalidRequest)
+                assert isinstance(result, InvalidRequest)
             else:
                 self.assertTrue(success)
                 self.assertFalse(result)
@@ -310,7 +310,7 @@ class ClusterTests(unittest.TestCase):
         for i, (success, result) in enumerate(results):
             if i == 57:
                 self.assertFalse(success)
-                self.assertIsInstance(result, TypeError)
+                assert isinstance(result, TypeError)
             else:
                 self.assertTrue(success)
                 self.assertFalse(result)

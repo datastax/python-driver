@@ -1100,7 +1100,7 @@ class TestCodeCoverage(unittest.TestCase):
         cluster = TestCluster()
         cluster.connect()
 
-        self.assertIsInstance(cluster.metadata.export_schema_as_string(), str)
+        assert isinstance(cluster.metadata.export_schema_as_string(), str)
         cluster.shutdown()
 
     def test_export_keyspace_schema(self):
@@ -1113,8 +1113,8 @@ class TestCodeCoverage(unittest.TestCase):
 
         for keyspace in cluster.metadata.keyspaces:
             keyspace_metadata = cluster.metadata.keyspaces[keyspace]
-            self.assertIsInstance(keyspace_metadata.export_as_string(), str)
-            self.assertIsInstance(keyspace_metadata.as_cql_query(), str)
+            assert isinstance(keyspace_metadata.export_as_string(), str)
+            assert isinstance(keyspace_metadata.as_cql_query(), str)
         cluster.shutdown()
 
     def assert_equal_diff(self, received, expected):
@@ -1465,10 +1465,10 @@ class IndexMapTests(unittest.TestCase):
 
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
-        self.assertIsInstance(ks_meta.indexes['a_idx'], IndexMetadata)
-        self.assertIsInstance(ks_meta.indexes['b_idx'], IndexMetadata)
-        self.assertIsInstance(table_meta.indexes['a_idx'], IndexMetadata)
-        self.assertIsInstance(table_meta.indexes['b_idx'], IndexMetadata)
+        assert isinstance(ks_meta.indexes['a_idx'], IndexMetadata)
+        assert isinstance(ks_meta.indexes['b_idx'], IndexMetadata)
+        assert isinstance(table_meta.indexes['a_idx'], IndexMetadata)
+        assert isinstance(table_meta.indexes['b_idx'], IndexMetadata)
 
         # both indexes updated when index dropped
         self.session.execute("DROP INDEX a_idx")
@@ -1479,9 +1479,9 @@ class IndexMapTests(unittest.TestCase):
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
         self.assertNotIn('a_idx', ks_meta.indexes)
-        self.assertIsInstance(ks_meta.indexes['b_idx'], IndexMetadata)
+        assert isinstance(ks_meta.indexes['b_idx'], IndexMetadata)
         self.assertNotIn('a_idx', table_meta.indexes)
-        self.assertIsInstance(table_meta.indexes['b_idx'], IndexMetadata)
+        assert isinstance(table_meta.indexes['b_idx'], IndexMetadata)
 
         # keyspace index updated when table dropped
         self.drop_basic_table()
@@ -1497,15 +1497,15 @@ class IndexMapTests(unittest.TestCase):
         self.session.execute("CREATE INDEX %s ON %s (a)" % (idx, self.table_name))
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
-        self.assertIsInstance(ks_meta.indexes[idx], IndexMetadata)
-        self.assertIsInstance(table_meta.indexes[idx], IndexMetadata)
+        assert isinstance(ks_meta.indexes[idx], IndexMetadata)
+        assert isinstance(table_meta.indexes[idx], IndexMetadata)
         self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
         old_meta = ks_meta
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         self.assertIsNot(ks_meta, old_meta)
         table_meta = ks_meta.tables[self.table_name]
-        self.assertIsInstance(ks_meta.indexes[idx], IndexMetadata)
-        self.assertIsInstance(table_meta.indexes[idx], IndexMetadata)
+        assert isinstance(ks_meta.indexes[idx], IndexMetadata)
+        assert isinstance(table_meta.indexes[idx], IndexMetadata)
         self.drop_basic_table()
 
 @requires_java_udf

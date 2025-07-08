@@ -182,7 +182,7 @@ class TypeTests(unittest.TestCase):
         assert UTF8Type == ctype.subtypes[0]
 
         # middle subtype should be a BarType instance with its own subtypes and names
-        self.assertIsInstance(ctype.subtypes[1], BarType)
+        assert isinstance(ctype.subtypes[1], BarType)
         assert [UTF8Type] == ctype.subtypes[1].subtypes
         assert [b"address"] == ctype.subtypes[1].names
 

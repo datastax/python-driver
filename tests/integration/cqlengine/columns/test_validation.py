@@ -234,15 +234,15 @@ class DataType():
                 value_to_compare = value
 
             result = self.model_class.objects(test_id=0).first()
-            self.assertIsInstance(result.class_param, self.python_klass)
+            assert isinstance(result.class_param, self.python_klass)
             assert result.class_param == value_to_compare
 
             result = self.model_class.objects.all().allow_filtering().filter(test_id=0).first()
-            self.assertIsInstance(result.class_param, self.python_klass)
+            assert isinstance(result.class_param, self.python_klass)
             assert result.class_param == value_to_compare
 
             result = self.model_class.objects.all().allow_filtering().filter(test_id=0, class_param=value).first()
-            self.assertIsInstance(result.class_param, self.python_klass)
+            assert isinstance(result.class_param, self.python_klass)
             assert result.class_param == value_to_compare
 
         return result

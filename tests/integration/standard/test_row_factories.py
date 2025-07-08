@@ -92,8 +92,8 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
 
     def test_tuple_factory(self):
         result = self._results_from_row_factory(tuple_factory)
-        self.assertIsInstance(result, ResultSet)
-        self.assertIsInstance(result.one(), tuple)
+        assert isinstance(result, ResultSet)
+        assert isinstance(result.one(), tuple)
 
         result = result.all()
         for row in result:
@@ -106,7 +106,7 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
 
     def test_named_tuple_factory(self):
         result = self._results_from_row_factory(named_tuple_factory)
-        self.assertIsInstance(result, ResultSet)
+        assert isinstance(result, ResultSet)
         result = result.all()
 
         for row in result:
@@ -119,8 +119,8 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
 
     def _test_dict_factory(self, row_factory, row_type):
         result = self._results_from_row_factory(row_factory)
-        self.assertIsInstance(result, ResultSet)
-        self.assertIsInstance(result.one(), row_type)
+        assert isinstance(result, ResultSet)
+        assert isinstance(result.one(), row_type)
 
         result = result.all()
         for row in result:
@@ -164,7 +164,7 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
                  ( 1 , 1 )
         '''.format(self.keyspace_name, self.function_table_name))
         result = session.execute(self.select)
-        self.assertIsInstance(result, ResultSet)
+        assert isinstance(result, ResultSet)
         first_row = result.one()
         assert first_row[0] == first_row[1]
 

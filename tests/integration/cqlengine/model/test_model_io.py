@@ -73,10 +73,10 @@ class TestModelIO(BaseCassEngTestCase):
         Tests that models can be saved and retrieved, using the create method.
         """
         tm = TestModel.create(count=8, text='123456789')
-        self.assertIsInstance(tm, TestModel)
+        assert isinstance(tm, TestModel)
 
         tm2 = TestModel.objects(id=tm.pk).first()
-        self.assertIsInstance(tm2, TestModel)
+        assert isinstance(tm2, TestModel)
 
         for cname in tm._columns.keys():
             assert getattr(tm, cname) == getattr(tm2, cname)
@@ -150,7 +150,7 @@ class TestModelIO(BaseCassEngTestCase):
         tm.save()
 
         tm2 = TestModel.objects(id=tm.pk).first()
-        self.assertIsInstance(tm2, TestModel)
+        assert isinstance(tm2, TestModel)
 
         self.assertTrue(tm2.text is None)
         self.assertTrue(tm2._values['text'].previous_value is None)
@@ -506,7 +506,7 @@ class TestUpdating(BaseCassEngTestCase):
         assert instance.int2 == 456
         assert instance.int3 == 7777
         self.assertIsNotNone(instance.int4)
-        self.assertIsInstance(instance.int4, int)
+        assert isinstance(instance.int4, int)
         self.assertGreaterEqual(instance.int4, 0)
         self.assertLessEqual(instance.int4, 1000)
         assert instance.int5 == 5555

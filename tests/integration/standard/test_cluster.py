@@ -862,7 +862,7 @@ class ClusterTests(unittest.TestCase):
             # use a copied instance and override the row factory
             # assert last returned value can be accessed as a namedtuple so we can prove something different
             named_tuple_row = rs.one()
-            self.assertIsInstance(named_tuple_row, tuple)
+            assert isinstance(named_tuple_row, tuple)
             self.assertTrue(named_tuple_row.release_version)
 
             tmp_profile = copy(node1)
@@ -873,7 +873,7 @@ class ClusterTests(unittest.TestCase):
                 queried_hosts.add(rs.response_future._current_host)
             assert queried_hosts == expected_hosts
             tuple_row = rs.one()
-            self.assertIsInstance(tuple_row, tuple)
+            assert isinstance(tuple_row, tuple)
             with self.assertRaises(AttributeError):
                 tuple_row.release_version
 

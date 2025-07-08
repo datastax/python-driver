@@ -111,7 +111,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
         self.assertTrue(results.has_more_pages)
         for count, page in enumerate(results, 1):
-            self.assertIsInstance(page, dict)
+            assert isinstance(page, dict)
             for colname, arr in page.items():
                 if count <= expected_pages:
                     self.assertGreater(len(arr), 0, "page count: %d" % (count,))

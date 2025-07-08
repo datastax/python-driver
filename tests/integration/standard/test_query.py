@@ -63,9 +63,9 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """.format(self.keyspace_name))
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
-        self.assertIsInstance(bound, BoundStatement)
+        assert isinstance(bound, BoundStatement)
         assert 2 == len(bound.values)
         self.session.execute(bound)
         assert bound.routing_key == b'\x00\x00\x00\x01'
@@ -379,7 +379,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         assert bound.routing_key == b'\x00\x00\x00\x01'
 
@@ -394,7 +394,7 @@ class PreparedStatementTests(unittest.TestCase):
             """)
         prepared.routing_key_indexes = None
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         assert bound.routing_key == None
 
@@ -408,7 +408,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         bound._set_routing_key('fake_key')
         assert bound.routing_key == 'fake_key'
@@ -421,7 +421,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         prepared.routing_key_indexes = [0, 1]
         bound = prepared.bind((1, 2))
@@ -440,7 +440,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind((1, 2))
         assert bound.keyspace == 'test3rf'
 

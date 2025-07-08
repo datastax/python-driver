@@ -254,4 +254,4 @@ class ConcurrencyTest((unittest.TestCase)):
         assert len(results) == max_recursion
         for r in results:
             self.assertFalse(r[0])
-            self.assertIsInstance(r[1], TypeError)
+            assert isinstance(r[1], TypeError)

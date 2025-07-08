@@ -95,7 +95,7 @@ class ConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
         args, kwargs = c.defunct.call_args
-        self.assertIsInstance(args[0], ProtocolError)
+        assert isinstance(args[0], ProtocolError)
 
     def test_negative_body_length(self, *args):
         c = self.make_connection()
@@ -112,7 +112,7 @@ class ConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
         args, kwargs = c.defunct.call_args
-        self.assertIsInstance(args[0], ProtocolError)
+        assert isinstance(args[0], ProtocolError)
 
     def test_unsupported_cql_version(self, *args):
         c = self.make_connection()
@@ -132,7 +132,7 @@ class ConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
         args, kwargs = c.defunct.call_args
-        self.assertIsInstance(args[0], ProtocolError)
+        assert isinstance(args[0], ProtocolError)
 
     def test_prefer_lz4_compression(self, *args):
         c = self.make_connection()
@@ -182,7 +182,7 @@ class ConnectionTest(unittest.TestCase):
         # make sure it errored correctly
         c.defunct.assert_called_once_with(ANY)
         args, kwargs = c.defunct.call_args
-        self.assertIsInstance(args[0], ProtocolError)
+        assert isinstance(args[0], ProtocolError)
 
     def test_use_requested_compression(self, *args):
         c = self.make_connection()
@@ -382,7 +382,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         connection.send_msg.assert_has_calls([call(ANY, request_id, ANY)] * get_holders.call_count)
         connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         exc = connection.defunct.call_args_list[0][0][0]
-        self.assertIsInstance(exc, ConnectionException)
+        assert isinstance(exc, ConnectionException)
         self.assertRegex(exc.args[0], r'^Received unexpected response to OptionsMessage.*')
         holder.return_connection.assert_has_calls(
             [call(connection)] * get_holders.call_count)
@@ -412,7 +412,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         connection.send_msg.assert_has_calls([call(ANY, request_id, ANY)] * get_holders.call_count)
         connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         exc = connection.defunct.call_args_list[0][0][0]
-        self.assertIsInstance(exc, OperationTimedOut)
+        assert isinstance(exc, OperationTimedOut)
         assert exc.errors == 'Connection heartbeat timeout after 0.05 seconds'
         assert exc.last_host == DefaultEndPoint('localhost')
         holder.return_connection.assert_has_calls(

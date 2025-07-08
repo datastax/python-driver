@@ -162,7 +162,7 @@ class SpecExecTest(unittest.TestCase):
         response_future = self.session.execute_async(statement, execution_profile='spec_ep_brr_lim',
                                                      timeout=14)
         response_future._event.wait(16)
-        self.assertIsInstance(response_future._final_exception, OperationTimedOut)
+        assert isinstance(response_future._final_exception, OperationTimedOut)
 
         # This is because 14 / 4 + 1 = 4
         assert len(response_future.attempted_hosts) == 4

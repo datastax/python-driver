@@ -1357,7 +1357,7 @@ class HostFilterPolicyInitTest(unittest.TestCase):
 
     def _check_init(self, hfp):
         self.assertIs(hfp._child_policy, self.child_policy)
-        self.assertIsInstance(hfp._hosts_lock, LockType)
+        assert isinstance(hfp._hosts_lock, LockType)
 
         # we can't use a simple assertIs because we wrap the function
         arg0, arg1 = Mock(name='arg0'), Mock(name='arg1')

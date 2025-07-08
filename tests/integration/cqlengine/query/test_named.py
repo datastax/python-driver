@@ -87,12 +87,12 @@ class TestQuerySetOperation(BaseCassEngTestCase):
 
         where = query2._where[0]
         assert where.field == 'test_id'
-        self.assertIsInstance(where.operator, EqualsOperator)
+        assert isinstance(where.operator, EqualsOperator)
         assert where.value == 5
 
         where = query2._where[1]
         assert where.field == 'expected_result'
-        self.assertIsInstance(where.operator, GreaterThanOrEqualOperator)
+        assert isinstance(where.operator, GreaterThanOrEqualOperator)
         assert where.value == 1
 
     def test_query_expression_where_clause_generation(self):
@@ -110,12 +110,12 @@ class TestQuerySetOperation(BaseCassEngTestCase):
 
         where = query2._where[0]
         assert where.field == 'test_id'
-        self.assertIsInstance(where.operator, EqualsOperator)
+        assert isinstance(where.operator, EqualsOperator)
         assert where.value == 5
 
         where = query2._where[1]
         assert where.field == 'expected_result'
-        self.assertIsInstance(where.operator, GreaterThanOrEqualOperator)
+        assert isinstance(where.operator, GreaterThanOrEqualOperator)
         assert where.value == 1
 
 @requires_collection_indexes

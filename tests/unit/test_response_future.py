@@ -216,14 +216,14 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=OverloadedErrorMessage)
         result.to_exception.return_value = result
         rf._set_result(None, None, None, result)
-        self.assertIsInstance(rf._final_exception, OverloadedErrorMessage)
+        assert isinstance(rf._final_exception, OverloadedErrorMessage)
 
         rf = ResponseFuture(session, message, query, 1, retry_policy=retry_policy)
         rf._query_retries = 1
         rf.send_request()
         result = Mock(spec=ConnectionException)
         rf._set_result(None, None, None, result)
-        self.assertIsInstance(rf._final_exception, ConnectionException)
+        assert isinstance(rf._final_exception, ConnectionException)
 
     def test_retry_policy_says_ignore(self):
         session = self.make_session()
@@ -585,7 +585,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertTrue(session.submit.call_args)
         args, kwargs = session.submit.call_args
         assert rf._reprepare == args[-5]
-        self.assertIsInstance(args[-4], PrepareMessage)
+        assert isinstance(args[-4], PrepareMessage)
         assert args[-4].query == "SELECT * FROM foobar"
 
     def test_prepared_query_not_found_bad_keyspace(self):

@@ -80,7 +80,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO cf0 (a, b, c) VALUES  (?, ?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind(('a', 'b', 'c'))
 
         self.session.execute(bound)
@@ -89,7 +89,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM cf0 WHERE a=?
             """)
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         bound = prepared.bind(('a'))
         results = self.session.execute(bound)
@@ -101,7 +101,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO cf0 (a, b, c) VALUES  (?, ?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind({
             'a': 'x',
             'b': 'y',
@@ -115,7 +115,7 @@ class PreparedStatementTests(unittest.TestCase):
             SELECT * FROM cf0 WHERE a=?
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         bound = prepared.bind({'a': 'x'})
         results = self.session.execute(bound)
@@ -136,7 +136,7 @@ class PreparedStatementTests(unittest.TestCase):
             self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
         else:
             prepared = session.prepare(statement_to_prepare)
-            self.assertIsInstance(prepared, PreparedStatement)
+            assert isinstance(prepared, PreparedStatement)
             bound = prepared.bind((1,))
             self.assertRaises(InvalidRequest, session.execute, bound)
 
@@ -155,7 +155,7 @@ class PreparedStatementTests(unittest.TestCase):
             self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
         else:
             prepared = session.prepare(statement_to_prepare)
-            self.assertIsInstance(prepared, PreparedStatement)
+            assert isinstance(prepared, PreparedStatement)
             bound = prepared.bind({'v': 1})
             self.assertRaises(InvalidRequest, session.execute, bound)
 
@@ -172,7 +172,7 @@ class PreparedStatementTests(unittest.TestCase):
             self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
         else:
             prepared = session.prepare(statement_to_prepare)
-            self.assertIsInstance(prepared, PreparedStatement)
+            assert isinstance(prepared, PreparedStatement)
             self.assertRaises(ValueError, prepared.bind, (1, 2))
 
     def test_imprecise_bind_values_dicts(self):
@@ -186,7 +186,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         # too many values is ok - others are ignored
         prepared.bind({'k': 1, 'v': 2, 'v2': 3})
@@ -200,7 +200,7 @@ class PreparedStatementTests(unittest.TestCase):
             prepared.bind({'k': 1, 'v2': 3})
 
         # also catch too few variables with dicts
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         if PROTOCOL_VERSION < 4:
             self.assertRaises(KeyError, prepared.bind, {})
         else:
@@ -217,7 +217,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         self.session.execute(bound)
 
@@ -225,7 +225,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         bound = prepared.bind((1,))
         results = self.session.execute(bound)
@@ -283,7 +283,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (0, 0)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind(None)
         bound.consistency_level = ConsistencyLevel.ALL
         self.session.execute(bound)
@@ -292,7 +292,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM test3rf.test WHERE k=0
             """)
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         bound = prepared.bind(None)
         bound.consistency_level = ConsistencyLevel.ALL
@@ -310,7 +310,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         bound = prepared.bind({'k': 1, 'v': None})
         self.session.execute(bound)
 
@@ -318,7 +318,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         bound = prepared.bind({'k': 1})
         results = self.session.execute(bound)
@@ -334,7 +334,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         future = self.session.execute_async(prepared, (873, None))
         future.result()
 
@@ -342,7 +342,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         future = self.session.execute_async(prepared, (873,))
         results = future.result()
@@ -357,7 +357,7 @@ class PreparedStatementTests(unittest.TestCase):
             INSERT INTO test3rf.test (k, v) VALUES  (?, ?)
             """)
 
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
         future = self.session.execute_async(prepared, {'k': 873, 'v': None})
         future.result()
 
@@ -365,7 +365,7 @@ class PreparedStatementTests(unittest.TestCase):
             """
             SELECT * FROM test3rf.test WHERE k=?
             """)
-        self.assertIsInstance(prepared, PreparedStatement)
+        assert isinstance(prepared, PreparedStatement)
 
         future = self.session.execute_async(prepared, {'k': 873})
         results = future.result()

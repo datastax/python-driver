@@ -84,4 +84,4 @@ class TestNamedTupleFactory(TestCase):
         assert len(w) == 0
         # check that this is a real namedtuple
         self.assertTrue(hasattr(rows[0], '_fields'))
-        self.assertIsInstance(rows[0], tuple)
+        assert isinstance(rows[0], tuple)

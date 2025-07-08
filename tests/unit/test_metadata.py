@@ -89,17 +89,17 @@ class StrategiesTest(unittest.TestCase):
         assert uks.make_token_replica_map({}, []) == {}
 
         fake_options_map = {'dc1': '3'}
-        self.assertIsInstance(rs.create('NetworkTopologyStrategy', fake_options_map), NetworkTopologyStrategy)
+        assert isinstance(rs.create('NetworkTopologyStrategy', fake_options_map), NetworkTopologyStrategy)
         assert rs.create('NetworkTopologyStrategy', fake_options_map).dc_replication_factors == NetworkTopologyStrategy(fake_options_map).dc_replication_factors
 
         fake_options_map = {'options': 'map'}
         assert rs.create('SimpleStrategy', fake_options_map) is None
 
         fake_options_map = {'options': 'map'}
-        self.assertIsInstance(rs.create('LocalStrategy', fake_options_map), LocalStrategy)
+        assert isinstance(rs.create('LocalStrategy', fake_options_map), LocalStrategy)
 
         fake_options_map = {'options': 'map', 'replication_factor': 3}
-        self.assertIsInstance(rs.create('SimpleStrategy', fake_options_map), SimpleStrategy)
+        assert isinstance(rs.create('SimpleStrategy', fake_options_map), SimpleStrategy)
         assert rs.create('SimpleStrategy', fake_options_map).replication_factor == SimpleStrategy(fake_options_map).replication_factor
 
         assert rs.create('xxxxxxxx', fake_options_map) == _UnknownStrategy('xxxxxxxx', fake_options_map)
@@ -498,8 +498,8 @@ class BytesTokensTest(unittest.TestCase):
         from_unicode = BytesToken.from_string('0123456789abcdef')
         from_bin = BytesToken.from_string(b'0123456789abcdef')
         assert from_unicode == from_bin
-        self.assertIsInstance(from_unicode.value, bytes)
-        self.assertIsInstance(from_bin.value, bytes)
+        assert isinstance(from_unicode.value, bytes)
+        assert isinstance(from_bin.value, bytes)
 
     def test_comparison(self):
         tok = BytesToken.from_string('0123456789abcdef')

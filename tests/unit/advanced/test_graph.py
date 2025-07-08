@@ -172,8 +172,8 @@ class GraphResultTests(unittest.TestCase):
         assert path.labels == path_dict['labels']
 
         # make sure inner objects are bound correctly
-        self.assertIsInstance(path.objects[0], Vertex)
-        self.assertIsInstance(path.objects[1], Edge)
+        assert isinstance(path.objects[0], Vertex)
+        assert isinstance(path.objects[1], Edge)
 
         # missing required properties
         for attr in path_dict:
@@ -403,5 +403,5 @@ class GraphRowFactoryTests(unittest.TestCase):
         rows = [json.dumps({'result': i}) for i in range(10)]
         results = graph_result_row_factory(col_names, ((o,) for o in rows))
         for i, res in enumerate(results):
-            self.assertIsInstance(res, Result)
+            assert isinstance(res, Result)
             assert res.value == i

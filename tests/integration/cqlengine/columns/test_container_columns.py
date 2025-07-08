@@ -113,8 +113,8 @@ class TestSetColumn(BaseCassEngTestCase):
         m1 = TestSetModel.create(int_set=set((1, 2)), text_set=set(('kai', 'andreas')))
         m2 = TestSetModel.get(partition=m1.partition)
 
-        self.assertIsInstance(m2.int_set, set)
-        self.assertIsInstance(m2.text_set, set)
+        assert isinstance(m2.int_set, set)
+        assert isinstance(m2.text_set, set)
 
         assert 1 in m2.int_set
         assert 2 in m2.int_set
@@ -164,14 +164,14 @@ class TestSetColumn(BaseCassEngTestCase):
         and that the class is instantiated in the constructor
         """
         column = columns.Set(columns.Text)
-        self.assertIsInstance(column.value_col, columns.Text)
+        assert isinstance(column.value_col, columns.Text)
 
     def test_instantiation_with_column_instance(self):
         """
         Tests that columns instantiated with a column instance work properly
         """
         column = columns.Set(columns.Text(min_length=100))
-        self.assertIsInstance(column.value_col, columns.Text)
+        assert isinstance(column.value_col, columns.Text)
 
     def test_to_python(self):
         """ Tests that to_python of value column is called """
@@ -227,8 +227,8 @@ class TestListColumn(BaseCassEngTestCase):
         m1 = TestListModel.create(int_list=[1, 2], text_list=['kai', 'andreas'])
         m2 = TestListModel.get(partition=m1.partition)
 
-        self.assertIsInstance(m2.int_list, list)
-        self.assertIsInstance(m2.text_list, list)
+        assert isinstance(m2.int_list, list)
+        assert isinstance(m2.text_list, list)
 
         assert len(m2.int_list) == 2
         assert len(m2.text_list) == 2
@@ -283,14 +283,14 @@ class TestListColumn(BaseCassEngTestCase):
         and that the class is instantiated in the constructor
         """
         column = columns.List(columns.Text)
-        self.assertIsInstance(column.value_col, columns.Text)
+        assert isinstance(column.value_col, columns.Text)
 
     def test_instantiation_with_column_instance(self):
         """
         Tests that columns instantiated with a column instance work properly
         """
         column = columns.List(columns.Text(min_length=100))
-        self.assertIsInstance(column.value_col, columns.Text)
+        assert isinstance(column.value_col, columns.Text)
 
     def test_to_python(self):
         """ Tests that to_python of value column is called """
@@ -496,16 +496,16 @@ class TestMapColumn(BaseCassEngTestCase):
         and that the class is instantiated in the constructor
         """
         column = columns.Map(columns.Text, columns.Integer)
-        self.assertIsInstance(column.key_col, columns.Text)
-        self.assertIsInstance(column.value_col, columns.Integer)
+        assert isinstance(column.key_col, columns.Text)
+        assert isinstance(column.value_col, columns.Integer)
 
     def test_instantiation_with_column_instance(self):
         """
         Tests that columns instantiated with a column instance work properly
         """
         column = columns.Map(columns.Text(min_length=100), columns.Integer())
-        self.assertIsInstance(column.key_col, columns.Text)
-        self.assertIsInstance(column.value_col, columns.Integer)
+        assert isinstance(column.key_col, columns.Text)
+        assert isinstance(column.value_col, columns.Integer)
 
     def test_to_python(self):
         """ Tests that to_python of value column is called """
@@ -617,9 +617,9 @@ class TestTupleColumn(BaseCassEngTestCase):
         m1 = TestTupleModel.create(int_tuple=(1, 2, 3, 5, 6), text_tuple=('kai', 'andreas'), mixed_tuple=('first', 2, 'Third'))
         m2 = TestTupleModel.get(partition=m1.partition)
 
-        self.assertIsInstance(m2.int_tuple, tuple)
-        self.assertIsInstance(m2.text_tuple, tuple)
-        self.assertIsInstance(m2.mixed_tuple, tuple)
+        assert isinstance(m2.int_tuple, tuple)
+        assert isinstance(m2.text_tuple, tuple)
+        assert isinstance(m2.mixed_tuple, tuple)
 
         assert (1, 2, 3) == m2.int_tuple
         assert ('kai', 'andreas') == m2.text_tuple
@@ -651,9 +651,9 @@ class TestTupleColumn(BaseCassEngTestCase):
         @test_category object_mapper
         """
         mixed_tuple = columns.Tuple(columns.Text, columns.Integer, columns.Text, required=False)
-        self.assertIsInstance(mixed_tuple.types[0], columns.Text)
-        self.assertIsInstance(mixed_tuple.types[1], columns.Integer)
-        self.assertIsInstance(mixed_tuple.types[2], columns.Text)
+        assert isinstance(mixed_tuple.types[0], columns.Text)
+        assert isinstance(mixed_tuple.types[1], columns.Integer)
+        assert isinstance(mixed_tuple.types[2], columns.Text)
         assert len(mixed_tuple.types) == 3
 
     def test_default_empty_container_saving(self):
@@ -824,15 +824,15 @@ class TestNestedType(BaseCassEngTestCase):
         m1 = TestNestedModel.create(list_list=list_list_master, map_list=map_list_master, set_tuple=set_tuple_master)
         m2 = TestNestedModel.get(partition=m1.partition)
 
-        self.assertIsInstance(m2.list_list, list)
-        self.assertIsInstance(m2.list_list[0], list)
-        self.assertIsInstance(m2.map_list, dict)
-        self.assertIsInstance(m2.map_list.get("key2"), list)
+        assert isinstance(m2.list_list, list)
+        assert isinstance(m2.list_list[0], list)
+        assert isinstance(m2.map_list, dict)
+        assert isinstance(m2.map_list.get("key2"), list)
 
         assert list_list_master == m2.list_list
         assert map_list_master == m2.map_list
         assert set_tuple_master == m2.set_tuple
-        self.assertIsInstance(m2.set_tuple.pop(), tuple)
+        assert isinstance(m2.set_tuple.pop(), tuple)
 
     def test_type_validation(self):
         """
@@ -875,11 +875,11 @@ class TestNestedType(BaseCassEngTestCase):
         map_list = columns.Map(columns.Text, columns.List(columns.Text), required=False)
         set_tuple = columns.Set(columns.Tuple(columns.Integer, columns.Integer), required=False)
 
-        self.assertIsInstance(list_list, columns.List)
-        self.assertIsInstance(list_list.types[0], columns.List)
-        self.assertIsInstance(map_list.types[0], columns.Text)
-        self.assertIsInstance(map_list.types[1], columns.List)
-        self.assertIsInstance(set_tuple.types[0], columns.Tuple)
+        assert isinstance(list_list, columns.List)
+        assert isinstance(list_list.types[0], columns.List)
+        assert isinstance(map_list.types[0], columns.Text)
+        assert isinstance(map_list.types[1], columns.List)
+        assert isinstance(set_tuple.types[0], columns.Tuple)
 
     def test_default_empty_container_saving(self):
         """
