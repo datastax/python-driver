@@ -571,8 +571,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         assert "LeveledCompactionStrategy" in cql
         # formerly legacy options; reintroduced in 4.0
         if CASSANDRA_VERSION < Version('4.0-a'):
-            self.assertNotIn("min_threshold", cql)
-            self.assertNotIn("max_threshold", cql)
+            assert "min_threshold" not in cql
+            assert "max_threshold" not in cql
 
     @requires_java_udf
     def test_refresh_schema_metadata(self):
@@ -596,11 +596,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
+        assert "new_keyspace" not in cluster2.metadata.keyspaces
 
         # Cluster metadata modification
         self.session.execute("CREATE KEYSPACE new_keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}")
-        self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
+        assert "new_keyspace" not in cluster2.metadata.keyspaces
 
         cluster2.refresh_schema_metadata()
         assert "new_keyspace" in cluster2.metadata.keyspaces
@@ -617,7 +617,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster2.refresh_schema_metadata()
 
         self.session.execute("ALTER TABLE {0}.{1} ADD c double".format(self.keyspace_name, table_name))
-        self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
+        assert "c" not in cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns
         cluster2.refresh_schema_metadata()
         assert "c" in cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns
 
@@ -655,7 +655,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         assert "new_keyspace" in cluster2.metadata.keyspaces
 
         cluster2.refresh_schema_metadata()
-        self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
+        assert "new_keyspace" not in cluster2.metadata.keyspaces
 
         cluster2.shutdown()
 
@@ -710,9 +710,9 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
+        assert "c" not in cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns
         self.session.execute("ALTER TABLE {0}.{1} ADD c double".format(self.keyspace_name, table_name))
-        self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
+        assert "c" not in cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns
 
         cluster2.refresh_table_metadata(self.keyspace_name, table_name)
         assert "c" in cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns
@@ -745,11 +745,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster2.connect()
 
         try:
-            self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            assert "mv1" not in cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
             self.session.execute("CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT a, b FROM {0}.{1} "
                                  "WHERE a IS NOT NULL AND b IS NOT NULL PRIMARY KEY (a, b)"
                                  .format(self.keyspace_name, self.function_table_name))
-            self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            assert "mv1" not in cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
 
             cluster2.refresh_table_metadata(self.keyspace_name, "mv1")
             assert "mv1" in cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
@@ -768,13 +768,13 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster3 = TestCluster(schema_event_refresh_window=-1)
         cluster3.connect()
         try:
-            self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            assert "mv2" not in cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
             self.session.execute(
                 "CREATE MATERIALIZED VIEW {0}.mv2 AS SELECT a, b FROM {0}.{1} "
                 "WHERE a IS NOT NULL AND b IS NOT NULL PRIMARY KEY (a, b)".format(
                     self.keyspace_name, self.function_table_name)
             )
-            self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            assert "mv2" not in cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
             cluster3.refresh_materialized_view_metadata(self.keyspace_name, 'mv2')
             assert "mv2" in cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
         finally:
@@ -1021,13 +1021,13 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         new_cql = table_meta.export_as_string()
         assert new_cql != original_table_cql
         assert Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]) in new_cql
-        self.assertNotIn(Ext1.name, new_cql)
+        assert Ext1.name not in new_cql
 
         assert Ext0.name in view_meta.extensions
         new_cql = view_meta.export_as_string()
         assert new_cql != original_view_cql
         assert Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]) in new_cql
-        self.assertNotIn(Ext1.name, new_cql)
+        assert Ext1.name not in new_cql
 
         # extensions registered, one present
         # --------------------------------------
@@ -1454,10 +1454,10 @@ class IndexMapTests(unittest.TestCase):
 
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
-        self.assertNotIn('a_idx', ks_meta.indexes)
-        self.assertNotIn('b_idx', ks_meta.indexes)
-        self.assertNotIn('a_idx', table_meta.indexes)
-        self.assertNotIn('b_idx', table_meta.indexes)
+        assert 'a_idx' not in ks_meta.indexes
+        assert 'b_idx' not in ks_meta.indexes
+        assert 'a_idx' not in table_meta.indexes
+        assert 'b_idx' not in table_meta.indexes
 
         self.session.execute("CREATE INDEX a_idx ON %s (a)" % self.table_name)
         self.session.execute("ALTER TABLE %s ADD b int" % self.table_name)
@@ -1478,17 +1478,17 @@ class IndexMapTests(unittest.TestCase):
 
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
         table_meta = ks_meta.tables[self.table_name]
-        self.assertNotIn('a_idx', ks_meta.indexes)
+        assert 'a_idx' not in ks_meta.indexes
         assert isinstance(ks_meta.indexes['b_idx'], IndexMetadata)
-        self.assertNotIn('a_idx', table_meta.indexes)
+        assert 'a_idx' not in table_meta.indexes
         assert isinstance(table_meta.indexes['b_idx'], IndexMetadata)
 
         # keyspace index updated when table dropped
         self.drop_basic_table()
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
-        self.assertNotIn(self.table_name, ks_meta.tables)
-        self.assertNotIn('a_idx', ks_meta.indexes)
-        self.assertNotIn('b_idx', ks_meta.indexes)
+        assert self.table_name not in ks_meta.tables
+        assert 'a_idx' not in ks_meta.indexes
+        assert 'b_idx' not in ks_meta.indexes
 
     def test_index_follows_alter(self):
         self.create_basic_table()
@@ -1619,7 +1619,7 @@ class FunctionMetadata(FunctionTest):
         @test_category function
         """
 
-        self.assertNotIn(self.function_name, self.keyspace_function_meta)
+        assert self.function_name not in self.keyspace_function_meta
 
         udt_name = 'udtx'
         self.session.execute("CREATE TYPE %s (x int)" % udt_name)
@@ -1629,7 +1629,7 @@ class FunctionMetadata(FunctionTest):
             keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
             type_idx = keyspace_cql.rfind("CREATE TYPE")
             func_idx = keyspace_cql.find("CREATE FUNCTION")
-            self.assertNotIn(-1, (type_idx, func_idx), "TYPE or FUNCTION not found in keyspace_cql: " + keyspace_cql)
+            assert -1 not in (type_idx, func_idx), "TYPE or FUNCTION not found in keyspace_cql: " + keyspace_cql
             self.assertGreater(func_idx, type_idx)
 
     def test_function_same_name_diff_types(self):
@@ -1866,7 +1866,7 @@ class AggregateMetadata(FunctionTest):
             keyspace_cql = self.cluster.metadata.keyspaces[self.keyspace_name].export_as_string()
             func_idx = keyspace_cql.find("CREATE FUNCTION")
             aggregate_idx = keyspace_cql.rfind("CREATE AGGREGATE")
-            self.assertNotIn(-1, (aggregate_idx, func_idx), "AGGREGATE or FUNCTION not found in keyspace_cql: " + keyspace_cql)
+            assert -1 not in (aggregate_idx, func_idx), "AGGREGATE or FUNCTION not found in keyspace_cql: " + keyspace_cql
             self.assertGreater(aggregate_idx, func_idx)
 
     def test_same_name_diff_types(self):
@@ -1976,7 +1976,7 @@ class AggregateMetadata(FunctionTest):
             cql = meta.as_cql_query()
             init_cond_idx = cql.find("INITCOND %s" % kwargs['initial_condition'])
             final_func_idx = cql.find('FINALFUNC "%s"' % kwargs['final_func'])
-            self.assertNotIn(-1, (init_cond_idx, final_func_idx))
+            assert -1 not in (init_cond_idx, final_func_idx)
             self.assertGreater(init_cond_idx, final_func_idx)
 
 
@@ -2197,8 +2197,8 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
         self.session.execute("DROP MATERIALIZED VIEW {0}.mv1".format(self.keyspace_name))
 
-        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-        self.assertNotIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].views)
+        assert "mv1" not in self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
+        assert "mv1" not in self.cluster.metadata.keyspaces[self.keyspace_name].views
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
         self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
 
@@ -2551,7 +2551,7 @@ class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
 
     def _assert_group_keys_by_host(self, keys, table_name, stmt):
         keys_per_host = group_keys_by_replica(self.session, self.ks_name, table_name, keys)
-        self.assertNotIn(NO_VALID_REPLICA, keys_per_host)
+        assert NO_VALID_REPLICA not in keys_per_host
 
         prepared_stmt = self.session.prepare(stmt)
         for key in keys:

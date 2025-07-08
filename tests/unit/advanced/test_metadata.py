@@ -49,10 +49,7 @@ class GraphMetadataToCQLTests(unittest.TestCase):
     def test_keyspace_no_graph_engine(self):
         km = self._create_keyspace_metadata(None)
         assert km.graph_engine == None
-        self.assertNotIn(
-            "graph_engine",
-            km.as_cql_query()
-        )
+        assert "graph_engine" not in km.as_cql_query()
 
     def test_keyspace_with_graph_engine(self):
         graph_engine = 'Core'
@@ -67,8 +64,8 @@ class GraphMetadataToCQLTests(unittest.TestCase):
         assert tm.vertex is None
         assert tm.edge is None
         cql = tm.as_cql_query()
-        self.assertNotIn("VERTEX LABEL", cql)
-        self.assertNotIn("EDGE LABEL", cql)
+        assert "VERTEX LABEL" not in cql
+        assert "EDGE LABEL" not in cql
 
     def test_table_with_vertex(self):
         tm = self._create_table_metadata(with_vertex=True)
@@ -76,14 +73,14 @@ class GraphMetadataToCQLTests(unittest.TestCase):
         assert tm.edge is None
         cql = tm.as_cql_query()
         assert "VERTEX LABEL" in cql
-        self.assertNotIn("EDGE LABEL", cql)
+        assert "EDGE LABEL" not in cql
 
     def test_table_with_edge(self):
         tm = self._create_table_metadata(with_edge=True)
         assert tm.vertex is None
         assert isinstance(tm.edge, EdgeMetadata)
         cql = tm.as_cql_query()
-        self.assertNotIn("VERTEX LABEL", cql)
+        assert "VERTEX LABEL" not in cql
         assert "EDGE LABEL" in cql
         assert "FROM from_label" in cql
         assert "TO to_label" in cql

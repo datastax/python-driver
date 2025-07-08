@@ -67,7 +67,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         result = self.session.execute("SELECT * FROM {0}".format(self.function_table_name))
         self.assertFalse(result.one().b.has_corn)
         table_sql = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].as_cql_query()
-        self.assertNotIn("<frozen>", table_sql)
+        assert "<frozen>" not in table_sql
 
     def test_can_insert_unprepared_registered_udts(self):
         """
@@ -686,7 +686,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         """
         s = self.session
         type_name = "type_name"
-        self.assertNotIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
+        assert type_name not in s.cluster.metadata.keyspaces['udttests'].user_types
         s.execute('CREATE TYPE %s (v0 int)' % (type_name,))
         assert type_name in s.cluster.metadata.keyspaces['udttests'].user_types
 

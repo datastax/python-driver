@@ -295,7 +295,7 @@ class MapUpdateTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertNotIn(1, c._updates)
+        assert 1 not in c._updates
 
 
 class CounterUpdateTests(unittest.TestCase):

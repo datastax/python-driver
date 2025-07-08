@@ -188,7 +188,7 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
             o.save()
 
         query = m.call_args[0][0].query_string
-        self.assertNotIn("IF NOT EXIST", query)
+        assert "IF NOT EXIST" not in query
 
 
 class IfNotExistWithCounterTest(BaseIfNotExistsWithCounterTest):

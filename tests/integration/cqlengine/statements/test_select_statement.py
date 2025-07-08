@@ -51,7 +51,7 @@ class SelectStatementTests(unittest.TestCase):
         ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
         assert str(ss) == 'SELECT COUNT(*) FROM table WHERE "a" = %(0)s LIMIT 10', str(ss)
         assert 'LIMIT' in str(ss)
-        self.assertNotIn('ORDER', str(ss))
+        assert 'ORDER' not in str(ss)
 
     def test_distinct(self):
         ss = SelectStatement('table', distinct_fields=['field2'])
@@ -100,8 +100,8 @@ class SelectStatementTests(unittest.TestCase):
 
         ss = SelectStatement('table', None, limit=0)
         qstr = str(ss)
-        self.assertNotIn('LIMIT', qstr)
+        assert 'LIMIT' not in qstr
 
         ss = SelectStatement('table', None, limit=None)
         qstr = str(ss)
-        self.assertNotIn('LIMIT', qstr)
+        assert 'LIMIT' not in qstr

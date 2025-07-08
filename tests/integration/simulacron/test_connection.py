@@ -153,7 +153,7 @@ class ConnectionTests(SimulacronBase):
             assert host in listener.hosts_marked_down
 
         # In this case HostConnection._replace shouldn't be called
-        self.assertNotIn("_replace", executor.called_functions)
+        assert "_replace" not in executor.called_functions
 
     def test_callbacks_and_pool_when_oto(self):
         """

@@ -83,7 +83,7 @@ class DSELoadBalancingPolicyTest(unittest.TestCase):
         target_host.is_up = False
         policy.on_down(target_host)
         query_plan = list(policy.make_query_plan(None, Mock(target_host='127.0.0.1')))
-        self.assertNotIn(target_host, query_plan)
+        assert target_host not in query_plan
 
     def test_target_host_nominal(self):
         node_count = 4

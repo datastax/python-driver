@@ -339,8 +339,8 @@ class GraphOptionTests(unittest.TestCase):
         # empty by default
         new_opts = GraphOptions()
         opt_map = new_opts.get_options_map()
-        self.assertNotIn('graph-read-consistency', opt_map)
-        self.assertNotIn('graph-write-consistency', opt_map)
+        assert 'graph-read-consistency' not in opt_map
+        assert 'graph-write-consistency' not in opt_map
 
         # set from other
         opt_map = new_opts.get_options_map(opts)

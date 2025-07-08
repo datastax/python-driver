@@ -710,13 +710,10 @@ class FunctionToCQLTests(unittest.TestCase):
                         )
 
     def test_non_monotonic(self):
-        self.assertNotIn(
-            'MONOTONIC',
-            self._function_with_kwargs(
-                monotonic=False,
-                monotonic_on=()
-            ).export_as_string()
-        )
+        assert 'MONOTONIC' not in self._function_with_kwargs(
+            monotonic=False,
+            monotonic_on=()
+        ).export_as_string()
 
     def test_monotonic_all(self):
         mono_function = self._function_with_kwargs(
@@ -735,12 +732,9 @@ class FunctionToCQLTests(unittest.TestCase):
         assert 'MONOTONIC ON x\n    LANG' in mono_on_function.as_cql_query(formatted=True)
 
     def test_nondeterministic(self):
-        self.assertNotIn(
-            'DETERMINISTIC',
-            self._function_with_kwargs(
-                deterministic=False
-            ).as_cql_query(formatted=False)
-        )
+        assert 'DETERMINISTIC' not in self._function_with_kwargs(
+            deterministic=False
+        ).as_cql_query(formatted=False)
 
     def test_deterministic(self):
         assert 'DETERMINISTIC' in self._function_with_kwargs(
@@ -770,12 +764,9 @@ class AggregateToCQLTests(unittest.TestCase):
                          )
 
     def test_nondeterministic(self):
-        self.assertNotIn(
-            'DETERMINISTIC',
-            self._aggregate_with_kwargs(
-                deterministic=False
-            ).as_cql_query(formatted=True)
-        )
+        assert 'DETERMINISTIC' not in self._aggregate_with_kwargs(
+            deterministic=False
+        ).as_cql_query(formatted=True)
 
     def test_deterministic(self):
         for formatted in (True, False):

@@ -186,7 +186,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
             TestTTLModel.objects(id=tid).update(text="aligators")
 
         query = m.call_args[0][0].query_string
-        self.assertNotIn("USING TTL", query)
+        assert "USING TTL" not in query
 
     def test_default_ttl_set(self):
         session = get_session()
@@ -205,7 +205,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
 
         # Should not be set either
         query = m.call_args[0][0].query_string
-        self.assertNotIn("USING TTL", query)
+        assert "USING TTL" not in query
 
     def test_default_ttl_modify(self):
         session = get_session()
@@ -235,4 +235,4 @@ class TTLDefaultTest(BaseDefaultTTLTest):
             TestDefaultTTLModel.objects(id=tid).ttl(None).update(text="aligators expired")
 
         query = m.call_args[0][0].query_string
-        self.assertNotIn("USING TTL", query)
+        assert "USING TTL" not in query

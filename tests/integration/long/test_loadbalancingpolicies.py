@@ -750,7 +750,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         session = cluster.connect()
         self._wait_for_nodes_up([1, 2, 3])
 
-        self.assertNotIn(ignored_address, [h.address for h in hfp.make_query_plan()])
+        assert ignored_address not in [h.address for h in hfp.make_query_plan()]
 
         create_schema(cluster, session, keyspace)
         self._insert(session, keyspace)

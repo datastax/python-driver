@@ -59,7 +59,7 @@ class _PoolTests(unittest.TestCase):
         pool.return_connection(conn)
         assert 0 == conn.in_flight
         if not self.uses_single_connection:
-            self.assertNotIn(conn, pool._trash)
+            assert conn not in pool._trash
 
     def test_failed_wait_for_connection(self):
         host = Mock(spec=Host, address='ip1')

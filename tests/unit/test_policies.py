@@ -635,7 +635,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
             assert qplan[0].datacenter == "dc1"
 
             # then the local non-replica
-            self.assertNotIn(qplan[1], replicas)
+            assert qplan[1] not in replicas
             assert qplan[1].datacenter == "dc1"
 
             # then one of the remotes (used_hosts_per_remote_dc is 1, so we

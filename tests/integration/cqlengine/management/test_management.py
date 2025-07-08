@@ -39,20 +39,20 @@ class KeyspaceManagementTest(BaseCassEngTestCase):
         cluster = get_cluster()
 
         keyspace_ss = 'test_ks_ss'
-        self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
+        assert keyspace_ss not in cluster.metadata.keyspaces
         management.create_keyspace_simple(keyspace_ss, 2)
         assert keyspace_ss in cluster.metadata.keyspaces
 
         management.drop_keyspace(keyspace_ss)
-        self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
+        assert keyspace_ss not in cluster.metadata.keyspaces
 
         keyspace_nts = 'test_ks_nts'
-        self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
+        assert keyspace_nts not in cluster.metadata.keyspaces
         management.create_keyspace_network_topology(keyspace_nts, {'dc1': 1})
         assert keyspace_nts in cluster.metadata.keyspaces
 
         management.drop_keyspace(keyspace_nts)
-        self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
+        assert keyspace_nts not in cluster.metadata.keyspaces
 
 
 class DropTableTest(BaseCassEngTestCase):
@@ -188,7 +188,7 @@ class AddColumnTest(BaseCassEngTestCase):
         assert len(meta_columns) == 5
         assert len(ThirdModel._columns) == 4
         assert 'fourth_key' in meta_columns
-        self.assertNotIn('fourth_key', ThirdModel._columns)
+        assert 'fourth_key' not in ThirdModel._columns
         assert 'blah' in ThirdModel._columns
         assert 'blah' in meta_columns
 
@@ -197,9 +197,9 @@ class AddColumnTest(BaseCassEngTestCase):
         assert len(meta_columns) == 5
         assert len(ThirdModel._columns) == 4
         assert 'fourth_key' in meta_columns
-        self.assertNotIn('fourth_key', FourthModel._columns)
+        assert 'fourth_key' not in FourthModel._columns
         assert 'renamed' in FourthModel._columns
-        self.assertNotIn('renamed', meta_columns)
+        assert 'renamed' not in meta_columns
         assert 'blah' in meta_columns
 
 

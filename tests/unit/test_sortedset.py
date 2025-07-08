@@ -378,7 +378,7 @@ class SortedSetTest(unittest.TestCase):
             for x in ss:
                 assert x in ss
                 ss.remove(x)
-                self.assertNotIn(x, ss)
+                assert x not in ss
 
     def test_uncomparable_types_with_tuples(self):
         # PYTHON-1087 - make set handle uncomparable types

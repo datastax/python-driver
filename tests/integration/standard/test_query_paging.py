@@ -86,7 +86,7 @@ class QueryPagingTests(unittest.TestCase):
         result_set = self.session.execute("SELECT * FROM test3rf.test")
         while(result_set.has_more_pages):
             for row in result_set.current_rows:
-                self.assertNotIn(row, list_all_results)
+                assert row not in list_all_results
             list_all_results.extend(result_set.current_rows)
             page_state = result_set.paging_state
             result_set = self.session.execute("SELECT * FROM test3rf.test", paging_state=page_state)
