@@ -38,51 +38,51 @@ class ExceptionTypeTest(unittest.TestCase):
         PYTHON-443
         Sanity check to ensure we don't unintentionally change class hierarchy of exception types
         """
-        self.assertTrue(issubclass(Unavailable, DriverException))
-        self.assertTrue(issubclass(Unavailable, RequestExecutionException))
+        assert issubclass(Unavailable, DriverException)
+        assert issubclass(Unavailable, RequestExecutionException)
 
-        self.assertTrue(issubclass(ReadTimeout, DriverException))
-        self.assertTrue(issubclass(ReadTimeout, RequestExecutionException))
-        self.assertTrue(issubclass(ReadTimeout, Timeout))
+        assert issubclass(ReadTimeout, DriverException)
+        assert issubclass(ReadTimeout, RequestExecutionException)
+        assert issubclass(ReadTimeout, Timeout)
 
-        self.assertTrue(issubclass(WriteTimeout, DriverException))
-        self.assertTrue(issubclass(WriteTimeout, RequestExecutionException))
-        self.assertTrue(issubclass(WriteTimeout, Timeout))
+        assert issubclass(WriteTimeout, DriverException)
+        assert issubclass(WriteTimeout, RequestExecutionException)
+        assert issubclass(WriteTimeout, Timeout)
 
-        self.assertTrue(issubclass(CoordinationFailure, DriverException))
-        self.assertTrue(issubclass(CoordinationFailure, RequestExecutionException))
+        assert issubclass(CoordinationFailure, DriverException)
+        assert issubclass(CoordinationFailure, RequestExecutionException)
 
-        self.assertTrue(issubclass(ReadFailure, DriverException))
-        self.assertTrue(issubclass(ReadFailure, RequestExecutionException))
-        self.assertTrue(issubclass(ReadFailure, CoordinationFailure))
+        assert issubclass(ReadFailure, DriverException)
+        assert issubclass(ReadFailure, RequestExecutionException)
+        assert issubclass(ReadFailure, CoordinationFailure)
 
-        self.assertTrue(issubclass(WriteFailure, DriverException))
-        self.assertTrue(issubclass(WriteFailure, RequestExecutionException))
-        self.assertTrue(issubclass(WriteFailure, CoordinationFailure))
+        assert issubclass(WriteFailure, DriverException)
+        assert issubclass(WriteFailure, RequestExecutionException)
+        assert issubclass(WriteFailure, CoordinationFailure)
 
-        self.assertTrue(issubclass(FunctionFailure, DriverException))
-        self.assertTrue(issubclass(FunctionFailure, RequestExecutionException))
+        assert issubclass(FunctionFailure, DriverException)
+        assert issubclass(FunctionFailure, RequestExecutionException)
 
-        self.assertTrue(issubclass(RequestValidationException, DriverException))
+        assert issubclass(RequestValidationException, DriverException)
 
-        self.assertTrue(issubclass(ConfigurationException, DriverException))
-        self.assertTrue(issubclass(ConfigurationException, RequestValidationException))
+        assert issubclass(ConfigurationException, DriverException)
+        assert issubclass(ConfigurationException, RequestValidationException)
 
-        self.assertTrue(issubclass(AlreadyExists, DriverException))
-        self.assertTrue(issubclass(AlreadyExists, RequestValidationException))
-        self.assertTrue(issubclass(AlreadyExists, ConfigurationException))
+        assert issubclass(AlreadyExists, DriverException)
+        assert issubclass(AlreadyExists, RequestValidationException)
+        assert issubclass(AlreadyExists, ConfigurationException)
 
-        self.assertTrue(issubclass(InvalidRequest, DriverException))
-        self.assertTrue(issubclass(InvalidRequest, RequestValidationException))
+        assert issubclass(InvalidRequest, DriverException)
+        assert issubclass(InvalidRequest, RequestValidationException)
 
-        self.assertTrue(issubclass(Unauthorized, DriverException))
-        self.assertTrue(issubclass(Unauthorized, RequestValidationException))
+        assert issubclass(Unauthorized, DriverException)
+        assert issubclass(Unauthorized, RequestValidationException)
 
-        self.assertTrue(issubclass(AuthenticationFailed, DriverException))
+        assert issubclass(AuthenticationFailed, DriverException)
 
-        self.assertTrue(issubclass(OperationTimedOut, DriverException))
+        assert issubclass(OperationTimedOut, DriverException)
 
-        self.assertTrue(issubclass(UnsupportedOperation, DriverException))
+        assert issubclass(UnsupportedOperation, DriverException)
 
 
 class ClusterTest(unittest.TestCase):
@@ -218,8 +218,8 @@ class ProtocolVersionTests(unittest.TestCase):
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V3)
         assert 0 == lower
 
-        self.assertTrue(ProtocolVersion.uses_error_code_map(ProtocolVersion.DSE_V1))
-        self.assertTrue(ProtocolVersion.uses_int_query_flags(ProtocolVersion.DSE_V1))
+        assert ProtocolVersion.uses_error_code_map(ProtocolVersion.DSE_V1)
+        assert ProtocolVersion.uses_int_query_flags(ProtocolVersion.DSE_V1)
 
         self.assertFalse(ProtocolVersion.uses_error_code_map(ProtocolVersion.V4))
         self.assertFalse(ProtocolVersion.uses_int_query_flags(ProtocolVersion.V4))

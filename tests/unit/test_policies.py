@@ -931,7 +931,7 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
 class ExponentialReconnectionPolicyTest(unittest.TestCase):
 
     def _assert_between(self, value, min, max):
-        self.assertTrue(min <= value <= max)
+        assert min <= value <= max
 
     def test_bad_vals(self):
         self.assertRaises(ValueError, ExponentialReconnectionPolicy, -1, 0)

@@ -27,19 +27,19 @@ class SelectStatementTests(unittest.TestCase):
     def test_field_rendering(self):
         """ tests that fields are properly added to the select statement """
         ss = SelectStatement('table', ['f1', 'f2'])
-        self.assertTrue(str(ss).startswith('SELECT "f1", "f2"'), str(ss))
-        self.assertTrue(str(ss).startswith('SELECT "f1", "f2"'), str(ss))
+        assert str(ss).startswith('SELECT "f1", "f2"'), str(ss)
+        assert str(ss).startswith('SELECT "f1", "f2"'), str(ss)
 
     def test_none_fields_rendering(self):
         """ tests that a '*' is added if no fields are passed in """
         ss = SelectStatement('table')
-        self.assertTrue(str(ss).startswith('SELECT *'), str(ss))
-        self.assertTrue(str(ss).startswith('SELECT *'), str(ss))
+        assert str(ss).startswith('SELECT *'), str(ss)
+        assert str(ss).startswith('SELECT *'), str(ss)
 
     def test_table_rendering(self):
         ss = SelectStatement('table')
-        self.assertTrue(str(ss).startswith('SELECT * FROM table'), str(ss))
-        self.assertTrue(str(ss).startswith('SELECT * FROM table'), str(ss))
+        assert str(ss).startswith('SELECT * FROM table'), str(ss)
+        assert str(ss).startswith('SELECT * FROM table'), str(ss)
 
     def test_where_clause_rendering(self):
         ss = SelectStatement('table')

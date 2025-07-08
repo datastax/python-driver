@@ -92,7 +92,7 @@ class ClusterTests(unittest.TestCase):
                     test_fn(self.session, statement, parameters)
             assert num_statements == len(results)
             for success, result in results:
-                self.assertTrue(success)
+                assert success
                 self.assertFalse(result)
 
             # read
@@ -155,13 +155,13 @@ class ClusterTests(unittest.TestCase):
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
             for success, result in results:
-                self.assertTrue(success)
+                assert success
                 self.assertFalse(result)
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
             for result in results:
-                self.assertTrue(isinstance(result, ExecutionResult))
-                self.assertTrue(result.success)
+                assert isinstance(result, ExecutionResult)
+                assert result.success
                 self.assertFalse(result.result_or_exc)
 
             # read
@@ -192,7 +192,7 @@ class ClusterTests(unittest.TestCase):
         results = self.execute_concurrent_args_helper(self.session, statement, parameters)
         assert num_statements == len(results)
         for success, result in results:
-            self.assertTrue(success)
+            assert success
             self.assertFalse(result)
 
         # read
@@ -203,9 +203,9 @@ class ClusterTests(unittest.TestCase):
 
         results = self.execute_concurrent_args_helper(self.session, statement, [(num_statements,)])
         assert 1 == len(results)
-        self.assertTrue(results[0][0])
+        assert results[0][0]
         result = results[0][1]
-        self.assertTrue(result.has_more_pages)
+        assert result.has_more_pages
         assert num_statements == sum(1 for _ in result)
 
     def test_execute_concurrent_paged_result_generator(self):
@@ -293,7 +293,7 @@ class ClusterTests(unittest.TestCase):
                 self.assertFalse(success)
                 assert isinstance(result, InvalidRequest)
             else:
-                self.assertTrue(success)
+                assert success
                 self.assertFalse(result)
 
     def test_no_raise_on_first_failure_client_side(self):
@@ -312,5 +312,5 @@ class ClusterTests(unittest.TestCase):
                 self.assertFalse(success)
                 assert isinstance(result, TypeError)
             else:
-                self.assertTrue(success)
+                assert success
                 self.assertFalse(result)

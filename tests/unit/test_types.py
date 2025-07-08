@@ -191,17 +191,17 @@ class TypeTests(unittest.TestCase):
 
     def test_parse_casstype_vector(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)")
-        self.assertTrue(issubclass(ctype, VectorType))
+        assert issubclass(ctype, VectorType)
         assert 3 == ctype.vector_size
         assert FloatType == ctype.subtype
 
     def test_parse_casstype_vector_of_vectors(self):
         inner_type = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)"
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
-        self.assertTrue(issubclass(ctype, VectorType))
+        assert issubclass(ctype, VectorType)
         assert 3 == ctype.vector_size
         sub_ctype = ctype.subtype
-        self.assertTrue(issubclass(sub_ctype, VectorType))
+        assert issubclass(sub_ctype, VectorType)
         assert 4 == sub_ctype.vector_size
         assert FloatType == sub_ctype.subtype
 

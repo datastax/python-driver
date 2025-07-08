@@ -42,8 +42,7 @@ class BaseCassEngTestCase(unittest.TestCase):
         self.session = get_session()
 
     def assertHasAttr(self, obj, attr):
-        self.assertTrue(hasattr(obj, attr),
-                "{0} doesn't have attribute: {1}".format(obj, attr))
+        assert hasattr(obj, attr), "{0} doesn't have attribute: {1}".format(obj, attr)
 
     def assertNotHasAttr(self, obj, attr):
         self.assertFalse(hasattr(obj, attr),

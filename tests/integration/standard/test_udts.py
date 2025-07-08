@@ -88,7 +88,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         row = result.one()
         assert 42 == row.b.age
         assert 'bob' == row.b.name
-        self.assertTrue(type(row.b) is User)
+        assert type(row.b) is User
 
         # use the same UDT name in a different keyspace
         s.execute("""
@@ -107,7 +107,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         row = result.one()
         assert 'Texas' == row.b.state
         assert True == row.b.is_cool
-        self.assertTrue(type(row.b) is User)
+        assert type(row.b) is User
 
         s.execute("DROP KEYSPACE udt_test_unprepared_registered2")
 
@@ -153,7 +153,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         row = result.one()
         assert 42 == row.b.age
         assert 'bob' == row.b.name
-        self.assertTrue(type(row.b) is User1)
+        assert type(row.b) is User1
 
         # use the same UDT name in a different keyspace
         s.execute("INSERT INTO udt_test_register_before_connecting2.mytable (a, b) VALUES (%s, %s)", (0, User2('Texas', True)))
@@ -161,7 +161,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         row = result.one()
         assert 'Texas' == row.b.state
         assert True == row.b.is_cool
-        self.assertTrue(type(row.b) is User2)
+        assert type(row.b) is User2
 
         s.execute("DROP KEYSPACE udt_test_register_before_connecting")
         s.execute("DROP KEYSPACE udt_test_register_before_connecting2")
@@ -234,7 +234,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         row = result.one()
         assert 42 == row.b.age
         assert 'bob' == row.b.name
-        self.assertTrue(type(row.b) is User)
+        assert type(row.b) is User
 
         # use the same UDT name in a different keyspace
         s.execute("""
@@ -256,7 +256,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         row = result.one()
         assert 'Texas' == row.b.state
         assert True == row.b.is_cool
-        self.assertTrue(type(row.b) is User)
+        assert type(row.b) is User
 
         s.execute("DROP KEYSPACE udt_test_prepared_registered2")
 
@@ -736,7 +736,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute(insert_statement, [1, typetoalter(1)])
         results = self.session.execute("SELECT * from {0}".format(self.function_table_name))
         for result in results:
-            self.assertTrue(hasattr(result.typetoalter, 'a'))
+            assert hasattr(result.typetoalter, 'a')
             self.assertFalse(hasattr(result.typetoalter, 'b'))
 
         # Alter UDT and ensure the alter is honored in results
@@ -745,5 +745,5 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute(insert_statement, [2, typetoalter(2, 2)])
         results = self.session.execute("SELECT * from {0}".format(self.function_table_name))
         for result in results:
-            self.assertTrue(hasattr(result.typetoalter, 'a'))
-            self.assertTrue(hasattr(result.typetoalter, 'b'))
+            assert hasattr(result.typetoalter, 'a')
+            assert hasattr(result.typetoalter, 'b')

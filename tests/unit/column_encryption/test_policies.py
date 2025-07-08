@@ -121,7 +121,7 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         coldesc = ColDesc('ks1','table1','col1')
         policy = AES256ColumnEncryptionPolicy()
         policy.add_column(coldesc, self._random_key(), "blob")
-        self.assertTrue(policy.contains_column(coldesc))
+        assert policy.contains_column(coldesc)
         self.assertFalse(policy.contains_column(ColDesc('ks2','table1','col1')))
         self.assertFalse(policy.contains_column(ColDesc('ks1','table2','col1')))
         self.assertFalse(policy.contains_column(ColDesc('ks1','table1','col2')))

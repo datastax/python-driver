@@ -254,7 +254,7 @@ class StrategiesTest(unittest.TestCase):
         nts.make_token_replica_map(token_to_host_owner, ring)
         elapsed_bad = timeit.default_timer() - start_time
         difference = elapsed_bad - elapsed_base
-        self.assertTrue(difference < 1 and difference > -1)
+        assert difference < 1 and difference > -1
 
     def test_nts_make_token_replica_map_multi_rack(self):
         token_to_host_owner = {}
@@ -782,9 +782,7 @@ class AggregateToCQLTests(unittest.TestCase):
             query = self._aggregate_with_kwargs(
                 deterministic=True
             ).as_cql_query(formatted=formatted)
-            self.assertTrue(query.endswith('DETERMINISTIC'),
-                            msg="'DETERMINISTIC' not found in {}".format(query)
-                            )
+            assert query.endswith('DETERMINISTIC'), "'DETERMINISTIC' not found in {}".format(query)
 
 
 class HostsTests(unittest.TestCase):

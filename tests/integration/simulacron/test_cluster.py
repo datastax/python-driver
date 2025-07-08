@@ -103,5 +103,5 @@ class DuplicateRpcTest(SimulacronCluster):
 
             warnings = mock_handler.messages.get("warning")
             assert len(warnings) == 1
-            self.assertTrue('multiple hosts with the same endpoint' in warnings[0])
+            assert 'multiple hosts with the same endpoint' in warnings[0]
             cluster.shutdown()

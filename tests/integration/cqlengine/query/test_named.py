@@ -358,9 +358,9 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
         key_space = NamedKeyspace(ks)
         mv_monthly = key_space.table("monthlyhigh")
         mv_all_time = key_space.table("alltimehigh")
-        self.assertTrue(self.check_table_size("scores", key_space, len(parameters)))
-        self.assertTrue(self.check_table_size("monthlyhigh", key_space, len(parameters)))
-        self.assertTrue(self.check_table_size("alltimehigh", key_space, len(parameters)))
+        assert self.check_table_size("scores", key_space, len(parameters))
+        assert self.check_table_size("monthlyhigh", key_space, len(parameters))
+        assert self.check_table_size("alltimehigh", key_space, len(parameters))
 
         filtered_mv_monthly_objects = mv_monthly.objects.filter(game='Chess', year=2015, month=6)
         assert len(filtered_mv_monthly_objects) == 1

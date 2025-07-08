@@ -30,19 +30,19 @@ class DeleteStatementTests(TestCase):
     def test_field_rendering(self):
         """ tests that fields are properly added to the select statement """
         ds = DeleteStatement('table', ['f1', 'f2'])
-        self.assertTrue(str(ds).startswith('DELETE "f1", "f2"'), str(ds))
-        self.assertTrue(str(ds).startswith('DELETE "f1", "f2"'), str(ds))
+        assert str(ds).startswith('DELETE "f1", "f2"'), str(ds)
+        assert str(ds).startswith('DELETE "f1", "f2"'), str(ds)
 
     def test_none_fields_rendering(self):
         """ tests that a '*' is added if no fields are passed in """
         ds = DeleteStatement('table', None)
-        self.assertTrue(str(ds).startswith('DELETE FROM'), str(ds))
-        self.assertTrue(str(ds).startswith('DELETE FROM'), str(ds))
+        assert str(ds).startswith('DELETE FROM'), str(ds)
+        assert str(ds).startswith('DELETE FROM'), str(ds)
 
     def test_table_rendering(self):
         ds = DeleteStatement('table', None)
-        self.assertTrue(str(ds).startswith('DELETE FROM table'), str(ds))
-        self.assertTrue(str(ds).startswith('DELETE FROM table'), str(ds))
+        assert str(ds).startswith('DELETE FROM table'), str(ds)
+        assert str(ds).startswith('DELETE FROM table'), str(ds)
 
     def test_where_clause_rendering(self):
         ds = DeleteStatement('table', None)

@@ -236,55 +236,55 @@ class VersionTests(unittest.TestCase):
         # just tests a bunch of versions
 
         # major wins
-        self.assertTrue(Version('3.3.0') > Version('2.5.0'))
-        self.assertTrue(Version('3.3.0') > Version('2.5.0.66'))
-        self.assertTrue(Version('3.3.0') > Version('2.5.21'))
+        assert Version('3.3.0') > Version('2.5.0')
+        assert Version('3.3.0') > Version('2.5.0.66')
+        assert Version('3.3.0') > Version('2.5.21')
 
         # minor wins
-        self.assertTrue(Version('2.3.0') > Version('2.2.0'))
-        self.assertTrue(Version('2.3.0') > Version('2.2.7'))
-        self.assertTrue(Version('2.3.0') > Version('2.2.7.9'))
+        assert Version('2.3.0') > Version('2.2.0')
+        assert Version('2.3.0') > Version('2.2.7')
+        assert Version('2.3.0') > Version('2.2.7.9')
 
         # patch wins
-        self.assertTrue(Version('2.3.1') > Version('2.3.0'))
-        self.assertTrue(Version('2.3.1') > Version('2.3.0.4post0'))
-        self.assertTrue(Version('2.3.1') > Version('2.3.0.44'))
+        assert Version('2.3.1') > Version('2.3.0')
+        assert Version('2.3.1') > Version('2.3.0.4post0')
+        assert Version('2.3.1') > Version('2.3.0.44')
 
         # various
-        self.assertTrue(Version('2.3.0.1') > Version('2.3.0.0'))
-        self.assertTrue(Version('2.3.0.680') > Version('2.3.0.670'))
-        self.assertTrue(Version('2.3.0.681') > Version('2.3.0.680'))
-        self.assertTrue(Version('2.3.0.1build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
-        self.assertTrue(Version('2.3.0.build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
-        self.assertTrue(Version('2.3.0') < Version('2.3.0.build'))
+        assert Version('2.3.0.1') > Version('2.3.0.0')
+        assert Version('2.3.0.680') > Version('2.3.0.670')
+        assert Version('2.3.0.681') > Version('2.3.0.680')
+        assert Version('2.3.0.1build0') > Version('2.3.0.1')  # 4th part fallback to str cmp
+        assert Version('2.3.0.build0') > Version('2.3.0.1')  # 4th part fallback to str cmp
+        assert Version('2.3.0') < Version('2.3.0.build')
 
-        self.assertTrue(Version('4-a') <= Version('4.0.0'))
-        self.assertTrue(Version('4-a') <= Version('4.0-alpha1'))
-        self.assertTrue(Version('4-a') <= Version('4.0-beta1'))
-        self.assertTrue(Version('4.0.0') >= Version('4.0.0'))
-        self.assertTrue(Version('4.0.0.421') >= Version('4.0.0'))
-        self.assertTrue(Version('4.0.1') >= Version('4.0.0'))
-        self.assertTrue(Version('2.3.0') == Version('2.3.0'))
-        self.assertTrue(Version('2.3.32') == Version('2.3.32'))
-        self.assertTrue(Version('2.3.32') == Version('2.3.32.0'))
-        self.assertTrue(Version('2.3.0.build') == Version('2.3.0.build'))
+        assert Version('4-a') <= Version('4.0.0')
+        assert Version('4-a') <= Version('4.0-alpha1')
+        assert Version('4-a') <= Version('4.0-beta1')
+        assert Version('4.0.0') >= Version('4.0.0')
+        assert Version('4.0.0.421') >= Version('4.0.0')
+        assert Version('4.0.1') >= Version('4.0.0')
+        assert Version('2.3.0') == Version('2.3.0')
+        assert Version('2.3.32') == Version('2.3.32')
+        assert Version('2.3.32') == Version('2.3.32.0')
+        assert Version('2.3.0.build') == Version('2.3.0.build')
 
-        self.assertTrue(Version('4') == Version('4.0.0'))
-        self.assertTrue(Version('4.0') == Version('4.0.0.0'))
-        self.assertTrue(Version('4.0') > Version('3.9.3'))
+        assert Version('4') == Version('4.0.0')
+        assert Version('4.0') == Version('4.0.0.0')
+        assert Version('4.0') > Version('3.9.3')
 
-        self.assertTrue(Version('4.0') > Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0.build5-SNAPSHOT') == Version('4.0.0.build5-SNAPSHOT'))
-        self.assertTrue(Version('4.1-SNAPSHOT') > Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0.build6-SNAPSHOT') > Version('4.0.0.build5-SNAPSHOT'))
-        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0-SNAPSHOT1'))
-        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0.0-SNAPSHOT1'))
+        assert Version('4.0') > Version('4.0-SNAPSHOT')
+        assert Version('4.0-SNAPSHOT') == Version('4.0-SNAPSHOT')
+        assert Version('4.0.0-SNAPSHOT') == Version('4.0-SNAPSHOT')
+        assert Version('4.0.0-SNAPSHOT') == Version('4.0.0-SNAPSHOT')
+        assert Version('4.0.0.build5-SNAPSHOT') == Version('4.0.0.build5-SNAPSHOT')
+        assert Version('4.1-SNAPSHOT') > Version('4.0-SNAPSHOT')
+        assert Version('4.0.1-SNAPSHOT') > Version('4.0.0-SNAPSHOT')
+        assert Version('4.0.0.build6-SNAPSHOT') > Version('4.0.0.build5-SNAPSHOT')
+        assert Version('4.0-SNAPSHOT2') > Version('4.0-SNAPSHOT1')
+        assert Version('4.0-SNAPSHOT2') > Version('4.0.0-SNAPSHOT1')
 
-        self.assertTrue(Version('4.0.0-alpha1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))
+        assert Version('4.0.0-alpha1-SNAPSHOT') > Version('4.0.0-SNAPSHOT')
 
 
 class FunctionTests(unittest.TestCase):

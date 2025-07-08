@@ -73,7 +73,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
         results = session.execute("SELECT * FROM test_table")
 
-        self.assertTrue(results.has_more_pages)
+        assert results.has_more_pages
         assert verify_iterator_data(self.assertEqual, results) == self.N_ITEMS  # make sure we see all rows
 
         cluster.shutdown()
@@ -109,7 +109,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
         results = session.execute("SELECT * FROM test_table")
 
-        self.assertTrue(results.has_more_pages)
+        assert results.has_more_pages
         for count, page in enumerate(results, 1):
             assert isinstance(page, dict)
             for colname, arr in page.items():
@@ -136,8 +136,8 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         @test_category configuration
         """
         if VERIFY_CYTHON:
-            self.assertTrue(HAVE_CYTHON)
-            self.assertTrue(HAVE_NUMPY)
+            assert HAVE_CYTHON
+            assert HAVE_NUMPY
 
     def _verify_numpy_page(self, page):
         colnames = self.colnames
@@ -257,5 +257,5 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
                 [self.assertIsNotNone(col_array[i]) for i in mapped_index[:begin_unset]]
                 for i in mapped_index[begin_unset:]:
                     assert col_array[i] is None
-        self.assertTrue(had_masked)
-        self.assertTrue(had_none)
+        assert had_masked
+        assert had_none

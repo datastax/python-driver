@@ -582,7 +582,7 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=PreparedQueryNotFound, info='a' * 16)
         rf._set_result(None, None, None, result)
 
-        self.assertTrue(session.submit.call_args)
+        assert session.submit.call_args
         args, kwargs = session.submit.call_args
         assert rf._reprepare == args[-5]
         assert isinstance(args[-4], PrepareMessage)

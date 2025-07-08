@@ -278,7 +278,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         wait_until(lambda: get_holders_fun.call_count > 0, 0.01, 100)
         time.sleep(interval * (count-1))
         ch.stop()
-        self.assertTrue(get_holders_fun.call_count)
+        assert get_holders_fun.call_count
 
     def test_empty_connections(self, *args):
         count = 3

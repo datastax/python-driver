@@ -74,7 +74,7 @@ class ResultSetTests(unittest.TestCase):
         response_future.has_more_pages.side_effect = PropertyMock(side_effect=(True, False))
         rs = ResultSet(response_future, [])
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, False))  # after init to avoid side effects being consumed by init
-        self.assertTrue(rs.has_more_pages)
+        assert rs.has_more_pages
         self.assertFalse(rs.has_more_pages)
 
     def test_iterate_then_index(self):
@@ -124,7 +124,7 @@ class ResultSetTests(unittest.TestCase):
         self.assertListEqual(list(rs), expected)
         self.assertListEqual(list(rs), expected)
 
-        self.assertTrue(rs)
+        assert rs
 
         # pages
         response_future = Mock(has_more_pages=True, _continuous_paging_session=None)
@@ -139,7 +139,7 @@ class ResultSetTests(unittest.TestCase):
         self.assertListEqual(list(rs), expected)
         self.assertListEqual(list(rs), expected)
 
-        self.assertTrue(rs)
+        assert rs
 
     def test_eq(self):
         # no pages
@@ -152,7 +152,7 @@ class ResultSetTests(unittest.TestCase):
         # results can be iterated or indexed once we're materialized
         self.assertListEqual(list(rs), expected)
         assert rs[9] == expected[9]
-        self.assertTrue(rs)
+        assert rs
 
         # pages
         response_future = Mock(has_more_pages=True, _continuous_paging_session=None)
@@ -165,11 +165,11 @@ class ResultSetTests(unittest.TestCase):
         # results can be iterated or indexed once we're materialized
         self.assertListEqual(list(rs), expected)
         assert rs[9] == expected[9]
-        self.assertTrue(rs)
+        assert rs
 
     def test_bool(self):
         self.assertFalse(ResultSet(Mock(has_more_pages=False), []))
-        self.assertTrue(ResultSet(Mock(has_more_pages=False), [1]))
+        assert ResultSet(Mock(has_more_pages=False), [1])
 
     def test_was_applied(self):
         # unknown row factory raises

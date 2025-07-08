@@ -114,7 +114,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         john = UserModel.objects.first()
         assert 0 == john.id
-        self.assertTrue(type(john.info) is User)
+        assert type(john.info) is User
         assert 42 == john.info.age
         assert "John" == john.info.name
 

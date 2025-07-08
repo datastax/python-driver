@@ -147,7 +147,7 @@ class _PoolTests(unittest.TestCase):
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
-        self.assertTrue(session.submit.call_args)
+        assert session.submit.call_args
         self.assertFalse(pool.is_shutdown)
 
     def test_return_defunct_connection_on_down_host(self):
@@ -169,15 +169,15 @@ class _PoolTests(unittest.TestCase):
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
-        self.assertTrue(conn.close.call_args)
+        assert conn.close.call_args
         if self.PoolImpl is HostConnection:
             # on shard aware implementation we use submit function regardless
-            self.assertTrue(host.signal_connection_failure.call_args)
-            self.assertTrue(session.submit.called)
+            assert host.signal_connection_failure.call_args
+            assert session.submit.called
         else:
             self.assertFalse(session.submit.called)
-            self.assertTrue(session.cluster.signal_connection_failure.call_args)
-        self.assertTrue(pool.is_shutdown)
+            assert session.cluster.signal_connection_failure.call_args
+        assert pool.is_shutdown
 
     def test_return_closed_connection(self):
         host = Mock(spec=Host, address='ip1')
@@ -196,7 +196,7 @@ class _PoolTests(unittest.TestCase):
         pool.return_connection(conn)
 
         # a new creation should be scheduled
-        self.assertTrue(session.submit.call_args)
+        assert session.submit.call_args
         self.assertFalse(pool.is_shutdown)
 
     def test_host_instantiations(self):

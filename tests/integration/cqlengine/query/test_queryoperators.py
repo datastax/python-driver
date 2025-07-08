@@ -154,6 +154,6 @@ class TestTokenFunction(BaseCassEngTestCase):
         query = named.all().limit(1)
         first_page = list(query)
         last = first_page[-1]
-        self.assertTrue(len(first_page) == 1)
+        assert len(first_page) == 1
         next_page = list(query.filter(pk__token__gt=functions.Token(last.key)))
-        self.assertTrue(len(next_page) == 1)
+        assert len(next_page) == 1

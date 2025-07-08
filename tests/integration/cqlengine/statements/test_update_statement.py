@@ -25,8 +25,8 @@ class UpdateStatementTests(unittest.TestCase):
     def test_table_rendering(self):
         """ tests that fields are properly added to the select statement """
         us = UpdateStatement('table')
-        self.assertTrue(str(us).startswith('UPDATE table SET'), str(us))
-        self.assertTrue(str(us).startswith('UPDATE table SET'), str(us))
+        assert str(us).startswith('UPDATE table SET'), str(us)
+        assert str(us).startswith('UPDATE table SET'), str(us)
 
     def test_rendering(self):
         us = UpdateStatement('table')

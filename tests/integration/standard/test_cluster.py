@@ -87,7 +87,7 @@ class ClusterTests(unittest.TestCase):
         cluster.connect()
         for host in cluster.metadata.all_hosts():
             if str(host) == "127.0.0.1:9042":
-                self.assertTrue(host.is_up)
+                assert host.is_up
             else:
                 assert host.is_up is None
         cluster.shutdown()
@@ -104,7 +104,7 @@ class ClusterTests(unittest.TestCase):
         @test_category connection
         """
         cluster = TestCluster(contact_points=["localhost"], connect_timeout=1)
-        self.assertTrue(DefaultEndPoint('127.0.0.1') in cluster.endpoints_resolved)
+        assert DefaultEndPoint('127.0.0.1') in cluster.endpoints_resolved
 
     @local
     def test_host_duplication(self):
@@ -498,7 +498,7 @@ class ClusterTests(unittest.TestCase):
             # cluster agreement wait exceeded
             c = TestCluster(max_schema_agreement_wait=agreement_timeout)
             c.connect()
-            self.assertTrue(c.metadata.keyspaces)
+            assert c.metadata.keyspaces
 
             # cluster agreement wait used for refresh
             original_meta = c.metadata.keyspaces
@@ -526,7 +526,7 @@ class ClusterTests(unittest.TestCase):
             s = c.connect()
             end_time = time.time()
             self.assertLess(end_time - start_time, refresh_threshold)
-            self.assertTrue(c.metadata.keyspaces)
+            assert c.metadata.keyspaces
 
             # cluster agreement wait used for refresh
             original_meta = c.metadata.keyspaces
@@ -746,13 +746,13 @@ class ClusterTests(unittest.TestCase):
                 self.assertListEqual(list(c.request_ids), list(expected_ids))
 
         # assert idle status
-        self.assertTrue(all(c.is_idle for c in connections))
+        assert all(c.is_idle for c in connections)
 
         # send messages on all connections
         statements_and_params = [("SELECT release_version FROM system.local WHERE key='local'", ())] * len(cluster.metadata.all_hosts())
         results = execute_concurrent(session, statements_and_params)
         for success, result in results:
-            self.assertTrue(success)
+            assert success
 
         # assert not idle status
         self.assertFalse(any(c.is_idle if not c.is_control_connection else False for c in connections))
@@ -777,7 +777,7 @@ class ClusterTests(unittest.TestCase):
 
     @patch('cassandra.cluster.Cluster.idle_heartbeat_interval', new=0.1)
     def test_idle_heartbeat_disabled(self):
-        self.assertTrue(Cluster.idle_heartbeat_interval)
+        assert Cluster.idle_heartbeat_interval
 
         # heartbeat disabled with '0'
         cluster = TestCluster(idle_heartbeat_interval=0)
@@ -802,10 +802,10 @@ class ClusterTests(unittest.TestCase):
 
         # prepare
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
-        self.assertTrue(session.execute(p, ('local',)))
+        assert session.execute(p, ('local',))
 
         # simple
-        self.assertTrue(session.execute("SELECT * FROM system.local WHERE key='local'"))
+        assert session.execute("SELECT * FROM system.local WHERE key='local'")
 
         # set keyspace
         session.set_keyspace('system')
@@ -863,7 +863,7 @@ class ClusterTests(unittest.TestCase):
             # assert last returned value can be accessed as a namedtuple so we can prove something different
             named_tuple_row = rs.one()
             assert isinstance(named_tuple_row, tuple)
-            self.assertTrue(named_tuple_row.release_version)
+            assert named_tuple_row.release_version
 
             tmp_profile = copy(node1)
             tmp_profile.row_factory = tuple_factory
@@ -878,7 +878,7 @@ class ClusterTests(unittest.TestCase):
                 tuple_row.release_version
 
             # make sure original profile is not impacted
-            self.assertTrue(session.execute(query, execution_profile='node1').one().release_version)
+            assert session.execute(query, execution_profile='node1').one().release_version
 
     def test_setting_lbp_legacy(self):
         cluster = TestCluster()
@@ -1328,7 +1328,7 @@ class ContextManagementTest(unittest.TestCase):
         """
         with TestCluster() as cluster:
             self.assertFalse(cluster.is_shutdown)
-        self.assertTrue(cluster.is_shutdown)
+        assert cluster.is_shutdown
 
     def test_simple_nested(self):
         """
@@ -1344,9 +1344,9 @@ class ContextManagementTest(unittest.TestCase):
             with cluster.connect() as session:
                 self.assertFalse(cluster.is_shutdown)
                 self.assertFalse(session.is_shutdown)
-                self.assertTrue(session.execute('select release_version from system.local').one())
-            self.assertTrue(session.is_shutdown)
-        self.assertTrue(cluster.is_shutdown)
+                assert session.execute('select release_version from system.local').one()
+            assert session.is_shutdown
+        assert cluster.is_shutdown
 
     def test_cluster_no_session(self):
         """
@@ -1362,9 +1362,9 @@ class ContextManagementTest(unittest.TestCase):
             session = cluster.connect()
             self.assertFalse(cluster.is_shutdown)
             self.assertFalse(session.is_shutdown)
-            self.assertTrue(session.execute('select release_version from system.local').one())
-        self.assertTrue(session.is_shutdown)
-        self.assertTrue(cluster.is_shutdown)
+            assert session.execute('select release_version from system.local').one()
+        assert session.is_shutdown
+        assert cluster.is_shutdown
 
     def test_session_no_cluster(self):
         """
@@ -1382,15 +1382,15 @@ class ContextManagementTest(unittest.TestCase):
             self.assertFalse(cluster.is_shutdown)
             self.assertFalse(session.is_shutdown)
             self.assertFalse(unmanaged_session.is_shutdown)
-            self.assertTrue(session.execute('select release_version from system.local').one())
-        self.assertTrue(session.is_shutdown)
+            assert session.execute('select release_version from system.local').one()
+        assert session.is_shutdown
         self.assertFalse(cluster.is_shutdown)
         self.assertFalse(unmanaged_session.is_shutdown)
         unmanaged_session.shutdown()
-        self.assertTrue(unmanaged_session.is_shutdown)
+        assert unmanaged_session.is_shutdown
         self.assertFalse(cluster.is_shutdown)
         cluster.shutdown()
-        self.assertTrue(cluster.is_shutdown)
+        assert cluster.is_shutdown
 
 
 class HostStateTest(unittest.TestCase):
@@ -1413,7 +1413,7 @@ class HostStateTest(unittest.TestCase):
             cluster.on_down(random_host, False)
             for _ in range(10):
                 new_host = cluster.metadata.all_hosts()[0]
-                self.assertTrue(new_host.is_up, "Host was not up on iteration {0}".format(_))
+                assert new_host.is_up, "Host was not up on iteration {0}".format(_)
                 time.sleep(.01)
 
             pool = session._pools.get(random_host)
@@ -1426,7 +1426,7 @@ class HostStateTest(unittest.TestCase):
                     was_marked_down = True
                     break
                 time.sleep(.01)
-            self.assertTrue(was_marked_down)
+            assert was_marked_down
 
 
 @local
@@ -1505,7 +1505,7 @@ class BetaProtocolTest(unittest.TestCase):
         cluster = Cluster(protocol_version=cassandra.ProtocolVersion.V6, allow_beta_protocol_version=True)
         session = cluster.connect()
         assert cluster.protocol_version == cassandra.ProtocolVersion.V6
-        self.assertTrue(session.execute("select release_version from system.local").one())
+        assert session.execute("select release_version from system.local").one()
         cluster.shutdown()
 
 
@@ -1525,9 +1525,9 @@ class DeprecationWarningTest(unittest.TestCase):
             TestCluster(load_balancing_policy=RoundRobinPolicy())
             logging.info(w)
             self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(any(["Legacy execution parameters will be removed in 4.0. "
+            assert any(["Legacy execution parameters will be removed in 4.0. "
                                  "Consider using execution profiles." in
-                            str(wa.message) for wa in w]))
+                            str(wa.message) for wa in w])
 
     def test_deprecation_warnings_meta_refreshed(self):
         """
@@ -1545,8 +1545,8 @@ class DeprecationWarningTest(unittest.TestCase):
             cluster.set_meta_refresh_enabled(True)
             logging.info(w)
             self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(any(["Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0." in
-                            str(wa.message) for wa in w]))
+            assert any(["Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0." in
+                            str(wa.message) for wa in w])
 
     def test_deprecation_warning_default_consistency_level(self):
         """
@@ -1564,5 +1564,5 @@ class DeprecationWarningTest(unittest.TestCase):
             session = cluster.connect()
             session.default_consistency_level = ConsistencyLevel.ONE
             self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(any(["Setting the consistency level at the session level will be removed in 4.0" in
-                            str(wa.message) for wa in w]))
+            assert any(["Setting the consistency level at the session level will be removed in 4.0" in
+                            str(wa.message) for wa in w])

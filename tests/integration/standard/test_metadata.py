@@ -84,11 +84,11 @@ class HostMetaDataTests(BasicExistingKeyspaceUnitTestCase):
 
         # The control connection node should have the listen address set.
         listen_addrs = [host.listen_address for host in self.cluster.metadata.all_hosts()]
-        self.assertTrue(local_host in listen_addrs)
+        assert local_host in listen_addrs
 
         # The control connection node should have the broadcast_rpc_address set.
         rpc_addrs = [host.broadcast_rpc_address for host in self.cluster.metadata.all_hosts()]
-        self.assertTrue(local_host in rpc_addrs)
+        assert local_host in rpc_addrs
 
     @unittest.skipUnless(
         os.getenv('MAPPED_CASSANDRA_VERSION', None) is not None,
@@ -223,15 +223,15 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         meta = self.cluster.metadata
         assert meta.cluster_name != None
-        self.assertTrue(self.keyspace_name in meta.keyspaces)
+        assert self.keyspace_name in meta.keyspaces
         ksmeta = meta.keyspaces[self.keyspace_name]
 
         assert ksmeta.name == self.keyspace_name
-        self.assertTrue(ksmeta.durable_writes)
+        assert ksmeta.durable_writes
         assert ksmeta.replication_strategy.name == 'SimpleStrategy'
         assert ksmeta.replication_strategy.replication_factor == 1
 
-        self.assertTrue(self.function_table_name in ksmeta.tables)
+        assert self.function_table_name in ksmeta.tables
         tablemeta = ksmeta.tables[self.function_table_name]
         assert tablemeta.keyspace_name == ksmeta.name
         assert tablemeta.name == self.function_table_name
@@ -346,7 +346,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         b_column = tablemeta.columns['b']
         self.assertFalse(b_column.is_reversed)
         c_column = tablemeta.columns['c']
-        self.assertTrue(c_column.is_reversed)
+        assert c_column.is_reversed
 
     def test_compound_primary_keys_more_columns_compact(self):
         create_statement = self.make_create_statement(["a"], ["b", "c"], ["d"])
@@ -396,14 +396,14 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         assert [] == tablemeta.clustering_key
         assert [u'a', u'b', u'c', u'd'] == sorted(tablemeta.columns.keys())
 
-        self.assertTrue(tablemeta.is_cql_compatible)
+        assert tablemeta.is_cql_compatible
 
         # It will be cql compatible after CASSANDRA-10857
         # since compact storage is being dropped
         tablemeta.clustering_key = ["foo", "bar"]
         tablemeta.columns["foo"] = None
         tablemeta.columns["bar"] = None
-        self.assertTrue(tablemeta.is_cql_compatible)
+        assert tablemeta.is_cql_compatible
 
     def test_compound_primary_keys_ordering(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
@@ -607,7 +607,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         # Keyspace metadata modification
         self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.keyspace_name))
-        self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
+        assert cluster2.metadata.keyspaces[self.keyspace_name].durable_writes
         cluster2.refresh_schema_metadata()
         self.assertFalse(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
 
@@ -679,9 +679,9 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         cluster2 = TestCluster(schema_event_refresh_window=-1)
         cluster2.connect()
 
-        self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
+        assert cluster2.metadata.keyspaces[self.keyspace_name].durable_writes
         self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.keyspace_name))
-        self.assertTrue(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
+        assert cluster2.metadata.keyspaces[self.keyspace_name].durable_writes
         cluster2.refresh_keyspace_metadata(self.keyspace_name)
         self.assertFalse(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
 
@@ -1333,7 +1333,7 @@ class TokenMetadataTest(unittest.TestCase):
         cluster = TestCluster()
         cluster.connect()
         tmap = cluster.metadata.token_map
-        self.assertTrue(issubclass(tmap.token_class, Token))
+        assert issubclass(tmap.token_class, Token)
         assert expected_node_count == len(tmap.ring)
         cluster.shutdown()
 
@@ -2253,22 +2253,22 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         # Make sure user is a partition key, and not null
         assert len(score_table.partition_key) == 1
         self.assertIsNotNone(score_table.columns['user'])
-        self.assertTrue(score_table.columns['user'], score_table.partition_key[0])
+        assert score_table.columns['user'], score_table.partition_key[0]
 
         # Validate clustering keys
         assert len(score_table.clustering_key) == 4
 
         self.assertIsNotNone(score_table.columns['game'])
-        self.assertTrue(score_table.columns['game'], score_table.clustering_key[0])
+        assert score_table.columns['game'], score_table.clustering_key[0]
 
         self.assertIsNotNone(score_table.columns['year'])
-        self.assertTrue(score_table.columns['year'], score_table.clustering_key[1])
+        assert score_table.columns['year'], score_table.clustering_key[1]
 
         self.assertIsNotNone(score_table.columns['month'])
-        self.assertTrue(score_table.columns['month'], score_table.clustering_key[2])
+        assert score_table.columns['month'], score_table.clustering_key[2]
 
         self.assertIsNotNone(score_table.columns['day'])
-        self.assertTrue(score_table.columns['day'], score_table.clustering_key[3])
+        assert score_table.columns['day'], score_table.clustering_key[3]
 
         self.assertIsNotNone(score_table.columns['score'])
 
@@ -2475,12 +2475,12 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         # Validate partition key, and not null
         assert len(t1_table.partition_key) == 1
         self.assertIsNotNone(t1_table.columns['theKey'])
-        self.assertTrue(t1_table.columns['theKey'], t1_table.partition_key[0])
+        assert t1_table.columns['theKey'], t1_table.partition_key[0]
 
         # Validate clustering key column
         assert len(t1_table.clustering_key) == 1
         self.assertIsNotNone(t1_table.columns['the;Clustering'])
-        self.assertTrue(t1_table.columns['the;Clustering'], t1_table.clustering_key[0])
+        assert t1_table.columns['the;Clustering'], t1_table.clustering_key[0]
 
         # Validate regular column
         self.assertIsNotNone(t1_table.columns['the Value'])
@@ -2567,10 +2567,7 @@ class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
     def test_existing_keyspaces_have_correct_virtual_tags(self):
         for name, ks in self.cluster.metadata.keyspaces.items():
             if name in self.virtual_ks_names:
-                self.assertTrue(
-                    ks.virtual,
-                    'incorrect .virtual value for {}'.format(name)
-                )
+                assert ks.virtual, 'incorrect .virtual value for {}'.format(name)
             else:
                 self.assertFalse(
                     ks.virtual,

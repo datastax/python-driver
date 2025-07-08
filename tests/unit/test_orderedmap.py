@@ -44,10 +44,10 @@ class OrderedMapTest(unittest.TestCase):
         om = OrderedMap(zip(keys, range(len(keys))))
 
         for k in keys:
-            self.assertTrue(k in om)
+            assert k in om
             self.assertFalse(k not in om)
 
-        self.assertTrue('notthere' not in om)
+        assert 'notthere' not in om
         self.assertFalse('notthere' in om)
 
     def test_keys(self):

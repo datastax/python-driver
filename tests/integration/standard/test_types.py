@@ -307,12 +307,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         columns_string = ','.join(col_names)
         s.execute("INSERT INTO all_empty (zz) VALUES (2)")
         results = s.execute("SELECT {0} FROM all_empty WHERE zz=2".format(columns_string)).one()
-        self.assertTrue(all(x is None for x in results))
+        assert all(x is None for x in results)
 
         # verify all types initially null with prepared statement
         select = s.prepare("SELECT {0} FROM all_empty WHERE zz=?".format(columns_string))
         results = s.execute(select.bind([2])).one()
-        self.assertTrue(all(x is None for x in results))
+        assert all(x is None for x in results)
 
         # insert empty strings for string-like fields
         expected_values = dict((col, '') for col in string_columns)
@@ -815,8 +815,8 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             for f in items:
                 row = s.execute(sel_statement, (f,)).one()
                 if math.isnan(f):
-                    self.assertTrue(math.isnan(row.f))
-                    self.assertTrue(math.isnan(row.d))
+                    assert math.isnan(row.f)
+                    assert math.isnan(row.d)
                 else:
                     assert row.f == f
                     assert row.d == f
@@ -847,7 +847,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         try:
             self.session.execute("INSERT INTO {0} (dc) VALUES (-1.08430792318105707)".format(self.function_table_name))
             results = self.session.execute("SELECT * FROM {0}".format(self.function_table_name))
-            self.assertTrue(str(results.one().dc) == '-1.08430792318105707')
+            assert str(results.one().dc) == '-1.08430792318105707'
         finally:
             self.session.execute("DROP TABLE {0}".format(self.function_table_name))
 

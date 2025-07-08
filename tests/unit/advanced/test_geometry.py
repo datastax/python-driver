@@ -144,7 +144,7 @@ class WKTTest(unittest.TestCase):
         assert len(lo.coords) == 2
         for cords in lo.coords:
             for cord in cords:
-                self.assertTrue(math.isnan(cord))
+                assert math.isnan(cord)
 
     def test_distance_parse(self):
         """
@@ -203,8 +203,8 @@ class WKTTest(unittest.TestCase):
         # Test point with NAN
         ps = "POINT (NAN NAN)"
         po = Point.from_wkt(ps)
-        self.assertTrue(math.isnan(po.x))
-        self.assertTrue(math.isnan(po.y))
+        assert math.isnan(po.x)
+        assert math.isnan(po.y)
 
     def test_polygon_parse(self):
         """
@@ -252,7 +252,7 @@ class WKTTest(unittest.TestCase):
         po = Polygon.from_wkt(ps)
         for cords in po.exterior.coords:
             for cord in cords:
-                self.assertTrue(math.isnan(cord))
+                assert math.isnan(cord)
 
     def _construct_line_string(self, num_of_points):
         # Constructs a arbitrarily long line string

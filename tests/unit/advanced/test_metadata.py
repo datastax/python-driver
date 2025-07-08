@@ -90,7 +90,7 @@ class GraphMetadataToCQLTests(unittest.TestCase):
 
     def test_vertex_with_label(self):
         tm = self. _create_table_metadata(with_vertex=True)
-        self.assertTrue(tm.as_cql_query().endswith('VERTEX LABEL label'))
+        assert tm.as_cql_query().endswith('VERTEX LABEL label')
 
     def test_edge_single_partition_key_and_clustering_key(self):
         tm = self._create_table_metadata(with_edge=True)

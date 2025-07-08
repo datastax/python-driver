@@ -153,7 +153,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
     def test_queryset_is_returned_on_class(self):
         """ ensure we get a queryset description back """
         qs = TestIfNotExistsModel.if_not_exists()
-        self.assertTrue(isinstance(qs, TestIfNotExistsModel.__queryset__), type(qs))
+        assert isinstance(qs, TestIfNotExistsModel.__queryset__), type(qs)
 
     def test_batch_if_not_exists(self):
         """ ensure 'IF NOT EXISTS' exists in statement when in batch """

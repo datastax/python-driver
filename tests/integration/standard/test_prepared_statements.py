@@ -496,7 +496,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         prepared_statement.fetch_size = 2
         result = self.session.execute(prepared_statement.bind((None)))
 
-        self.assertTrue(result.has_more_pages)
+        assert result.has_more_pages
 
         self.session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
 

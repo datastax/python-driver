@@ -57,7 +57,7 @@ class TestConsistency(BaseConsistencyTest):
 
     def test_queryset_is_returned_on_create(self):
         qs = TestConsistencyModel.consistency(CL.ALL)
-        self.assertTrue(isinstance(qs, TestConsistencyModel.__queryset__), type(qs))
+        assert isinstance(qs, TestConsistencyModel.__queryset__), type(qs)
 
     def test_update_uses_consistency(self):
         t = TestConsistencyModel.create(text="bacon and eggs")

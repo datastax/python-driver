@@ -91,7 +91,7 @@ class TestSetColumn(BaseCassEngTestCase):
         m.save()
 
         m = TestSetModel.get(partition=m.partition)
-        self.assertTrue(5 not in m.int_set)
+        assert 5 not in m.int_set
 
     def test_blind_deleting_last_item_should_succeed(self):
         m = TestSetModel.create()
@@ -101,7 +101,7 @@ class TestSetColumn(BaseCassEngTestCase):
         TestSetModel.objects(partition=m.partition).update(int_set=set())
 
         m = TestSetModel.get(partition=m.partition)
-        self.assertTrue(5 not in m.int_set)
+        assert 5 not in m.int_set
 
     def test_empty_set_retrieval(self):
         m = TestSetModel.create()
@@ -388,7 +388,7 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp.save()
 
         tmp = TestMapModel.get(partition=tmp.partition)
-        self.assertTrue("blah" not in tmp.int_map)
+        assert "blah" not in tmp.int_map
 
     def test_io_success(self):
         """ Tests that a basic usage works as expected """
@@ -400,11 +400,11 @@ class TestMapColumn(BaseCassEngTestCase):
                                  text_map={'now': now, 'then': then})
         m2 = TestMapModel.get(partition=m1.partition)
 
-        self.assertTrue(isinstance(m2.int_map, dict))
-        self.assertTrue(isinstance(m2.text_map, dict))
+        assert isinstance(m2.int_map, dict)
+        assert isinstance(m2.text_map, dict)
 
-        self.assertTrue(1 in m2.int_map)
-        self.assertTrue(2 in m2.int_map)
+        assert 1 in m2.int_map
+        assert 2 in m2.int_map
         assert m2.int_map[1] == k1
         assert m2.int_map[2] == k2
 

@@ -52,5 +52,5 @@ class CustomClusterTests(unittest.TestCase):
 
         wait_until(lambda: len(cluster.metadata.all_hosts()) == 3, 1, 5)
         for host in cluster.metadata.all_hosts():
-            self.assertTrue(host.is_up)
+            assert host.is_up
             session.execute("select * from system.local where key='local'", host=host)

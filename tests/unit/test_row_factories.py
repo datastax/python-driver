@@ -83,5 +83,5 @@ class TestNamedTupleFactory(TestCase):
             rows = named_tuple_factory(self.short_colnames, self.short_rows)
         assert len(w) == 0
         # check that this is a real namedtuple
-        self.assertTrue(hasattr(rows[0], '_fields'))
+        assert hasattr(rows[0], '_fields')
         assert isinstance(rows[0], tuple)

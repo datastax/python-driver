@@ -141,7 +141,7 @@ class HeartbeatTest(unittest.TestCase):
 
             # Wait to seconds for the driver to be notified
             time.sleep(2)
-            self.assertTrue(test_listener.host_down)
+            assert test_listener.host_down
             # Resume paused node
         finally:
             node.resume()
@@ -399,7 +399,7 @@ class ConnectionTests(object):
                 self.assertAlmostEqual(start, end, 1)
                 exception_thrown = True
                 break
-        self.assertTrue(exception_thrown)
+        assert exception_thrown
 
     def test_subclasses_share_loop(self):
 

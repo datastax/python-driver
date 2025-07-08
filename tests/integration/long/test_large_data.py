@@ -237,7 +237,7 @@ class LargeDataTests(unittest.TestCase):
         for i, row in enumerate(result):
             assert row['txt'] == text
             found_result = True
-        self.assertTrue(found_result, "No results were found")
+        assert found_result, "No results were found"
 
         session.cluster.shutdown()
 

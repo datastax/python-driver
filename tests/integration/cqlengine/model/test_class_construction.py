@@ -170,13 +170,13 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         cols = ModelWithPartitionKeys._columns
 
-        self.assertTrue(cols['c1'].primary_key)
+        assert cols['c1'].primary_key
         self.assertFalse(cols['c1'].partition_key)
 
-        self.assertTrue(cols['p1'].primary_key)
-        self.assertTrue(cols['p1'].partition_key)
-        self.assertTrue(cols['p2'].primary_key)
-        self.assertTrue(cols['p2'].partition_key)
+        assert cols['p1'].primary_key
+        assert cols['p1'].partition_key
+        assert cols['p2'].primary_key
+        assert cols['p2'].partition_key
 
         obj = ModelWithPartitionKeys(p1='a', p2='b')
         assert obj.pk == ('a', 'b')

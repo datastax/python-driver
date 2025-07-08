@@ -174,7 +174,7 @@ class SegmentCodecTest(unittest.TestCase):
         headers.append(segment_codec_no_compression.decode_header(buffer))
         segments.append(segment_codec_no_compression.decode(buffer, headers[1]))
 
-        self.assertTrue(all([h.is_self_contained is False for h in headers]))
+        assert all([h.is_self_contained is False for h in headers])
         decoded_msg = segments[0].payload + segments[1].payload
         assert decoded_msg == self.large_msg
 

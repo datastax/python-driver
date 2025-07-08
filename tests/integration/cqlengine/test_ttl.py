@@ -101,7 +101,7 @@ class TTLModelTests(BaseTTLTest):
         ensures we get a queryset descriptor back
         """
         qs = TestTTLModel.ttl(60)
-        self.assertTrue(isinstance(qs, TestTTLModel.__queryset__), type(qs))
+        assert isinstance(qs, TestTTLModel.__queryset__), type(qs)
 
 
 class TTLInstanceUpdateTest(BaseTTLTest):

@@ -125,8 +125,8 @@ class OptionsTest(BaseCassEngTestCase):
                         found_at = cql.find(attr, start)
                     else:
                         
-                        self.assertTrue(found_at > start)
-                        self.assertTrue(found_at < end)
+                        assert found_at > start
+                        assert found_at < end
 
     def test_all_size_tiered_options(self):
         class AllSizeTieredOptionsModel(Model):

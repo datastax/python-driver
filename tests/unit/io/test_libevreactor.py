@@ -83,8 +83,8 @@ class LibevConnectionTest(ReactorTestMixin, unittest.TestCase):
             # be called
             libev__cleanup(_global_loop)
             for conn in live_connections:
-                self.assertTrue(conn._write_watcher.stop.mock_calls)
-                self.assertTrue(conn._read_watcher.stop.mock_calls)
+                assert conn._write_watcher.stop.mock_calls
+                assert conn._read_watcher.stop.mock_calls
 
         _global_loop._shutdown = False
 

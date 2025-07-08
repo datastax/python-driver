@@ -92,7 +92,7 @@ class MetricsTests(unittest.TestCase):
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
         results = execute_until_pass(self.session, query)
-        self.assertTrue(results)
+        assert results
 
         # Pause node so it shows as unreachable to coordinator
         get_node(1).pause()
@@ -121,7 +121,7 @@ class MetricsTests(unittest.TestCase):
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
         results = execute_until_pass(self.session, query)
-        self.assertTrue(results)
+        assert results
 
         # Pause node so it shows as unreachable to coordinator
         get_node(1).pause()
@@ -149,7 +149,7 @@ class MetricsTests(unittest.TestCase):
         # Assert read
         query = SimpleStatement("SELECT * FROM test WHERE k=1", consistency_level=ConsistencyLevel.ALL)
         results = execute_until_pass(self.session, query)
-        self.assertTrue(results)
+        assert results
 
         # Stop node gracefully
         # Sometimes this commands continues with the other nodes having not noticed
@@ -289,8 +289,8 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         assert cluster3.metrics.get_stats()['request_timer']['count'] == 5
 
         # Check scales to ensure they are appropriately named
-        self.assertTrue("appcluster" in scales._Stats.stats.keys())
-        self.assertTrue("devops" in scales._Stats.stats.keys())
+        assert "appcluster" in scales._Stats.stats.keys()
+        assert "devops" in scales._Stats.stats.keys()
 
         cluster2.shutdown()
         cluster3.shutdown()
@@ -385,8 +385,8 @@ class MetricsRequestSize(BasicExistingKeyspaceUnitTestCase):
             except SyntaxException:
                 continue
 
-        self.assertTrue(self.wait_for_count(ra, 10))
-        self.assertTrue(self.wait_for_count(ra, 3, error=True))
+        assert self.wait_for_count(ra, 10)
+        assert self.wait_for_count(ra, 3, error=True)
 
         ra.remove_ra(self.session)
 

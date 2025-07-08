@@ -30,7 +30,7 @@ class BatchStatementTest(unittest.TestCase):
         batch = BatchStatement()
         batch.add(ss)
 
-        self.assertTrue(batch._statements_and_parameters)
+        assert batch._statements_and_parameters
         assert batch.keyspace == keyspace
         assert batch.routing_key == routing_key
         assert batch.custom_payload == custom_payload

@@ -66,9 +66,9 @@ class NameTupleFactory(BasicSharedKeyspaceUnitTestCase):
         query = "SELECT v1 AS duplicate, v2 AS duplicate, v3 AS duplicate from {0}.{1}".format(self.ks_name, self.function_table_name)
         rs = self.session.execute(query)
         row = rs.one()
-        self.assertTrue(hasattr(row, 'duplicate'))
-        self.assertTrue(hasattr(row, 'duplicate_'))
-        self.assertTrue(hasattr(row, 'duplicate__'))
+        assert hasattr(row, 'duplicate')
+        assert hasattr(row, 'duplicate_')
+        assert hasattr(row, 'duplicate__')
 
 
 class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):

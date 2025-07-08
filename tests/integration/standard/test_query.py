@@ -81,7 +81,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         # Ensure this does not throw an exception
         trace = rs.get_query_trace()
-        self.assertTrue(trace.events)
+        assert trace.events
         str(trace)
         for event in trace.events:
             str(event)
@@ -113,7 +113,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         rs_trace = rs.get_query_trace()
         assert rs_trace == future_trace
-        self.assertTrue(rs_trace.events)
+        assert rs_trace.events
         assert len(rs_trace.events) == len(future_trace.events)
 
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
@@ -129,7 +129,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
             # Ensure this does not throw an exception
             trace = rs.get_query_trace()
-            self.assertTrue(trace.events)
+            assert trace.events
             str(trace)
             for event in trace.events:
                 str(event)
@@ -171,7 +171,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         # Ensure that ip is set
         self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
-        self.assertTrue(pat.match(client_ip), "Client IP from trace did not match the expected value")
+        assert pat.match(client_ip), "Client IP from trace did not match the expected value"
 
     def test_trace_cl(self):
         """
@@ -224,12 +224,12 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         assert len(response_future._query_traces) == 1
         trace = response_future._query_traces[0]
-        self.assertTrue(self._wait_for_trace_to_populate(trace.trace_id))
+        assert self._wait_for_trace_to_populate(trace.trace_id)
 
         # Delete trace duration from the session (this is what the driver polls for "complete")
         delete_statement = SimpleStatement("DELETE duration FROM system_traces.sessions WHERE session_id = {0}".format(trace.trace_id), consistency_level=ConsistencyLevel.ALL)
         self.session.execute(delete_statement)
-        self.assertTrue(self._wait_for_trace_to_delete(trace.trace_id))
+        assert self._wait_for_trace_to_delete(trace.trace_id)
 
         # should raise because duration is not set
         self.assertRaises(TraceUnavailable, trace.populate, max_wait=0.2, wait_for_complete=True)
@@ -241,7 +241,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertIsNotNone(trace.trace_id)
         self.assertIsNotNone(trace.request_type)
         self.assertIsNotNone(trace.parameters)
-        self.assertTrue(trace.events)  # non-zero list len
+        assert trace.events  # non-zero list len
         self.assertIsNotNone(trace.started_at)
 
     def _wait_for_trace_to_populate(self, trace_id):
@@ -811,7 +811,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
-        self.assertTrue(result)
+        assert result
         self.assertFalse(result.one().applied)
 
         statement = SimpleStatement(
@@ -821,8 +821,8 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
-        self.assertTrue(result)
-        self.assertTrue(result.one().applied)
+        assert result
+        assert result.one().applied
 
     def test_conditional_update_with_prepared_statements(self):
         self.session.execute("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
@@ -833,7 +833,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
-        self.assertTrue(result)
+        assert result
         self.assertFalse(result.one().applied)
 
         statement = self.session.prepare(
@@ -843,8 +843,8 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(bound)
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
-        self.assertTrue(result)
-        self.assertTrue(result.one().applied)
+        assert result
+        assert result.one().applied
 
     def test_conditional_update_with_batch_statements(self):
         self.session.execute("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
@@ -854,7 +854,7 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
-        self.assertTrue(result)
+        assert result
         self.assertFalse(result.one().applied)
 
         statement = BatchStatement(serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
@@ -863,8 +863,8 @@ class SerialConsistencyTests(unittest.TestCase):
         future = self.session.execute_async(statement)
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
-        self.assertTrue(result)
-        self.assertTrue(result.one().applied)
+        assert result
+        assert result.one().applied
 
     def test_bad_consistency_level(self):
         statement = SimpleStatement("foo")
@@ -945,7 +945,7 @@ class LightweightTransactionTests(unittest.TestCase):
                 self.fail("Unexpected exception %s: %s" % (exception_type, result.message))
 
         # Make sure test passed
-        self.assertTrue(received_timeout)
+        assert received_timeout
 
     @xfail_scylla('Fails on Scylla with error `SERIAL/LOCAL_SERIAL consistency may only be requested for one partition at a time`')
     def test_was_applied_batch_stmt(self):
@@ -1008,7 +1008,7 @@ class LightweightTransactionTests(unittest.TestCase):
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 3)
 
             result = self.session.execute(batch_statement)
-            self.assertTrue(result.was_applied)
+            assert result.was_applied
 
             all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             for i, row in enumerate(all_rows):
@@ -1059,7 +1059,7 @@ class LightweightTransactionTests(unittest.TestCase):
                     APPLY batch;
                     """
         result = self.session.execute(batch_str)
-        self.assertTrue(result.was_applied)
+        assert result.was_applied
 
 
 class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):

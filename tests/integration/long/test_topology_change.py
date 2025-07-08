@@ -39,7 +39,7 @@ class TopologyChangeTests(TestCase):
         get_node(3).nodetool("disablebinary")
 
         wait_until(condition=lambda: state_listener.downed_host is not None, delay=2, max_attempts=50)
-        self.assertTrue(state_listener.downed_host.is_currently_reconnecting())
+        assert state_listener.downed_host.is_currently_reconnecting()
 
         decommission(3)
 

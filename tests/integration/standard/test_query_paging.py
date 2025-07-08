@@ -331,7 +331,7 @@ class QueryPagingTests(unittest.TestCase):
             results = execute_concurrent_with_args(self.session, prepared, [None] * 10)
             assert 10 == len(results)
             for (success, result) in results:
-                self.assertTrue(success)
+                assert success
                 assert 100 == len(list(result))
 
     def test_fetch_size(self):
@@ -346,7 +346,7 @@ class QueryPagingTests(unittest.TestCase):
 
         self.session.default_fetch_size = 10
         result = self.session.execute(prepared, [])
-        self.assertTrue(result.has_more_pages)
+        assert result.has_more_pages
 
         self.session.default_fetch_size = 2000
         result = self.session.execute(prepared, [])
@@ -368,7 +368,7 @@ class QueryPagingTests(unittest.TestCase):
 
         prepared.fetch_size = 10
         result = self.session.execute(prepared, [])
-        self.assertTrue(result.has_more_pages)
+        assert result.has_more_pages
 
         prepared.fetch_size = 2000
         bound = prepared.bind([])
@@ -383,7 +383,7 @@ class QueryPagingTests(unittest.TestCase):
         prepared.fetch_size = 10
         bound = prepared.bind([])
         result = self.session.execute(bound, [])
-        self.assertTrue(result.has_more_pages)
+        assert result.has_more_pages
 
         bound.fetch_size = 2000
         result = self.session.execute(bound, [])
@@ -395,7 +395,7 @@ class QueryPagingTests(unittest.TestCase):
 
         bound.fetch_size = 10
         result = self.session.execute(bound, [])
-        self.assertTrue(result.has_more_pages)
+        assert result.has_more_pages
 
         s = SimpleStatement("SELECT * FROM test3rf.test", fetch_size=None)
         result = self.session.execute(s, [])
@@ -403,7 +403,7 @@ class QueryPagingTests(unittest.TestCase):
 
         s = SimpleStatement("SELECT * FROM test3rf.test")
         result = self.session.execute(s, [])
-        self.assertTrue(result.has_more_pages)
+        assert result.has_more_pages
 
         s = SimpleStatement("SELECT * FROM test3rf.test")
         s.fetch_size = None

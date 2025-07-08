@@ -210,7 +210,7 @@ class ControlConnectionTest(unittest.TestCase):
         """
         Basic test with all schema versions agreeing
         """
-        self.assertTrue(self.control_connection.wait_for_schema_agreement())
+        assert self.control_connection.wait_for_schema_agreement()
         # the control connection should not have slept at all
         assert self.time.clock == 0
 
@@ -219,7 +219,7 @@ class ControlConnectionTest(unittest.TestCase):
         wait_for_schema_agreement uses preloaded results if given for shared table queries
         """
         preloaded_results = self._matching_schema_preloaded_results
-        self.assertTrue(self.control_connection.wait_for_schema_agreement(preloaded_results=preloaded_results))
+        assert self.control_connection.wait_for_schema_agreement(preloaded_results=preloaded_results)
         # the control connection should not have slept at all
         assert self.time.clock == 0
         # the connection should not have made any queries if given preloaded results
@@ -230,7 +230,7 @@ class ControlConnectionTest(unittest.TestCase):
         wait_for_schema_agreement requery if schema does not match using preloaded results
         """
         preloaded_results = self._nonmatching_schema_preloaded_results
-        self.assertTrue(self.control_connection.wait_for_schema_agreement(preloaded_results=preloaded_results))
+        assert self.control_connection.wait_for_schema_agreement(preloaded_results=preloaded_results)
         # the control connection should not have slept at all
         assert self.time.clock == 0
         assert self.connection.wait_for_responses.call_count == 1
@@ -262,7 +262,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.peer_results[1][1][3] = 'c'
         self.cluster.metadata.get_host(DefaultEndPoint('192.168.1.1')).is_up = False
 
-        self.assertTrue(self.control_connection.wait_for_schema_agreement())
+        assert self.control_connection.wait_for_schema_agreement()
         assert self.time.clock == 0
 
     def test_wait_for_schema_agreement_rpc_lookup(self):
@@ -279,7 +279,7 @@ class ControlConnectionTest(unittest.TestCase):
 
         # even though the new host has a different schema version, it's
         # marked as down, so the control connection shouldn't care
-        self.assertTrue(self.control_connection.wait_for_schema_agreement())
+        assert self.control_connection.wait_for_schema_agreement()
         assert self.time.clock == 0
 
         # but once we mark it up, the control connection will care

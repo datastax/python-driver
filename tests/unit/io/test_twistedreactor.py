@@ -76,7 +76,7 @@ class TestTwistedProtocol(unittest.TestCase):
         object that a successful connection was made.
         """
         self.obj_ut.makeConnection(self.tr)
-        self.assertTrue(self.mock_connection.client_connection_made.called)
+        assert self.mock_connection.client_connection_made.called
 
     def test_receiving_data(self):
         """
@@ -85,7 +85,7 @@ class TestTwistedProtocol(unittest.TestCase):
         """
         self.obj_ut.makeConnection(self.tr)
         self.obj_ut.dataReceived('foobar')
-        self.assertTrue(self.mock_connection.handle_read.called)
+        assert self.mock_connection.handle_read.called
         self.mock_connection._iobuf.write.assert_called_with("foobar")
 
 
@@ -136,8 +136,8 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut.is_closed = False
         self.obj_ut.close()
 
-        self.assertTrue(self.obj_ut.connected_event.is_set())
-        self.assertTrue(self.obj_ut.error_all_requests.called)
+        assert self.obj_ut.connected_event.is_set()
+        assert self.obj_ut.error_all_requests.called
 
     def test_handle_read__incomplete(self):
         """

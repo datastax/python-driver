@@ -105,7 +105,7 @@ class AuthenticationTests(unittest.TestCase):
             cluster = self.cluster_as(user, passwd)
             session = cluster.connect(wait_for_all_pools=True)
             try:
-                self.assertTrue(session.execute("SELECT release_version FROM system.local WHERE key='local'"))
+                assert session.execute("SELECT release_version FROM system.local WHERE key='local'")
                 assert_quiescent_pool_state(self, cluster, wait=1)
                 for pool in session.get_pools():
                     connection, _ = pool.borrow_connection(timeout=0)

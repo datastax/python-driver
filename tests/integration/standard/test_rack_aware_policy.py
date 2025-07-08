@@ -68,7 +68,7 @@ class RackAwareRoundRobinPolicyTests(unittest.TestCase):
             results = self.session.execute(bound)
             assert results == [(i, i%5, i%2)]
             coordinator = str(results.response_future.coordinator_host.endpoint)
-            self.assertTrue(coordinator in set(["127.0.0.1:9042", "127.0.0.2:9042"]))
+            assert coordinator in set(["127.0.0.1:9042", "127.0.0.2:9042"])
 
         self.node2.stop(wait_other_notice=True, gently=True)
 
@@ -86,4 +86,4 @@ class RackAwareRoundRobinPolicyTests(unittest.TestCase):
             results = self.session.execute(bound)
             assert results == [(i, i%5, i%2)]
             coordinator = str(results.response_future.coordinator_host.endpoint)
-            self.assertTrue(coordinator in set(["127.0.0.3:9042", "127.0.0.4:9042"]))
+            assert coordinator in set(["127.0.0.3:9042", "127.0.0.4:9042"])

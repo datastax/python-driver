@@ -229,7 +229,7 @@ class ConcurrencyTest((unittest.TestCase)):
         """
         last_time_added = 0
         for success, result in results:
-            self.assertTrue(success)
+            assert success
             current_time_added = list(result)[0]
 
             #Windows clock granularity makes this equal most of the times

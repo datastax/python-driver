@@ -1325,7 +1325,7 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
             v1=9,
         )
         for value in values:
-            self.assertTrue(value not in str(b.queries[0]))
+            assert value not in str(b.queries[0])
 
         # Test DML path
         b2 = BatchQuery()
@@ -1335,7 +1335,7 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
             v1=9,
         )
         for value in values:
-            self.assertTrue(value not in str(b2.queries[0]))
+            assert value not in str(b2.queries[0])
 
     def test_db_field_value_list(self):
         DBFieldModel.create(k0=0, k1=0, c0=0, v0=4, v1=5)
@@ -1455,7 +1455,7 @@ class TestModelQueryWithDifferedFeld(BaseCassEngTestCase):
         # Validate correct fields are fetched
         smiths = list(People.filter(last_name="Smith"))
         assert len(smiths) == 3
-        self.assertTrue(smiths[0].last_name is not None)
+        assert smiths[0].last_name is not None
 
         # Modify table with new value
         sync_table(People2)
@@ -1471,4 +1471,4 @@ class TestModelQueryWithDifferedFeld(BaseCassEngTestCase):
         # validate correct items are returneds
         smiths = list(People2.filter(last_name="Smith"))
         assert len(smiths) == 5
-        self.assertTrue(smiths[0].last_name is not None)
+        assert smiths[0].last_name is not None

@@ -185,9 +185,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.addCleanup(cluster.shutdown)
 
         if murmur3 is not None:
-            self.assertTrue(isinstance(cluster.profile_manager.default.load_balancing_policy, TokenAwarePolicy))
+            assert isinstance(cluster.profile_manager.default.load_balancing_policy, TokenAwarePolicy)
         else:
-            self.assertTrue(isinstance(cluster.profile_manager.default.load_balancing_policy, DCAwareRoundRobinPolicy))
+            assert isinstance(cluster.profile_manager.default.load_balancing_policy, DCAwareRoundRobinPolicy)
 
     def test_roundrobin(self):
         use_singledc()
@@ -509,7 +509,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                                                   routing_key=bound.routing_key))
         assert results.response_future.attempted_hosts[0] in cluster.metadata.get_replicas(keyspace, bound.routing_key)
 
-        self.assertTrue(results[0].i)
+        assert results[0].i
 
     def test_token_aware_with_rf_2(self, use_prepared=False):
         use_singledc()
@@ -762,7 +762,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         first_node_count = self.coordinator_stats.get_query_count(1)
         third_node_count = self.coordinator_stats.get_query_count(3)
         assert first_node_count + third_node_count == 12
-        self.assertTrue(first_node_count == 8 or first_node_count == 4)
+        assert first_node_count == 8 or first_node_count == 4
 
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
 

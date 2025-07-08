@@ -77,7 +77,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         session.client_protocol_handler = CustomTestRawRowType
         result_set = session.execute("SELECT schema_version FROM system.local WHERE key='local'")
         raw_value = result_set.one()[0]
-        self.assertTrue(isinstance(raw_value, bytes))
+        assert isinstance(raw_value, bytes)
         assert len(raw_value) == 16
 
         # Ensure that we get normal uuid back when we re-connect
