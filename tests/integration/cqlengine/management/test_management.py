@@ -254,7 +254,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
 
         table_options = management._get_table_metadata(ModelWithTableProperties).options
 
-        self.assertLessEqual(ModelWithTableProperties.__options__.items(), table_options.items())
+        assert ModelWithTableProperties.__options__.items() <= table_options.items()
 
     def test_bogus_option_update(self):
         sync_table(ModelWithTableProperties)

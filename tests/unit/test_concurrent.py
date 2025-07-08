@@ -234,7 +234,7 @@ class ConcurrencyTest((unittest.TestCase)):
 
             #Windows clock granularity makes this equal most of the times
             if "Windows" in platform.system():
-                self.assertLessEqual(last_time_added, current_time_added)
+                assert last_time_added <= current_time_added
             else:
                 self.assertLess(last_time_added, current_time_added)
             last_time_added = current_time_added

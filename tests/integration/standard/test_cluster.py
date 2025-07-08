@@ -250,7 +250,7 @@ class ClusterTests(unittest.TestCase):
         """
 
         cluster = Cluster()
-        self.assertLessEqual(cluster.protocol_version,  cassandra.ProtocolVersion.MAX_SUPPORTED)
+        assert cluster.protocol_version <= cassandra.ProtocolVersion.MAX_SUPPORTED
         session = cluster.connect()
         updated_protocol_version = session._protocol_version
         updated_cluster_version = cluster.protocol_version

@@ -218,7 +218,7 @@ class TestColumnComparison(unittest.TestCase):
 
         assert l == sorted(l)
         assert TestQueryUpdateModel.partition.column != TestQueryUpdateModel.cluster.column
-        self.assertLessEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
+        assert TestQueryUpdateModel.partition.column <= TestQueryUpdateModel.cluster.column
         self.assertGreater(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)
         self.assertGreaterEqual(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)
 

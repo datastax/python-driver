@@ -40,8 +40,8 @@ class ColumnTest(unittest.TestCase):
             pass
 
         # __le__
-        self.assertLessEqual(c0, c1)
-        self.assertLessEqual(c0, c0)
+        assert c0 <= c1
+        assert c0 <= c0
         try:
             c0 <= object()  # this raises for Python 3
         except TypeError:

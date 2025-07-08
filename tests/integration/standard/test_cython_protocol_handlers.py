@@ -115,7 +115,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
             for colname, arr in page.items():
                 if count <= expected_pages:
                     self.assertGreater(len(arr), 0, "page count: %d" % (count,))
-                    self.assertLessEqual(len(arr), session.default_fetch_size)
+                    assert len(arr) <= session.default_fetch_size
                 else:
                     # we get one extra item out of this iteration because of the way NumpyParser returns results
                     # The last page is returned as a dict with zero-length arrays

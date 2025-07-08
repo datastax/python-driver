@@ -996,7 +996,7 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         policy = ExponentialReconnectionPolicy(base_delay=base_delay, max_delay=max_delay, max_attempts=max_attempts)
         schedule = list(policy.new_schedule())
         for number in schedule:
-            self.assertLessEqual(number, sys.float_info.max)
+            assert number <= sys.float_info.max
 
     def test_schedule_with_jitter(self):
         """
