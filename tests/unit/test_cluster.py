@@ -159,7 +159,7 @@ class SessionTest(unittest.TestCase):
 
         # default is None
         default_profile = c.profile_manager.default
-        self.assertIsNone(default_profile.serial_consistency_level)
+        assert default_profile.serial_consistency_level is None
 
         for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
             s.get_execution_profile(EXEC_PROFILE_DEFAULT).serial_consistency_level = cl
@@ -186,7 +186,7 @@ class SessionTest(unittest.TestCase):
         s = Session(c, [Host("127.0.0.1", SimpleConvictionPolicy)])
         c.connection_class.initialize_reactor()
         # default is None
-        self.assertIsNone(s.default_serial_consistency_level)
+        assert s.default_serial_consistency_level is None
 
         # Should fail
         with self.assertRaises(ValueError):

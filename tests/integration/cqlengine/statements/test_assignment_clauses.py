@@ -35,8 +35,8 @@ class SetUpdateClauseTests(unittest.TestCase):
         c.set_context_id(0)
 
         assert c._assignments == set((1, 2))
-        self.assertIsNone(c._additions)
-        self.assertIsNone(c._removals)
+        assert c._additions is None
+        assert c._removals is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = %(0)s'
@@ -51,9 +51,9 @@ class SetUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
-        self.assertIsNone(c._additions)
-        self.assertIsNone(c._removals)
+        assert c._assignments is None
+        assert c._additions is None
+        assert c._removals is None
 
         assert c.get_context_size() == 0
         assert str(c) == ''
@@ -68,9 +68,9 @@ class SetUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
-        self.assertIsNone(c._additions)
-        self.assertIsNone(c._removals)
+        assert c._assignments is None
+        assert c._additions is None
+        assert c._removals is None
 
         assert c.get_context_size() == 0
         assert str(c) == ''
@@ -87,8 +87,8 @@ class SetUpdateClauseTests(unittest.TestCase):
         c.set_context_id(0)
 
         assert c._assignments == set()
-        self.assertIsNone(c._additions)
-        self.assertIsNone(c._removals)
+        assert c._additions is None
+        assert c._removals is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = %(0)s'
@@ -102,9 +102,9 @@ class SetUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
+        assert c._assignments is None
         assert c._additions == set((3,))
-        self.assertIsNone(c._removals)
+        assert c._removals is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = "s" + %(0)s'
@@ -118,8 +118,8 @@ class SetUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
-        self.assertIsNone(c._additions)
+        assert c._assignments is None
+        assert c._additions is None
         assert c._removals == set((3,))
 
         assert c.get_context_size() == 1
@@ -134,7 +134,7 @@ class SetUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
+        assert c._assignments is None
         assert c._additions == set((3,))
         assert c._removals == set((1,))
 
@@ -154,8 +154,8 @@ class ListUpdateClauseTests(unittest.TestCase):
         c.set_context_id(0)
 
         assert c._assignments == [1, 2, 3]
-        self.assertIsNone(c._append)
-        self.assertIsNone(c._prepend)
+        assert c._append is None
+        assert c._prepend is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = %(0)s'
@@ -170,8 +170,8 @@ class ListUpdateClauseTests(unittest.TestCase):
         c.set_context_id(0)
 
         assert c._assignments == [1, 2, 3]
-        self.assertIsNone(c._append)
-        self.assertIsNone(c._prepend)
+        assert c._append is None
+        assert c._prepend is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = %(0)s'
@@ -186,8 +186,8 @@ class ListUpdateClauseTests(unittest.TestCase):
         c.set_context_id(0)
 
         assert c._assignments == [1, 2, 3]
-        self.assertIsNone(c._append)
-        self.assertIsNone(c._prepend)
+        assert c._append is None
+        assert c._prepend is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = %(0)s'
@@ -201,9 +201,9 @@ class ListUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
+        assert c._assignments is None
         assert c._append == [3, 4]
-        self.assertIsNone(c._prepend)
+        assert c._prepend is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = "s" + %(0)s'
@@ -217,8 +217,8 @@ class ListUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
-        self.assertIsNone(c._append)
+        assert c._assignments is None
+        assert c._append is None
         assert c._prepend == [1, 2]
 
         assert c.get_context_size() == 1
@@ -233,7 +233,7 @@ class ListUpdateClauseTests(unittest.TestCase):
         c._analyze()
         c.set_context_id(0)
 
-        self.assertIsNone(c._assignments)
+        assert c._assignments is None
         assert c._append == [5, 6]
         assert c._prepend == [1, 2]
 
@@ -251,8 +251,8 @@ class ListUpdateClauseTests(unittest.TestCase):
         c.set_context_id(0)
 
         assert c._assignments == [1, 2, 3]
-        self.assertIsNone(c._append)
-        self.assertIsNone(c._prepend)
+        assert c._append is None
+        assert c._prepend is None
 
         assert c.get_context_size() == 1
         assert str(c) == '"s" = %(0)s'

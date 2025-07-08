@@ -586,7 +586,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         def check_result_and_metadata(expected):
             assert session.execute(prepared_statement, (value, value, value)).one() == expected
             assert prepared_statement.result_metadata_id == first_id
-            self.assertIsNone(prepared_statement.result_metadata)
+            assert prepared_statement.result_metadata is None
 
         # Successful conditional update
         check_result_and_metadata((True,))

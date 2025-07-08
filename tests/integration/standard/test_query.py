@@ -237,7 +237,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         # should get the events with wait False
         trace.populate(wait_for_complete=False)
-        self.assertIsNone(trace.duration)
+        assert trace.duration is None
         self.assertIsNotNone(trace.trace_id)
         self.assertIsNotNone(trace.request_type)
         self.assertIsNotNone(trace.parameters)

@@ -37,8 +37,8 @@ class BatchStatementTest(unittest.TestCase):
 
         batch.clear()
         self.assertFalse(batch._statements_and_parameters)
-        self.assertIsNone(batch.keyspace)
-        self.assertIsNone(batch.routing_key)
+        assert batch.keyspace is None
+        assert batch.routing_key is None
         self.assertFalse(batch.custom_payload)
 
         batch.add(ss)
@@ -47,8 +47,8 @@ class BatchStatementTest(unittest.TestCase):
         batch = BatchStatement()
         batch.clear()
         self.assertFalse(batch._statements_and_parameters)
-        self.assertIsNone(batch.keyspace)
-        self.assertIsNone(batch.routing_key)
+        assert batch.keyspace is None
+        assert batch.routing_key is None
         self.assertFalse(batch.custom_payload)
 
         batch.add('something')

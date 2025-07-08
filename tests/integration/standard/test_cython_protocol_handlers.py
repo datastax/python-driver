@@ -255,6 +255,7 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
             else:
                 had_none = True
                 [self.assertIsNotNone(col_array[i]) for i in mapped_index[:begin_unset]]
-                [self.assertIsNone(col_array[i]) for i in mapped_index[begin_unset:]]
+                for i in mapped_index[begin_unset:]:
+                    assert col_array[i] is None
         self.assertTrue(had_masked)
         self.assertTrue(had_none)

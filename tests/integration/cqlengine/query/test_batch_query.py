@@ -150,7 +150,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         assert q._batch == b
 
         q = q.batch(None)
-        self.assertIsNone(q._batch)
+        assert q._batch is None
 
     @execute_count(0)
     def test_dml_none_success_case(self):
@@ -161,7 +161,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         assert q._batch == b
 
         q.batch(None)
-        self.assertIsNone(q._batch)
+        assert q._batch is None
 
     @execute_count(3)
     def test_batch_execute_on_exception_succeeds(self):

@@ -140,7 +140,7 @@ class TestModelIO(BaseCassEngTestCase):
         tm = TestModel.create(count=8, text='123456789')
         tm.delete()
         tm2 = TestModel.objects(id=tm.pk).first()
-        self.assertIsNone(tm2)
+        assert tm2 is None
 
     def test_column_deleting_works_properly(self):
         """
@@ -221,9 +221,9 @@ class TestModelIO(BaseCassEngTestCase):
 
         # override default
         inst = TestModel.create(a_bool=None)
-        self.assertIsNone(inst.a_bool)
+        assert inst.a_bool is None
         queried = TestModel.objects(id=inst.id).first()
-        self.assertIsNone(queried.a_bool)
+        assert queried.a_bool is None
 
         # letting default be set
         inst = TestModel.create()

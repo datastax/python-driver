@@ -293,12 +293,12 @@ class GraphOptionTests(unittest.TestCase):
 
         # will update options with set value
         another = GraphOptions()
-        self.assertIsNone(another.graph_name)
+        assert another.graph_name is None
         another.update(opts)
         assert another.graph_name == expected.encode()
 
         opts.graph_name = None
-        self.assertIsNone(opts.graph_name)
+        assert opts.graph_name is None
         # will not update another with its set-->unset value
         another.update(opts)
         assert another.graph_name == expected.encode()  # remains unset

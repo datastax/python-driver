@@ -78,7 +78,7 @@ class OrderedMapTest(unittest.TestCase):
             assert om.get(k) == v
 
         assert om.get('notthere', 'default') == 'default'
-        self.assertIsNone(om.get('notthere'))
+        assert om.get('notthere') is None
 
     def test_equal(self):
         d1 = {'one': 1}

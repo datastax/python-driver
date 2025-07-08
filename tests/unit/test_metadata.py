@@ -93,7 +93,7 @@ class StrategiesTest(unittest.TestCase):
         assert rs.create('NetworkTopologyStrategy', fake_options_map).dc_replication_factors == NetworkTopologyStrategy(fake_options_map).dc_replication_factors
 
         fake_options_map = {'options': 'map'}
-        self.assertIsNone(rs.create('SimpleStrategy', fake_options_map))
+        assert rs.create('SimpleStrategy', fake_options_map) is None
 
         fake_options_map = {'options': 'map'}
         self.assertIsInstance(rs.create('LocalStrategy', fake_options_map), LocalStrategy)

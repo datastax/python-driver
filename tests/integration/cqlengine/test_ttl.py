@@ -177,7 +177,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         o = TestTTLModel.create(text="some text")
         tid = o.id
 
-        self.assertIsNone(o._ttl)
+        assert o._ttl is None
 
         default_ttl = self.get_default_ttl('test_ttlmodel')
         assert default_ttl == 0
@@ -195,7 +195,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         tid = o.id
 
         # Should not be set, it's handled by Cassandra
-        self.assertIsNone(o._ttl)
+        assert o._ttl is None
 
         default_ttl = self.get_default_ttl('test_default_ttlmodel')
         assert default_ttl == 20

@@ -1231,7 +1231,7 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
             # delete
             model.objects(k0=i.k0, k1=i.k1).delete()
             i = model.objects(k0=i.k0, k1=i.k1).first()
-            self.assertIsNone(i)
+            assert i is None
 
             i = model.create(**values)
             i = model.objects(k0=i.k0, k1=i.k1).first()
@@ -1239,7 +1239,7 @@ class TestModelQueryWithDBField(BaseCassEngTestCase):
             i.delete()
             model.objects(k0=i.k0, k1=i.k1).delete()
             i = model.objects(k0=i.k0, k1=i.k1).first()
-            self.assertIsNone(i)
+            assert i is None
 
     @execute_count(21)
     def test_slice(self):

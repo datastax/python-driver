@@ -83,10 +83,10 @@ class TestDatetime(BaseCassEngTestCase):
     def test_datetime_none(self):
         dt = self.DatetimeTest.objects.create(test_id=3, created_at=None)
         dt2 = self.DatetimeTest.objects(test_id=3).first()
-        self.assertIsNone(dt2.created_at)
+        assert dt2.created_at is None
 
         dts = self.DatetimeTest.objects.filter(test_id=3).values_list('created_at')
-        self.assertIsNone(dts[0][0])
+        assert dts[0][0] is None
 
     def test_datetime_invalid(self):
         dt_value= 'INVALID'
@@ -160,7 +160,7 @@ class TestBoolValidation(BaseCassEngTestCase):
         test_obj = self.BoolValidationTest(test_id=1)
 
         test_obj.validate()
-        self.assertIsNone(test_obj.bool_column)
+        assert test_obj.bool_column is None
 
 
 class TestVarInt(BaseCassEngTestCase):
@@ -222,10 +222,10 @@ class DataType():
         """
         if value is None:
             result = self.model_class.objects.all().allow_filtering().filter(test_id=0).first()
-            self.assertIsNone(result.class_param)
+            assert result.class_param is None
 
             result = self.model_class.objects(test_id=0).first()
-            self.assertIsNone(result.class_param)
+            assert result.class_param is None
 
         else:
             if not isinstance(value, self.python_klass):
@@ -276,10 +276,10 @@ class DataType():
         """
         self.model_class.objects.create(test_id=1, class_param=None)
         dt2 = self.model_class.objects(test_id=1).first()
-        self.assertIsNone(dt2.class_param)
+        assert dt2.class_param is None
 
         dts = self.model_class.objects(test_id=1).values_list('class_param')
-        self.assertIsNone(dts[0][0])
+        assert dts[0][0] is None
 
 
 class TestDate(DataType, BaseCassEngTestCase):

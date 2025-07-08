@@ -70,8 +70,8 @@ class GraphMetadataToCQLTests(unittest.TestCase):
 
     def test_table_no_vertex_or_edge(self):
         tm = self._create_table_metadata()
-        self.assertIsNone(tm.vertex)
-        self.assertIsNone(tm.edge)
+        assert tm.vertex is None
+        assert tm.edge is None
         cql = tm.as_cql_query()
         self.assertNotIn("VERTEX LABEL", cql)
         self.assertNotIn("EDGE LABEL", cql)
@@ -79,14 +79,14 @@ class GraphMetadataToCQLTests(unittest.TestCase):
     def test_table_with_vertex(self):
         tm = self._create_table_metadata(with_vertex=True)
         self.assertIsInstance(tm.vertex, VertexMetadata)
-        self.assertIsNone(tm.edge)
+        assert tm.edge is None
         cql = tm.as_cql_query()
         self.assertIn("VERTEX LABEL", cql)
         self.assertNotIn("EDGE LABEL", cql)
 
     def test_table_with_edge(self):
         tm = self._create_table_metadata(with_edge=True)
-        self.assertIsNone(tm.vertex)
+        assert tm.vertex is None
         self.assertIsInstance(tm.edge, EdgeMetadata)
         cql = tm.as_cql_query()
         self.assertNotIn("VERTEX LABEL", cql)

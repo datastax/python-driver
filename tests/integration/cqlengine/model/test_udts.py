@@ -151,7 +151,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         created_user.update()
 
         john_info = UserModel.objects.first().info
-        self.assertIsNone(john_info)
+        assert john_info is None
 
     def test_can_create_same_udt_different_keyspaces(self):
         sync_type(DEFAULT_KEYSPACE, User)
@@ -179,15 +179,15 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         john_info = UserModelGender.objects.first().info
         assert 42 == john_info.age
         assert "John" == john_info.name
-        self.assertIsNone(john_info.gender)
+        assert john_info.gender is None
 
         user = UserGender(age=42)
         UserModelGender.create(id=0, info=user)
 
         john_info = UserModelGender.objects.first().info
         assert 42 == john_info.age
-        self.assertIsNone(john_info.name)
-        self.assertIsNone(john_info.gender)
+        assert john_info.name is None
+        assert john_info.gender is None
 
     def test_can_insert_nested_udts(self):
         class Depth_0(UserType):

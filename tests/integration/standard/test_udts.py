@@ -702,7 +702,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         s.execute('ALTER TYPE %s ADD v1 text' % (type_name,))
         val = s.execute('SELECT v FROM %s' % self.table_name).one()[0]
         assert val['v0'] == 1
-        self.assertIsNone(val['v1'])
+        assert val['v1'] is None
         s.execute("INSERT INTO %s (k, v) VALUES (0, {v0 : 2, v1 : 'sometext'})" % (self.table_name,))
         val = s.execute('SELECT v FROM %s' % self.table_name).one()[0]
         assert val['v0'] == 2

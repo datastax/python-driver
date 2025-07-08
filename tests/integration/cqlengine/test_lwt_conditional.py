@@ -250,7 +250,7 @@ class TestConditional(BaseCassEngTestCase):
             t.iff(count=9999).update(text=None)
         self.assertIsNotNone(TestConditionalModel.objects(id=t.id).first().text)
         t.iff(count=5).update(text=None)
-        self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
+        assert TestConditionalModel.objects(id=t.id).first().text is None
 
         # QuerySet path
         t = TestConditionalModel.if_not_exists().create(text='something', count=5)
@@ -259,21 +259,21 @@ class TestConditional(BaseCassEngTestCase):
             TestConditionalModel.objects(id=t.id).iff(count=9999).update(text=None)
         self.assertIsNotNone(TestConditionalModel.objects(id=t.id).first().text)
         TestConditionalModel.objects(id=t.id).iff(count=5).update(text=None)
-        self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
+        assert TestConditionalModel.objects(id=t.id).first().text is None
 
     def test_column_delete_after_update(self):
         # DML path
         t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         t.iff(count=5).update(text=None, count=6)
 
-        self.assertIsNone(t.text)
+        assert t.text is None
         assert t.count == 6
 
         # QuerySet path
         t = TestConditionalModel.if_not_exists().create(text='something', count=5)
         TestConditionalModel.objects(id=t.id).iff(count=5).update(text=None, count=6)
 
-        self.assertIsNone(TestConditionalModel.objects(id=t.id).first().text)
+        assert TestConditionalModel.objects(id=t.id).first().text is None
         assert TestConditionalModel.objects(id=t.id).first().count == 6
 
     def test_conditional_without_instance(self):
@@ -294,5 +294,5 @@ class TestConditional(BaseCassEngTestCase):
         TestConditionalModel.iff(count=5).filter(id=uuid).update(text=None, count=6)
 
         t = TestConditionalModel.filter(id=uuid).first()
-        self.assertIsNone(t.text)
+        assert t.text is None
         assert t.count == 6

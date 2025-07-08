@@ -1933,12 +1933,12 @@ class AggregateMetadata(FunctionTest):
         encoder = Encoder()
 
         # no initial condition, final func
-        self.assertIsNone(kwargs['initial_condition'])
-        self.assertIsNone(kwargs['final_func'])
+        assert kwargs['initial_condition'] is None
+        assert kwargs['final_func'] is None
         with self.VerifiedAggregate(self, **kwargs) as va:
             meta = self.keyspace_aggregate_meta[va.signature]
-            self.assertIsNone(meta.initial_condition)
-            self.assertIsNone(meta.final_func)
+            assert meta.initial_condition is None
+            assert meta.final_func is None
             cql = meta.as_cql_query()
             assert cql.find('INITCOND') == -1
             assert cql.find('FINALFUNC') == -1
@@ -1948,7 +1948,7 @@ class AggregateMetadata(FunctionTest):
         with self.VerifiedAggregate(self, **kwargs) as va:
             meta = self.keyspace_aggregate_meta[va.signature]
             assert meta.initial_condition == kwargs['initial_condition']
-            self.assertIsNone(meta.final_func)
+            assert meta.final_func is None
             cql = meta.as_cql_query()
             search_string = "INITCOND %s" % kwargs['initial_condition']
             self.assertGreater(cql.find(search_string), 0, '"%s" search string not found in cql:\n%s' % (search_string, cql))
@@ -1959,7 +1959,7 @@ class AggregateMetadata(FunctionTest):
         kwargs['final_func'] = 'List_As_String'
         with self.VerifiedAggregate(self, **kwargs) as va:
             meta = self.keyspace_aggregate_meta[va.signature]
-            self.assertIsNone(meta.initial_condition)
+            assert meta.initial_condition is None
             assert meta.final_func == kwargs['final_func']
             cql = meta.as_cql_query()
             assert cql.find('INITCOND') == -1

@@ -89,7 +89,7 @@ class ClusterTests(unittest.TestCase):
             if str(host) == "127.0.0.1:9042":
                 self.assertTrue(host.is_up)
             else:
-                self.assertIsNone(host.is_up)
+                assert host.is_up is None
         cluster.shutdown()
 
     @local
@@ -566,7 +566,7 @@ class ClusterTests(unittest.TestCase):
         query = "SELECT * FROM system.local WHERE key='local'"
         statement = SimpleStatement(query)
         result = session.execute(statement)
-        self.assertIsNone(result.get_query_trace())
+        assert result.get_query_trace() is None
 
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2, trace=True)
@@ -576,7 +576,7 @@ class ClusterTests(unittest.TestCase):
         statement2 = SimpleStatement(query)
         future = session.execute_async(statement2)
         future.result()
-        self.assertIsNone(future.get_query_trace())
+        assert future.get_query_trace() is None
 
         prepared = session.prepare("SELECT * FROM system.local WHERE key='local'")
         future = session.execute_async(prepared, parameters=(), trace=True)
@@ -642,7 +642,7 @@ class ClusterTests(unittest.TestCase):
         """
         with TestCluster() as cluster:
             session = cluster.connect()
-            self.assertIsNone(session.execute("SELECT * from system.local WHERE key='madeup_key'").one())
+            assert session.execute("SELECT * from system.local WHERE key='madeup_key'").one() is None
 
     def test_string_coverage(self):
         """

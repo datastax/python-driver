@@ -348,4 +348,4 @@ class StaticDeleteTests(BaseCassEngTestCase):
         sdm = StaticDeleteModel.filter(example_id=5).first()
         assert 1 == sdm.example_static2
         sdm.update(example_static2=None)
-        self.assertIsNone(sdm.example_static2)
+        assert sdm.example_static2 is None
