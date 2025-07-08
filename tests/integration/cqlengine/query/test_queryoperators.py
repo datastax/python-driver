@@ -37,10 +37,10 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = WhereClause('time', EqualsOperator(), functions.MaxTimeUUID(now))
         where.set_context_id(5)
 
-        self.assertEqual(str(where), '"time" = MaxTimeUUID(%(5)s)')
+        assert str(where) == '"time" = MaxTimeUUID(%(5)s)'
         ctx = {}
         where.update_context(ctx)
-        self.assertEqual(ctx, {'5': columns.DateTime().to_database(now)})
+        assert ctx == {'5': columns.DateTime().to_database(now)}
 
     def test_mintimeuuid_function(self):
         """
@@ -50,10 +50,10 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         where = WhereClause('time', EqualsOperator(), functions.MinTimeUUID(now))
         where.set_context_id(5)
 
-        self.assertEqual(str(where), '"time" = MinTimeUUID(%(5)s)')
+        assert str(where) == '"time" = MinTimeUUID(%(5)s)'
         ctx = {}
         where.update_context(ctx)
-        self.assertEqual(ctx, {'5': columns.DateTime().to_database(now)})
+        assert ctx == {'5': columns.DateTime().to_database(now)}
 
 
 class TokenTestModel(Model):
@@ -93,7 +93,7 @@ class TestTokenFunction(BaseCassEngTestCase):
 
         # pk__token equality
         r = TokenTestModel.objects(pk__token=functions.Token(last_token))
-        self.assertEqual(len(r), 1)
+        assert len(r) == 1
         r.all()  # Attempt to obtain queryset for results. This has thrown an exception in the past
 
     def test_compound_pk_token_function(self):
@@ -108,7 +108,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         q = TestModel.objects.filter(pk__token__gt=func)
         where = q._where[0]
         where.set_context_id(1)
-        self.assertEqual(str(where), 'token("p1", "p2") > token(%({0})s, %({1})s)'.format(1, 2))
+        assert str(where) == 'token("p1", "p2") > token(%({0})s, %({1})s)'.format(1, 2)
 
         # Verify that a SELECT query can be successfully generated
         str(q._select_query())
@@ -120,7 +120,7 @@ class TestTokenFunction(BaseCassEngTestCase):
         q = TestModel.objects.filter(pk__token__gt=func)
         where = q._where[0]
         where.set_context_id(1)
-        self.assertEqual(str(where), 'token("p1", "p2") > token(%({0})s, %({1})s)'.format(1, 2))
+        assert str(where) == 'token("p1", "p2") > token(%({0})s, %({1})s)'.format(1, 2)
         str(q._select_query())
 
         # The 'pk__token' virtual column may only be compared to a Token

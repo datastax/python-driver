@@ -22,14 +22,14 @@ class ColumnTest(unittest.TestCase):
     def test_comparisons(self):
         c0 = Column()
         c1 = Column()
-        self.assertEqual(c1.position - c0.position, 1)
+        assert c1.position - c0.position == 1
 
         # __ne__
         self.assertNotEqual(c0, c1)
         self.assertNotEqual(c0, object())
 
         # __eq__
-        self.assertEqual(c0, c0)
+        assert c0 == c0
         self.assertFalse(c0 == object())
 
         # __lt__
@@ -64,5 +64,5 @@ class ColumnTest(unittest.TestCase):
 
     def test_hash(self):
         c0 = Column()
-        self.assertEqual(id(c0), c0.__hash__())
+        assert id(c0) == c0.__hash__()
 

@@ -31,10 +31,10 @@ class SniEndPointTest(unittest.TestCase):
     def test_sni_endpoint_properties(self):
 
         endpoint = self.endpoint_factory.create_from_sni('test')
-        self.assertEqual(endpoint.address, 'proxy.datastax.com')
-        self.assertEqual(endpoint.port, 30002)
-        self.assertEqual(endpoint._server_name, 'test')
-        self.assertEqual(str(endpoint), 'proxy.datastax.com:30002:test')
+        assert endpoint.address == 'proxy.datastax.com'
+        assert endpoint.port == 30002
+        assert endpoint._server_name == 'test'
+        assert str(endpoint) == 'proxy.datastax.com:30002:test'
 
     def test_endpoint_equality(self):
         self.assertNotEqual(
@@ -42,10 +42,7 @@ class SniEndPointTest(unittest.TestCase):
             self.endpoint_factory.create_from_sni('10.0.0.1')
         )
 
-        self.assertEqual(
-            self.endpoint_factory.create_from_sni('10.0.0.1'),
-            self.endpoint_factory.create_from_sni('10.0.0.1')
-        )
+        assert self.endpoint_factory.create_from_sni('10.0.0.1') == self.endpoint_factory.create_from_sni('10.0.0.1')
 
         self.assertNotEqual(
             self.endpoint_factory.create_from_sni('10.0.0.1'),
@@ -64,4 +61,4 @@ class SniEndPointTest(unittest.TestCase):
         endpoint = self.endpoint_factory.create_from_sni('test')
         for i in range(10):
             (address, _) = endpoint.resolve()
-            self.assertEqual(address, next(it))
+            assert address == next(it)

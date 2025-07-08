@@ -151,12 +151,12 @@ class TestSetColumn(BaseCassEngTestCase):
 
         m1.int_set.add(5)
         m1.int_set.remove(1)
-        self.assertEqual(m1.int_set, set((2, 3, 4, 5)))
+        assert m1.int_set == set((2, 3, 4, 5))
 
         m1.save()
 
         m2 = TestSetModel.get(partition=m1.partition)
-        self.assertEqual(m2.int_set, set((2, 3, 4, 5)))
+        assert m2.int_set == set((2, 3, 4, 5))
 
     def test_instantiation_with_column_class(self):
         """
@@ -178,9 +178,9 @@ class TestSetColumn(BaseCassEngTestCase):
         column = columns.Set(JsonTestColumn)
         val = set((1, 2, 3))
         db_val = column.to_database(val)
-        self.assertEqual(db_val, set(json.dumps(v) for v in val))
+        assert db_val == set(json.dumps(v) for v in val)
         py_val = column.to_python(db_val)
-        self.assertEqual(py_val, val)
+        assert py_val == val
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
@@ -191,7 +191,7 @@ class TestSetColumn(BaseCassEngTestCase):
         TestSetModel.create(partition=pkey)
 
         m = TestSetModel.get(partition=pkey)
-        self.assertEqual(m.int_set, set((3, 4)))
+        assert m.int_set == set((3, 4))
 
 
 class TestListModel(Model):
@@ -230,14 +230,14 @@ class TestListColumn(BaseCassEngTestCase):
         self.assertIsInstance(m2.int_list, list)
         self.assertIsInstance(m2.text_list, list)
 
-        self.assertEqual(len(m2.int_list), 2)
-        self.assertEqual(len(m2.text_list), 2)
+        assert len(m2.int_list) == 2
+        assert len(m2.text_list) == 2
 
-        self.assertEqual(m2.int_list[0], 1)
-        self.assertEqual(m2.int_list[1], 2)
+        assert m2.int_list[0] == 1
+        assert m2.int_list[1] == 2
 
-        self.assertEqual(m2.text_list[0], 'kai')
-        self.assertEqual(m2.text_list[1], 'andreas')
+        assert m2.text_list[0] == 'kai'
+        assert m2.text_list[1] == 'andreas'
 
     def test_type_validation(self):
         """
@@ -275,7 +275,7 @@ class TestListColumn(BaseCassEngTestCase):
             expected = full
 
         m2 = TestListModel.get(partition=m1.partition)
-        self.assertEqual(list(m2.int_list), expected)
+        assert list(m2.int_list) == expected
 
     def test_instantiation_with_column_class(self):
         """
@@ -297,9 +297,9 @@ class TestListColumn(BaseCassEngTestCase):
         column = columns.List(JsonTestColumn)
         val = [1, 2, 3]
         db_val = column.to_database(val)
-        self.assertEqual(db_val, [json.dumps(v) for v in val])
+        assert db_val == [json.dumps(v) for v in val]
         py_val = column.to_python(db_val)
-        self.assertEqual(py_val, val)
+        assert py_val == val
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
@@ -310,7 +310,7 @@ class TestListColumn(BaseCassEngTestCase):
         TestListModel.create(partition=pkey)
 
         m = TestListModel.get(partition=pkey)
-        self.assertEqual(m.int_list, [1, 2, 3, 4])
+        assert m.int_list == [1, 2, 3, 4]
 
     def test_remove_entry_works(self):
         pkey = uuid4()
@@ -318,7 +318,7 @@ class TestListColumn(BaseCassEngTestCase):
         tmp.int_list.pop()
         tmp.update()
         tmp = TestListModel.get(partition=pkey)
-        self.assertEqual(tmp.int_list, [1])
+        assert tmp.int_list == [1]
 
     def test_update_from_non_empty_to_empty(self):
         pkey = uuid4()
@@ -327,7 +327,7 @@ class TestListColumn(BaseCassEngTestCase):
         tmp.update()
 
         tmp = TestListModel.get(partition=pkey)
-        self.assertEqual(tmp.int_list, [])
+        assert tmp.int_list == []
 
     def test_insert_none(self):
         pkey = uuid4()
@@ -341,12 +341,12 @@ class TestListColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestListModel.get(partition=m.partition)
-        self.assertEqual(m2.int_list, expected)
+        assert m2.int_list == expected
 
         TestListModel.objects(partition=m.partition).update(int_list=[])
 
         m3 = TestListModel.get(partition=m.partition)
-        self.assertEqual(m3.int_list, [])
+        assert m3.int_list == []
 
 
 class TestMapModel(Model):
@@ -405,8 +405,8 @@ class TestMapColumn(BaseCassEngTestCase):
 
         self.assertTrue(1 in m2.int_map)
         self.assertTrue(2 in m2.int_map)
-        self.assertEqual(m2.int_map[1], k1)
-        self.assertEqual(m2.int_map[2], k2)
+        assert m2.int_map[1] == k1
+        assert m2.int_map[2] == k2
 
         self.assertAlmostEqual(get_total_seconds(now - m2.text_map['now']), 0, 2)
         self.assertAlmostEqual(get_total_seconds(then - m2.text_map['then']), 0, 2)
@@ -449,7 +449,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m1.save()
 
         m2 = TestMapModel.get(partition=m1.partition)
-        self.assertEqual(m2.text_map, final)
+        assert m2.text_map == final
 
     def test_updates_from_none(self):
         """ Tests that updates from None work as expected """
@@ -459,7 +459,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        self.assertEqual(m2.int_map, expected)
+        assert m2.int_map == expected
 
         m2.int_map = None
         m2.save()
@@ -474,7 +474,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        self.assertEqual(m2.int_map, expected)
+        assert m2.int_map == expected
 
         TestMapModel.objects(partition=m.partition).update(int_map={})
 
@@ -488,7 +488,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestMapModel.get(partition=m.partition)
-        self.assertEqual(m2.int_map, {})
+        assert m2.int_map == {}
 
     def test_instantiation_with_column_class(self):
         """
@@ -512,9 +512,9 @@ class TestMapColumn(BaseCassEngTestCase):
         column = columns.Map(JsonTestColumn, JsonTestColumn)
         val = {1: 2, 3: 4, 5: 6}
         db_val = column.to_database(val)
-        self.assertEqual(db_val, dict((json.dumps(k), json.dumps(v)) for k, v in val.items()))
+        assert db_val == dict((json.dumps(k), json.dumps(v)) for k, v in val.items())
         py_val = column.to_python(db_val)
-        self.assertEqual(py_val, val)
+        assert py_val == val
 
     def test_default_empty_container_saving(self):
         """ tests that the default empty container is not saved if it hasn't been updated """
@@ -526,7 +526,7 @@ class TestMapColumn(BaseCassEngTestCase):
         TestMapModel.create(partition=pkey)
 
         m = TestMapModel.get(partition=pkey)
-        self.assertEqual(m.int_map, tmap)
+        assert m.int_map == tmap
 
 
 class TestCamelMapModel(Model):
@@ -621,9 +621,9 @@ class TestTupleColumn(BaseCassEngTestCase):
         self.assertIsInstance(m2.text_tuple, tuple)
         self.assertIsInstance(m2.mixed_tuple, tuple)
 
-        self.assertEqual((1, 2, 3), m2.int_tuple)
-        self.assertEqual(('kai', 'andreas'), m2.text_tuple)
-        self.assertEqual(('first', 2, 'Third'), m2.mixed_tuple)
+        assert (1, 2, 3) == m2.int_tuple
+        assert ('kai', 'andreas') == m2.text_tuple
+        assert ('first', 2, 'Third') == m2.mixed_tuple
 
     def test_type_validation(self):
         """
@@ -654,7 +654,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         self.assertIsInstance(mixed_tuple.types[0], columns.Text)
         self.assertIsInstance(mixed_tuple.types[1], columns.Integer)
         self.assertIsInstance(mixed_tuple.types[2], columns.Text)
-        self.assertEqual(len(mixed_tuple.types), 3)
+        assert len(mixed_tuple.types) == 3
 
     def test_default_empty_container_saving(self):
         """
@@ -673,7 +673,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         TestTupleModel.create(partition=pkey)
 
         m = TestTupleModel.get(partition=pkey)
-        self.assertEqual(m.int_tuple, (1, 2, 3))
+        assert m.int_tuple == (1, 2, 3)
 
     def test_updates(self):
         """
@@ -693,7 +693,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         m1.save()
 
         m2 = TestTupleModel.get(partition=m1.partition)
-        self.assertEqual(tuple(m2.int_tuple), replacement)
+        assert tuple(m2.int_tuple) == replacement
 
     def test_update_from_non_empty_to_empty(self):
         """
@@ -711,7 +711,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         tmp.update()
 
         tmp = TestTupleModel.get(partition=pkey)
-        self.assertEqual(tmp.int_tuple, (None))
+        assert tmp.int_tuple == (None)
 
     def test_insert_none(self):
         """
@@ -725,7 +725,7 @@ class TestTupleColumn(BaseCassEngTestCase):
         """
         pkey = uuid4()
         tmp = TestTupleModel.create(partition=pkey, int_tuple=(None))
-        self.assertEqual((None), tmp.int_tuple)
+        assert (None) == tmp.int_tuple
 
     def test_blind_tuple_updates_from_none(self):
         """
@@ -744,12 +744,12 @@ class TestTupleColumn(BaseCassEngTestCase):
         m.save()
 
         m2 = TestTupleModel.get(partition=m.partition)
-        self.assertEqual(m2.int_tuple, expected)
+        assert m2.int_tuple == expected
 
         TestTupleModel.objects(partition=m.partition).update(int_tuple=None)
 
         m3 = TestTupleModel.get(partition=m.partition)
-        self.assertEqual(m3.int_tuple, None)
+        assert m3.int_tuple == None
 
 
 class TestNestedModel(Model):
@@ -829,9 +829,9 @@ class TestNestedType(BaseCassEngTestCase):
         self.assertIsInstance(m2.map_list, dict)
         self.assertIsInstance(m2.map_list.get("key2"), list)
 
-        self.assertEqual(list_list_master, m2.list_list)
-        self.assertEqual(map_list_master, m2.map_list)
-        self.assertEqual(set_tuple_master, m2.set_tuple)
+        assert list_list_master == m2.list_list
+        assert map_list_master == m2.map_list
+        assert set_tuple_master == m2.set_tuple
         self.assertIsInstance(m2.set_tuple.pop(), tuple)
 
     def test_type_validation(self):
@@ -902,9 +902,9 @@ class TestNestedType(BaseCassEngTestCase):
         TestNestedModel.create(partition=pkey)
 
         m = TestNestedModel.get(partition=pkey)
-        self.assertEqual(m.list_list, list_list_master)
-        self.assertEqual(m.map_list, map_list_master)
-        self.assertEqual(m.set_tuple, set_tuple_master)
+        assert m.list_list == list_list_master
+        assert m.map_list == map_list_master
+        assert m.set_tuple == set_tuple_master
 
     def test_updates(self):
         """
@@ -931,9 +931,9 @@ class TestNestedType(BaseCassEngTestCase):
         m1.save()
 
         m2 = TestNestedModel.get(partition=m1.partition)
-        self.assertEqual(m2.list_list, list_list_replacement)
-        self.assertEqual(m2.map_list, map_list_replacement)
-        self.assertEqual(m2.set_tuple, set_tuple_replacement)
+        assert m2.list_list == list_list_replacement
+        assert m2.map_list == map_list_replacement
+        assert m2.set_tuple == set_tuple_replacement
 
     def test_update_from_non_empty_to_empty(self):
         """
@@ -955,9 +955,9 @@ class TestNestedType(BaseCassEngTestCase):
         tmp.update()
 
         tmp = TestNestedModel.get(partition=tmp.partition)
-        self.assertEqual(tmp.list_list, [])
-        self.assertEqual(tmp.map_list, {})
-        self.assertEqual(tmp.set_tuple, set())
+        assert tmp.list_list == []
+        assert tmp.map_list == {}
+        assert tmp.set_tuple == set()
 
     def test_insert_none(self):
         """
@@ -971,8 +971,8 @@ class TestNestedType(BaseCassEngTestCase):
         """
         pkey = uuid4()
         tmp = TestNestedModel.create(partition=pkey, list_list=(None), map_list=(None), set_tuple=(None))
-        self.assertEqual([], tmp.list_list)
-        self.assertEqual({}, tmp.map_list)
-        self.assertEqual(set(), tmp.set_tuple)
+        assert [] == tmp.list_list
+        assert {} == tmp.map_list
+        assert set() == tmp.set_tuple
 
 

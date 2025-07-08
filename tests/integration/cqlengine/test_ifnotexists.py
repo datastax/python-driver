@@ -86,19 +86,19 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         with self.assertRaises(LWTException) as assertion:
             TestIfNotExistsModel.objects(count=9, text='111111111111').if_not_exists().create(id=id)
 
-        self.assertEqual(assertion.exception.existing, {
+        assert assertion.exception.existing == {
             'count': 8,
             'id': id,
             'text': '123456789',
             '[applied]': False,
-        })
+        }
 
         q = TestIfNotExistsModel.objects(id=id)
-        self.assertEqual(len(q), 1)
+        assert len(q) == 1
 
         tm = q.first()
-        self.assertEqual(tm.count, 8)
-        self.assertEqual(tm.text, '123456789')
+        assert tm.count == 8
+        assert tm.text == '123456789'
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_insert_if_not_exists(self):
@@ -114,19 +114,19 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
         with self.assertRaises(LWTException) as assertion:
             b.execute()
 
-        self.assertEqual(assertion.exception.existing, {
+        assert assertion.exception.existing == {
             'count': 8,
             'id': id,
             'text': '123456789',
             '[applied]': False,
-        })
+        }
 
         q = TestIfNotExistsModel.objects(id=id)
-        self.assertEqual(len(q), 1)
+        assert len(q) == 1
 
         tm = q.first()
-        self.assertEqual(tm.count, 8)
-        self.assertEqual(tm.text, '123456789')
+        assert tm.count == 8
+        assert tm.text == '123456789'
 
 
 class IfNotExistsModelTest(BaseIfNotExistsTest):
@@ -174,7 +174,7 @@ class IfNotExistsInstanceTest(BaseIfNotExistsTest):
         o = TestIfNotExistsModel.create(text="whatever")
         o.text = "new stuff"
         o = o.if_not_exists()
-        self.assertEqual(True, o._if_not_exists)
+        assert True == o._if_not_exists
 
     def test_if_not_exists_is_not_include_with_query_on_update(self):
         """

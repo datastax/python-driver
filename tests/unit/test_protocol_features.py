@@ -22,6 +22,6 @@ class TestProtocolFeatures(unittest.TestCase):
 
         protocol_features = ProtocolFeatures.parse_from_supported(OptionsHolder().options)
 
-        self.assertEqual(protocol_features.rate_limit_error, 123)
-        self.assertEqual(protocol_features.shard_id, 0)
-        self.assertEqual(protocol_features.sharding_info, None)
+        assert protocol_features.rate_limit_error == 123
+        assert protocol_features.shard_id == 0
+        assert protocol_features.sharding_info is None

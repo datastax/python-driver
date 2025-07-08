@@ -251,7 +251,7 @@ class ConcurrencyTest((unittest.TestCase)):
         self.assertRaises(TypeError, execute_concurrent_with_args, s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=True)
 
         results = execute_concurrent_with_args(s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=False)  # previously
-        self.assertEqual(len(results), max_recursion)
+        assert len(results) == max_recursion
         for r in results:
             self.assertFalse(r[0])
             self.assertIsInstance(r[1], TypeError)

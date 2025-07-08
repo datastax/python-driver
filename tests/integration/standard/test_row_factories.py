@@ -97,12 +97,12 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
 
         result = result.all()
         for row in result:
-            self.assertEqual(row[0], row[1])
+            assert row[0] == row[1]
 
-        self.assertEqual(result[0][0], result[0][1])
-        self.assertEqual(result[0][0], 1)
-        self.assertEqual(result[1][0], result[1][1])
-        self.assertEqual(result[1][0], 2)
+        assert result[0][0] == result[0][1]
+        assert result[0][0] == 1
+        assert result[1][0] == result[1][1]
+        assert result[1][0] == 2
 
     def test_named_tuple_factory(self):
         result = self._results_from_row_factory(named_tuple_factory)
@@ -110,12 +110,12 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         result = result.all()
 
         for row in result:
-            self.assertEqual(row.k, row.v)
+            assert row.k == row.v
 
-        self.assertEqual(result[0].k, result[0].v)
-        self.assertEqual(result[0].k, 1)
-        self.assertEqual(result[1].k, result[1].v)
-        self.assertEqual(result[1].k, 2)
+        assert result[0].k == result[0].v
+        assert result[0].k == 1
+        assert result[1].k == result[1].v
+        assert result[1].k == 2
 
     def _test_dict_factory(self, row_factory, row_type):
         result = self._results_from_row_factory(row_factory)
@@ -124,12 +124,12 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
 
         result = result.all()
         for row in result:
-            self.assertEqual(row['k'], row['v'])
+            assert row['k'] == row['v']
 
-        self.assertEqual(result[0]['k'], result[0]['v'])
-        self.assertEqual(result[0]['k'], 1)
-        self.assertEqual(result[1]['k'], result[1]['v'])
-        self.assertEqual(result[1]['k'], 2)
+        assert result[0]['k'] == result[0]['v']
+        assert result[0]['k'] == 1
+        assert result[1]['k'] == result[1]['v']
+        assert result[1]['k'] == 2
 
     def test_dict_factory(self):
         self._test_dict_factory(dict_factory, dict)
@@ -166,7 +166,7 @@ class RowFactoryTests(BasicSharedKeyspaceUnitTestCaseWFunctionTable):
         result = session.execute(self.select)
         self.assertIsInstance(result, ResultSet)
         first_row = result.one()
-        self.assertEqual(first_row[0], first_row[1])
+        assert first_row[0] == first_row[1]
 
 
 class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):

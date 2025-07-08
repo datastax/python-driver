@@ -71,20 +71,20 @@ class CustomProtocolHandlerTest(unittest.TestCase):
 
         result = session.execute("SELECT schema_version FROM system.local WHERE key='local'")
         uuid_type = result.one()[0]
-        self.assertEqual(type(uuid_type), uuid.UUID)
+        assert type(uuid_type) == uuid.UUID
 
         # use our custom protocol handlder
         session.client_protocol_handler = CustomTestRawRowType
         result_set = session.execute("SELECT schema_version FROM system.local WHERE key='local'")
         raw_value = result_set.one()[0]
         self.assertTrue(isinstance(raw_value, bytes))
-        self.assertEqual(len(raw_value), 16)
+        assert len(raw_value) == 16
 
         # Ensure that we get normal uuid back when we re-connect
         session.client_protocol_handler = ProtocolHandler
         result_set = session.execute("SELECT schema_version FROM system.local WHERE key='local'")
         uuid_type = result_set.one()[0]
-        self.assertEqual(type(uuid_type), uuid.UUID)
+        assert type(uuid_type) == uuid.UUID
         cluster.shutdown()
 
     def test_custom_raw_row_results_all_types(self):
@@ -115,9 +115,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         params = get_all_primitive_params(0)
         results = session.execute("SELECT {0} FROM alltypes WHERE primkey=0".format(columns_string)).one()
         for expected, actual in zip(params, results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
         # Ensure we have covered the various primitive types
-        self.assertEqual(len(CustomResultMessageTracked.checked_rev_row_set), len(PRIMITIVE_DATATYPES)-1)
+        assert len(CustomResultMessageTracked.checked_rev_row_set) == len(PRIMITIVE_DATATYPES)-1
         cluster.shutdown()
 
     @unittest.expectedFailure
@@ -219,7 +219,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
             response = future.result()
 
             # This means the flag are not handled as they are meant by the server if uses_int=False
-            self.assertEqual(response.has_more_pages, uses_int_query_flag)
+            assert response.has_more_pages == uses_int_query_flag
 
         execute_with_long_wait_retry(session, SimpleStatement("TRUNCATE test3rf.test"))
         cluster.shutdown()

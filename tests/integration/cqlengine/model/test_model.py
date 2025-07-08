@@ -35,7 +35,7 @@ class TestModel(unittest.TestCase):
         m0 = EqualityModel(pk=0)
         m1 = EqualityModel(pk=1)
 
-        self.assertEqual(m0, m0)
+        assert m0 == m0
         self.assertNotEqual(m0, m1)
 
     def test_model_equality(self):
@@ -51,7 +51,7 @@ class TestModel(unittest.TestCase):
         m0 = EqualityModel0(pk=0)
         m1 = EqualityModel1(kk=1)
 
-        self.assertEqual(m0, m0)
+        assert m0 == m0
         self.assertNotEqual(m0, m1)
 
     def test_keywords_as_names(self):
@@ -87,8 +87,8 @@ class TestModel(unittest.TestCase):
 
         created = table.create(select=0, table='table')
         selected = table.objects(select=0)[0]
-        self.assertEqual(created.select, selected.select)
-        self.assertEqual(created.table, selected.table)
+        assert created.select == selected.select
+        assert created.table == selected.table
 
         # Alter should work
         class table(Model):
@@ -101,9 +101,9 @@ class TestModel(unittest.TestCase):
 
         created = table.create(select=1, table='table')
         selected = table.objects(select=1)[0]
-        self.assertEqual(created.select, selected.select)
-        self.assertEqual(created.table, selected.table)
-        self.assertEqual(created.where, selected.where)
+        assert created.select == selected.select
+        assert created.table == selected.table
+        assert created.where == selected.where
 
         drop_keyspace('keyspace')
 
@@ -112,18 +112,18 @@ class TestModel(unittest.TestCase):
             k = columns.Integer(primary_key=True)
 
         # no model keyspace uses default
-        self.assertEqual(TestModel.column_family_name(), "%s.test_model" % (models.DEFAULT_KEYSPACE,))
+        assert TestModel.column_family_name() == "%s.test_model" % (models.DEFAULT_KEYSPACE,)
 
         # model keyspace overrides
         TestModel.__keyspace__ = "my_test_keyspace"
-        self.assertEqual(TestModel.column_family_name(), "%s.test_model" % (TestModel.__keyspace__,))
+        assert TestModel.column_family_name() == "%s.test_model" % (TestModel.__keyspace__,)
 
         # neither set should raise CQLEngineException before failing or formatting an invalid name
         del TestModel.__keyspace__
         with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
             self.assertRaises(CQLEngineException, TestModel.column_family_name)
             # .. but we can still get the bare CF name
-            self.assertEqual(TestModel.column_family_name(include_keyspace=False), "test_model")
+            assert TestModel.column_family_name(include_keyspace=False) == "test_model"
 
     def test_column_family_case_sensitive(self):
         """
@@ -141,15 +141,15 @@ class TestModel(unittest.TestCase):
 
             k = columns.Integer(primary_key=True)
 
-        self.assertEqual(TestModel.column_family_name(), '%s."TestModel"' % (models.DEFAULT_KEYSPACE,))
+        assert TestModel.column_family_name() == '%s."TestModel"' % (models.DEFAULT_KEYSPACE,)
 
         TestModel.__keyspace__ = "my_test_keyspace"
-        self.assertEqual(TestModel.column_family_name(), '%s."TestModel"' % (TestModel.__keyspace__,))
+        assert TestModel.column_family_name() == '%s."TestModel"' % (TestModel.__keyspace__,)
 
         del TestModel.__keyspace__
         with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
             self.assertRaises(CQLEngineException, TestModel.column_family_name)
-            self.assertEqual(TestModel.column_family_name(include_keyspace=False), '"TestModel"')
+            assert TestModel.column_family_name(include_keyspace=False) == '"TestModel"'
 
 
 class BuiltInAttributeConflictTest(unittest.TestCase):
@@ -216,7 +216,7 @@ class TestColumnComparison(unittest.TestCase):
              TestQueryUpdateModel.text_list.column,
              TestQueryUpdateModel.text_map.column]
 
-        self.assertEqual(l, sorted(l))
+        assert l == sorted(l)
         self.assertNotEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
         self.assertLessEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
         self.assertGreater(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)

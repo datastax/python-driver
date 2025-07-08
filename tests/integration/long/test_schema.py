@@ -156,6 +156,6 @@ class SchemaTests(unittest.TestCase):
     def check_and_wait_for_agreement(self, session, rs, exepected):
         # Wait for RESULT_KIND_SCHEMA_CHANGE message to arrive
         time.sleep(1)
-        self.assertEqual(rs.response_future.is_schema_agreed, exepected)
+        assert rs.response_future.is_schema_agreed == exepected
         if not rs.response_future.is_schema_agreed:
             session.cluster.control_connection.wait_for_schema_agreement(wait_time=1000)

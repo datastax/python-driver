@@ -26,27 +26,27 @@ class ParamBindingTest(unittest.TestCase):
 
     def test_bind_sequence(self):
         result = bind_params("%s %s %s", (1, "a", 2.0), Encoder())
-        self.assertEqual(result, "1 'a' 2.0")
+        assert result == "1 'a' 2.0"
 
     def test_bind_map(self):
         result = bind_params("%(a)s %(b)s %(c)s", dict(a=1, b="a", c=2.0), Encoder())
-        self.assertEqual(result, "1 'a' 2.0")
+        assert result == "1 'a' 2.0"
 
     def test_sequence_param(self):
         result = bind_params("%s", (ValueSequence((1, "a", 2.0)),), Encoder())
-        self.assertEqual(result, "(1, 'a', 2.0)")
+        assert result == "(1, 'a', 2.0)"
 
     def test_generator_param(self):
         result = bind_params("%s", ((i for i in range(3)),), Encoder())
-        self.assertEqual(result, "[0, 1, 2]")
+        assert result == "[0, 1, 2]"
 
     def test_none_param(self):
         result = bind_params("%s", (None,), Encoder())
-        self.assertEqual(result, "NULL")
+        assert result == "NULL"
 
     def test_list_collection(self):
         result = bind_params("%s", (['a', 'b', 'c'],), Encoder())
-        self.assertEqual(result, "['a', 'b', 'c']")
+        assert result == "['a', 'b', 'c']"
 
     def test_set_collection(self):
         result = bind_params("%s", (set(['a', 'b']),), Encoder())
@@ -58,15 +58,15 @@ class ParamBindingTest(unittest.TestCase):
         vals['b'] = 'b'
         vals['c'] = 'c'
         result = bind_params("%s", (vals,), Encoder())
-        self.assertEqual(result, "{'a': 'a', 'b': 'b', 'c': 'c'}")
+        assert result == "{'a': 'a', 'b': 'b', 'c': 'c'}"
 
     def test_quote_escaping(self):
         result = bind_params("%s", ("""'ef''ef"ef""ef'""",), Encoder())
-        self.assertEqual(result, """'''ef''''ef"ef""ef'''""")
+        assert result == """'''ef''''ef"ef""ef'''"""
 
     def test_float_precision(self):
         f = 3.4028234663852886e+38
-        self.assertEqual(float(bind_params("%s", (f,), Encoder())), f)
+        assert float(bind_params("%s", (f,), Encoder())) == f
 
 class BoundStatementTestV3(unittest.TestCase):
 
@@ -128,13 +128,13 @@ class BoundStatementTestV3(unittest.TestCase):
                                                result_metadata_id=None)
         prepared_statement.fetch_size = 1234
         bound_statement = BoundStatement(prepared_statement=prepared_statement)
-        self.assertEqual(1234, bound_statement.fetch_size)
+        assert 1234 == bound_statement.fetch_size
 
     def test_too_few_parameters_for_routing_key(self):
         self.assertRaises(ValueError, self.prepared.bind, (1,))
 
         bound = self.prepared.bind((1, 2))
-        self.assertEqual(bound.keyspace, 'keyspace')
+        assert bound.keyspace == 'keyspace'
 
     def test_dict_missing_routing_key(self):
         self.assertRaises(KeyError, self.bound.bind, {'rk0': 0, 'ck0': 0, 'v0': 0})
@@ -145,7 +145,7 @@ class BoundStatementTestV3(unittest.TestCase):
 
     def test_extra_value(self):
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': 0, 'should_not_be_here': 123})  # okay to have extra keys in dict
-        self.assertEqual(self.bound.values, [b'\x00' * 4] * 4)  # four encoded zeros
+        assert self.bound.values == [b'\x00' * 4] * 4  # four encoded zeros
         self.assertRaises(ValueError, self.bound.bind, (0, 0, 0, 0, 123))
 
     def test_values_none(self):
@@ -166,12 +166,12 @@ class BoundStatementTestV3(unittest.TestCase):
 
     def test_bind_none(self):
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': None})
-        self.assertEqual(self.bound.values[-1], None)
+        assert self.bound.values[-1] == None
 
         old_values = self.bound.values
         self.bound.bind((0, 0, 0, None))
         self.assertIsNot(self.bound.values, old_values)
-        self.assertEqual(self.bound.values[-1], None)
+        assert self.bound.values[-1] == None
 
     def test_unset_value(self):
         self.assertRaises(ValueError, self.bound.bind, {'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': UNSET_VALUE})
@@ -190,19 +190,19 @@ class BoundStatementTestV4(BoundStatementTestV3):
     def test_missing_value(self):
         # in v4 missing values are UNSET_VALUE
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0})
-        self.assertEqual(self.bound.values[-1], UNSET_VALUE)
+        assert self.bound.values[-1] == UNSET_VALUE
 
         old_values = self.bound.values
         self.bound.bind((0, 0, 0))
         self.assertIsNot(self.bound.values, old_values)
-        self.assertEqual(self.bound.values[-1], UNSET_VALUE)
+        assert self.bound.values[-1] == UNSET_VALUE
 
     def test_unset_value(self):
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': UNSET_VALUE})
-        self.assertEqual(self.bound.values[-1], UNSET_VALUE)
+        assert self.bound.values[-1] == UNSET_VALUE
 
         self.bound.bind((0, 0, 0, UNSET_VALUE))
-        self.assertEqual(self.bound.values[-1], UNSET_VALUE)
+        assert self.bound.values[-1] == UNSET_VALUE
 
 
 class BoundStatementTestV5(BoundStatementTestV4):

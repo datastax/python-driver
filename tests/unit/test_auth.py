@@ -22,7 +22,4 @@ class TestPlainTextAuthenticator(unittest.TestCase):
 
     def test_evaluate_challenge_with_unicode_data(self):
         authenticator = PlainTextAuthenticator("johnӁ", "doeӁ")
-        self.assertEqual(
-            authenticator.evaluate_challenge(b'PLAIN-START'),
-            "\x00johnӁ\x00doeӁ".encode('utf-8')
-        )
+        assert authenticator.evaluate_challenge(b'PLAIN-START') == "\x00johnӁ\x00doeӁ".encode('utf-8')

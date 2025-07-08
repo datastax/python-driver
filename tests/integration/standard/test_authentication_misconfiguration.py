@@ -40,7 +40,7 @@ class MisconfiguredAuthenticationTests(unittest.TestCase):
         cluster.connect()
         cluster.refresh_nodes()
         down_hosts = [host for host in cluster.metadata.all_hosts() if not host.is_up]
-        self.assertEqual(len(down_hosts), 1)
+        assert len(down_hosts) == 1
         cluster.shutdown()
 
     @classmethod

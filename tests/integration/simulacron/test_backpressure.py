@@ -123,7 +123,7 @@ class TCPBackpressureTests(SimulacronBase):
         # that only "a few" successes happened here
         self.assertLess(successes, 50)
         self.assertLess(self.callback_successes, 50)
-        self.assertEqual(self.callback_errors, len(futures) - self.callback_successes)
+        assert self.callback_errors == len(futures) - self.callback_successes
 
     def test_cluster_busy(self):
         """ Verify that once TCP buffer is full we get busy exceptions rather than timeouts """

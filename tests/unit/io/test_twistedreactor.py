@@ -144,18 +144,17 @@ class TestTwistedConnection(unittest.TestCase):
         Verify that handle_read() processes incomplete messages properly.
         """
         self.obj_ut.process_msg = Mock()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), b'')  # buf starts empty
+        assert self.obj_ut._iobuf.getvalue() == b''  # buf starts empty
         # incomplete header
         self.obj_ut._iobuf.write(b'\x84\x00\x00\x00\x00')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._io_buffer.cql_frame_buffer.getvalue(), b'\x84\x00\x00\x00\x00')
+        assert self.obj_ut._io_buffer.cql_frame_buffer.getvalue() == b'\x84\x00\x00\x00\x00'
 
         # full header, but incomplete body
         self.obj_ut._iobuf.write(b'\x00\x00\x00\x15')
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._io_buffer.cql_frame_buffer.getvalue(),
-                         b'\x84\x00\x00\x00\x00\x00\x00\x00\x15')
-        self.assertEqual(self.obj_ut._current_frame.end_pos, 30)
+        assert self.obj_ut._io_buffer.cql_frame_buffer.getvalue() == b'\x84\x00\x00\x00\x00\x00\x00\x00\x15'
+        assert self.obj_ut._current_frame.end_pos == 30
 
         # verify we never attempted to process the incomplete message
         self.assertFalse(self.obj_ut.process_msg.called)
@@ -165,7 +164,7 @@ class TestTwistedConnection(unittest.TestCase):
         Verify that handle_read() processes complete messages properly.
         """
         self.obj_ut.process_msg = Mock()
-        self.assertEqual(self.obj_ut._iobuf.getvalue(), b'')  # buf starts empty
+        assert self.obj_ut._iobuf.getvalue() == b''  # buf starts empty
 
         # write a complete message, plus 'NEXT' (to simulate next message)
         # assumes protocol v3+ as default Connection.protocol_version
@@ -174,7 +173,7 @@ class TestTwistedConnection(unittest.TestCase):
         self.obj_ut._iobuf.write(
             b'\x84\x01\x00\x02\x03\x00\x00\x00\x15' + body + extra)
         self.obj_ut.handle_read()
-        self.assertEqual(self.obj_ut._io_buffer.cql_frame_buffer.getvalue(), extra)
+        assert self.obj_ut._io_buffer.cql_frame_buffer.getvalue() == extra
         self.obj_ut.process_msg.assert_called_with(
             _Frame(version=4, flags=1, stream=2, opcode=3, body_offset=9, end_pos=9 + len(body)), body)
 

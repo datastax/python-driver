@@ -56,4 +56,4 @@ class TestRateLimitExceededException(unittest.TestCase):
         with self.assertRaises(RateLimitReached) as context:
             execute_write()
 
-        self.assertEqual(context.exception.op_type, OperationType.Write)
+        assert context.exception.op_type == OperationType.Write

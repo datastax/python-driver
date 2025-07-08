@@ -31,9 +31,9 @@ class BatchStatementTest(unittest.TestCase):
         batch.add(ss)
 
         self.assertTrue(batch._statements_and_parameters)
-        self.assertEqual(batch.keyspace, keyspace)
-        self.assertEqual(batch.routing_key, routing_key)
-        self.assertEqual(batch.custom_payload, custom_payload)
+        assert batch.keyspace == keyspace
+        assert batch.routing_key == routing_key
+        assert batch.custom_payload == custom_payload
 
         batch.clear()
         self.assertFalse(batch._statements_and_parameters)
@@ -60,11 +60,11 @@ class BatchStatementTest(unittest.TestCase):
         batch.add_all(statements, parameters)
         bound_statements = [t[1] for t in batch._statements_and_parameters]
         str_parameters = [str(i) for i in range(10)]
-        self.assertEqual(bound_statements, str_parameters)
+        assert bound_statements == str_parameters
 
     def test_len(self):
         for n in 0, 10, 100:
             batch = BatchStatement()
             batch.add_all(statements=['%s'] * n,
                           parameters=[(i,) for i in range(n)])
-            self.assertEqual(len(batch), n)
+            assert len(batch) == n

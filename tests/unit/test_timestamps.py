@@ -42,7 +42,7 @@ class _TimestampTestMixin(object):
         for expected in expected_timestamps:
             actual = tsg()
             if expected is not None:
-                self.assertEqual(actual, expected)
+                assert actual == expected
 
         # assert we patched timestamps.time.time correctly
         with self.assertRaises(StopIteration):
@@ -102,8 +102,8 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
 
     def assertLastCallArgRegex(self, call, pattern):
         last_warn_args, last_warn_kwargs = call
-        self.assertEqual(len(last_warn_args), 1)
-        self.assertEqual(len(last_warn_kwargs), 0)
+        assert len(last_warn_args) == 1
+        assert len(last_warn_kwargs) == 0
         self.assertRegex(last_warn_args[0], pattern)
 
     def test_basic_log_content(self):
@@ -124,10 +124,10 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         tsg._last_warn = 12
 
         tsg._next_timestamp(20, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 0)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 0
         tsg._next_timestamp(16, tsg.last)
 
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 1
         self.assertLastCallArgRegex(
             self.patched_timestamp_log.warning.call_args,
             r'Clock skew detected:.*\b16\b.*\b4\b.*\b20\b'
@@ -147,7 +147,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
 
         no_warn_tsg.last = 100
         no_warn_tsg._next_timestamp(99, no_warn_tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 0)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 0
 
     def test_warning_threshold_respected_no_logging(self):
         """
@@ -164,7 +164,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last, tsg._last_warn = 100, 97
         tsg._next_timestamp(98, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 0)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 0
 
     def test_warning_threshold_respected_logs(self):
         """
@@ -182,7 +182,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last, tsg._last_warn = 100, 97
         tsg._next_timestamp(98, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 1
 
     def test_warning_interval_respected_no_logging(self):
         """
@@ -200,10 +200,10 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last = 100
         tsg._next_timestamp(70, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 1
 
         tsg._next_timestamp(71, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 1
 
     def test_warning_interval_respected_logs(self):
         """
@@ -222,10 +222,10 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         )
         tsg.last = 100
         tsg._next_timestamp(70, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 1)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 1
 
         tsg._next_timestamp(72, tsg.last)
-        self.assertEqual(len(self.patched_timestamp_log.warning.call_args_list), 2)
+        assert len(self.patched_timestamp_log.warning.call_args_list) == 2
 
 
 class TestTimestampGeneratorMultipleThreads(unittest.TestCase):
@@ -266,6 +266,6 @@ class TestTimestampGeneratorMultipleThreads(unittest.TestCase):
             for t in threads:
                 t.join()
 
-            self.assertEqual(len(generated_timestamps), num_threads * timestamp_to_generate)
+            assert len(generated_timestamps) == num_threads * timestamp_to_generate
             for i, timestamp in enumerate(sorted(generated_timestamps)):
-                self.assertEqual(int(i + 1e6), timestamp)
+                assert int(i + 1e6) == timestamp

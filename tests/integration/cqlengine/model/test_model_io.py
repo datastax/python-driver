@@ -79,7 +79,7 @@ class TestModelIO(BaseCassEngTestCase):
         self.assertIsInstance(tm2, TestModel)
 
         for cname in tm._columns.keys():
-            self.assertEqual(getattr(tm, cname), getattr(tm2, cname))
+            assert getattr(tm, cname) == getattr(tm2, cname)
 
     def test_model_instantiation_save_and_load(self):
         """
@@ -89,13 +89,13 @@ class TestModelIO(BaseCassEngTestCase):
         tm = TestModel(count=8, text='123456789')
         # Tests that values are available on instantiation.
         self.assertIsNotNone(tm['id'])
-        self.assertEqual(tm.count, 8)
-        self.assertEqual(tm.text, '123456789')
+        assert tm.count == 8
+        assert tm.text == '123456789'
         tm.save()
         tm2 = TestModel.objects(id=tm.id).first()
 
         for cname in tm._columns.keys():
-            self.assertEqual(getattr(tm, cname), getattr(tm2, cname))
+            assert getattr(tm, cname) == getattr(tm2, cname)
 
     def test_model_read_as_dict(self):
         """
@@ -108,18 +108,16 @@ class TestModelIO(BaseCassEngTestCase):
             'text': tm.text,
             'a_bool': tm.a_bool,
         }
-        self.assertEqual(sorted(tm.keys()), sorted(column_dict.keys()))
+        assert sorted(tm.keys()) == sorted(column_dict.keys())
 
         self.assertSetEqual(set(tm.values()), set(column_dict.values()))
-        self.assertEqual(
-            sorted(tm.items(), key=itemgetter(0)),
-            sorted(column_dict.items(), key=itemgetter(0)))
-        self.assertEqual(len(tm), len(column_dict))
+        assert sorted(tm.items(), key=itemgetter(0)) == sorted(column_dict.items(), key=itemgetter(0))
+        assert len(tm) == len(column_dict)
         for column_id in column_dict.keys():
-            self.assertEqual(tm[column_id], column_dict[column_id])
+            assert tm[column_id] == column_dict[column_id]
 
         tm['count'] = 6
-        self.assertEqual(tm.count, 6)
+        assert tm.count == 6
 
     def test_model_updating_works_properly(self):
         """
@@ -132,8 +130,8 @@ class TestModelIO(BaseCassEngTestCase):
         tm.save()
 
         tm2 = TestModel.objects(id=tm.pk).first()
-        self.assertEqual(tm.count, tm2.count)
-        self.assertEqual(tm.a_bool, tm2.a_bool)
+        assert tm.count == tm2.count
+        assert tm.a_bool == tm2.a_bool
 
     def test_model_deleting_works_properly(self):
         """
@@ -212,11 +210,11 @@ class TestModelIO(BaseCassEngTestCase):
                                  m=UUID('067e6162-3b6f-4ae2-a171-2470b63dff00'), n=int(str(2147483647) + '000'),
                                  o=Duration(2, 3, 4))
 
-        self.assertEqual(1, AllDatatypesModel.objects.count())
+        assert 1 == AllDatatypesModel.objects.count()
         output = AllDatatypesModel.objects.first()
 
         for i, i_char in enumerate(range(ord('a'), ord('a') + 14)):
-            self.assertEqual(input[i], output[chr(i_char)])
+            assert input[i] == output[chr(i_char)]
 
     def test_can_specify_none_instead_of_default(self):
         self.assertIsNotNone(TestModel.a_bool.column.default)
@@ -229,9 +227,9 @@ class TestModelIO(BaseCassEngTestCase):
 
         # letting default be set
         inst = TestModel.create()
-        self.assertEqual(inst.a_bool, TestModel.a_bool.column.default)
+        assert inst.a_bool == TestModel.a_bool.column.default
         queried = TestModel.objects(id=inst.id).first()
-        self.assertEqual(queried.a_bool, TestModel.a_bool.column.default)
+        assert queried.a_bool == TestModel.a_bool.column.default
 
     def test_can_insert_model_with_all_protocol_v4_column_types(self):
         """
@@ -265,11 +263,11 @@ class TestModelIO(BaseCassEngTestCase):
 
         v4DatatypesModel.create(id=0, a=date(1970, 1, 1), b=32523, c=time(16, 47, 25, 7), d=123)
 
-        self.assertEqual(1, v4DatatypesModel.objects.count())
+        assert 1 == v4DatatypesModel.objects.count()
         output = v4DatatypesModel.objects.first()
 
         for i, i_char in enumerate(range(ord('a'), ord('a') + 3)):
-            self.assertEqual(input[i], output[chr(i_char)])
+            assert input[i] == output[chr(i_char)]
 
     def test_can_insert_double_and_float(self):
         """
@@ -292,16 +290,16 @@ class TestModelIO(BaseCassEngTestCase):
 
         FloatingPointModel.create(id=0, f=2.39)
         output = FloatingPointModel.objects.first()
-        self.assertEqual(2.390000104904175, output.f)  # float loses precision
+        assert 2.390000104904175 == output.f  # float loses precision
 
         FloatingPointModel.create(id=0, f=3.4028234663852886e+38, d=2.39)
         output = FloatingPointModel.objects.first()
-        self.assertEqual(3.4028234663852886e+38, output.f)
-        self.assertEqual(2.39, output.d)  # double retains precision
+        assert 3.4028234663852886e+38 == output.f
+        assert 2.39 == output.d  # double retains precision
 
         FloatingPointModel.create(id=0, d=3.4028234663852886e+38)
         output = FloatingPointModel.objects.first()
-        self.assertEqual(3.4028234663852886e+38, output.d)
+        assert 3.4028234663852886e+38 == output.d
 
 
 class TestMultiKeyModel(Model):
@@ -503,15 +501,15 @@ class TestUpdating(BaseCassEngTestCase):
             int3=7777,
             int5=5555)
 
-        self.assertEqual(instance.id, 1)
-        self.assertEqual(instance.int1, 9999)
-        self.assertEqual(instance.int2, 456)
-        self.assertEqual(instance.int3, 7777)
+        assert instance.id == 1
+        assert instance.int1 == 9999
+        assert instance.int2 == 456
+        assert instance.int3 == 7777
         self.assertIsNotNone(instance.int4)
         self.assertIsInstance(instance.int4, int)
         self.assertGreaterEqual(instance.int4, 0)
         self.assertLessEqual(instance.int4, 1000)
-        self.assertEqual(instance.int5, 5555)
+        assert instance.int5 == 5555
         self.assertTrue(instance.int6 is None)
 
         # All previous values are unset as the object hasn't been persisted
@@ -554,20 +552,20 @@ class TestUpdating(BaseCassEngTestCase):
                                 text_set=text_set, text_map=text_map)
         initial.save()
         current = TestModelSave.objects.get(partition=partition, cluster=cluster)
-        self.assertEqual(current.text, text)
-        self.assertEqual(current.text_list, text_list)
-        self.assertEqual(current.text_set, text_set)
-        self.assertEqual(current.text_map, text_map)
+        assert current.text == text
+        assert current.text_list == text_list
+        assert current.text_set == text_set
+        assert current.text_map == text_map
 
         next = TestModelSave(partition=partition, cluster=cluster, text=None, text_list=None,
                             text_set=None, text_map=None)
 
         next.save()
         current = TestModelSave.objects.get(partition=partition, cluster=cluster)
-        self.assertEqual(current.text, None)
-        self.assertEqual(current.text_list, [])
-        self.assertEqual(current.text_set, set())
-        self.assertEqual(current.text_map, {})
+        assert current.text == None
+        assert current.text_list == []
+        assert current.text_set == set()
+        assert current.text_map == {}
 
 
 def test_none_filter_fails():
@@ -697,7 +695,7 @@ class TestQuerying(BaseCassEngTestCase):
         day = date(2013, 11, 26)
         obj = TestQueryModel.create(test_id=uid, date=day, description=u'foo')
 
-        self.assertEqual(obj.description, u'foo')
+        assert obj.description == u'foo'
 
         inst = TestQueryModel.filter(
             TestQueryModel.test_id == uid,
@@ -780,10 +778,10 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         t = BasicModelNoRouting.create(k=2, v=3)
         t.update(v=4).save()
         f = BasicModelNoRouting.objects.filter(k=2).first()
-        self.assertEqual(t, f)
+        assert t == f
 
         t.delete()
-        self.assertEqual(BasicModelNoRouting.objects.count(), 0)
+        assert BasicModelNoRouting.objects.count() == 0
 
 
     def test_routing_key_generation_basic(self):
@@ -806,7 +804,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         mrk = BasicModel._routing_key_from_values([1], self.session.cluster.protocol_version)
         simple = SimpleStatement("")
         simple.routing_key = mrk
-        self.assertEqual(bound.routing_key, simple.routing_key)
+        assert bound.routing_key == simple.routing_key
 
     def test_routing_key_generation_multi(self):
         """
@@ -827,7 +825,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         mrk = BasicModelMulti._routing_key_from_values([1, 2], self.session.cluster.protocol_version)
         simple = SimpleStatement("")
         simple.routing_key = mrk
-        self.assertEqual(bound.routing_key, simple.routing_key)
+        assert bound.routing_key == simple.routing_key
 
     def test_routing_key_generation_complex(self):
         """
@@ -853,7 +851,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         mrk = ComplexModelRouting._routing_key_from_values([partition, cluster, text, float], self.session.cluster.protocol_version)
         simple = SimpleStatement("")
         simple.routing_key = mrk
-        self.assertEqual(bound.routing_key, simple.routing_key)
+        assert bound.routing_key == simple.routing_key
 
     def test_partition_key_index(self):
         """
@@ -899,7 +897,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         # Those specified in the models partition field
         for indx, value in enumerate(state.partition_key_values(model._partition_key_index)):
             name = res.get(value)
-            self.assertEqual(indx, model._partition_key_index.get(name))
+            assert indx == model._partition_key_index.get(name)
 
 
 def test_none_filter_fails():

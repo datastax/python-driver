@@ -90,7 +90,7 @@ class ClusterTests(unittest.TestCase):
             results = \
                 test_fn(self.session, list(zip(statements, parameters))) if zip_args else \
                     test_fn(self.session, statement, parameters)
-            self.assertEqual(num_statements, len(results))
+            assert num_statements == len(results)
             for success, result in results:
                 self.assertTrue(success)
                 self.assertFalse(result)
@@ -108,12 +108,12 @@ class ClusterTests(unittest.TestCase):
             validate_fn(num_statements, results)
 
     def execute_concurrent_valiate_tuple(self, num_statements, results):
-            self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, [(i,)]) for i in range(num_statements)], results)
+            assert num_statements == len(results)
+            assert [(True, [(i,)]) for i in range(num_statements)] == results
 
     def execute_concurrent_valiate_dict(self, num_statements, results):
-            self.assertEqual(num_statements, len(results))
-            self.assertEqual([(True, [{"v":i}]) for i in range(num_statements)], results)
+            assert num_statements == len(results)
+            assert [(True, [{"v":i}]) for i in range(num_statements)] == results
 
     def test_execute_concurrent(self):
         self.execute_concurrent_base(self.execute_concurrent_helper, \
@@ -174,7 +174,7 @@ class ClusterTests(unittest.TestCase):
 
             for i in range(num_statements):
                 result = next(results)
-                self.assertEqual((True, [(i,)]), result)
+                assert (True, [(i,)]) == result
             self.assertRaises(StopIteration, next, results)
 
     def test_execute_concurrent_paged_result(self):
@@ -190,7 +190,7 @@ class ClusterTests(unittest.TestCase):
         parameters = [(i, i) for i in range(num_statements)]
 
         results = self.execute_concurrent_args_helper(self.session, statement, parameters)
-        self.assertEqual(num_statements, len(results))
+        assert num_statements == len(results)
         for success, result in results:
             self.assertTrue(success)
             self.assertFalse(result)
@@ -202,11 +202,11 @@ class ClusterTests(unittest.TestCase):
             fetch_size=int(num_statements / 2))
 
         results = self.execute_concurrent_args_helper(self.session, statement, [(num_statements,)])
-        self.assertEqual(1, len(results))
+        assert 1 == len(results)
         self.assertTrue(results[0][0])
         result = results[0][1]
         self.assertTrue(result.has_more_pages)
-        self.assertEqual(num_statements, sum(1 for _ in result))
+        assert num_statements == sum(1 for _ in result)
 
     def test_execute_concurrent_paged_result_generator(self):
         """
@@ -233,7 +233,7 @@ class ClusterTests(unittest.TestCase):
         parameters = [(i, i) for i in range(num_statements)]
 
         results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
-        self.assertEqual(num_statements, sum(1 for _ in results))
+        assert num_statements == sum(1 for _ in results)
 
         # read
         statement = SimpleStatement(
@@ -250,7 +250,7 @@ class ClusterTests(unittest.TestCase):
             for _ in paged_result:
                 found_results += 1
 
-        self.assertEqual(found_results, num_statements)
+        assert found_results == num_statements
 
     def test_first_failure(self):
         statements = cycle(("INSERT INTO test3rf.test (k, v) VALUES (%s, %s)", ))

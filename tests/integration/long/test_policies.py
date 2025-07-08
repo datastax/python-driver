@@ -62,6 +62,6 @@ class RetryPolicyTests(unittest.TestCase):
             session.execute("update test_retry_policy_cas.t set data = 'staging' where id = 42 if data ='testing'")
 
         exception = cm.exception
-        self.assertEqual(exception.consistency, ConsistencyLevel.SERIAL)
-        self.assertEqual(exception.required_replicas, 2)
-        self.assertEqual(exception.alive_replicas, 1)
+        assert exception.consistency == ConsistencyLevel.SERIAL
+        assert exception.required_replicas == 2
+        assert exception.alive_replicas == 1

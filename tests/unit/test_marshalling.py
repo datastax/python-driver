@@ -112,27 +112,19 @@ class UnmarshalTest(unittest.TestCase):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             unmarshaller = lookup_casstype(valtype)
             whatwegot = unmarshaller.from_binary(serializedval, 3)
-            self.assertEqual(whatwegot, nativeval,
-                             msg='Unmarshaller for %s (%s) failed: unmarshal(%r) got %r instead of %r'
-                                 % (valtype, unmarshaller, serializedval, whatwegot, nativeval))
-            self.assertEqual(type(whatwegot), type(nativeval),
-                             msg='Unmarshaller for %s (%s) gave wrong type (%s instead of %s)'
-                                 % (valtype, unmarshaller, type(whatwegot), type(nativeval)))
+            assert whatwegot == nativeval, 'Unmarshaller for %s (%s) failed: unmarshal(%r) got %r instead of %r' % (valtype, unmarshaller, serializedval, whatwegot, nativeval)
+            assert type(whatwegot) == type(nativeval), 'Unmarshaller for %s (%s) gave wrong type (%s instead of %s)' % (valtype, unmarshaller, type(whatwegot), type(nativeval))
 
     def test_marshalling(self):
         for serializedval, valtype, nativeval in marshalled_value_pairs:
             marshaller = lookup_casstype(valtype)
             whatwegot = marshaller.to_binary(nativeval, 3)
-            self.assertEqual(whatwegot, serializedval,
-                             msg='Marshaller for %s (%s) failed: marshal(%r) got %r instead of %r'
-                                 % (valtype, marshaller, nativeval, whatwegot, serializedval))
-            self.assertEqual(type(whatwegot), type(serializedval),
-                             msg='Marshaller for %s (%s) gave wrong type (%s instead of %s)'
-                                 % (valtype, marshaller, type(whatwegot), type(serializedval)))
+            assert whatwegot == serializedval, 'Marshaller for %s (%s) failed: marshal(%r) got %r instead of %r' % (valtype, marshaller, nativeval, whatwegot, serializedval)
+            assert type(whatwegot) == type(serializedval), 'Marshaller for %s (%s) gave wrong type (%s instead of %s)' % (valtype, marshaller, type(whatwegot), type(serializedval))
 
     def test_date(self):
         # separate test because it will deserialize as datetime
-        self.assertEqual(DateType.from_binary(DateType.to_binary(date(2015, 11, 2), 3), 3), datetime(2015, 11, 2))
+        assert DateType.from_binary(DateType.to_binary(date(2015, 11, 2), 3), 3) == datetime(2015, 11, 2)
 
     def test_decimal(self):
         # testing implicit numeric conversion
@@ -142,4 +134,4 @@ class UnmarshalTest(unittest.TestCase):
         for proto_ver in range(3, ProtocolVersion.MAX_SUPPORTED + 1):
             for n in converted_types:
                 expected = Decimal(n)
-                self.assertEqual(DecimalType.from_binary(DecimalType.to_binary(n, proto_ver), proto_ver), expected)
+                assert DecimalType.from_binary(DecimalType.to_binary(n, proto_ver), proto_ver) == expected

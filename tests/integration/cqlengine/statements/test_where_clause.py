@@ -29,8 +29,8 @@ class TestWhereClause(unittest.TestCase):
         wc = WhereClause('a', EqualsOperator(), 'c')
         wc.set_context_id(5)
 
-        self.assertEqual('"a" = %(5)s', str(wc), str(wc))
-        self.assertEqual('"a" = %(5)s', str(wc), type(wc))
+        assert '"a" = %(5)s' == str(wc), str(wc)
+        assert '"a" = %(5)s' == str(wc), type(wc)
 
     def test_equality_method(self):
         """ tests that 2 identical where clauses evaluate as == """

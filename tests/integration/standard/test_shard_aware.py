@@ -120,13 +120,13 @@ class TestShardAwareIntegration(unittest.TestCase):
 
         bound = prepared.bind(('a', 'b'))
         results = session.execute(bound, trace=True)
-        self.assertEqual(results, [('a', 'b', 'c')])
+        assert results == [('a', 'b', 'c')]
         if verify_in_tracing:
             self.verify_same_shard_in_tracing(results, "shard 0")
 
         bound = prepared.bind(('100002', 'f'))
         results = session.execute(bound, trace=True)
-        self.assertEqual(results, [('100002', 'f', 'g')])
+        assert results == [('100002', 'f', 'g')]
 
         if verify_in_tracing:
             self.verify_same_shard_in_tracing(results, "shard 1")

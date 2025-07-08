@@ -52,11 +52,11 @@ class SingleInterfaceTest(unittest.TestCase):
         hosts = self.cluster.metadata._hosts
         broadcast_rpc_ports = []
         broadcast_ports = []
-        self.assertEqual(len(hosts), 3)
+        assert len(hosts) == 3
         for endpoint, host in hosts.items():
 
-            self.assertEqual(endpoint.address, host.broadcast_rpc_address)
-            self.assertEqual(endpoint.port, host.broadcast_rpc_port)
+            assert endpoint.address == host.broadcast_rpc_address
+            assert endpoint.port == host.broadcast_rpc_port
 
             if host.broadcast_rpc_port in broadcast_rpc_ports:
                 self.fail("Duplicate broadcast_rpc_port")
@@ -70,4 +70,4 @@ class SingleInterfaceTest(unittest.TestCase):
                                                  consistency_level=ConsistencyLevel.ALL))
 
         for pool in self.session.get_pools():
-            self.assertEqual(1, pool.get_state()['open_count'])
+            assert 1 == pool.get_state()['open_count']

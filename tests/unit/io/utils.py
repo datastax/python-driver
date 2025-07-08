@@ -310,7 +310,7 @@ class ReactorTestMixin(object):
 
             # Ensure the message size is the good one and that the
             # message has been processed if it is non-empty
-            self.assertEqual(c._io_buffer.io_buffer.tell(), expected_size)
+            assert c._io_buffer.io_buffer.tell() == expected_size
             if expected_size == 0:
                 c.process_io_buffer.assert_not_called()
             else:
@@ -400,9 +400,8 @@ class ReactorTestMixin(object):
         size_mod = msg_size % write_size
         last_write_size = size_mod if size_mod else write_size
         self.assertFalse(c.is_defunct)
-        self.assertEqual(expected_writes, self.get_socket(c).send.call_count)
-        self.assertEqual(last_write_size,
-                         len(self.get_socket(c).send.call_args[0][0]))
+        assert expected_writes == self.get_socket(c).send.call_count
+        assert last_write_size == len(self.get_socket(c).send.call_args[0][0])
 
     def test_socket_error_on_read(self):
         c = self.make_connection()
@@ -429,11 +428,11 @@ class ReactorTestMixin(object):
 
         self.get_socket(c).recv.return_value = message[0:1]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._io_buffer.cql_frame_buffer.getvalue(), message[0:1])
+        assert c._io_buffer.cql_frame_buffer.getvalue() == message[0:1]
 
         self.get_socket(c).recv.return_value = message[1:]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(bytes(), c._io_buffer.io_buffer.getvalue())
+        assert bytes() == c._io_buffer.io_buffer.getvalue()
 
         # let it write out a StartupMessage
         c.handle_write(*self.null_handle_function_args)
@@ -455,12 +454,12 @@ class ReactorTestMixin(object):
         # read in the first nine bytes
         self.get_socket(c).recv.return_value = message[:9]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(c._io_buffer.cql_frame_buffer.getvalue(), message[:9])
+        assert c._io_buffer.cql_frame_buffer.getvalue() == message[:9]
 
         # ... then read in the rest
         self.get_socket(c).recv.return_value = message[9:]
         c.handle_read(*self.null_handle_function_args)
-        self.assertEqual(bytes(), c._io_buffer.io_buffer.getvalue())
+        assert bytes() == c._io_buffer.io_buffer.getvalue()
 
         # let it write out a StartupMessage
         c.handle_write(*self.null_handle_function_args)

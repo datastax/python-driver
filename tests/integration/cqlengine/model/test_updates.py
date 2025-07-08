@@ -60,8 +60,8 @@ class ModelUpdateTests(BaseCassEngTestCase):
 
         # database should reflect both updates
         m2 = TestUpdateModel.get(partition=m0.partition, cluster=m0.cluster)
-        self.assertEqual(m2.count, m1.count)
-        self.assertEqual(m2.text, m0.text)
+        assert m2.count == m1.count
+        assert m2.text == m0.text
 
         #This shouldn't raise a Validation error as the PR is not changing
         m0.update(partition=m0.partition, cluster=m0.cluster)
@@ -85,12 +85,12 @@ class ModelUpdateTests(BaseCassEngTestCase):
 
         # update the text, and call update
         m0.update(text='monkey land')
-        self.assertEqual(m0.text, 'monkey land')
+        assert m0.text == 'monkey land'
 
         # database should reflect both updates
         m2 = TestUpdateModel.get(partition=m0.partition, cluster=m0.cluster)
-        self.assertEqual(m2.count, m1.count)
-        self.assertEqual(m2.text, m0.text)
+        assert m2.count == m1.count
+        assert m2.text == m0.text
 
     def test_noop_model_direct_update(self):
         """ Tests that calling update on a model with no changes will do nothing. """
@@ -206,15 +206,13 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         initial = ModelWithDefault(id=1, mf={0: 0}, dummy=0, udt=first_udt, udt_default=first_udt)
         initial.save()
 
-        self.assertEqual(ModelWithDefault.get()._as_dict(),
-                         {'id': 1, 'dummy': 0, 'mf': {0: 0}, "udt": first_udt, "udt_default": first_udt})
+        assert ModelWithDefault.get()._as_dict() == {'id': 1, 'dummy': 0, 'mf': {0: 0}, "udt": first_udt, "udt_default": first_udt}
 
         second_udt = UDT(age=1, mf={3: 3}, dummy_udt=12)
         second = ModelWithDefault(id=1)
         second.update(mf={0: 1}, udt=second_udt)
 
-        self.assertEqual(ModelWithDefault.get()._as_dict(),
-                         {'id': 1, 'dummy': 0, 'mf': {0: 1}, "udt": second_udt, "udt_default": first_udt})
+        assert ModelWithDefault.get()._as_dict() == {'id': 1, 'dummy': 0, 'mf': {0: 1}, "udt": second_udt, "udt_default": first_udt}
 
     def test_value_is_written_if_is_default(self):
         """
@@ -231,8 +229,7 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         initial.udt_default = self.udt_default
         initial.update()
 
-        self.assertEqual(ModelWithDefault.get()._as_dict(),
-                         {'id': 1, 'dummy': 42, 'mf': {0: 0}, "udt": None, "udt_default": self.udt_default})
+        assert ModelWithDefault.get()._as_dict() == {'id': 1, 'dummy': 42, 'mf': {0: 0}, "udt": None, "udt_default": self.udt_default}
 
     def test_null_update_is_respected(self):
         """
@@ -253,8 +250,7 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         updated_udt = UDT(age=1, mf={2:2}, dummy_udt=None)
         obj.update(dummy=None, udt_default=updated_udt)
 
-        self.assertEqual(ModelWithDefault.get()._as_dict(),
-                         {'id': 1, 'dummy': None, 'mf': {0: 0}, "udt": None, "udt_default": updated_udt})
+        assert ModelWithDefault.get()._as_dict() == {'id': 1, 'dummy': None, 'mf': {0: 0}, "udt": None, "udt_default": updated_udt}
 
     def test_only_set_values_is_updated(self):
         """
@@ -276,8 +272,7 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         item.udt, item.udt_default = udt, udt_default
         item.save()
 
-        self.assertEqual(ModelWithDefault.get()._as_dict(),
-                         {'id': 1, 'dummy': None, 'mf': {1: 2}, "udt": udt, "udt_default": udt_default})
+        assert ModelWithDefault.get()._as_dict() == {'id': 1, 'dummy': None, 'mf': {1: 2}, "udt": udt, "udt_default": udt_default}
 
     def test_collections(self):
         """
@@ -296,8 +291,7 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
 
         udt, udt_default = UDT(age=1, mf={2: 1}), UDT(age=1, mf={2: 1})
         item.update(mf={2:1}, udt=udt, udt_default=udt_default)
-        self.assertEqual(ModelWithDefault.get()._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {2: 1}, "udt": udt, "udt_default": udt_default})
+        assert ModelWithDefault.get()._as_dict() == {'id': 1, 'dummy': 1, 'mf': {2: 1}, "udt": udt, "udt_default": udt_default}
 
     def test_collection_with_default(self):
         """
@@ -314,38 +308,31 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         udt, udt_default = UDT(age=1, mf={6: 6}), UDT(age=1, mf={6: 6})
 
         item = ModelWithDefaultCollection.create(id=1, mf={1: 1}, dummy=1, udt=udt, udt_default=udt_default).save()
-        self.assertEqual(ModelWithDefaultCollection.objects.get(id=1)._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {1: 1}, "udt": udt, "udt_default": udt_default})
+        assert ModelWithDefaultCollection.objects.get(id=1)._as_dict() == {'id': 1, 'dummy': 1, 'mf': {1: 1}, "udt": udt, "udt_default": udt_default}
 
         udt, udt_default = UDT(age=1, mf={5: 5}), UDT(age=1, mf={5: 5})
         item.update(mf={2: 2}, udt=udt, udt_default=udt_default)
-        self.assertEqual(ModelWithDefaultCollection.objects.get(id=1)._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {2: 2}, "udt": udt, "udt_default": udt_default})
+        assert ModelWithDefaultCollection.objects.get(id=1)._as_dict() == {'id': 1, 'dummy': 1, 'mf': {2: 2}, "udt": udt, "udt_default": udt_default}
 
         udt, udt_default = UDT(age=1, mf=None), UDT(age=1, mf=None)
         expected_udt, expected_udt_default = UDT(age=1, mf={}), UDT(age=1, mf={})
         item.update(mf=None, udt=udt, udt_default=udt_default)
-        self.assertEqual(ModelWithDefaultCollection.objects.get(id=1)._as_dict(),
-                         {'id': 1, 'dummy': 1, 'mf': {}, "udt": expected_udt, "udt_default": expected_udt_default})
+        assert ModelWithDefaultCollection.objects.get(id=1)._as_dict() == {'id': 1, 'dummy': 1, 'mf': {}, "udt": expected_udt, "udt_default": expected_udt_default}
 
         udt_default = UDT(age=1, mf={2:2}, dummy_udt=42)
         item = ModelWithDefaultCollection.create(id=2, dummy=2)
-        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
-                         {'id': 2, 'dummy': 2, 'mf': {2: 2}, "udt": None, "udt_default": udt_default})
+        assert ModelWithDefaultCollection.objects.get(id=2)._as_dict() == {'id': 2, 'dummy': 2, 'mf': {2: 2}, "udt": None, "udt_default": udt_default}
 
         udt, udt_default = UDT(age=1, mf={1: 1, 6: 6}), UDT(age=1, mf={1: 1, 6: 6})
         item.update(mf={1: 1, 4: 4}, udt=udt, udt_default=udt_default)
-        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
-                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
+        assert ModelWithDefaultCollection.objects.get(id=2)._as_dict() == {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default}
 
         item.update(udt_default=None)
-        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
-                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": None})
+        assert ModelWithDefaultCollection.objects.get(id=2)._as_dict() == {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": None}
 
         udt_default = UDT(age=1, mf={2:2})
         item.update(udt_default=udt_default)
-        self.assertEqual(ModelWithDefaultCollection.objects.get(id=2)._as_dict(),
-                         {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default})
+        assert ModelWithDefaultCollection.objects.get(id=2)._as_dict() == {'id': 2, 'dummy': 2, 'mf': {1: 1, 4: 4}, "udt": udt, "udt_default": udt_default}
 
 
     def test_udt_to_python(self):
@@ -370,5 +357,4 @@ class ModelWithDefaultTests(BaseCassEngTestCase):
         item.update(udt=user_to_update)
 
         udt, udt_default = UDT(time_col=10), UDT(age=1, mf={2:2})
-        self.assertEqual(ModelWithDefault.objects.get(id=1)._as_dict(),
-                         {'id': 1, 'dummy': 42, 'mf': {}, "udt": udt, "udt_default": udt_default})
+        assert ModelWithDefault.objects.get(id=1)._as_dict() == {'id': 1, 'dummy': 42, 'mf': {}, "udt": udt, "udt_default": udt_default}

@@ -72,7 +72,7 @@ class ControlConnectionTests(unittest.TestCase):
         cc_id_pre_drop = id(self.cluster.control_connection._connection)
         self.session.execute("DROP KEYSPACE keyspacetodrop")
         cc_id_post_drop = id(self.cluster.control_connection._connection)
-        self.assertEqual(cc_id_post_drop, cc_id_pre_drop)
+        assert cc_id_post_drop == cc_id_pre_drop
 
     def test_get_control_connection_host(self):
         """
@@ -86,14 +86,14 @@ class ControlConnectionTests(unittest.TestCase):
         """
 
         host = self.cluster.get_control_connection_host()
-        self.assertEqual(host, None)
+        assert host == None
 
         self.session = self.cluster.connect()
         cc_host = self.cluster.control_connection._connection.host
 
         host = self.cluster.get_control_connection_host()
-        self.assertEqual(host.address, cc_host)
-        self.assertEqual(host.is_up, True)
+        assert host.address == cc_host
+        assert host.is_up == True
 
         # reconnect and make sure that the new host is reflected correctly
         self.cluster.control_connection._reconnect()
@@ -113,17 +113,17 @@ class ControlConnectionTests(unittest.TestCase):
         self.cluster = TestCluster()
 
         host = self.cluster.get_control_connection_host()
-        self.assertEqual(host, None)
+        assert host == None
 
         self.session = self.cluster.connect()
         cc_endpoint = self.cluster.control_connection._connection.endpoint
 
         host = self.cluster.get_control_connection_host()
-        self.assertEqual(host.endpoint, cc_endpoint)
-        self.assertEqual(host.is_up, True)
+        assert host.endpoint == cc_endpoint
+        assert host.is_up == True
         hosts = self.cluster.metadata.all_hosts()
-        self.assertEqual(3, len(hosts))
+        assert 3 == len(hosts)
 
         for host in hosts:
-            self.assertEqual(9042, host.broadcast_rpc_port)
-            self.assertEqual(7000, host.broadcast_port)
+            assert 9042 == host.broadcast_rpc_port
+            assert 7000 == host.broadcast_port

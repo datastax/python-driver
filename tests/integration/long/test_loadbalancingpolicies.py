@@ -366,7 +366,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         responses = set()
         for node in [1, 2, 5]:
             responses.add(self.coordinator_stats.get_query_count(node))
-        self.assertEqual(set([0, 0, 12]), responses)
+        assert set([0, 0, 12]) == responses
 
         self.coordinator_stats.reset_counts()
         decommission(5)
@@ -380,7 +380,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         responses = set()
         for node in [1, 2]:
             responses.add(self.coordinator_stats.get_query_count(node))
-        self.assertEqual(set([0, 12]), responses)
+        assert set([0, 12]) == responses
 
         self.coordinator_stats.reset_counts()
         decommission(1)
@@ -440,9 +440,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self._query(session, keyspace, use_prepared=use_prepared)
             self.fail()
         except Unavailable as e:
-            self.assertEqual(e.consistency, 1)
-            self.assertEqual(e.required_replicas, 1)
-            self.assertEqual(e.alive_replicas, 0)
+            assert e.consistency == 1
+            assert e.required_replicas == 1
+            assert e.alive_replicas == 0
 
         self.coordinator_stats.reset_counts()
         start(2)
@@ -476,7 +476,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.coordinator_stats.get_query_count(1),
             self.coordinator_stats.get_query_count(3)
         ])
-        self.assertEqual(results, set([0, 12]))
+        assert results == set([0, 12])
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)
 
     def test_token_aware_composite_key(self):
@@ -547,7 +547,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         p = session.prepare("SELECT * FROM system.local WHERE key=?")
         # this would blow up prior to 61b4fad
         r = session.execute(p, ('local',))
-        self.assertEqual(r[0].key, 'local')
+        assert r[0].key == 'local'
 
     def test_token_aware_with_shuffle_rf2(self):
         """
@@ -602,7 +602,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.assert_query_count_equals(self, 1, 0)
         query_count_two = self.coordinator_stats.get_query_count(2)
         query_count_three = self.coordinator_stats.get_query_count(3)
-        self.assertEqual(query_count_two + query_count_three, 12)
+        assert query_count_two + query_count_three == 12
 
         self.coordinator_stats.reset_counts()
         stop(2)
@@ -644,7 +644,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             f = session.execute_async(query, (i,), trace=True)
             full_dc1_replicas = [h for h in cluster.metadata.get_replicas('test_tr', cqltypes.Int32Type.serialize(i, cluster.protocol_version))
                                  if h.datacenter == 'dc1']
-            self.assertEqual(len(full_dc1_replicas), 2)
+            assert len(full_dc1_replicas) == 2
 
             f.result()
             trace_hosts = [cluster.metadata.get_host(e.source) for e in f.get_query_trace().events]
@@ -681,7 +681,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                         self.coordinator_stats.get_query_count(3))
 
             query_counts.add(loop_qcs)
-            self.assertEqual(sum(loop_qcs), 12)
+            assert sum(loop_qcs) == 12
 
             # end the loop if we get more than one query ordering
             self.coordinator_stats.reset_counts()
@@ -763,7 +763,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         # will be 4 and for the other 8
         first_node_count = self.coordinator_stats.get_query_count(1)
         third_node_count = self.coordinator_stats.get_query_count(3)
-        self.assertEqual(first_node_count + third_node_count, 12)
+        assert first_node_count + third_node_count == 12
         self.assertTrue(first_node_count == 8 or first_node_count == 4)
 
         self.coordinator_stats.assert_query_count_equals(self, 2, 0)

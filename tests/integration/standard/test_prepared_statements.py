@@ -93,7 +93,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind(('a'))
         results = self.session.execute(bound)
-        self.assertEqual(results, [('a', 'b', 'c')])
+        assert results == [('a', 'b', 'c')]
 
         # test with new dict binding
         prepared = self.session.prepare(
@@ -119,7 +119,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind({'a': 'x'})
         results = self.session.execute(bound)
-        self.assertEqual(results, [('x', 'y', 'z')])
+        assert results == [('x', 'y', 'z')]
 
     def test_missing_primary_key(self):
         """
@@ -229,7 +229,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind((1,))
         results = self.session.execute(bound)
-        self.assertEqual(results.one().v, None)
+        assert results.one().v == None
 
     def test_unset_values(self):
         """
@@ -272,7 +272,7 @@ class PreparedStatementTests(unittest.TestCase):
         for params, expected in bind_expected:
             self.session.execute(insert, params)
             results = self.session.execute(select, (0,))
-            self.assertEqual(results.one(), expected)
+            assert results.one() == expected
 
         self.assertRaises(ValueError, self.session.execute, select, (UNSET_VALUE, 0, 0))
 
@@ -297,7 +297,7 @@ class PreparedStatementTests(unittest.TestCase):
         bound = prepared.bind(None)
         bound.consistency_level = ConsistencyLevel.ALL
         results = self.session.execute(bound)
-        self.assertEqual(results.one().v, 0)
+        assert results.one().v == 0
 
     def test_none_values_dicts(self):
         """
@@ -322,7 +322,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         bound = prepared.bind({'k': 1})
         results = self.session.execute(bound)
-        self.assertEqual(results.one().v, None)
+        assert results.one().v == None
 
     def test_async_binding(self):
         """
@@ -346,7 +346,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         future = self.session.execute_async(prepared, (873,))
         results = future.result()
-        self.assertEqual(results.one().v, None)
+        assert results.one().v == None
 
     def test_async_binding_dicts(self):
         """
@@ -369,7 +369,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         future = self.session.execute_async(prepared, {'k': 873})
         results = future.result()
-        self.assertEqual(results.one().v, None)
+        assert results.one().v == None
 
     def test_raise_error_on_prepared_statement_execution_dropped_table(self):
         """
@@ -441,17 +441,17 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         """
         wildcard_prepared = self.session.prepare("SELECT * FROM {}".format(self.table_name))
         original_result_metadata = wildcard_prepared.result_metadata
-        self.assertEqual(len(original_result_metadata), 3)
+        assert len(original_result_metadata) == 3
 
         r = self.session.execute(wildcard_prepared)
-        self.assertEqual(r[0], (1, 1, 1))
+        assert r[0] == (1, 1, 1)
 
         self.session.execute("ALTER TABLE {} DROP d".format(self.table_name))
 
         # Get a bunch of requests in the pipeline with varying states of result_meta, reprepare, resolved
         futures = set(self.session.execute_async(wildcard_prepared.bind(None)) for _ in range(200))
         for f in futures:
-            self.assertEqual(f.result()[0], (1, 1))
+            assert f.result()[0] == (1, 1)
 
         self.assertIsNot(wildcard_prepared.result_metadata, original_result_metadata)
 
@@ -468,7 +468,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         """
         prepared_statement = self.session.prepare("SELECT * from {} WHERE a = ?".format(self.table_name))
         id_before = prepared_statement.result_metadata_id
-        self.assertEqual(len(prepared_statement.result_metadata), 3)
+        assert len(prepared_statement.result_metadata) == 3
 
         self.session.execute("ALTER TABLE {} ADD c int".format(self.table_name))
         bound_statement = prepared_statement.bind((1, ))
@@ -477,7 +477,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         id_after = prepared_statement.result_metadata_id
 
         self.assertNotEqual(id_before, id_after)
-        self.assertEqual(len(prepared_statement.result_metadata), 4)
+        assert len(prepared_statement.result_metadata) == 4
 
     def test_prepared_id_is_updated_across_pages(self):
         """
@@ -491,7 +491,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         """
         prepared_statement = self.session.prepare("SELECT * from {}".format(self.table_name))
         id_before = prepared_statement.result_metadata_id
-        self.assertEqual(len(prepared_statement.result_metadata), 3)
+        assert len(prepared_statement.result_metadata) == 3
 
         prepared_statement.fetch_size = 2
         result = self.session.execute(prepared_statement.bind((None)))
@@ -505,9 +505,9 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         id_after = prepared_statement.result_metadata_id
 
-        self.assertEqual(result_set, expected_result_set)
+        assert result_set == expected_result_set
         self.assertNotEqual(id_before, id_after)
-        self.assertEqual(len(prepared_statement.result_metadata), 4)
+        assert len(prepared_statement.result_metadata) == 4
 
     def test_prepare_id_is_updated_across_session(self):
         """
@@ -524,7 +524,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         stm = "SELECT * from {} WHERE a = ?".format(self.table_name)
         one_prepared_stm = one_session.prepare(stm)
-        self.assertEqual(len(one_prepared_stm.result_metadata), 3)
+        assert len(one_prepared_stm.result_metadata) == 3
 
         one_id_before = one_prepared_stm.result_metadata_id
 
@@ -533,7 +533,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         one_id_after = one_prepared_stm.result_metadata_id
         self.assertNotEqual(one_id_before, one_id_after)
-        self.assertEqual(len(one_prepared_stm.result_metadata), 4)
+        assert len(one_prepared_stm.result_metadata) == 4
 
     def test_not_reprepare_invalid_statements(self):
         """
@@ -584,11 +584,8 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         LOG.debug('initial result_metadata_id: {}'.format(first_id))
 
         def check_result_and_metadata(expected):
-            self.assertEqual(
-                session.execute(prepared_statement, (value, value, value)).one(),
-                expected
-            )
-            self.assertEqual(prepared_statement.result_metadata_id, first_id)
+            assert session.execute(prepared_statement, (value, value, value)).one() == expected
+            assert prepared_statement.result_metadata_id == first_id
             self.assertIsNone(prepared_statement.result_metadata)
 
         # Successful conditional update

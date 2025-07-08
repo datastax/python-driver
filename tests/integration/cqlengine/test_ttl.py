@@ -130,7 +130,7 @@ class TTLInstanceTest(BaseTTLTest):
         o = TestTTLModel.create(text="whatever")
         o.text = "new stuff"
         o = o.ttl(60)
-        self.assertEqual(60, o._ttl)
+        assert 60 == o._ttl
 
     def test_ttl_is_include_with_query_on_update(self):
         session = get_session()
@@ -180,7 +180,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         self.assertIsNone(o._ttl)
 
         default_ttl = self.get_default_ttl('test_ttlmodel')
-        self.assertEqual(default_ttl, 0)
+        assert default_ttl == 0
 
         with mock.patch.object(session, 'execute') as m:
             TestTTLModel.objects(id=tid).update(text="aligators")
@@ -198,7 +198,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         self.assertIsNone(o._ttl)
 
         default_ttl = self.get_default_ttl('test_default_ttlmodel')
-        self.assertEqual(default_ttl, 20)
+        assert default_ttl == 20
 
         with mock.patch.object(session, 'execute') as m:
             TestTTLModel.objects(id=tid).update(text="aligators expired")
@@ -211,13 +211,13 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         session = get_session()
 
         default_ttl = self.get_default_ttl('test_default_ttlmodel')
-        self.assertEqual(default_ttl, 20)
+        assert default_ttl == 20
 
         TestDefaultTTLModel.__options__ = {'default_time_to_live': 10}
         sync_table(TestDefaultTTLModel)
 
         default_ttl = self.get_default_ttl('test_default_ttlmodel')
-        self.assertEqual(default_ttl, 10)
+        assert default_ttl == 10
 
         # Restore default TTL
         TestDefaultTTLModel.__options__ = {'default_time_to_live': 20}
@@ -229,7 +229,7 @@ class TTLDefaultTest(BaseDefaultTTLTest):
         tid = o.id
 
         o.ttl(3600)
-        self.assertEqual(o._ttl, 3600)
+        assert o._ttl == 3600
 
         with mock.patch.object(session, 'execute') as m:
             TestDefaultTTLModel.objects(id=tid).ttl(None).update(text="aligators expired")

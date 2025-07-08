@@ -23,9 +23,9 @@ class GraphExecutionProfileTest(unittest.TestCase):
     def test_graph_source_can_be_set_with_graph_execution_profile(self):
         options = GraphOptions(graph_source='a')
         ep = GraphExecutionProfile(graph_options=options)
-        self.assertEqual(ep.graph_options.graph_source, b'a')
+        assert ep.graph_options.graph_source == b'a'
 
     def test_graph_source_is_preserve_with_graph_analytics_execution_profile(self):
         options = GraphOptions(graph_source='doesnt_matter')
         ep = GraphAnalyticsExecutionProfile(graph_options=options)
-        self.assertEqual(ep.graph_options.graph_source, b'a')  # graph source is set automatically
+        assert ep.graph_options.graph_source == b'a'  # graph source is set automatically

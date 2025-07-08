@@ -4,11 +4,11 @@ from cassandra.tablets import Tablets, Tablet
 
 class TabletsTest(unittest.TestCase):
     def compare_ranges(self, tablets, ranges):
-        self.assertEqual(len(tablets), len(ranges))
+        assert len(tablets) == len(ranges)
 
         for idx, tablet in enumerate(tablets):
-            self.assertEqual(tablet.first_token, ranges[idx][0], "First token is not correct in tablet: {}".format(tablet))
-            self.assertEqual(tablet.last_token, ranges[idx][1], "Last token is not correct in tablet: {}".format(tablet))
+            assert tablet.first_token == ranges[idx][0], "First token is not correct in tablet: {}".format(tablet)
+            assert tablet.last_token == ranges[idx][1], "Last token is not correct in tablet: {}".format(tablet)
 
     def test_add_tablet_to_empty_tablets(self):
         tablets = Tablets({("test_ks", "test_tb"): []})

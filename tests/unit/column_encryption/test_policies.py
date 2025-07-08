@@ -33,7 +33,7 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         policy = AES256ColumnEncryptionPolicy()
         policy.add_column(coldesc, self._random_key(), "blob")
         encrypted_bytes = policy.encrypt(coldesc, bytes)
-        self.assertEqual(bytes, policy.decrypt(coldesc, encrypted_bytes))
+        assert bytes == policy.decrypt(coldesc, encrypted_bytes)
 
     def test_no_padding_necessary(self):
         self._test_round_trip(self._random_block())
@@ -157,14 +157,14 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         for _ in range(10):
             policy.encrypt(coldesc1, self._random_block())
         cache_info = policy.cache_info()
-        self.assertEqual(cache_info.hits, 9)
-        self.assertEqual(cache_info.misses, 1)
-        self.assertEqual(cache_info.maxsize, 128)
+        assert cache_info.hits == 9
+        assert cache_info.misses == 1
+        assert cache_info.maxsize == 128
 
         # Important note: we're measuring the size of the cache of ciphers, NOT stored
         # keys.  We won't have a cipher here until we actually encrypt something
-        self.assertEqual(cache_info.currsize, 1)
+        assert cache_info.currsize == 1
         policy.encrypt(coldesc2, self._random_block())
-        self.assertEqual(policy.cache_info().currsize, 2)
+        assert policy.cache_info().currsize == 2
         policy.encrypt(coldesc3, self._random_block())
-        self.assertEqual(policy.cache_info().currsize, 3)
+        assert policy.cache_info().currsize == 3

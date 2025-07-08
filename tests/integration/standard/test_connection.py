@@ -420,7 +420,7 @@ class ConnectionTests(object):
         self.addCleanup(clusterC1.shutdown)
         self.addCleanup(clusterC2.shutdown)
 
-        self.assertEqual(len(get_eventloop_threads(self.event_loop_name)), 1)
+        assert len(get_eventloop_threads(self.event_loop_name)) == 1
 
 
 def get_eventloop_threads(name):

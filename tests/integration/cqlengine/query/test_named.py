@@ -77,46 +77,46 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         Tests the where clause creation
         """
         query1 = self.table.objects(test_id=5)
-        self.assertEqual(len(query1._where), 1)
+        assert len(query1._where) == 1
         where = query1._where[0]
-        self.assertEqual(where.field, 'test_id')
-        self.assertEqual(where.value, 5)
+        assert where.field == 'test_id'
+        assert where.value == 5
 
         query2 = query1.filter(expected_result__gte=1)
-        self.assertEqual(len(query2._where), 2)
+        assert len(query2._where) == 2
 
         where = query2._where[0]
-        self.assertEqual(where.field, 'test_id')
+        assert where.field == 'test_id'
         self.assertIsInstance(where.operator, EqualsOperator)
-        self.assertEqual(where.value, 5)
+        assert where.value == 5
 
         where = query2._where[1]
-        self.assertEqual(where.field, 'expected_result')
+        assert where.field == 'expected_result'
         self.assertIsInstance(where.operator, GreaterThanOrEqualOperator)
-        self.assertEqual(where.value, 1)
+        assert where.value == 1
 
     def test_query_expression_where_clause_generation(self):
         """
         Tests the where clause creation
         """
         query1 = self.table.objects(self.table.column('test_id') == 5)
-        self.assertEqual(len(query1._where), 1)
+        assert len(query1._where) == 1
         where = query1._where[0]
-        self.assertEqual(where.field, 'test_id')
-        self.assertEqual(where.value, 5)
+        assert where.field == 'test_id'
+        assert where.value == 5
 
         query2 = query1.filter(self.table.column('expected_result') >= 1)
-        self.assertEqual(len(query2._where), 2)
+        assert len(query2._where) == 2
 
         where = query2._where[0]
-        self.assertEqual(where.field, 'test_id')
+        assert where.field == 'test_id'
         self.assertIsInstance(where.operator, EqualsOperator)
-        self.assertEqual(where.value, 5)
+        assert where.value == 5
 
         where = query2._where[1]
-        self.assertEqual(where.field, 'expected_result')
+        assert where.field == 'expected_result'
         self.assertIsInstance(where.operator, GreaterThanOrEqualOperator)
-        self.assertEqual(where.value, 1)
+        assert where.value == 1
 
 @requires_collection_indexes
 class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
@@ -363,12 +363,12 @@ class TestNamedWithMV(BasicSharedKeyspaceUnitTestCase):
         self.assertTrue(self.check_table_size("alltimehigh", key_space, len(parameters)))
 
         filtered_mv_monthly_objects = mv_monthly.objects.filter(game='Chess', year=2015, month=6)
-        self.assertEqual(len(filtered_mv_monthly_objects), 1)
-        self.assertEqual(filtered_mv_monthly_objects[0]['score'], 3500)
-        self.assertEqual(filtered_mv_monthly_objects[0]['user'], 'jbellis')
+        assert len(filtered_mv_monthly_objects) == 1
+        assert filtered_mv_monthly_objects[0]['score'] == 3500
+        assert filtered_mv_monthly_objects[0]['user'] == 'jbellis'
         filtered_mv_alltime_objects = mv_all_time.objects.filter(game='Chess')
-        self.assertEqual(len(filtered_mv_alltime_objects), 2)
-        self.assertEqual(filtered_mv_alltime_objects[0]['score'], 3500)
+        assert len(filtered_mv_alltime_objects) == 2
+        assert filtered_mv_alltime_objects[0]['score'] == 3500
 
     def check_table_size(self, table_name, key_space, expected_size):
         table = key_space.table(table_name)

@@ -22,7 +22,7 @@ class SelectStatementTests(unittest.TestCase):
     def test_single_field_is_listified(self):
         """ tests that passing a string field into the constructor puts it into a list """
         ss = SelectStatement('table', 'field')
-        self.assertEqual(ss.fields, ['field'])
+        assert ss.fields == ['field']
 
     def test_field_rendering(self):
         """ tests that fields are properly added to the select statement """
@@ -44,41 +44,41 @@ class SelectStatementTests(unittest.TestCase):
     def test_where_clause_rendering(self):
         ss = SelectStatement('table')
         ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
-        self.assertEqual(str(ss), 'SELECT * FROM table WHERE "a" = %(0)s', str(ss))
+        assert str(ss) == 'SELECT * FROM table WHERE "a" = %(0)s', str(ss)
 
     def test_count(self):
         ss = SelectStatement('table', count=True, limit=10, order_by='d')
         ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
-        self.assertEqual(str(ss), 'SELECT COUNT(*) FROM table WHERE "a" = %(0)s LIMIT 10', str(ss))
+        assert str(ss) == 'SELECT COUNT(*) FROM table WHERE "a" = %(0)s LIMIT 10', str(ss)
         self.assertIn('LIMIT', str(ss))
         self.assertNotIn('ORDER', str(ss))
 
     def test_distinct(self):
         ss = SelectStatement('table', distinct_fields=['field2'])
         ss.add_where(Column(db_field='field1'), EqualsOperator(), 'b')
-        self.assertEqual(str(ss), 'SELECT DISTINCT "field2" FROM table WHERE "field1" = %(0)s', str(ss))
+        assert str(ss) == 'SELECT DISTINCT "field2" FROM table WHERE "field1" = %(0)s', str(ss)
 
         ss = SelectStatement('table', distinct_fields=['field1', 'field2'])
-        self.assertEqual(str(ss), 'SELECT DISTINCT "field1", "field2" FROM table')
+        assert str(ss) == 'SELECT DISTINCT "field1", "field2" FROM table'
 
         ss = SelectStatement('table', distinct_fields=['field1'], count=True)
-        self.assertEqual(str(ss), 'SELECT DISTINCT COUNT("field1") FROM table')
+        assert str(ss) == 'SELECT DISTINCT COUNT("field1") FROM table'
 
     def test_context(self):
         ss = SelectStatement('table')
         ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
-        self.assertEqual(ss.get_context(), {'0': 'b'})
+        assert ss.get_context() == {'0': 'b'}
 
     def test_context_id_update(self):
         """ tests that the right things happen the the context id """
         ss = SelectStatement('table')
         ss.add_where(Column(db_field='a'), EqualsOperator(), 'b')
-        self.assertEqual(ss.get_context(), {'0': 'b'})
-        self.assertEqual(str(ss), 'SELECT * FROM table WHERE "a" = %(0)s')
+        assert ss.get_context() == {'0': 'b'}
+        assert str(ss) == 'SELECT * FROM table WHERE "a" = %(0)s'
 
         ss.update_context_id(5)
-        self.assertEqual(ss.get_context(), {'5': 'b'})
-        self.assertEqual(str(ss), 'SELECT * FROM table WHERE "a" = %(5)s')
+        assert ss.get_context() == {'5': 'b'}
+        assert str(ss) == 'SELECT * FROM table WHERE "a" = %(5)s'
 
     def test_additional_rendering(self):
         ss = SelectStatement(

@@ -48,7 +48,7 @@ class GraphMetadataToCQLTests(unittest.TestCase):
 
     def test_keyspace_no_graph_engine(self):
         km = self._create_keyspace_metadata(None)
-        self.assertEqual(km.graph_engine, None)
+        assert km.graph_engine == None
         self.assertNotIn(
             "graph_engine",
             km.as_cql_query()
@@ -57,7 +57,7 @@ class GraphMetadataToCQLTests(unittest.TestCase):
     def test_keyspace_with_graph_engine(self):
         graph_engine = 'Core'
         km = self._create_keyspace_metadata(graph_engine)
-        self.assertEqual(km.graph_engine, graph_engine)
+        assert km.graph_engine == graph_engine
         cql = km.as_cql_query()
         self.assertIn(
             "graph_engine",

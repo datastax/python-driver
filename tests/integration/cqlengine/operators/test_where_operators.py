@@ -45,15 +45,15 @@ class TestWhereOperators(unittest.TestCase):
 
     def test_operator_rendering(self):
         """ tests symbols are rendered properly """
-        self.assertEqual("=", str(EqualsOperator()))
-        self.assertEqual("!=", str(NotEqualsOperator()))
-        self.assertEqual("IN", str(InOperator()))
-        self.assertEqual(">", str(GreaterThanOperator()))
-        self.assertEqual(">=", str(GreaterThanOrEqualOperator()))
-        self.assertEqual("<", str(LessThanOperator()))
-        self.assertEqual("<=", str(LessThanOrEqualOperator()))
-        self.assertEqual("CONTAINS", str(ContainsOperator()))
-        self.assertEqual("LIKE", str(LikeOperator()))
+        assert "=" == str(EqualsOperator())
+        assert "!=" == str(NotEqualsOperator())
+        assert "IN" == str(InOperator())
+        assert ">" == str(GreaterThanOperator())
+        assert ">=" == str(GreaterThanOrEqualOperator())
+        assert "<" == str(LessThanOperator())
+        assert "<=" == str(LessThanOrEqualOperator())
+        assert "CONTAINS" == str(ContainsOperator())
+        assert "LIKE" == str(LikeOperator())
 
 
 class TestIsNotNull(BaseCassEngTestCase):
@@ -71,18 +71,12 @@ class TestIsNotNull(BaseCassEngTestCase):
         check_lookup(self, 'IS NOT NULL', IsNotNullOperator)
 
         # The * is not expanded because there are no referred fields
-        self.assertEqual(
-            str(TestQueryUpdateModel.filter(IsNotNull("text")).limit(2)),
-            'SELECT * FROM cqlengine_test.test_query_update_model WHERE "text" IS NOT NULL LIMIT 2'
-        )
+        assert str(TestQueryUpdateModel.filter(IsNotNull("text")).limit(2)) == 'SELECT * FROM cqlengine_test.test_query_update_model WHERE "text" IS NOT NULL LIMIT 2'
 
         # We already know partition so cqlengine doesn't query for it
-        self.assertEqual(
-            str(TestQueryUpdateModel.filter(IsNotNull("text"), partition=uuid4())),
-            ('SELECT "cluster", "count", "text", "text_set", '
-             '"text_list", "text_map", "bin_map" FROM cqlengine_test.test_query_update_model '
-             'WHERE "text" IS NOT NULL AND "partition" = %(0)s LIMIT 10000')
-        )
+        assert str(TestQueryUpdateModel.filter(IsNotNull("text"), partition=uuid4())) == ('SELECT "cluster", "count", "text", "text_set", '
+         '"text_list", "text_map", "bin_map" FROM cqlengine_test.test_query_update_model '
+         'WHERE "text" IS NOT NULL AND "partition" = %(0)s LIMIT 10000')
 
     @greaterthanorequalcass30
     def test_is_not_null_execution(self):

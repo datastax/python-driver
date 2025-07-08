@@ -72,7 +72,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
         results = s.execute("SELECT * FROM blobstring").one()
         for expected, actual in zip(params, results):
-            self.assertEqual(expected, actual)
+            assert expected == actual
 
     def test_can_insert_blob_type_as_bytearray(self):
         """
@@ -87,7 +87,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
         results = s.execute("SELECT * FROM blobbytes").one()
         for expected, actual in zip(params, results):
-            self.assertEqual(expected, actual)
+            assert expected == actual
 
     @unittest.skipIf(not hasattr(cassandra, 'deserializers'), "Cython required for to test DesBytesTypeArray deserializer")
     def test_des_bytes_type_array(self):
@@ -114,7 +114,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
             results = s.execute("SELECT * FROM blobbytes2").one()
             for expected, actual in zip(params, results):
-                self.assertEqual(expected, actual)
+                assert expected == actual
         finally:
             if original is not None:
                 cassandra.deserializers.DesBytesType=original
@@ -149,7 +149,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # verify data
         results = s.execute("SELECT {0} FROM alltypes WHERE zz=0".format(columns_string)).one()
         for expected, actual in zip(params, results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # try the same thing sending one insert at the time
         s.execute("TRUNCATE alltypes;")
@@ -169,7 +169,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
                 if isinstance(data_sample, ipaddress.IPv4Address) or isinstance(data_sample, ipaddress.IPv6Address):
                     compare_value = str(data_sample)
-                self.assertEqual(result, compare_value)
+                assert result == compare_value
 
         # try the same thing with a prepared statement
         placeholders = ','.join(["?"] * len(col_names))
@@ -180,13 +180,13 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # verify data
         results = s.execute("SELECT {0} FROM alltypes WHERE zz=0".format(columns_string)).one()
         for expected, actual in zip(params, results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # verify data with prepared statement query
         select = s.prepare("SELECT {0} FROM alltypes WHERE zz=?".format(columns_string))
         results = s.execute(select.bind([0])).one()
         for expected, actual in zip(params, results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # verify data with with prepared statement, use dictionary with no explicit columns
         select = s.prepare("SELECT * FROM alltypes")
@@ -194,7 +194,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                             execution_profile=s.execution_profile_clone_update(EXEC_PROFILE_DEFAULT, row_factory=ordered_dict_factory)).one()
 
         for expected, actual in zip(params, results.values()):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         c.shutdown()
 
@@ -242,7 +242,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # verify data
         results = s.execute("SELECT {0} FROM allcoltypes WHERE zz=0".format(columns_string)).one()
         for expected, actual in zip(params, results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # create the input for prepared statement
         params = [0]
@@ -258,13 +258,13 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # verify data
         results = s.execute("SELECT {0} FROM allcoltypes WHERE zz=0".format(columns_string)).one()
         for expected, actual in zip(params, results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # verify data with prepared statement query
         select = s.prepare("SELECT {0} FROM allcoltypes WHERE zz=?".format(columns_string))
         results = s.execute(select.bind([0])).one()
         for expected, actual in zip(params, results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # verify data with with prepared statement, use dictionary with no explicit columns
         select = s.prepare("SELECT * FROM allcoltypes")
@@ -273,7 +273,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                                                                                row_factory=ordered_dict_factory)).one()
 
         for expected, actual in zip(params, results.values()):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         c.shutdown()
 
@@ -323,12 +323,12 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # verify string types empty with simple statement
         results = s.execute("SELECT {0} FROM all_empty WHERE zz=3".format(columns_string)).one()
         for expected, actual in zip(expected_values.values(), results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # verify string types empty with prepared statement
         results = s.execute(s.prepare("SELECT {0} FROM all_empty WHERE zz=?".format(columns_string)), [3]).one()
         for expected, actual in zip(expected_values.values(), results):
-            self.assertEqual(actual, expected)
+            assert actual == expected
 
         # non-string types shouldn't accept empty strings
         for col in non_string_columns:
@@ -360,13 +360,13 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         query = "SELECT {0} FROM all_empty WHERE zz=5".format(columns_string)
         results = s.execute(query).one()
         for col in results:
-            self.assertEqual(None, col)
+            assert None == col
 
         # check via prepared statement
         select = s.prepare("SELECT {0} FROM all_empty WHERE zz=?".format(columns_string))
         results = s.execute(select.bind([5])).one()
         for col in results:
-            self.assertEqual(None, col)
+            assert None == col
 
         # do the same thing again, but use a prepared statement to insert the nulls
         s.execute(simple_insert, params)
@@ -377,11 +377,11 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
         results = s.execute(query).one()
         for col in results:
-            self.assertEqual(None, col)
+            assert None == col
 
         results = s.execute(select.bind([5])).one()
         for col in results:
-            self.assertEqual(None, col)
+            assert None == col
 
     def test_can_insert_empty_values_for_int32(self):
         """
@@ -419,13 +419,13 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # test non-prepared statement
         s.execute("INSERT INTO tz_aware (a, b) VALUES ('key1', %s)", [dt])
         result = s.execute("SELECT b FROM tz_aware WHERE a='key1'").one().b
-        self.assertEqual(dt.utctimetuple(), result.utctimetuple())
+        assert dt.utctimetuple() == result.utctimetuple()
 
         # test prepared statement
         insert = s.prepare("INSERT INTO tz_aware (a, b) VALUES ('key2', ?)")
         s.execute(insert.bind([dt]))
         result = s.execute("SELECT b FROM tz_aware WHERE a='key2'").one().b
-        self.assertEqual(dt.utctimetuple(), result.utctimetuple())
+        assert dt.utctimetuple() == result.utctimetuple()
 
     def test_can_insert_tuples(self):
         """
@@ -447,20 +447,20 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         complete = ('foo', 123, True)
         s.execute("INSERT INTO tuple_type (a, b) VALUES (0, %s)", parameters=(complete,))
         result = s.execute("SELECT b FROM tuple_type WHERE a=0").one()
-        self.assertEqual(complete, result.b)
+        assert complete == result.b
 
         partial = ('bar', 456)
         partial_result = partial + (None,)
         s.execute("INSERT INTO tuple_type (a, b) VALUES (1, %s)", parameters=(partial,))
         result = s.execute("SELECT b FROM tuple_type WHERE a=1").one()
-        self.assertEqual(partial_result, result.b)
+        assert partial_result == result.b
 
         # test single value tuples
         subpartial = ('zoo',)
         subpartial_result = subpartial + (None, None)
         s.execute("INSERT INTO tuple_type (a, b) VALUES (2, %s)", parameters=(subpartial,))
         result = s.execute("SELECT b FROM tuple_type WHERE a=2").one()
-        self.assertEqual(subpartial_result, result.b)
+        assert subpartial_result == result.b
 
         # test prepared statement
         prepared = s.prepare("INSERT INTO tuple_type (a, b) VALUES (?, ?)")
@@ -472,9 +472,9 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         self.assertRaises(ValueError, s.execute, prepared, parameters=(0, (1, 2, 3, 4, 5, 6)))
 
         prepared = s.prepare("SELECT b FROM tuple_type WHERE a=?")
-        self.assertEqual(complete, s.execute(prepared, (3,)).one().b)
-        self.assertEqual(partial_result, s.execute(prepared, (4,)).one().b)
-        self.assertEqual(subpartial_result, s.execute(prepared, (5,)).one().b)
+        assert complete == s.execute(prepared, (3,)).one().b
+        assert partial_result == s.execute(prepared, (4,)).one().b
+        assert subpartial_result == s.execute(prepared, (5,)).one().b
 
         c.shutdown()
 
@@ -515,7 +515,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             s.execute("INSERT INTO tuple_lengths (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
             result = s.execute("SELECT v_%s FROM tuple_lengths WHERE k=0", (i,)).one()
-            self.assertEqual(tuple(created_tuple), result['v_%s' % i])
+            assert tuple(created_tuple) == result['v_%s' % i]
         c.shutdown()
 
     def test_can_insert_tuples_all_primitive_datatypes(self):
@@ -543,7 +543,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             expected = tuple(values + [None] * (type_count - len(values)))
             s.execute("INSERT INTO tuple_primitive (k, v) VALUES (%s, %s)", (i, tuple(values)))
             result = s.execute("SELECT v FROM tuple_primitive WHERE k=%s", (i,)).one()
-            self.assertEqual(result.v, expected)
+            assert result.v == expected
         c.shutdown()
 
     def test_can_insert_tuples_all_collection_datatypes(self):
@@ -598,7 +598,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             s.execute("INSERT INTO tuple_non_primative (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
             result = s.execute("SELECT v_%s FROM tuple_non_primative WHERE k=0", (i,)).one()
-            self.assertEqual(created_tuple, result['v_%s' % i])
+            assert created_tuple == result['v_%s' % i]
             i += 1
 
         # test tuple<set<datatype>>
@@ -607,7 +607,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             s.execute("INSERT INTO tuple_non_primative (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
             result = s.execute("SELECT v_%s FROM tuple_non_primative WHERE k=0", (i,)).one()
-            self.assertEqual(created_tuple, result['v_%s' % i])
+            assert created_tuple == result['v_%s' % i]
             i += 1
 
         # test tuple<map<datatype, datatype>>
@@ -621,7 +621,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
             s.execute("INSERT INTO tuple_non_primative (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
             result = s.execute("SELECT v_%s FROM tuple_non_primative WHERE k=0", (i,)).one()
-            self.assertEqual(created_tuple, result['v_%s' % i])
+            assert created_tuple == result['v_%s' % i]
             i += 1
         c.shutdown()
 
@@ -682,7 +682,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
 
             # verify tuple was written and read correctly
             result = s.execute("SELECT v_%s FROM nested_tuples WHERE k=%s", (i, i)).one()
-            self.assertEqual(created_tuple, result['v_%s' % i])
+            assert created_tuple == result['v_%s' % i]
         c.shutdown()
 
     def test_can_insert_tuples_with_nulls(self):
@@ -701,16 +701,16 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         s.execute(insert, [(None, None, None, None)])
 
         result = s.execute("SELECT * FROM tuples_nulls WHERE k=0")
-        self.assertEqual((None, None, None, None), result.one().t)
+        assert (None, None, None, None) == result.one().t
 
         read = s.prepare("SELECT * FROM tuples_nulls WHERE k=0")
-        self.assertEqual((None, None, None, None), s.execute(read).one().t)
+        assert (None, None, None, None) == s.execute(read).one().t
 
         # also test empty strings where compatible
         s.execute(insert, [('', None, None, b'')])
         result = s.execute("SELECT * FROM tuples_nulls WHERE k=0")
-        self.assertEqual(('', None, None, b''), result.one().t)
-        self.assertEqual(('', None, None, b''), s.execute(read).one().t)
+        assert ('', None, None, b'') == result.one().t
+        assert ('', None, None, b'') == s.execute(read).one().t
 
     def test_insert_collection_with_null_fails(self):
         """
@@ -781,14 +781,14 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # CompositeType string literals are split on ':' chars
         s.execute("INSERT INTO composites (a, b) VALUES (0, 'abc:123')")
         result = s.execute("SELECT * FROM composites WHERE a = 0").one()
-        self.assertEqual(0, result.a)
-        self.assertEqual(('abc', 123), result.b)
+        assert 0 == result.a
+        assert ('abc', 123) == result.b
 
         # CompositeType values can omit elements at the end
         s.execute("INSERT INTO composites (a, b) VALUES (0, 'abc')")
         result = s.execute("SELECT * FROM composites WHERE a = 0").one()
-        self.assertEqual(0, result.a)
-        self.assertEqual(('abc',), result.b)
+        assert 0 == result.a
+        assert ('abc',) == result.b
 
     @notprotocolv1
     def test_special_float_cql_encoding(self):
@@ -818,8 +818,8 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                     self.assertTrue(math.isnan(row.f))
                     self.assertTrue(math.isnan(row.d))
                 else:
-                    self.assertEqual(row.f, f)
-                    self.assertEqual(row.d, f)
+                    assert row.f == f
+                    assert row.d == f
 
         # cql encoding
         verify_insert_select('INSERT INTO float_cql_encoding (f, d) VALUES (%s, %s)',
@@ -891,8 +891,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                 results = self.session.execute("SELECT * FROM duration_smoke")
 
                 v = results.one()[1]
-                self.assertEqual(Duration(month_day_value, month_day_value, nanosecond_value), v,
-                                 "Error encoding value {0},{0},{1}".format(month_day_value, nanosecond_value))
+                assert Duration(month_day_value, month_day_value, nanosecond_value) == v, "Error encoding value {0},{0},{1}".format(month_day_value, nanosecond_value)
 
         self.assertRaises(ValueError, self.session.execute, prepared,
                           (1, Duration(0, 0, int("8FFFFFFFFFFFFFF0", 16))))
@@ -948,16 +947,16 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
         session = TestCluster(protocol_version=proto_ver).connect(self.keyspace_name)
         try:
             results = session.execute('select * from t').one()
-            self.assertEqual("[SortedSet([1, 2]), SortedSet([3, 5])]", str(results.v))
+            assert "[SortedSet([1, 2]), SortedSet([3, 5])]" == str(results.v)
 
             results = session.execute('select * from u').one()
-            self.assertEqual("SortedSet([[1, 2], [3, 5]])", str(results.v))
+            assert "SortedSet([[1, 2], [3, 5]])" == str(results.v)
 
             results = session.execute('select * from v').one()
-            self.assertEqual("{SortedSet([1, 2]): [1, 2, 3], SortedSet([3, 5]): [4, 5, 6]}", str(results.v))
+            assert "{SortedSet([1, 2]): [1, 2, 3], SortedSet([3, 5]): [4, 5, 6]}" == str(results.v)
 
             results = session.execute('select * from w').one()
-            self.assertEqual("typ(v0=OrderedMapSerializedKey([(1, [1, 2, 3]), (2, [4, 5, 6])]), v1=[7, 8, 9])", str(results.v))
+            assert "typ(v0=OrderedMapSerializedKey([(1, [1, 2, 3]), (2, [4, 5, 6])]), v1=[7, 8, 9])" == str(results.v)
 
         finally:
             session.cluster.shutdown()
@@ -985,7 +984,7 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
 
     def _get_first_j(self, rs):
         rows = rs.all()
-        self.assertEqual(len(rows), 1)
+        assert len(rows) == 1
         return rows[0].j
 
     def _get_row_simple(self, idx, table_name):
@@ -1131,8 +1130,8 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
 
     def test_round_trip_udts(self):
         def _udt_equal_test_fn(udt1, udt2):
-            self.assertEqual(udt1.a, udt2.a)
-            self.assertEqual(udt1.b, udt2.b)
+            assert udt1.a == udt2.a
+            assert udt1.b == udt2.b
 
         self.session.execute("create type {}.fixed_type (a int, b int)".format(self.keyspace_name))
         self.session.execute("create type {}.mixed_type_one (a int, b varint)".format(self.keyspace_name))

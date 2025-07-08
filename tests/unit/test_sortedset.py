@@ -25,11 +25,11 @@ class SortedSetTest(unittest.TestCase):
         input = [5, 4, 3, 2, 1, 1, 1]
         expected = sorted(set(input))
         ss = sortedset(input)
-        self.assertEqual(len(ss), len(expected))
-        self.assertEqual(list(ss), expected)
+        assert len(ss) == len(expected)
+        assert list(ss) == expected
 
     def test_repr(self):
-        self.assertEqual(repr(sortedset([1, 2, 3, 4])), "SortedSet([1, 2, 3, 4])")
+        assert repr(sortedset([1, 2, 3, 4])) == "SortedSet([1, 2, 3, 4])"
 
     def test_contains(self):
         input = [5, 4, 3, 2, 1, 1, 1]
@@ -49,12 +49,12 @@ class SortedSetTest(unittest.TestCase):
     def test_mutable_contents(self):
         ba = bytearray(b'some data here')
         ss = sortedset([ba, ba])
-        self.assertEqual(list(ss), [ba])
+        assert list(ss) == [ba]
 
     def test_clear(self):
         ss = sortedset([1, 2, 3])
         ss.clear()
-        self.assertEqual(len(ss), 0)
+        assert len(ss) == 0
 
     def test_equal(self):
         s1 = set([1])
@@ -62,10 +62,10 @@ class SortedSetTest(unittest.TestCase):
         ss1 = sortedset(s1)
         ss12 = sortedset(s12)
 
-        self.assertEqual(ss1, s1)
-        self.assertEqual(ss12, s12)
-        self.assertEqual(ss12, s12)
-        self.assertEqual(ss1.__eq__(None), NotImplemented)
+        assert ss1 == s1
+        assert ss12 == s12
+        assert ss12 == s12
+        assert ss1.__eq__(None) == NotImplemented
         self.assertNotEqual(ss1, ss12)
         self.assertNotEqual(ss12, ss1)
         self.assertNotEqual(ss1, s12)
@@ -145,45 +145,45 @@ class SortedSetTest(unittest.TestCase):
         ss12 = sortedset([1, 2])
         ss23 = sortedset([2, 3])
 
-        self.assertEqual(sortedset().union(s1), sortedset([1]))
-        self.assertEqual(ss12.union(s1), sortedset([1, 2]))
-        self.assertEqual(ss12.union(ss23), sortedset([1, 2, 3]))
-        self.assertEqual(ss23.union(ss12), sortedset([1, 2, 3]))
-        self.assertEqual(ss23.union(s1), sortedset([1, 2, 3]))
+        assert sortedset().union(s1) == sortedset([1])
+        assert ss12.union(s1) == sortedset([1, 2])
+        assert ss12.union(ss23) == sortedset([1, 2, 3])
+        assert ss23.union(ss12) == sortedset([1, 2, 3])
+        assert ss23.union(s1) == sortedset([1, 2, 3])
 
     def test_intersection(self):
         s12 = set([1, 2])
         ss23 = sortedset([2, 3])
-        self.assertEqual(s12.intersection(ss23), set([2]))
-        self.assertEqual(ss23.intersection(s12), sortedset([2]))
-        self.assertEqual(ss23.intersection(s12, [2], (2,)), sortedset([2]))
-        self.assertEqual(ss23.intersection(s12, [900], (2,)), sortedset())
+        assert s12.intersection(ss23) == set([2])
+        assert ss23.intersection(s12) == sortedset([2])
+        assert ss23.intersection(s12, [2], (2,)) == sortedset([2])
+        assert ss23.intersection(s12, [900], (2,)) == sortedset()
 
     def test_difference(self):
         s1 = set([1])
         ss12 = sortedset([1, 2])
         ss23 = sortedset([2, 3])
 
-        self.assertEqual(sortedset().difference(s1), sortedset())
-        self.assertEqual(ss12.difference(s1), sortedset([2]))
-        self.assertEqual(ss12.difference(ss23), sortedset([1]))
-        self.assertEqual(ss23.difference(ss12), sortedset([3]))
-        self.assertEqual(ss23.difference(s1), sortedset([2, 3]))
+        assert sortedset().difference(s1) == sortedset()
+        assert ss12.difference(s1) == sortedset([2])
+        assert ss12.difference(ss23) == sortedset([1])
+        assert ss23.difference(ss12) == sortedset([3])
+        assert ss23.difference(s1) == sortedset([2, 3])
 
     def test_symmetric_difference(self):
         s = set([1, 3, 5])
         ss = sortedset([2, 3, 4])
         ss2 = sortedset([5, 6, 7])
 
-        self.assertEqual(ss.symmetric_difference(s), sortedset([1, 2, 4, 5]))
+        assert ss.symmetric_difference(s) == sortedset([1, 2, 4, 5])
         self.assertFalse(ss.symmetric_difference(ss))
-        self.assertEqual(ss.symmetric_difference(s), sortedset([1, 2, 4, 5]))
-        self.assertEqual(ss2.symmetric_difference(ss), sortedset([2, 3, 4, 5, 6, 7]))
+        assert ss.symmetric_difference(s) == sortedset([1, 2, 4, 5])
+        assert ss2.symmetric_difference(ss) == sortedset([2, 3, 4, 5, 6, 7])
 
     def test_pop(self):
         ss = sortedset([2, 1])
-        self.assertEqual(ss.pop(), 2)
-        self.assertEqual(ss.pop(), 1)
+        assert ss.pop() == 2
+        assert ss.pop() == 1
         try:
             ss.pop()
             self.fail("Error not thrown")
@@ -192,11 +192,11 @@ class SortedSetTest(unittest.TestCase):
 
     def test_remove(self):
         ss = sortedset([2, 1])
-        self.assertEqual(len(ss), 2)
+        assert len(ss) == 2
         self.assertRaises(KeyError, ss.remove, 3)
-        self.assertEqual(len(ss), 2)
+        assert len(ss) == 2
         ss.remove(1)
-        self.assertEqual(len(ss), 1)
+        assert len(ss) == 1
         ss.remove(2)
         self.assertFalse(ss)
         self.assertRaises(KeyError, ss.remove, 2)
@@ -205,7 +205,7 @@ class SortedSetTest(unittest.TestCase):
     def test_getitem(self):
         ss = sortedset(range(3))
         for i in range(len(ss)):
-            self.assertEqual(ss[i], i)
+            assert ss[i] == i
         with self.assertRaises(IndexError):
             ss[len(ss)]
 
@@ -266,115 +266,115 @@ class SortedSetTest(unittest.TestCase):
         self.assertTrue(ss12 > ss1)
 
         # __and__
-        self.assertEqual(ss1 & ss12, ss1)
-        self.assertEqual(ss12 & ss12, ss12)
-        self.assertEqual(ss12 & set(), sortedset())
+        assert ss1 & ss12 == ss1
+        assert ss12 & ss12 == ss12
+        assert ss12 & set() == sortedset()
 
         # __iand__
         tmp = sortedset(ss12)
         tmp &= ss1
-        self.assertEqual(tmp, ss1)
+        assert tmp == ss1
         tmp = sortedset(ss1)
         tmp &= ss12
-        self.assertEqual(tmp, ss1)
+        assert tmp == ss1
         tmp = sortedset(ss12)
         tmp &= ss12
-        self.assertEqual(tmp, ss12)
+        assert tmp == ss12
         tmp = sortedset(ss12)
         tmp &= set()
-        self.assertEqual(tmp, sortedset())
+        assert tmp == sortedset()
 
         # __rand__
-        self.assertEqual(set([1]) & ss12, ss1)
+        assert set([1]) & ss12 == ss1
 
         # __or__
-        self.assertEqual(ss1 | ss12, ss12)
-        self.assertEqual(ss12 | ss12, ss12)
-        self.assertEqual(ss12 | set(), ss12)
-        self.assertEqual(sortedset() | ss1 | ss12, ss12)
+        assert ss1 | ss12 == ss12
+        assert ss12 | ss12 == ss12
+        assert ss12 | set() == ss12
+        assert sortedset() | ss1 | ss12 == ss12
 
         # __ior__
         tmp = sortedset(ss1)
         tmp |= ss12
-        self.assertEqual(tmp, ss12)
+        assert tmp == ss12
         tmp = sortedset(ss12)
         tmp |= ss12
-        self.assertEqual(tmp, ss12)
+        assert tmp == ss12
         tmp = sortedset(ss12)
         tmp |= set()
-        self.assertEqual(tmp, ss12)
+        assert tmp == ss12
         tmp = sortedset()
         tmp |= ss1
         tmp |= ss12
-        self.assertEqual(tmp, ss12)
+        assert tmp == ss12
 
         # __ror__
-        self.assertEqual(set([1]) | ss12, ss12)
+        assert set([1]) | ss12 == ss12
 
         # __sub__
-        self.assertEqual(ss1 - ss12, set())
-        self.assertEqual(ss12 - ss12, set())
-        self.assertEqual(ss12 - set(), ss12)
-        self.assertEqual(ss12 - ss1, sortedset([2]))
+        assert ss1 - ss12 == set()
+        assert ss12 - ss12 == set()
+        assert ss12 - set() == ss12
+        assert ss12 - ss1 == sortedset([2])
 
         # __isub__
         tmp = sortedset(ss1)
         tmp -= ss12
-        self.assertEqual(tmp, set())
+        assert tmp == set()
         tmp = sortedset(ss12)
         tmp -= ss12
-        self.assertEqual(tmp, set())
+        assert tmp == set()
         tmp = sortedset(ss12)
         tmp -= set()
-        self.assertEqual(tmp, ss12)
+        assert tmp == ss12
         tmp = sortedset(ss12)
         tmp -= ss1
-        self.assertEqual(tmp, sortedset([2]))
+        assert tmp == sortedset([2])
 
         # __rsub__
-        self.assertEqual(set((1,2,3)) - ss12, set((3,)))
+        assert set((1,2,3)) - ss12 == set((3,))
 
         # __xor__
-        self.assertEqual(ss1 ^ ss12, set([2]))
-        self.assertEqual(ss12 ^ ss1, set([2]))
-        self.assertEqual(ss12 ^ ss12, set())
-        self.assertEqual(ss12 ^ set(), ss12)
+        assert ss1 ^ ss12 == set([2])
+        assert ss12 ^ ss1 == set([2])
+        assert ss12 ^ ss12 == set()
+        assert ss12 ^ set() == ss12
 
         # __ixor__
         tmp = sortedset(ss1)
         tmp ^= ss12
-        self.assertEqual(tmp, set([2]))
+        assert tmp == set([2])
         tmp = sortedset(ss12)
         tmp ^= ss1
-        self.assertEqual(tmp, set([2]))
+        assert tmp == set([2])
         tmp = sortedset(ss12)
         tmp ^= ss12
-        self.assertEqual(tmp, set())
+        assert tmp == set()
         tmp = sortedset(ss12)
         tmp ^= set()
-        self.assertEqual(tmp, ss12)
+        assert tmp == ss12
 
         # __rxor__
-        self.assertEqual(set([1, 2]) ^ ss1, (set([2])))
+        assert set([1, 2]) ^ ss1 == (set([2]))
 
     def test_reduce_pickle(self):
         ss = sortedset((4,3,2,1))
         import pickle
         s = pickle.dumps(ss)
-        self.assertEqual(pickle.loads(s), ss)
+        assert pickle.loads(s) == ss
 
     def _test_uncomparable_types(self, items):
         for perm in permutations(items):
             ss = sortedset(perm)
             s = set(perm)
-            self.assertEqual(s, ss)
-            self.assertEqual(ss, ss.union(s))
+            assert s == ss
+            assert ss == ss.union(s)
             for x in range(len(ss)):
                 subset = set(s)
                 for _ in range(x):
                     subset.pop()
-                self.assertEqual(ss.difference(subset), s.difference(subset))
-                self.assertEqual(ss.intersection(subset), s.intersection(subset))
+                assert ss.difference(subset) == s.difference(subset)
+                assert ss.intersection(subset) == s.intersection(subset)
             for x in ss:
                 self.assertIn(x, ss)
                 ss.remove(x)

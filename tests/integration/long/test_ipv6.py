@@ -83,7 +83,7 @@ class IPV6ConnectionTest(object):
         session = cluster.connect()
         future = session.execute_async("SELECT * FROM system.local WHERE key='local'")
         future.result()
-        self.assertEqual(future._current_host.address, '::1')
+        assert future._current_host.address == '::1'
         cluster.shutdown()
 
     def test_error(self):

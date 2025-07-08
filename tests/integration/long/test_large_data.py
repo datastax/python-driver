@@ -161,11 +161,11 @@ class LargeDataTests(unittest.TestCase):
         lastvalue = 0
         for j, row in enumerate(results):
             lastValue=row['i']
-            self.assertEqual(lastValue, j)
+            assert lastValue == j
 
         #check the last value make sure it's what we expect
         index_value = to_insert-1
-        self.assertEqual(lastValue,index_value,"Verification failed only found {0} inserted we were expecting {1}".format(j,index_value))
+        assert lastValue == index_value, "Verification failed only found {0} inserted we were expecting {1}".format(j,index_value)
 
         session.cluster.shutdown()
 
@@ -200,7 +200,7 @@ class LargeDataTests(unittest.TestCase):
         # Verify
         bb = pack('>H', 0xCAFE)
         for i, row in enumerate(results):
-            self.assertEqual(row['v'], bb)
+            assert row['v'] == bb
 
         self.assertGreaterEqual(i, expected_results, "Verification failed only found {0} inserted we were expecting {1}".format(i,expected_results))
 
@@ -235,7 +235,7 @@ class LargeDataTests(unittest.TestCase):
         # Verify
         found_result = False
         for i, row in enumerate(result):
-            self.assertEqual(row['txt'], text)
+            assert row['txt'] == text
             found_result = True
         self.assertTrue(found_result, "No results were found")
 
@@ -266,6 +266,6 @@ class LargeDataTests(unittest.TestCase):
         # Verify
         for row in result:
             for i in range(table_width):
-                self.assertEqual(row[create_column_name(i)], i)
+                assert row[create_column_name(i)] == i
 
         session.cluster.shutdown()

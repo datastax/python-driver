@@ -88,10 +88,7 @@ class MessageTest(unittest.TestCase):
         self._check_calls(io, [(b'\x00\x00\x00\x01',), (b'a',), (b'\x00\x03',), (b'\x00\x00\x00\x00',)])
 
     def _check_calls(self, io, expected):
-        self.assertEqual(
-            tuple(c[1] for c in io.write.mock_calls),
-            tuple(expected)
-        )
+        assert tuple(c[1] for c in io.write.mock_calls) == tuple(expected)
 
     def test_continuous_paging(self):
         """
@@ -118,16 +115,16 @@ class MessageTest(unittest.TestCase):
         message.send_body(io, ProtocolVersion.DSE_V1)
 
         # continuous paging adds two write calls to the buffer
-        self.assertEqual(len(io.write.mock_calls), 6)
+        assert len(io.write.mock_calls) == 6
         # Check that the appropriate flag is set to True
-        self.assertEqual(uint32_unpack(io.write.mock_calls[3][1][0]) & _WITH_SERIAL_CONSISTENCY_FLAG, 0)
-        self.assertEqual(uint32_unpack(io.write.mock_calls[3][1][0]) & _PAGE_SIZE_FLAG, 0)
-        self.assertEqual(uint32_unpack(io.write.mock_calls[3][1][0]) & _WITH_PAGING_STATE_FLAG, 0)
-        self.assertEqual(uint32_unpack(io.write.mock_calls[3][1][0]) & _PAGING_OPTIONS_FLAG, _PAGING_OPTIONS_FLAG)
+        assert uint32_unpack(io.write.mock_calls[3][1][0]) & _WITH_SERIAL_CONSISTENCY_FLAG == 0
+        assert uint32_unpack(io.write.mock_calls[3][1][0]) & _PAGE_SIZE_FLAG == 0
+        assert uint32_unpack(io.write.mock_calls[3][1][0]) & _WITH_PAGING_STATE_FLAG == 0
+        assert uint32_unpack(io.write.mock_calls[3][1][0]) & _PAGING_OPTIONS_FLAG == _PAGING_OPTIONS_FLAG
 
         # Test max_pages and max_pages_per_second are correctly written
-        self.assertEqual(uint32_unpack(io.write.mock_calls[4][1][0]), max_pages)
-        self.assertEqual(uint32_unpack(io.write.mock_calls[5][1][0]), max_pages_per_second)
+        assert uint32_unpack(io.write.mock_calls[4][1][0]) == max_pages
+        assert uint32_unpack(io.write.mock_calls[5][1][0]) == max_pages_per_second
 
     def test_prepare_flag(self):
         """
@@ -144,9 +141,9 @@ class MessageTest(unittest.TestCase):
         for version in ProtocolVersion.SUPPORTED_VERSIONS:
             message.send_body(io, version)
             if ProtocolVersion.uses_prepare_flags(version):
-                self.assertEqual(len(io.write.mock_calls), 3)
+                assert len(io.write.mock_calls) == 3
             else:
-                self.assertEqual(len(io.write.mock_calls), 2)
+                assert len(io.write.mock_calls) == 2
             io.reset_mock()
 
     def test_prepare_flag_with_keyspace(self):

@@ -386,7 +386,7 @@ class ConnectionTests(SimulacronBase):
 
         time.sleep(20)
 
-        self.assertEqual(listener.hosts_marked_down, [])
+        assert listener.hosts_marked_down == []
 
     def test_host_is_not_set_to_down_after_query_oto(self):
         """
@@ -420,7 +420,7 @@ class ConnectionTests(SimulacronBase):
             f._event.wait()
             self.assertIsInstance(f._final_exception, OperationTimedOut)
 
-        self.assertEqual(listener.hosts_marked_down, [])
+        assert listener.hosts_marked_down == []
         assert_quiescent_pool_state(self, cluster)
 
     def test_can_shutdown_connection_subclass(self):

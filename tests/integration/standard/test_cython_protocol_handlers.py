@@ -74,7 +74,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         results = session.execute("SELECT * FROM test_table")
 
         self.assertTrue(results.has_more_pages)
-        self.assertEqual(verify_iterator_data(self.assertEqual, results), self.N_ITEMS)  # make sure we see all rows
+        assert verify_iterator_data(self.assertEqual, results) == self.N_ITEMS  # make sure we see all rows
 
         cluster.shutdown()
 
@@ -119,9 +119,9 @@ class CythonProtocolHandlerTest(unittest.TestCase):
                 else:
                     # we get one extra item out of this iteration because of the way NumpyParser returns results
                     # The last page is returned as a dict with zero-length arrays
-                    self.assertEqual(len(arr), 0)
-            self.assertEqual(self._verify_numpy_page(page), len(arr))
-        self.assertEqual(count, expected_pages + 1)  # see note about extra 'page' above
+                    assert len(arr) == 0
+            assert self._verify_numpy_page(page) == len(arr)
+        assert count == expected_pages + 1  # see note about extra 'page' above
 
         cluster.shutdown()
 
@@ -161,11 +161,11 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         elif datatype == 'double':
             self.match_dtype_props(dtype, 'f', 8)
         else:
-            self.assertEqual(dtype.kind, 'O', msg=(dtype, datatype))
+            assert dtype.kind == 'O', (dtype, datatype)
 
     def match_dtype_props(self, dtype, kind, size, signed=None):
-        self.assertEqual(dtype.kind, kind, msg=dtype)
-        self.assertEqual(dtype.itemsize, size, msg=dtype)
+        assert dtype.kind == kind, dtype
+        assert dtype.itemsize == size, dtype
 
 
 def arrays_to_list_of_tuples(arrays, colnames):

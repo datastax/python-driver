@@ -35,13 +35,13 @@ class BaseStatementTest(unittest.TestCase):
     def test_fetch_size(self):
         """ tests that fetch_size is correctly set """
         stmt = BaseCQLStatement('table', None, fetch_size=1000)
-        self.assertEqual(stmt.fetch_size, 1000)
+        assert stmt.fetch_size == 1000
 
         stmt = BaseCQLStatement('table', None, fetch_size=None)
-        self.assertEqual(stmt.fetch_size, FETCH_SIZE_UNSET)
+        assert stmt.fetch_size == FETCH_SIZE_UNSET
 
         stmt = BaseCQLStatement('table', None)
-        self.assertEqual(stmt.fetch_size, FETCH_SIZE_UNSET)
+        assert stmt.fetch_size == FETCH_SIZE_UNSET
 
 
 class ExecuteStatementTest(BaseCassEngTestCase):
@@ -64,8 +64,8 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         response = result.one()
 
         for assignment in original.assignments:
-            self.assertEqual(response[assignment.field], assignment.value)
-        self.assertEqual(len(response), 8)
+            assert response[assignment.field] == assignment.value
+        assert len(response) == 8
 
     def test_insert_statement_execute(self):
         """
@@ -99,7 +99,7 @@ class ExecuteStatementTest(BaseCassEngTestCase):
 
         # Verifying delete statement
         execute(DeleteStatement(self.table_name, where=where))
-        self.assertEqual(TestQueryUpdateModel.objects.count(), 0)
+        assert TestQueryUpdateModel.objects.count() == 0
 
     @greaterthanorequalcass3_10
     @requires_custom_indexes
@@ -128,17 +128,16 @@ class ExecuteStatementTest(BaseCassEngTestCase):
         ss = SelectStatement(self.table_name)
         like_clause = "text_for_%"
         ss.add_where(Column(db_field='text'), LikeOperator(), like_clause)
-        self.assertEqual(str(ss),
-                         'SELECT * FROM {} WHERE "text" LIKE %(0)s'.format(self.table_name))
+        assert str(ss) == 'SELECT * FROM {} WHERE "text" LIKE %(0)s'.format(self.table_name)
 
         result = execute(ss)
-        self.assertEqual(result[0]["text"], self.text)
+        assert result[0]["text"] == self.text
 
         q = TestQueryUpdateModel.objects.filter(text__like=like_clause).allow_filtering()
-        self.assertEqual(q[0].text, self.text)
+        assert q[0].text == self.text
 
         q = TestQueryUpdateModel.objects.filter(text__like=like_clause)
-        self.assertEqual(q[0].text, self.text)
+        assert q[0].text == self.text
 
     def _insert_statement(self, partition, cluster):
         # Verifying insert statement

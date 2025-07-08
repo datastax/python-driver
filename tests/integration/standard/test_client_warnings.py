@@ -70,7 +70,7 @@ class ClientWarningTests(unittest.TestCase):
         """
         future = self.session.execute_async(self.warn_batch)
         future.result()
-        self.assertEqual(len(future.warnings), 1)
+        assert len(future.warnings) == 1
         self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
 
     def test_warning_with_trace(self):
@@ -86,7 +86,7 @@ class ClientWarningTests(unittest.TestCase):
         """
         future = self.session.execute_async(self.warn_batch, trace=True)
         future.result()
-        self.assertEqual(len(future.warnings), 1)
+        assert len(future.warnings) == 1
         self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
         self.assertIsNotNone(future.get_query_trace())
 
@@ -106,7 +106,7 @@ class ClientWarningTests(unittest.TestCase):
         payload = {'key': b'value'}
         future = self.session.execute_async(self.warn_batch, custom_payload=payload)
         future.result()
-        self.assertEqual(len(future.warnings), 1)
+        assert len(future.warnings) == 1
         self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
         self.assertDictEqual(future.custom_payload, payload)
 
@@ -126,7 +126,7 @@ class ClientWarningTests(unittest.TestCase):
         payload = {'key': b'value'}
         future = self.session.execute_async(self.warn_batch, trace=True, custom_payload=payload)
         future.result()
-        self.assertEqual(len(future.warnings), 1)
+        assert len(future.warnings) == 1
         self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
         self.assertIsNotNone(future.get_query_trace())
         self.assertDictEqual(future.custom_payload, payload)

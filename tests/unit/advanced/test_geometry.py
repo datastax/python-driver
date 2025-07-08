@@ -35,12 +35,12 @@ class GeoTypes(unittest.TestCase):
         for proto_ver in protocol_versions:
             for geo in self.samples:
                 cql_type = lookup_casstype(geo.__class__.__name__ + 'Type')
-                self.assertEqual(cql_type.from_binary(cql_type.to_binary(geo, proto_ver), proto_ver), geo)
+                assert cql_type.from_binary(cql_type.to_binary(geo, proto_ver), proto_ver) == geo
 
     def _verify_both_endian(self, typ, body_fmt, params, expected):
         for proto_ver in protocol_versions:
-            self.assertEqual(typ.from_binary(struct.pack(">BI" + body_fmt, wkb_be, *params), proto_ver), expected)
-            self.assertEqual(typ.from_binary(struct.pack("<BI" + body_fmt, wkb_le, *params), proto_ver), expected)
+            assert typ.from_binary(struct.pack(">BI" + body_fmt, wkb_be, *params), proto_ver) == expected
+            assert typ.from_binary(struct.pack("<BI" + body_fmt, wkb_le, *params), proto_ver) == expected
 
     def test_both_endian(self):
         self._verify_both_endian(PointType, "dd", (WKBGeometryType.POINT, 1, 2), Point(1, 2))
@@ -51,23 +51,22 @@ class GeoTypes(unittest.TestCase):
         for cls in (LineString, Polygon):
             class_name = cls.__name__
             cql_type = lookup_casstype(class_name + 'Type')
-            self.assertEqual(str(cql_type.from_binary(cql_type.to_binary(cls(), 0), 0)), class_name.upper() + " EMPTY")
-        self.assertEqual(str(PointType.from_binary(PointType.to_binary(Point(), 0), 0)), "POINT (nan nan)")
+            assert str(cql_type.from_binary(cql_type.to_binary(cls(), 0), 0)) == class_name.upper() + " EMPTY"
+        assert str(PointType.from_binary(PointType.to_binary(Point(), 0), 0)) == "POINT (nan nan)"
 
     def test_str_wkt(self):
-        self.assertEqual(str(Point(1., 2.)), 'POINT (1.0 2.0)')
-        self.assertEqual(str(Point()), "POINT (nan nan)")
-        self.assertEqual(str(LineString(((1., 2.), (3., 4.), (5., 6.)))), 'LINESTRING (1.0 2.0, 3.0 4.0, 5.0 6.0)')
-        self.assertEqual(str(_LinearRing(((1., 2.), (3., 4.), (5., 6.)))), 'LINEARRING (1.0 2.0, 3.0 4.0, 5.0 6.0)')
-        self.assertEqual(str(Polygon([(10.1, 10.0), (110.0, 10.0), (110., 110.0), (10., 110.0), (10., 10.0)],
+        assert str(Point(1., 2.)) == 'POINT (1.0 2.0)'
+        assert str(Point()) == "POINT (nan nan)"
+        assert str(LineString(((1., 2.), (3., 4.), (5., 6.)))) == 'LINESTRING (1.0 2.0, 3.0 4.0, 5.0 6.0)'
+        assert str(_LinearRing(((1., 2.), (3., 4.), (5., 6.)))) == 'LINEARRING (1.0 2.0, 3.0 4.0, 5.0 6.0)'
+        assert str(Polygon([(10.1, 10.0), (110.0, 10.0), (110., 110.0), (10., 110.0), (10., 10.0)],
                                      [[(20., 20.0), (20., 30.0), (30., 30.0), (30., 20.0), (20., 20.0)],
-                                      [(40., 20.0), (40., 30.0), (50., 30.0), (50., 20.0), (40., 20.0)]])),
-                         'POLYGON ((10.1 10.0, 110.0 10.0, 110.0 110.0, 10.0 110.0, 10.0 10.0), (20.0 20.0, 20.0 30.0, 30.0 30.0, 30.0 20.0, 20.0 20.0), (40.0 20.0, 40.0 30.0, 50.0 30.0, 50.0 20.0, 40.0 20.0))')
+                                      [(40., 20.0), (40., 30.0), (50., 30.0), (50., 20.0), (40., 20.0)]])) == 'POLYGON ((10.1 10.0, 110.0 10.0, 110.0 110.0, 10.0 110.0, 10.0 10.0), (20.0 20.0, 20.0 30.0, 30.0 30.0, 30.0 20.0, 20.0 20.0), (40.0 20.0, 40.0 30.0, 50.0 30.0, 50.0 20.0, 40.0 20.0))'
 
         class LinearRing(_LinearRing):
             pass
         for cls in (LineString, LinearRing, Polygon):
-            self.assertEqual(str(cls()), cls.__name__.upper() + " EMPTY")
+            assert str(cls()) == cls.__name__.upper() + " EMPTY"
 
     def test_repr(self):
         for geo in (Point(1., 2.),
@@ -76,7 +75,7 @@ class GeoTypes(unittest.TestCase):
                     Polygon([(10.1, 10.0), (110.0, 10.0), (110., 110.0), (10., 110.0), (10., 10.0)],
                             [[(20., 20.0), (20., 30.0), (30., 30.0), (30., 20.0), (20., 20.0)],
                              [(40., 20.0), (40., 30.0), (50., 30.0), (50., 20.0), (40., 20.0)]])):
-            self.assertEqual(eval(repr(geo)), geo)
+            assert eval(repr(geo)) == geo
 
     def test_hash(self):
         for geo in (Point(1., 2.),
@@ -85,7 +84,7 @@ class GeoTypes(unittest.TestCase):
                     Polygon([(10.1, 10.0), (110.0, 10.0), (110., 110.0), (10., 110.0), (10., 10.0)],
                             [[(20., 20.0), (20., 30.0), (30., 30.0), (30., 20.0), (20., 20.0)],
                              [(40., 20.0), (40., 30.0), (50., 30.0), (50., 20.0), (40., 20.0)]])):
-            self.assertEqual(len(set((geo, geo))), 1)
+            assert len(set((geo, geo))) == 1
 
     def test_eq(self):
         for geo in (Point(1., 2.),
@@ -95,7 +94,7 @@ class GeoTypes(unittest.TestCase):
                             [[(20., 20.0), (20., 30.0), (30., 30.0), (30., 20.0), (20., 20.0)],
                              [(40., 20.0), (40., 30.0), (50., 30.0), (50., 20.0), (40., 20.0)]])):
             # same type
-            self.assertEqual(geo, geo)
+            assert geo == geo
 
             # does not blow up on other types
             # specifically use assertFalse(eq) to make sure we're using the geo __eq__ operator
@@ -117,19 +116,19 @@ class WKTTest(unittest.TestCase):
         ls = "LINESTRING (1.0 2.0, 3.0 4.0, 5.0 6.0)"
         lo = LineString.from_wkt(ls)
         lo_expected_cords = ((1.0, 2.0), (3.0, 4.0), (5.0, 6.0))
-        self.assertEqual(lo.coords, lo_expected_cords)
+        assert lo.coords == lo_expected_cords
 
         # Test very long line string
         long_ls = self._construct_line_string(10000)
         long_lo = LineString.from_wkt(long_ls)
-        self.assertEqual(len(long_lo.coords), 10000)
-        self.assertEqual(long_lo.coords, self._construct_line_string_expected_cords(10000))
+        assert len(long_lo.coords) == 10000
+        assert long_lo.coords == self._construct_line_string_expected_cords(10000)
 
         # Test line string with negative numbers
         ls = "LINESTRING (-1.3 1.2, 3.23 -4.54, 1.34 -9.26)"
         lo = LineString.from_wkt(ls)
         lo_expected_cords = ((-1.3, 1.2), (3.23, -4.54), (1.34, -9.26))
-        self.assertEqual(lo.coords, lo_expected_cords)
+        assert lo.coords == lo_expected_cords
 
         # Test bad line strings
         bls = "LINESTRIN (1.0 2.0, 3.0 4.0, 5.0 6.0)"
@@ -142,7 +141,7 @@ class WKTTest(unittest.TestCase):
         # Test with NAN
         ls = "LINESTRING (NAN NAN, NAN NAN)"
         lo = LineString.from_wkt(ls)
-        self.assertEqual(len(lo.coords), 2)
+        assert len(lo.coords) == 2
         for cords in lo.coords:
             for cord in cords:
                 self.assertTrue(math.isnan(cord))
@@ -158,9 +157,9 @@ class WKTTest(unittest.TestCase):
 
         ds = "DISTANCE ((12, 10) 3)"
         do = Distance(12, 10, 3)
-        self.assertEqual(do.x, 12)
-        self.assertEqual(do.y, 10)
-        self.assertEqual(do.radius, 3)
+        assert do.x == 12
+        assert do.y == 10
+        assert do.radius == 3
         # Test bad distance strings
 
         bds = "DISTANCE ((1.0 2.0))"
@@ -184,8 +183,8 @@ class WKTTest(unittest.TestCase):
         # Test basic point
         ps = "POINT (1.0 2.0)"
         po = Point.from_wkt(ps)
-        self.assertEqual(po.x, 1.0)
-        self.assertEqual(po.y, 2.0)
+        assert po.x == 1.0
+        assert po.y == 2.0
 
         # Test bad point strings
         bps = "POIN (1.0 2.0)"
@@ -198,8 +197,8 @@ class WKTTest(unittest.TestCase):
         # Points get truncated automatically
         tps = "POINT (9.0 2.0 3.0 4.0 5.0)"
         tpo = Point.from_wkt(tps)
-        self.assertEqual(tpo.x, 9.0)
-        self.assertEqual(tpo.y, 2.0)
+        assert tpo.x == 9.0
+        assert tpo.y == 2.0
 
         # Test point with NAN
         ps = "POINT (NAN NAN)"
@@ -221,18 +220,18 @@ class WKTTest(unittest.TestCase):
         expected_ex_coords = ((10.1, 10.0), (110.0, 10.0), (110.0, 110.0), (10.0, 110.0), (10.0, 10.0))
         expected_in_coords_1 = ((20.0, 20.0), (20.0, 30.0), (30.0, 30.0), (30.0, 20.0), (20.0, 20.0))
         expected_in_coords_2 = ((40.0, 20.0), (40.0, 30.0), (50.0, 30.0), (50.0, 20.0), (40.0, 20.0))
-        self.assertEqual(poly_obj.exterior.coords, expected_ex_coords)
-        self.assertEqual(len(poly_obj.interiors), 2)
-        self.assertEqual(poly_obj.interiors[0].coords, expected_in_coords_1)
-        self.assertEqual(poly_obj.interiors[1].coords, expected_in_coords_2)
+        assert poly_obj.exterior.coords == expected_ex_coords
+        assert len(poly_obj.interiors) == 2
+        assert poly_obj.interiors[0].coords == expected_in_coords_1
+        assert poly_obj.interiors[1].coords == expected_in_coords_2
 
         # Test with very long polygon
         long_poly_string = self._construct_polygon_string(10000)
         long_poly_obj = Polygon.from_wkt(long_poly_string)
-        self.assertEqual(len(long_poly_obj.exterior.coords), 10000)
+        assert len(long_poly_obj.exterior.coords) == 10000
         #for expected, recieved in zip(self._construct_line_string_expected_cords(10000), long_poly_obj.exterior.coords):
         #    self.assertEqual(expected, recieved)
-        self.assertEqual(long_poly_obj.exterior.coords, self._construct_line_string_expected_cords(10000))
+        assert long_poly_obj.exterior.coords == self._construct_line_string_expected_cords(10000)
 
         # Test bad polygon strings
         bps = "POLYGONE ((30 10, 40 40, 20 40, 10 20, 30 10))"
@@ -246,7 +245,7 @@ class WKTTest(unittest.TestCase):
         ps = "POLYGON ((30 10, 40 40, 20, 10 20, 30))"
         po = Polygon.from_wkt(ps)
         expected_ex_coords = ((30.0, 10.0), (40.0, 40.0), (20.0,), (10.0, 20.0), (30.0,))
-        self.assertEqual(po.exterior.coords, expected_ex_coords)
+        assert po.exterior.coords == expected_ex_coords
 
         # Test Polygon with NAN
         ps = "POLYGON ((NAN NAN, NAN NAN, NAN NAN, NAN, NAN))"

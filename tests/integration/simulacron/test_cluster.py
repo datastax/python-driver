@@ -51,10 +51,10 @@ class ClusterTests(SimulacronCluster):
         with self.assertRaises(WriteTimeout) as assert_raised_context:
             self.session.execute(query_to_prime_simple)
         wt = assert_raised_context.exception
-        self.assertEqual(wt.write_type, WriteType.name_to_value[write_type])
-        self.assertEqual(wt.consistency, ConsistencyLevel.name_to_value[consistency])
-        self.assertEqual(wt.received_responses, received_responses)
-        self.assertEqual(wt.required_responses, required_responses)
+        assert wt.write_type == WriteType.name_to_value[write_type]
+        assert wt.consistency == ConsistencyLevel.name_to_value[consistency]
+        assert wt.received_responses == received_responses
+        assert wt.required_responses == required_responses
         self.assertIn(write_type, str(wt))
         self.assertIn(consistency, str(wt))
         self.assertIn(str(received_responses), str(wt))
@@ -102,6 +102,6 @@ class DuplicateRpcTest(SimulacronCluster):
             session = cluster.connect(wait_for_all_pools=True)
 
             warnings = mock_handler.messages.get("warning")
-            self.assertEqual(len(warnings), 1)
+            assert len(warnings) == 1
             self.assertTrue('multiple hosts with the same endpoint' in warnings[0])
             cluster.shutdown()

@@ -50,7 +50,7 @@ class RoutingTests(unittest.TestCase):
 
         cass_token = s.execute(select, key_values).one()[0]
         token = s.cluster.metadata.token_map.token_class(cass_token)
-        self.assertEqual(my_token, token)
+        assert my_token == token
 
     def create_prepare(self, key_types):
         s = self.session

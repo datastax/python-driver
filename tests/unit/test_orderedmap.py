@@ -23,15 +23,15 @@ class OrderedMapTest(unittest.TestCase):
         b = OrderedMap([('one', 1), ('three', 3), ('two', 2)])
         c = OrderedMap(a)
         builtin = {'one': 1, 'two': 2, 'three': 3}
-        self.assertEqual(a, b)
-        self.assertEqual(a, c)
-        self.assertEqual(a, builtin)
-        self.assertEqual(OrderedMap([(1, 1), (1, 2)]), {1: 2})
+        assert a == b
+        assert a == c
+        assert a == builtin
+        assert OrderedMap([(1, 1), (1, 2)]) == {1: 2}
 
         d = OrderedMap({'': 3}, key1='v1', key2='v2')
-        self.assertEqual(d[''], 3)
-        self.assertEqual(d['key1'], 'v1')
-        self.assertEqual(d['key2'], 'v2')
+        assert d[''] == 3
+        assert d['key1'] == 'v1'
+        assert d['key2'] == 'v2'
 
         with self.assertRaises(TypeError):
             OrderedMap('too', 'many', 'args')
@@ -75,9 +75,9 @@ class OrderedMapTest(unittest.TestCase):
         om = OrderedMap(zip(keys, range(len(keys))))
 
         for v, k in enumerate(keys):
-            self.assertEqual(om.get(k), v)
-        
-        self.assertEqual(om.get('notthere', 'default'), 'default')
+            assert om.get(k) == v
+
+        assert om.get('notthere', 'default') == 'default'
         self.assertIsNone(om.get('notthere'))
 
     def test_equal(self):
@@ -87,9 +87,9 @@ class OrderedMapTest(unittest.TestCase):
         om12 = OrderedMap([('one', 1), ('two', 2)])
         om21 = OrderedMap([('two', 2), ('one', 1)])
 
-        self.assertEqual(om1, d1)
-        self.assertEqual(om12, d12)
-        self.assertEqual(om21, d12)
+        assert om1 == d1
+        assert om12 == d12
+        assert om21 == d12
         self.assertNotEqual(om1, om12)
         self.assertNotEqual(om12, om1)
         self.assertNotEqual(om12, om21)
@@ -104,8 +104,8 @@ class OrderedMapTest(unittest.TestCase):
         om = OrderedMap(zip(keys, range(len(keys))))
 
         for v, k in enumerate(keys):
-            self.assertEqual(om[k], v)
-        
+            assert om[k] == v
+
         with self.assertRaises(KeyError):
             om['notthere']
 
@@ -116,16 +116,16 @@ class OrderedMapTest(unittest.TestCase):
         om = OrderedMap(items)
 
         itr = iter(om)
-        self.assertEqual(sum([1 for _ in itr]), len(keys))
+        assert sum([1 for _ in itr]) == len(keys)
         self.assertRaises(StopIteration, next, itr)
 
-        self.assertEqual(list(iter(om)), keys)
-        self.assertEqual(list(om.items()), items)
-        self.assertEqual(list(om.values()), values)
+        assert list(iter(om)) == keys
+        assert list(om.items()) == items
+        assert list(om.values()) == values
 
     def test_len(self):
-        self.assertEqual(len(OrderedMap()), 0)
-        self.assertEqual(len(OrderedMap([(1, 1)])), 1)
+        assert len(OrderedMap()) == 0
+        assert len(OrderedMap([(1, 1)])) == 1
 
     def test_mutable_keys(self):
         d = {'1': 1}
@@ -136,16 +136,14 @@ class OrderedMapTest(unittest.TestCase):
         # changes in 3.x
         d = {'map': 'inner'}
         s = set([1, 2, 3])
-        self.assertEqual(repr(OrderedMap([('two', 2), ('one', 1), (d, 'value'), (s, 'another')])),
-                         "OrderedMap([('two', 2), ('one', 1), (%r, 'value'), (%r, 'another')])" % (d, s))
+        assert repr(OrderedMap([('two', 2), ('one', 1), (d, 'value'), (s, 'another')])) == "OrderedMap([('two', 2), ('one', 1), (%r, 'value'), (%r, 'another')])" % (d, s)
 
-        self.assertEqual(str(OrderedMap([('two', 2), ('one', 1), (d, 'value'), (s, 'another')])),
-                         "{'two': 2, 'one': 1, %r: 'value', %r: 'another'}" % (d, s))
+        assert str(OrderedMap([('two', 2), ('one', 1), (d, 'value'), (s, 'another')])) == "{'two': 2, 'one': 1, %r: 'value', %r: 'another'}" % (d, s)
 
     def test_popitem(self):
         item = (1, 2)
         om = OrderedMap((item,))
-        self.assertEqual(om.popitem(), item)
+        assert om.popitem() == item
         self.assertRaises(KeyError, om.popitem)
 
     def test_delitem(self):
@@ -154,7 +152,7 @@ class OrderedMapTest(unittest.TestCase):
         self.assertRaises(KeyError, om.__delitem__, 3)
 
         del om[1]
-        self.assertEqual(om, {2: 2})
+        assert om == {2: 2}
         del om[2]
         self.assertFalse(om)
 
@@ -164,7 +162,7 @@ class OrderedMapTest(unittest.TestCase):
 class OrderedMapSerializedKeyTest(unittest.TestCase):
     def test_init(self):
         om = OrderedMapSerializedKey(UTF8Type, 3)
-        self.assertEqual(om, {})
+        assert om == {}
 
     def test_normalized_lookup(self):
         key_type = lookup_casstype('MapType(UTF8Type, Int32Type)')

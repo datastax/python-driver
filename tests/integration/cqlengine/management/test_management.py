@@ -177,16 +177,16 @@ class AddColumnTest(BaseCassEngTestCase):
     def test_add_column(self):
         sync_table(FirstModel)
         meta_columns = _get_table_metadata(FirstModel).columns
-        self.assertEqual(set(meta_columns), set(FirstModel._columns))
+        assert set(meta_columns) == set(FirstModel._columns)
 
         sync_table(SecondModel)
         meta_columns = _get_table_metadata(FirstModel).columns
-        self.assertEqual(set(meta_columns), set(SecondModel._columns))
+        assert set(meta_columns) == set(SecondModel._columns)
 
         sync_table(ThirdModel)
         meta_columns = _get_table_metadata(FirstModel).columns
-        self.assertEqual(len(meta_columns), 5)
-        self.assertEqual(len(ThirdModel._columns), 4)
+        assert len(meta_columns) == 5
+        assert len(ThirdModel._columns) == 4
         self.assertIn('fourth_key', meta_columns)
         self.assertNotIn('fourth_key', ThirdModel._columns)
         self.assertIn('blah', ThirdModel._columns)
@@ -194,8 +194,8 @@ class AddColumnTest(BaseCassEngTestCase):
 
         sync_table(FourthModel)
         meta_columns = _get_table_metadata(FirstModel).columns
-        self.assertEqual(len(meta_columns), 5)
-        self.assertEqual(len(ThirdModel._columns), 4)
+        assert len(meta_columns) == 5
+        assert len(ThirdModel._columns) == 4
         self.assertIn('fourth_key', meta_columns)
         self.assertNotIn('fourth_key', FourthModel._columns)
         self.assertIn('renamed', FourthModel._columns)
@@ -239,8 +239,7 @@ class TablePropertiesTests(BaseCassEngTestCase):
             expected.update({'read_repair_chance': 0.17985})
 
         options = management._get_table_metadata(ModelWithTableProperties).options
-        self.assertEqual(dict([(k, options.get(k)) for k in expected.keys()]),
-                         expected)
+        assert dict([(k, options.get(k)) for k in expected.keys()]) == expected
 
     def test_table_property_update(self):
         ModelWithTableProperties.__options__['bloom_filter_fp_chance'] = 0.66778
@@ -485,4 +484,4 @@ class StaticColumnTests(BaseCassEngTestCase):
         with mock.patch.object(session, "execute", wraps=session.execute) as m2:
             sync_table(StaticModel)
 
-        self.assertEqual(len(m2.call_args_list), 0)
+        assert len(m2.call_args_list) == 0

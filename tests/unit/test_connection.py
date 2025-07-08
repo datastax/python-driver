@@ -67,17 +67,17 @@ class ConnectionTest(unittest.TestCase):
     def test_connection_endpoint(self):
         endpoint = DefaultEndPoint('1.2.3.4')
         c = Connection(endpoint)
-        self.assertEqual(c.endpoint, endpoint)
-        self.assertEqual(c.endpoint.address, endpoint.address)
+        assert c.endpoint == endpoint
+        assert c.endpoint.address == endpoint.address
 
         c = Connection(host=endpoint)  # kwarg
-        self.assertEqual(c.endpoint, endpoint)
-        self.assertEqual(c.endpoint.address, endpoint.address)
+        assert c.endpoint == endpoint
+        assert c.endpoint.address == endpoint.address
 
         c = Connection('10.0.0.1')
         endpoint = DefaultEndPoint('10.0.0.1')
-        self.assertEqual(c.endpoint, endpoint)
-        self.assertEqual(c.endpoint.address, endpoint.address)
+        assert c.endpoint == endpoint
+        assert c.endpoint.address == endpoint.address
 
     def test_bad_protocol_version(self, *args):
         c = self.make_connection()
@@ -155,7 +155,7 @@ class ConnectionTest(unittest.TestCase):
 
         c.process_msg(_Frame(version=4, flags=0, stream=0, opcode=SupportedMessage.opcode, body_offset=9, end_pos=9 + len(options)), options)
 
-        self.assertEqual(c.decompressor, locally_supported_compressions['lz4'][1])
+        assert c.decompressor == locally_supported_compressions['lz4'][1]
 
     def test_requested_compression_not_available(self, *args):
         c = self.make_connection()
@@ -206,7 +206,7 @@ class ConnectionTest(unittest.TestCase):
 
         c.process_msg(_Frame(version=4, flags=0, stream=0, opcode=SupportedMessage.opcode, body_offset=9, end_pos=9 + len(options)), options)
 
-        self.assertEqual(c.decompressor, locally_supported_compressions['snappy'][1])
+        assert c.decompressor == locally_supported_compressions['snappy'][1]
 
     def test_disable_compression(self, *args):
         c = self.make_connection()
@@ -234,7 +234,7 @@ class ConnectionTest(unittest.TestCase):
         message = self.make_msg(header, options)
         c.process_msg(message, len(message) - 8)
 
-        self.assertEqual(c.decompressor, None)
+        assert c.decompressor == None
 
     def test_not_implemented(self):
         """
@@ -246,17 +246,17 @@ class ConnectionTest(unittest.TestCase):
     def test_set_keyspace_blocking(self):
         c = self.make_connection()
 
-        self.assertEqual(c.keyspace, None)
+        assert c.keyspace == None
         c.set_keyspace_blocking(None)
-        self.assertEqual(c.keyspace, None)
+        assert c.keyspace == None
 
         c.keyspace = 'ks'
         c.set_keyspace_blocking('ks')
-        self.assertEqual(c.keyspace, 'ks')
+        assert c.keyspace == 'ks'
 
     def test_set_connection_class(self):
         cluster = Cluster(connection_class='test')
-        self.assertEqual('test', cluster.connection_class)
+        assert 'test' == cluster.connection_class
 
 
 @patch('cassandra.connection.ConnectionHeartbeat._raise_if_stopped')
@@ -315,11 +315,11 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.run_heartbeat(get_holders)
 
         holder.get_connections.assert_has_calls([call()] * get_holders.call_count)
-        self.assertEqual(idle_connection.in_flight, 0)
-        self.assertEqual(non_idle_connection.in_flight, 0)
+        assert idle_connection.in_flight == 0
+        assert non_idle_connection.in_flight == 0
 
         idle_connection.send_msg.assert_has_calls([call(ANY, request_id, ANY)] * get_holders.call_count)
-        self.assertEqual(non_idle_connection.send_msg.call_count, 0)
+        assert non_idle_connection.send_msg.call_count == 0
 
     def test_closed_defunct(self, *args):
         get_holders = self.make_get_holders(1)
@@ -332,10 +332,10 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.run_heartbeat(get_holders)
 
         holder.get_connections.assert_has_calls([call()] * get_holders.call_count)
-        self.assertEqual(closed_connection.in_flight, 0)
-        self.assertEqual(defunct_connection.in_flight, 0)
-        self.assertEqual(closed_connection.send_msg.call_count, 0)
-        self.assertEqual(defunct_connection.send_msg.call_count, 0)
+        assert closed_connection.in_flight == 0
+        assert defunct_connection.in_flight == 0
+        assert closed_connection.send_msg.call_count == 0
+        assert defunct_connection.send_msg.call_count == 0
 
     def test_no_req_ids(self, *args):
         in_flight = 3
@@ -351,9 +351,9 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         self.run_heartbeat(get_holders)
 
         holder.get_connections.assert_has_calls([call()] * get_holders.call_count)
-        self.assertEqual(max_connection.in_flight, in_flight)
-        self.assertEqual(max_connection.send_msg.call_count, 0)
-        self.assertEqual(max_connection.send_msg.call_count, 0)
+        assert max_connection.in_flight == in_flight
+        assert max_connection.send_msg.call_count == 0
+        assert max_connection.send_msg.call_count == 0
         max_connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         holder.return_connection.assert_has_calls(
             [call(max_connection)] * get_holders.call_count)
@@ -378,7 +378,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
 
         self.run_heartbeat(get_holders)
 
-        self.assertEqual(connection.in_flight, get_holders.call_count)
+        assert connection.in_flight == get_holders.call_count
         connection.send_msg.assert_has_calls([call(ANY, request_id, ANY)] * get_holders.call_count)
         connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         exc = connection.defunct.call_args_list[0][0][0]
@@ -408,13 +408,13 @@ class ConnectionHeartbeatTest(unittest.TestCase):
 
         self.run_heartbeat(get_holders)
 
-        self.assertEqual(connection.in_flight, get_holders.call_count)
+        assert connection.in_flight == get_holders.call_count
         connection.send_msg.assert_has_calls([call(ANY, request_id, ANY)] * get_holders.call_count)
         connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         exc = connection.defunct.call_args_list[0][0][0]
         self.assertIsInstance(exc, OperationTimedOut)
-        self.assertEqual(exc.errors, 'Connection heartbeat timeout after 0.05 seconds')
-        self.assertEqual(exc.last_host, DefaultEndPoint('localhost'))
+        assert exc.errors == 'Connection heartbeat timeout after 0.05 seconds'
+        assert exc.last_host == DefaultEndPoint('localhost')
         holder.return_connection.assert_has_calls(
             [call(connection)] * get_holders.call_count)
 
@@ -439,25 +439,19 @@ class DefaultEndPointTest(unittest.TestCase):
 
     def test_default_endpoint_properties(self):
         endpoint = DefaultEndPoint('10.0.0.1')
-        self.assertEqual(endpoint.address, '10.0.0.1')
-        self.assertEqual(endpoint.port, 9042)
-        self.assertEqual(str(endpoint), '10.0.0.1:9042')
+        assert endpoint.address == '10.0.0.1'
+        assert endpoint.port == 9042
+        assert str(endpoint) == '10.0.0.1:9042'
 
         endpoint = DefaultEndPoint('10.0.0.1', 8888)
-        self.assertEqual(endpoint.address, '10.0.0.1')
-        self.assertEqual(endpoint.port, 8888)
-        self.assertEqual(str(endpoint), '10.0.0.1:8888')
+        assert endpoint.address == '10.0.0.1'
+        assert endpoint.port == 8888
+        assert str(endpoint) == '10.0.0.1:8888'
 
     def test_endpoint_equality(self):
-        self.assertEqual(
-            DefaultEndPoint('10.0.0.1'),
-            DefaultEndPoint('10.0.0.1')
-        )
+        assert DefaultEndPoint('10.0.0.1') == DefaultEndPoint('10.0.0.1')
 
-        self.assertEqual(
-            DefaultEndPoint('10.0.0.1'),
-            DefaultEndPoint('10.0.0.1', 9042)
-        )
+        assert DefaultEndPoint('10.0.0.1') == DefaultEndPoint('10.0.0.1', 9042)
 
         self.assertNotEqual(
             DefaultEndPoint('10.0.0.1'),
@@ -470,15 +464,9 @@ class DefaultEndPointTest(unittest.TestCase):
         )
 
     def test_endpoint_resolve(self):
-        self.assertEqual(
-            DefaultEndPoint('10.0.0.1').resolve(),
-            ('10.0.0.1', 9042)
-        )
+        assert DefaultEndPoint('10.0.0.1').resolve() == ('10.0.0.1', 9042)
 
-        self.assertEqual(
-            DefaultEndPoint('10.0.0.1', 3232).resolve(),
-            ('10.0.0.1', 3232)
-        )
+        assert DefaultEndPoint('10.0.0.1', 3232).resolve() == ('10.0.0.1', 3232)
 
 
 class TestShardawarePortGenerator(unittest.TestCase):
@@ -489,7 +477,7 @@ class TestShardawarePortGenerator(unittest.TestCase):
         ports = list(itertools.islice(gen.generate(shard_id=1, total_shards=3), 5))
 
         # Starting from aligned 10005 + shard_id (1), step by 3
-        self.assertEqual(ports, [10006, 10009, 10012, 10015, 10018])
+        assert ports == [10006, 10009, 10012, 10015, 10018]
 
     @patch('random.randrange')
     def test_wraps_around_to_start(self, mock_randrange):
@@ -498,7 +486,7 @@ class TestShardawarePortGenerator(unittest.TestCase):
         ports = list(itertools.islice(gen.generate(shard_id=2, total_shards=4), 5))
 
         # Expected wrap-around from start_port after end_port is exceeded
-        self.assertEqual(ports, [10010, 10014, 10018, 10002, 10006])
+        assert ports == [10010, 10014, 10018, 10002, 10006]
 
     @patch('random.randrange')
     def test_all_ports_have_correct_modulo(self, mock_randrange):
@@ -508,7 +496,7 @@ class TestShardawarePortGenerator(unittest.TestCase):
         gen = ShardAwarePortGenerator(10000, 10020)
 
         for port in gen.generate(shard_id=shard_id, total_shards=total_shards):
-            self.assertEqual(port % total_shards, shard_id)
+            assert port % total_shards == shard_id
 
     @patch('random.randrange')
     def test_generate_is_repeatable_with_same_mock(self, mock_randrange):
@@ -518,4 +506,4 @@ class TestShardawarePortGenerator(unittest.TestCase):
         first_run = list(itertools.islice(gen.generate(0, 2), 5))
         second_run = list(itertools.islice(gen.generate(0, 2), 5))
 
-        self.assertEqual(first_run, second_run)
+        assert first_run == second_run

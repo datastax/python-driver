@@ -24,10 +24,7 @@ class InsertStatementTests(unittest.TestCase):
         ist.add_assignment(Column(db_field='a'), 'b')
         ist.add_assignment(Column(db_field='c'), 'd')
 
-        self.assertEqual(
-            str(ist),
-            'INSERT INTO table ("a", "c") VALUES (%(0)s, %(1)s)'
-        )
+        assert str(ist) == 'INSERT INTO table ("a", "c") VALUES (%(0)s, %(1)s)'
 
     def test_context_update(self):
         ist = InsertStatement('table', None)
@@ -35,12 +32,9 @@ class InsertStatementTests(unittest.TestCase):
         ist.add_assignment(Column(db_field='c'), 'd')
 
         ist.update_context_id(4)
-        self.assertEqual(
-            str(ist),
-            'INSERT INTO table ("a", "c") VALUES (%(4)s, %(5)s)'
-        )
+        assert str(ist) == 'INSERT INTO table ("a", "c") VALUES (%(4)s, %(5)s)'
         ctx = ist.get_context()
-        self.assertEqual(ctx, {'4': 'b', '5': 'd'})
+        assert ctx == {'4': 'b', '5': 'd'}
 
     def test_additional_rendering(self):
         ist = InsertStatement('table', ttl=60)

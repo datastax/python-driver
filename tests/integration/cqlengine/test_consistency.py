@@ -53,7 +53,7 @@ class TestConsistency(BaseConsistencyTest):
             qs.create(text="i am not fault tolerant this way")
 
         args = m.call_args
-        self.assertEqual(CL.ALL, args[0][0].consistency_level)
+        assert CL.ALL == args[0][0].consistency_level
 
     def test_queryset_is_returned_on_create(self):
         qs = TestConsistencyModel.consistency(CL.ALL)
@@ -67,7 +67,7 @@ class TestConsistency(BaseConsistencyTest):
             t.consistency(CL.ALL).save()
 
         args = m.call_args
-        self.assertEqual(CL.ALL, args[0][0].consistency_level)
+        assert CL.ALL == args[0][0].consistency_level
 
     def test_batch_consistency(self):
 
@@ -77,7 +77,7 @@ class TestConsistency(BaseConsistencyTest):
 
         args = m.call_args
 
-        self.assertEqual(CL.ALL, args[0][0].consistency_level)
+        assert CL.ALL == args[0][0].consistency_level
 
         with mock.patch.object(self.session, 'execute') as m:
             with BatchQuery() as b:
@@ -95,7 +95,7 @@ class TestConsistency(BaseConsistencyTest):
             TestConsistencyModel.objects(id=uid).consistency(CL.ALL).update(text="grilled cheese")
 
         args = m.call_args
-        self.assertEqual(CL.ALL, args[0][0].consistency_level)
+        assert CL.ALL == args[0][0].consistency_level
 
     def test_delete(self):
         # ensures we always carry consistency through on delete statements
@@ -110,13 +110,13 @@ class TestConsistency(BaseConsistencyTest):
             TestConsistencyModel.objects(id=uid).consistency(CL.ALL).delete()
 
         args = m.call_args
-        self.assertEqual(CL.ALL, args[0][0].consistency_level)
+        assert CL.ALL == args[0][0].consistency_level
 
     def test_default_consistency(self):
         # verify global assumed default
-        self.assertEqual(Session._default_consistency_level, ConsistencyLevel.LOCAL_ONE)
+        assert Session._default_consistency_level == ConsistencyLevel.LOCAL_ONE
 
         # verify that this session default is set according to connection.setup
         # assumes tests/cqlengine/__init__ setup uses CL.ONE
         session = connection.get_session()
-        self.assertEqual(session.default_consistency_level, ConsistencyLevel.ONE)
+        assert session.default_consistency_level == ConsistencyLevel.ONE

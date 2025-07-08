@@ -481,12 +481,12 @@ class UsingDescriptorTests(BaseCassEngTestCase):
             TestModel.objects.using(keyspace='ks2').get(partition=1, cluster=1)
 
         obj2 = TestModel.objects.using(connection='cluster', keyspace='ks2').get(partition=1, cluster=1)
-        self.assertEqual(obj2.count, 2)
+        assert obj2.count == 2
 
         # Update test
         TestModel.objects(partition=2, cluster=2).using(connection='cluster', keyspace='ks2').update(count=5)
         obj3 = TestModel.objects.using(connection='cluster', keyspace='ks2').get(partition=2, cluster=2)
-        self.assertEqual(obj3.count, 5)
+        assert obj3.count == 5
 
         TestModel.objects(partition=2, cluster=2).using(connection='cluster', keyspace='ks2').delete()
         with self.assertRaises(TestModel.DoesNotExist):
@@ -511,11 +511,11 @@ class UsingDescriptorTests(BaseCassEngTestCase):
         TestModel.objects.using(connection='cluster').create(partition=1, cluster=1)
         TestModel.objects(partition=1, cluster=1).using(connection='cluster').update(count=2)
         obj1 = TestModel.objects.using(connection='cluster').get(partition=1, cluster=1)
-        self.assertEqual(obj1.count, 2)
+        assert obj1.count == 2
 
         obj1.using(connection='cluster').update(count=5)
         obj1 = TestModel.objects.using(connection='cluster').get(partition=1, cluster=1)
-        self.assertEqual(obj1.count, 5)
+        assert obj1.count == 5
 
         obj1.using(connection='cluster').delete()
         with self.assertRaises(TestModel.DoesNotExist):

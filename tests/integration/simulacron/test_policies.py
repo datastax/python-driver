@@ -101,27 +101,27 @@ class SpecExecTest(unittest.TestCase):
 
         # This LBP should repeat hosts up to around 30
         result = self.session.execute(statement, execution_profile='spec_ep_brr')
-        self.assertEqual(7, len(result.response_future.attempted_hosts))
+        assert 7 == len(result.response_future.attempted_hosts)
 
         # This LBP should keep host list to 3
         result = self.session.execute(statement, execution_profile='spec_ep_rr')
-        self.assertEqual(3, len(result.response_future.attempted_hosts))
+        assert 3 == len(result.response_future.attempted_hosts)
         # Spec_execution policy should limit retries to 1
         result = self.session.execute(statement, execution_profile='spec_ep_rr_lim')
 
-        self.assertEqual(2, len(result.response_future.attempted_hosts))
+        assert 2 == len(result.response_future.attempted_hosts)
 
         # Spec_execution policy should not be used if  the query is not idempotent
         result = self.session.execute(statement_non_idem, execution_profile='spec_ep_brr')
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
+        assert 1 == len(result.response_future.attempted_hosts)
 
         # Default policy with non_idem query
         result = self.session.execute(statement_non_idem, timeout=12)
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
+        assert 1 == len(result.response_future.attempted_hosts)
 
         # Should be able to run an idempotent query against default execution policy with no speculative_execution_policy
         result = self.session.execute(statement, timeout=12)
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
+        assert 1 == len(result.response_future.attempted_hosts)
 
         # Test timeout with spec_ex
         with self.assertRaises(OperationTimedOut):
@@ -135,7 +135,7 @@ class SpecExecTest(unittest.TestCase):
         prepared_statement = self.session.prepare(prepared_query_to_prime)
         # non-idempotent
         result = self.session.execute(prepared_statement, ("0",), execution_profile='spec_ep_brr')
-        self.assertEqual(1, len(result.response_future.attempted_hosts))
+        assert 1 == len(result.response_future.attempted_hosts)
         # idempotent
         prepared_statement.is_idempotent = True
         result = self.session.execute(prepared_statement, ("0",), execution_profile='spec_ep_brr')
@@ -165,7 +165,7 @@ class SpecExecTest(unittest.TestCase):
         self.assertIsInstance(response_future._final_exception, OperationTimedOut)
 
         # This is because 14 / 4 + 1 = 4
-        self.assertEqual(len(response_future.attempted_hosts), 4)
+        assert len(response_future.attempted_hosts) == 4
 
     def test_delay_can_be_0(self):
         """
@@ -199,11 +199,11 @@ class SpecExecTest(unittest.TestCase):
         stmt = SimpleStatement(query_to_prime)
         stmt.is_idempotent = True
         results = session.execute(stmt, execution_profile="spec")
-        self.assertEqual(len(results.response_future.attempted_hosts), 3)
+        assert len(results.response_future.attempted_hosts) == 3
 
         # send_request is called number_of_requests times for the speculative request
         # plus one for the call from the main thread.
-        self.assertEqual(next(counter), number_of_requests + 1)
+        assert next(counter) == number_of_requests + 1
 
 
 class CustomRetryPolicy(RetryPolicy):
@@ -337,7 +337,7 @@ class RetryPolicyTests(unittest.TestCase):
           }
         prime_query(query_to_prime, then=then, rows=None, column_types=None)
         self.session.execute(query_to_prime)
-        self.assertEqual(next(counter_policy.write_timeout), 1)
+        assert next(counter_policy.write_timeout) == 1
         counter_policy.reset_counters()
 
         query_to_prime_prepared = "SELECT * from simulacron_keyspace.simulacron_table WHERE key = :key"
@@ -349,11 +349,11 @@ class RetryPolicyTests(unittest.TestCase):
 
         bound_stm = prepared_stmt.bind({"key": "0"})
         self.session.execute(bound_stm)
-        self.assertEqual(next(counter_policy.write_timeout), 1)
+        assert next(counter_policy.write_timeout) == 1
 
         counter_policy.reset_counters()
         self.session.execute(prepared_stmt, ("0",))
-        self.assertEqual(next(counter_policy.write_timeout), 1)
+        assert next(counter_policy.write_timeout) == 1
 
     def test_setting_retry_policy_to_statement(self):
         """
@@ -385,13 +385,13 @@ class RetryPolicyTests(unittest.TestCase):
         prepared_stmt = self.session.prepare(query_to_prime_prepared)
         prepared_stmt.retry_policy = counter_policy
         self.session.execute(prepared_stmt, ("0",))
-        self.assertEqual(next(counter_policy.write_timeout), 1)
+        assert next(counter_policy.write_timeout) == 1
 
         counter_policy.reset_counters()
         bound_stmt = prepared_stmt.bind({"key": "0"})
         bound_stmt.retry_policy = counter_policy
         self.session.execute(bound_stmt)
-        self.assertEqual(next(counter_policy.write_timeout), 1)
+        assert next(counter_policy.write_timeout) == 1
 
     def test_retry_policy_on_request_error(self):
         """
@@ -441,9 +441,9 @@ class RetryPolicyTests(unittest.TestCase):
             with self.assertRaises(exc):
                 rf.result()
 
-            self.assertEqual(len(rf.attempted_hosts), 1)  # no retry
+            assert len(rf.attempted_hosts) == 1  # no retry
 
-        self.assertEqual(next(retry_policy.request_error), 4)
+        assert next(retry_policy.request_error) == 4
 
         # Test that by default, retry on next host
         retry_policy = RetryPolicy()
@@ -458,4 +458,4 @@ class RetryPolicyTests(unittest.TestCase):
             with self.assertRaises(NoHostAvailable):
                 rf.result()
 
-            self.assertEqual(len(rf.attempted_hosts), 3)  # all 3 nodes failed
+            assert len(rf.attempted_hosts) == 3  # all 3 nodes failed

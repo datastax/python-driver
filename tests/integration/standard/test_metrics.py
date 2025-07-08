@@ -102,7 +102,7 @@ class MetricsTests(unittest.TestCase):
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(WriteTimeout):
                 self.session.execute(query, timeout=None)
-            self.assertEqual(1, self.cluster.metrics.stats.write_timeouts)
+            assert 1 == self.cluster.metrics.stats.write_timeouts
 
         finally:
             get_node(1).resume()
@@ -131,7 +131,7 @@ class MetricsTests(unittest.TestCase):
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(ReadTimeout):
                 self.session.execute(query, timeout=None)
-            self.assertEqual(1, self.cluster.metrics.stats.read_timeouts)
+            assert 1 == self.cluster.metrics.stats.read_timeouts
 
         finally:
             get_node(1).resume()
@@ -161,13 +161,13 @@ class MetricsTests(unittest.TestCase):
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
                 self.session.execute(query)
-            self.assertEqual(self.cluster.metrics.stats.unavailables, 1)
+            assert self.cluster.metrics.stats.unavailables == 1
 
             # Test write
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             with self.assertRaises(Unavailable):
                 self.session.execute(query, timeout=None)
-            self.assertEqual(self.cluster.metrics.stats.unavailables, 2)
+            assert self.cluster.metrics.stats.unavailables == 2
         finally:
             get_node(1).start(wait_other_notice=True, wait_for_binary_proto=True)
             # Give some time for the cluster to come back up, for the next test
@@ -206,7 +206,7 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         )
         cluster2.connect(self.ks_name, wait_for_all_pools=True)
 
-        self.assertEqual(len(cluster2.metadata.all_hosts()), 3)
+        assert len(cluster2.metadata.all_hosts()) == 3
 
         query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
         self.session.execute(query)
@@ -229,19 +229,19 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         stats_cluster2 = cluster2.metrics.get_stats()
 
         # Test direct access to stats
-        self.assertEqual(1, self.cluster.metrics.stats.write_timeouts)
-        self.assertEqual(0, cluster2.metrics.stats.write_timeouts)
+        assert 1 == self.cluster.metrics.stats.write_timeouts
+        assert 0 == cluster2.metrics.stats.write_timeouts
 
         # Test direct access to a child stats
         self.assertNotEqual(0.0, self.cluster.metrics.request_timer['mean'])
-        self.assertEqual(0.0, cluster2.metrics.request_timer['mean'])
+        assert 0.0 == cluster2.metrics.request_timer['mean']
 
         # Test access via metrics.get_stats()
         self.assertNotEqual(0.0, stats_cluster1['request_timer']['mean'])
-        self.assertEqual(0.0, stats_cluster2['request_timer']['mean'])
+        assert 0.0 == stats_cluster2['request_timer']['mean']
 
         # Test access by stats_name
-        self.assertEqual(0.0, scales.getStats()['cluster2-metrics']['request_timer']['mean'])
+        assert 0.0 == scales.getStats()['cluster2-metrics']['request_timer']['mean']
 
         cluster2.shutdown()
 
@@ -285,8 +285,8 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
             query = SimpleStatement("SELECT * FROM {0}.{0}".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
             session3.execute(query)
 
-        self.assertEqual(cluster2.metrics.get_stats()['request_timer']['count'], 10)
-        self.assertEqual(cluster3.metrics.get_stats()['request_timer']['count'], 5)
+        assert cluster2.metrics.get_stats()['request_timer']['count'] == 10
+        assert cluster3.metrics.get_stats()['request_timer']['count'] == 5
 
         # Check scales to ensure they are appropriately named
         self.assertTrue("appcluster" in scales._Stats.stats.keys())

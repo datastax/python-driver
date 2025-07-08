@@ -81,28 +81,16 @@ class EmptyColumnTests(SimulacronCluster):
 
         # Test all row factories
         self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = named_tuple_factory
-        self.assertEqual(
-            list(self.session.execute(query)),
-            [namedtuple('Row', ['field_0_', 'field_1_'])('testval', 'testval1')]
-        )
+        assert list(self.session.execute(query)) == [namedtuple('Row', ['field_0_', 'field_1_'])('testval', 'testval1')]
 
         self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = tuple_factory
-        self.assertEqual(
-            list(self.session.execute(query)),
-            [('testval', 'testval1')]
-        )
+        assert list(self.session.execute(query)) == [('testval', 'testval1')]
 
         self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = dict_factory
-        self.assertEqual(
-            list(self.session.execute(query)),
-            [{'': 'testval', ' ': 'testval1'}]
-        )
+        assert list(self.session.execute(query)) == [{'': 'testval', ' ': 'testval1'}]
 
         self.cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT].row_factory = ordered_dict_factory
-        self.assertEqual(
-            list(self.session.execute(query)),
-            [OrderedDict((('', 'testval'), (' ', 'testval1')))]
-        )
+        assert list(self.session.execute(query)) == [OrderedDict((('', 'testval'), (' ', 'testval1')))]
 
     def test_empty_columns_in_system_schema(self):
         queries = [
@@ -232,7 +220,7 @@ class EmptyColumnTests(SimulacronCluster):
         self.session = self.cluster.connect(wait_for_all_pools=True)
 
         table_metadata = self.cluster.metadata.keyspaces['testks'].tables['testtable']
-        self.assertEqual(len(table_metadata.columns), 2)
+        assert len(table_metadata.columns) == 2
         self.assertIn('', table_metadata.columns)
         self.assertIn(' ', table_metadata.columns)
 
@@ -249,7 +237,4 @@ class EmptyColumnTests(SimulacronCluster):
             empty = columns.Text(db_field='', primary_key=True)
             space = columns.Text(db_field=' ')
 
-        self.assertEqual(
-            [TestModel(empty='testval', space='testval1')],
-            list(TestModel.objects.only(['empty', 'space']).all())
-        )
+        assert [TestModel(empty='testval', space='testval1')] == list(TestModel.objects.only(['empty', 'space']).all())

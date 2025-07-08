@@ -53,11 +53,11 @@ class _PoolTests(unittest.TestCase):
 
         c, request_id = pool.borrow_connection(timeout=0.01)
         self.assertIs(c, conn)
-        self.assertEqual(1, conn.in_flight)
+        assert 1 == conn.in_flight
         conn.set_keyspace_blocking.assert_called_once_with('foobarkeyspace')
 
         pool.return_connection(conn)
-        self.assertEqual(0, conn.in_flight)
+        assert 0 == conn.in_flight
         if not self.uses_single_connection:
             self.assertNotIn(conn, pool._trash)
 
@@ -71,7 +71,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
-        self.assertEqual(1, conn.in_flight)
+        assert 1 == conn.in_flight
 
         conn.in_flight = conn.max_request_id
 
@@ -90,7 +90,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
-        self.assertEqual(1, conn.in_flight)
+        assert 1 == conn.in_flight
 
         def get_second_conn():
             c, request_id = pool.borrow_connection(1.0)
@@ -102,7 +102,7 @@ class _PoolTests(unittest.TestCase):
 
         pool.return_connection(conn)
         t.join()
-        self.assertEqual(0, conn.in_flight)
+        assert 0 == conn.in_flight
 
     def test_spawn_when_at_max(self):
         host = Mock(spec=Host, address='ip1')
@@ -118,7 +118,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         pool.borrow_connection(timeout=0.01)
-        self.assertEqual(1, conn.in_flight)
+        assert 1 == conn.in_flight
 
         # make this conn full
         conn.in_flight = conn.max_request_id
@@ -217,7 +217,7 @@ class _PoolTests(unittest.TestCase):
         b = Host('127.0.0.1', SimpleConvictionPolicy)
         c = Host('127.0.0.2', SimpleConvictionPolicy)
 
-        self.assertEqual(a, b, 'Two Host instances should be equal when sharing.')
+        assert a == b, 'Two Host instances should be equal when sharing.'
         self.assertNotEqual(a, c, 'Two Host instances should NOT be equal when using two different addresses.')
         self.assertNotEqual(b, c, 'Two Host instances should NOT be equal when using two different addresses.')
 

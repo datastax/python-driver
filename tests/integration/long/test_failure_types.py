@@ -161,9 +161,9 @@ class ClientExceptionTests(unittest.TestCase):
                 self.execute_helper(session, statement)
             if ProtocolVersion.uses_error_code_map(PROTOCOL_VERSION):
                 if isinstance(cm.exception, ReadFailure):
-                    self.assertEqual(list(cm.exception.error_code_map.values())[0], 1)
+                    assert list(cm.exception.error_code_map.values())[0] == 1
                 if isinstance(cm.exception, WriteFailure):
-                    self.assertEqual(list(cm.exception.error_code_map.values())[0], 0)
+                    assert list(cm.exception.error_code_map.values())[0] == 0
 
     def test_write_failures_from_coordinator(self):
         """

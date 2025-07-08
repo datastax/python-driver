@@ -61,13 +61,13 @@ class TestNamedTupleFactory(TestCase):
 
         with warnings.catch_warnings(record=True) as w:
             rows = named_tuple_factory(self.long_colnames, self.long_rows)
-        self.assertEqual(len(w), 1)
+        assert len(w) == 1
         warning = w[0]
         self.assertIn('pseudo_namedtuple_factory', str(warning))
         self.assertIn('3.7', str(warning))
 
         for r in rows:
-            self.assertEqual(r.col0, self.long_rows[0][0])
+            assert r.col0 == self.long_rows[0][0]
 
     def test_creation_no_warning_on_short_column_list(self):
         """
@@ -81,7 +81,7 @@ class TestNamedTupleFactory(TestCase):
         """
         with warnings.catch_warnings(record=True) as w:
             rows = named_tuple_factory(self.short_colnames, self.short_rows)
-        self.assertEqual(len(w), 0)
+        assert len(w) == 0
         # check that this is a real namedtuple
         self.assertTrue(hasattr(rows[0], '_fields'))
         self.assertIsInstance(rows[0], tuple)

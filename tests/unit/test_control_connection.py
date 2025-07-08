@@ -212,7 +212,7 @@ class ControlConnectionTest(unittest.TestCase):
         """
         self.assertTrue(self.control_connection.wait_for_schema_agreement())
         # the control connection should not have slept at all
-        self.assertEqual(self.time.clock, 0)
+        assert self.time.clock == 0
 
     def test_wait_for_schema_agreement_uses_preloaded_results_if_given(self):
         """
@@ -221,9 +221,9 @@ class ControlConnectionTest(unittest.TestCase):
         preloaded_results = self._matching_schema_preloaded_results
         self.assertTrue(self.control_connection.wait_for_schema_agreement(preloaded_results=preloaded_results))
         # the control connection should not have slept at all
-        self.assertEqual(self.time.clock, 0)
+        assert self.time.clock == 0
         # the connection should not have made any queries if given preloaded results
-        self.assertEqual(self.connection.wait_for_responses.call_count, 0)
+        assert self.connection.wait_for_responses.call_count == 0
 
     def test_wait_for_schema_agreement_falls_back_to_querying_if_schemas_dont_match_preloaded_result(self):
         """
@@ -232,8 +232,8 @@ class ControlConnectionTest(unittest.TestCase):
         preloaded_results = self._nonmatching_schema_preloaded_results
         self.assertTrue(self.control_connection.wait_for_schema_agreement(preloaded_results=preloaded_results))
         # the control connection should not have slept at all
-        self.assertEqual(self.time.clock, 0)
-        self.assertEqual(self.connection.wait_for_responses.call_count, 1)
+        assert self.time.clock == 0
+        assert self.connection.wait_for_responses.call_count == 1
 
     def test_wait_for_schema_agreement_fails(self):
         """
@@ -263,7 +263,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.cluster.metadata.get_host(DefaultEndPoint('192.168.1.1')).is_up = False
 
         self.assertTrue(self.control_connection.wait_for_schema_agreement())
-        self.assertEqual(self.time.clock, 0)
+        assert self.time.clock == 0
 
     def test_wait_for_schema_agreement_rpc_lookup(self):
         """
@@ -280,7 +280,7 @@ class ControlConnectionTest(unittest.TestCase):
         # even though the new host has a different schema version, it's
         # marked as down, so the control connection shouldn't care
         self.assertTrue(self.control_connection.wait_for_schema_agreement())
-        self.assertEqual(self.time.clock, 0)
+        assert self.time.clock == 0
 
         # but once we mark it up, the control connection will care
         host.is_up = True
@@ -290,27 +290,27 @@ class ControlConnectionTest(unittest.TestCase):
     def test_refresh_nodes_and_tokens(self):
         self.control_connection.refresh_node_list_and_token_map()
         meta = self.cluster.metadata
-        self.assertEqual(meta.partitioner, 'Murmur3Partitioner')
-        self.assertEqual(meta.cluster_name, 'foocluster')
+        assert meta.partitioner == 'Murmur3Partitioner'
+        assert meta.cluster_name == 'foocluster'
 
         # check token map
-        self.assertEqual(sorted(meta.all_hosts()), sorted(meta.token_map.keys()))
+        assert sorted(meta.all_hosts()) == sorted(meta.token_map.keys())
         for token_list in meta.token_map.values():
-            self.assertEqual(3, len(token_list))
+            assert 3 == len(token_list)
 
         # check datacenter/rack
         for host in meta.all_hosts():
-            self.assertEqual(host.datacenter, "dc1")
-            self.assertEqual(host.rack, "rack1")
+            assert host.datacenter == "dc1"
+            assert host.rack == "rack1"
 
-        self.assertEqual(self.connection.wait_for_responses.call_count, 1)
+        assert self.connection.wait_for_responses.call_count == 1
 
     def test_refresh_nodes_and_tokens_with_invalid_peers(self):
         def refresh_and_validate_added_hosts():
             self.connection.wait_for_responses = Mock(return_value=_node_meta_results(
                 self.connection.local_results, self.connection.peer_results))
             self.control_connection.refresh_node_list_and_token_map()
-            self.assertEqual(1, len(self.cluster.added_hosts))  # only one valid peer found
+            assert 1 == len(self.cluster.added_hosts)  # only one valid peer found
 
         # peersV1
         del self.connection.peer_results[:]
@@ -357,12 +357,12 @@ class ControlConnectionTest(unittest.TestCase):
                 self.connection.local_results, self.connection.peer_results))
         self.control_connection.refresh_node_list_and_token_map()
         # all peers are updated
-        self.assertEqual(0, len(self.cluster.added_hosts))
+        assert 0 == len(self.cluster.added_hosts)
 
         assert self.cluster.metadata.get_host('192.168.1.5')
         assert self.cluster.metadata.get_host('192.168.1.6')
 
-        self.assertEqual(3, len(self.cluster.metadata.all_hosts()))
+        assert 3 == len(self.cluster.metadata.all_hosts())
 
 
     def test_refresh_nodes_and_tokens_uses_preloaded_results_if_given(self):
@@ -372,21 +372,21 @@ class ControlConnectionTest(unittest.TestCase):
         preloaded_results = self._matching_schema_preloaded_results
         self.control_connection._refresh_node_list_and_token_map(self.connection, preloaded_results=preloaded_results)
         meta = self.cluster.metadata
-        self.assertEqual(meta.partitioner, 'Murmur3Partitioner')
-        self.assertEqual(meta.cluster_name, 'foocluster')
+        assert meta.partitioner == 'Murmur3Partitioner'
+        assert meta.cluster_name == 'foocluster'
 
         # check token map
-        self.assertEqual(sorted(meta.all_hosts()), sorted(meta.token_map.keys()))
+        assert sorted(meta.all_hosts()) == sorted(meta.token_map.keys())
         for token_list in meta.token_map.values():
-            self.assertEqual(3, len(token_list))
+            assert 3 == len(token_list)
 
         # check datacenter/rack
         for host in meta.all_hosts():
-            self.assertEqual(host.datacenter, "dc1")
-            self.assertEqual(host.rack, "rack1")
+            assert host.datacenter == "dc1"
+            assert host.rack == "rack1"
 
         # the connection should not have made any queries if given preloaded results
-        self.assertEqual(self.connection.wait_for_responses.call_count, 0)
+        assert self.connection.wait_for_responses.call_count == 0
 
     def test_refresh_nodes_and_tokens_no_partitioner(self):
         """
@@ -396,8 +396,8 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.local_results[1][0][5] = None
         self.control_connection.refresh_node_list_and_token_map()
         meta = self.cluster.metadata
-        self.assertEqual(meta.partitioner, None)
-        self.assertEqual(meta.token_map, {})
+        assert meta.partitioner == None
+        assert meta.token_map == {}
 
     def test_refresh_nodes_and_tokens_add_host(self):
         self.connection.peer_results[1].append(
@@ -405,22 +405,22 @@ class ControlConnectionTest(unittest.TestCase):
         )
         self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
         self.control_connection.refresh_node_list_and_token_map()
-        self.assertEqual(1, len(self.cluster.added_hosts))
-        self.assertEqual(self.cluster.added_hosts[0].address, "192.168.1.3")
-        self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
-        self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
-        self.assertEqual(self.cluster.added_hosts[0].host_id, "uuid4")
+        assert 1 == len(self.cluster.added_hosts)
+        assert self.cluster.added_hosts[0].address == "192.168.1.3"
+        assert self.cluster.added_hosts[0].datacenter == "dc1"
+        assert self.cluster.added_hosts[0].rack == "rack1"
+        assert self.cluster.added_hosts[0].host_id == "uuid4"
 
     def test_refresh_nodes_and_tokens_remove_host(self):
         del self.connection.peer_results[1][1]
         self.control_connection.refresh_node_list_and_token_map()
-        self.assertEqual(1, len(self.cluster.metadata.removed_hosts))
-        self.assertEqual(self.cluster.metadata.removed_hosts[0].address, "192.168.1.2")
+        assert 1 == len(self.cluster.metadata.removed_hosts)
+        assert self.cluster.metadata.removed_hosts[0].address == "192.168.1.2"
 
     def test_refresh_nodes_and_tokens_timeout(self):
 
         def bad_wait_for_responses(*args, **kwargs):
-            self.assertEqual(kwargs['timeout'], self.control_connection._timeout)
+            assert kwargs['timeout'] == self.control_connection._timeout
             raise OperationTimedOut()
 
         self.connection.wait_for_responses = bad_wait_for_responses
@@ -435,8 +435,8 @@ class ControlConnectionTest(unittest.TestCase):
 
         self.connection.wait_for_responses = Mock(side_effect=bad_wait_for_responses)
         self.control_connection.refresh_schema()
-        self.assertEqual(self.connection.wait_for_responses.call_count, self.cluster.max_schema_agreement_wait / self.control_connection._timeout)
-        self.assertEqual(self.connection.wait_for_responses.call_args[1]['timeout'], self.control_connection._timeout)
+        assert self.connection.wait_for_responses.call_count == self.cluster.max_schema_agreement_wait / self.control_connection._timeout
+        assert self.connection.wait_for_responses.call_args[1]['timeout'] == self.control_connection._timeout
 
     def test_handle_topology_change(self):
         event = {
@@ -579,15 +579,15 @@ class ControlConnectionTest(unittest.TestCase):
             self.connection.local_results, self.connection.peer_results))
         self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
         self.control_connection.refresh_node_list_and_token_map()
-        self.assertEqual(1, len(self.cluster.added_hosts))
-        self.assertEqual(self.cluster.added_hosts[0].endpoint.address, "192.168.1.3")
-        self.assertEqual(self.cluster.added_hosts[0].endpoint.port, 555)
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_address, "192.168.1.3")
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_port, 555)
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_address, "10.0.0.3")
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_port, 666)
-        self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
-        self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
+        assert 1 == len(self.cluster.added_hosts)
+        assert self.cluster.added_hosts[0].endpoint.address == "192.168.1.3"
+        assert self.cluster.added_hosts[0].endpoint.port == 555
+        assert self.cluster.added_hosts[0].broadcast_rpc_address == "192.168.1.3"
+        assert self.cluster.added_hosts[0].broadcast_rpc_port == 555
+        assert self.cluster.added_hosts[0].broadcast_address == "10.0.0.3"
+        assert self.cluster.added_hosts[0].broadcast_port == 666
+        assert self.cluster.added_hosts[0].datacenter == "dc1"
+        assert self.cluster.added_hosts[0].rack == "rack1"
 
     def test_refresh_nodes_and_tokens_add_host_detects_invalid_port(self):
         del self.connection.peer_results[:]
@@ -599,15 +599,15 @@ class ControlConnectionTest(unittest.TestCase):
             self.connection.local_results, self.connection.peer_results))
         self.cluster.scheduler.schedule = lambda delay, f, *args, **kwargs: f(*args, **kwargs)
         self.control_connection.refresh_node_list_and_token_map()
-        self.assertEqual(1, len(self.cluster.added_hosts))
-        self.assertEqual(self.cluster.added_hosts[0].endpoint.address, "192.168.1.3")
-        self.assertEqual(self.cluster.added_hosts[0].endpoint.port, 9042)  # fallback default
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_address, "192.168.1.3")
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_rpc_port, None)
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_address, "10.0.0.3")
-        self.assertEqual(self.cluster.added_hosts[0].broadcast_port, None)
-        self.assertEqual(self.cluster.added_hosts[0].datacenter, "dc1")
-        self.assertEqual(self.cluster.added_hosts[0].rack, "rack1")
+        assert 1 == len(self.cluster.added_hosts)
+        assert self.cluster.added_hosts[0].endpoint.address == "192.168.1.3"
+        assert self.cluster.added_hosts[0].endpoint.port == 9042  # fallback default
+        assert self.cluster.added_hosts[0].broadcast_rpc_address == "192.168.1.3"
+        assert self.cluster.added_hosts[0].broadcast_rpc_port == None
+        assert self.cluster.added_hosts[0].broadcast_address == "10.0.0.3"
+        assert self.cluster.added_hosts[0].broadcast_port == None
+        assert self.cluster.added_hosts[0].datacenter == "dc1"
+        assert self.cluster.added_hosts[0].rack == "rack1"
 
 
 class EventTimingTest(unittest.TestCase):

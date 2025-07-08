@@ -122,11 +122,11 @@ class ClusterTests(unittest.TestCase):
             connect_timeout=1
         )
         cluster.connect(wait_for_all_pools=True)
-        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        assert len(cluster.metadata.all_hosts()) == 3
         cluster.shutdown()
         cluster = TestCluster(contact_points=["127.0.0.1", "localhost"], connect_timeout=1)
         cluster.connect(wait_for_all_pools=True)
-        self.assertEqual(len(cluster.metadata.all_hosts()), 3)
+        assert len(cluster.metadata.all_hosts()) == 3
         cluster.shutdown()
 
     @local
@@ -188,7 +188,7 @@ class ClusterTests(unittest.TestCase):
         self.assertFalse(result)
 
         result = session.execute("SELECT * FROM clustertests.cf0")
-        self.assertEqual([('a', 'b', 'c')], result)
+        assert [('a', 'b', 'c')] == result
 
         execute_with_long_wait_retry(session, "DROP KEYSPACE clustertests")
 
@@ -256,29 +256,29 @@ class ClusterTests(unittest.TestCase):
         updated_cluster_version = cluster.protocol_version
         # Make sure the correct protocol was selected by default
         if CASSANDRA_VERSION >= Version('4.0-beta5'):
-            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V5)
-            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V5)
+            assert updated_protocol_version == cassandra.ProtocolVersion.V5
+            assert updated_cluster_version == cassandra.ProtocolVersion.V5
         elif CASSANDRA_VERSION >= Version('4.0-a'):
-            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V4)
-            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V4)
+            assert updated_protocol_version == cassandra.ProtocolVersion.V4
+            assert updated_cluster_version == cassandra.ProtocolVersion.V4
         elif CASSANDRA_VERSION >= Version('3.11'):
-            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V4)
-            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V4)
+            assert updated_protocol_version == cassandra.ProtocolVersion.V4
+            assert updated_cluster_version == cassandra.ProtocolVersion.V4
         elif CASSANDRA_VERSION >= Version('3.0'):
-            self.assertEqual(updated_protocol_version, cassandra.ProtocolVersion.V4)
-            self.assertEqual(updated_cluster_version, cassandra.ProtocolVersion.V4)
+            assert updated_protocol_version == cassandra.ProtocolVersion.V4
+            assert updated_cluster_version == cassandra.ProtocolVersion.V4
         elif CASSANDRA_VERSION >= Version('2.2'):
-            self.assertEqual(updated_protocol_version, 4)
-            self.assertEqual(updated_cluster_version, 4)
+            assert updated_protocol_version == 4
+            assert updated_cluster_version == 4
         elif CASSANDRA_VERSION >= Version('2.1'):
-            self.assertEqual(updated_protocol_version, 3)
-            self.assertEqual(updated_cluster_version, 3)
+            assert updated_protocol_version == 3
+            assert updated_cluster_version == 3
         elif CASSANDRA_VERSION >= Version('2.0'):
-            self.assertEqual(updated_protocol_version, 2)
-            self.assertEqual(updated_cluster_version, 2)
+            assert updated_protocol_version == 2
+            assert updated_cluster_version == 2
         else:
-            self.assertEqual(updated_protocol_version, 1)
-            self.assertEqual(updated_cluster_version, 1)
+            assert updated_protocol_version == 1
+            assert updated_cluster_version == 1
 
         cluster.shutdown()
 
@@ -334,12 +334,12 @@ class ClusterTests(unittest.TestCase):
         self.assertFalse(result)
 
         result = session.execute("SELECT * FROM test1rf.test")
-        self.assertEqual([(8889, 8889)], result, "Rows in ResultSet are {0}".format(result.current_rows))
+        assert [(8889, 8889)] == result, "Rows in ResultSet are {0}".format(result.current_rows)
 
         # test_connect_on_keyspace
         session2 = cluster.connect('test1rf')
         result2 = session2.execute("SELECT * FROM test")
-        self.assertEqual(result, result2)
+        assert result == result2
         cluster.shutdown()
 
     def test_set_keyspace_twice(self):
@@ -410,7 +410,7 @@ class ClusterTests(unittest.TestCase):
         # full schema refresh, with wait
         cluster.refresh_schema_metadata()
         self.assertIsNot(original_meta, cluster.metadata.keyspaces)
-        self.assertEqual(original_meta, cluster.metadata.keyspaces)
+        assert original_meta == cluster.metadata.keyspaces
 
         cluster.shutdown()
 
@@ -427,7 +427,7 @@ class ClusterTests(unittest.TestCase):
         self.assertIs(original_meta, current_meta)
         current_system_meta = current_meta['system']
         self.assertIsNot(original_system_meta, current_system_meta)
-        self.assertEqual(original_system_meta.as_cql_query(), current_system_meta.as_cql_query())
+        assert original_system_meta.as_cql_query() == current_system_meta.as_cql_query()
         cluster.shutdown()
 
     def test_refresh_schema_table(self):
@@ -446,7 +446,7 @@ class ClusterTests(unittest.TestCase):
         self.assertIs(original_meta, current_meta)
         self.assertIs(original_system_meta, current_system_meta)
         self.assertIsNot(original_system_schema_meta, current_system_schema_meta)
-        self.assertEqual(original_system_schema_meta.as_cql_query(), current_system_schema_meta.as_cql_query())
+        assert original_system_schema_meta.as_cql_query() == current_system_schema_meta.as_cql_query()
         cluster.shutdown()
 
     def test_refresh_schema_type(self):
@@ -474,9 +474,9 @@ class ClusterTests(unittest.TestCase):
         current_test1rf_meta = current_meta[keyspace_name]
         current_type_meta = current_test1rf_meta.user_types[type_name]
         self.assertIs(original_meta, current_meta)
-        self.assertEqual(original_test1rf_meta.export_as_string(), current_test1rf_meta.export_as_string())
+        assert original_test1rf_meta.export_as_string() == current_test1rf_meta.export_as_string()
         self.assertIsNot(original_type_meta, current_type_meta)
-        self.assertEqual(original_type_meta.as_cql_query(), current_type_meta.as_cql_query())
+        assert original_type_meta.as_cql_query() == current_type_meta.as_cql_query()
         cluster.shutdown()
 
     @local
@@ -515,7 +515,7 @@ class ClusterTests(unittest.TestCase):
             end_time = time.time()
             self.assertLess(end_time - start_time, agreement_timeout)
             self.assertIsNot(original_meta, c.metadata.keyspaces)
-            self.assertEqual(original_meta, c.metadata.keyspaces)
+            assert original_meta == c.metadata.keyspaces
 
             c.shutdown()
 
@@ -535,7 +535,7 @@ class ClusterTests(unittest.TestCase):
             end_time = time.time()
             self.assertLess(end_time - start_time, refresh_threshold)
             self.assertIsNot(original_meta, c.metadata.keyspaces)
-            self.assertEqual(original_meta, c.metadata.keyspaces)
+            assert original_meta == c.metadata.keyspaces
 
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
@@ -713,10 +713,7 @@ class ClusterTests(unittest.TestCase):
             # Three conenctions to nodes plus the control connection
             auth_warning = mock_handler.get_message_count('warning', "An authentication challenge was not sent")
             self.assertGreaterEqual(auth_warning, 4)
-            self.assertEqual(
-                auth_warning,
-                mock_handler.get_message_count("debug", "Got ReadyMessage on new connection")
-            )
+            assert auth_warning == mock_handler.get_message_count("debug", "Got ReadyMessage on new connection")
 
     def test_idle_heartbeat(self):
         interval = 2
@@ -763,14 +760,14 @@ class ClusterTests(unittest.TestCase):
         # holders include session pools and cc
         holders = cluster.get_connection_holders()
         self.assertIn(cluster.control_connection, holders)
-        self.assertEqual(len(holders), len(cluster.metadata.all_hosts()) + 1)  # hosts pools, 1 for cc
+        assert len(holders) == len(cluster.metadata.all_hosts()) + 1  # hosts pools, 1 for cc
 
         # include additional sessions
         session2 = cluster.connect(wait_for_all_pools=True)
 
         holders = cluster.get_connection_holders()
         self.assertIn(cluster.control_connection, holders)
-        self.assertEqual(len(holders), 2 * len(cluster.metadata.all_hosts()) + 1)  # 2 sessions' hosts pools, 1 for cc
+        assert len(holders) == 2 * len(cluster.metadata.all_hosts()) + 1  # 2 sessions' hosts pools, 1 for cc
 
         cluster._idle_heartbeat.stop()
         cluster._idle_heartbeat.join()
@@ -784,7 +781,7 @@ class ClusterTests(unittest.TestCase):
 
         # heartbeat disabled with '0'
         cluster = TestCluster(idle_heartbeat_interval=0)
-        self.assertEqual(cluster.idle_heartbeat_interval, 0)
+        assert cluster.idle_heartbeat_interval == 0
         session = cluster.connect()
 
         # let two heatbeat intervals pass (first one had startup messages in it)
@@ -852,7 +849,7 @@ class ClusterTests(unittest.TestCase):
             for _ in expected_hosts:
                 rs = session.execute(query)
                 queried_hosts.add(rs.response_future._current_host)
-            self.assertEqual(queried_hosts, expected_hosts)
+            assert queried_hosts == expected_hosts
 
             # by name we should only hit the one
             expected_hosts = set(h for h in cluster.metadata.all_hosts() if h.address == CASSANDRA_IP)
@@ -860,7 +857,7 @@ class ClusterTests(unittest.TestCase):
             for _ in cluster.metadata.all_hosts():
                 rs = session.execute(query, execution_profile='node1')
                 queried_hosts.add(rs.response_future._current_host)
-            self.assertEqual(queried_hosts, expected_hosts)
+            assert queried_hosts == expected_hosts
 
             # use a copied instance and override the row factory
             # assert last returned value can be accessed as a namedtuple so we can prove something different
@@ -874,7 +871,7 @@ class ClusterTests(unittest.TestCase):
             for _ in cluster.metadata.all_hosts():
                 rs = session.execute(query, execution_profile=tmp_profile)
                 queried_hosts.add(rs.response_future._current_host)
-            self.assertEqual(queried_hosts, expected_hosts)
+            assert queried_hosts == expected_hosts
             tuple_row = rs.one()
             self.assertIsInstance(tuple_row, tuple)
             with self.assertRaises(AttributeError):
@@ -887,9 +884,7 @@ class ClusterTests(unittest.TestCase):
         cluster = TestCluster()
         self.addCleanup(cluster.shutdown)
         cluster.load_balancing_policy = RoundRobinPolicy()
-        self.assertEqual(
-            list(cluster.load_balancing_policy.make_query_plan()), []
-        )
+        assert list(cluster.load_balancing_policy.make_query_plan()) == []
         cluster.connect()
         self.assertNotEqual(
             list(cluster.load_balancing_policy.make_query_plan()), []
@@ -925,7 +920,7 @@ class ClusterTests(unittest.TestCase):
             rs = session.execute(query, execution_profile='rr2')
             rr2_queried_hosts.add(rs.response_future._current_host)
 
-            self.assertEqual(rr2_queried_hosts, rr1_queried_hosts)
+            assert rr2_queried_hosts == rr1_queried_hosts
 
     def test_ta_lbp(self):
         """
@@ -1020,7 +1015,7 @@ class ClusterTests(unittest.TestCase):
             pools = session.get_pool_state()
             # there are more hosts, but we connected to the ones in the lbp aggregate
             self.assertGreater(len(cluster.metadata.all_hosts()), 2)
-            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2')))
+            assert set(h.address for h in pools) == set(('127.0.0.1', '127.0.0.2'))
 
             # dynamically update pools on add
             node3 = ExecutionProfile(
@@ -1030,7 +1025,7 @@ class ClusterTests(unittest.TestCase):
             )
             cluster.add_execution_profile('node3', node3)
             pools = session.get_pool_state()
-            self.assertEqual(set(h.address for h in pools), set(('127.0.0.1', '127.0.0.2', '127.0.0.3')))
+            assert set(h.address for h in pools) == set(('127.0.0.1', '127.0.0.2', '127.0.0.3'))
 
     @local
     def test_add_profile_timeout(self):
@@ -1054,7 +1049,7 @@ class ClusterTests(unittest.TestCase):
                 session = cluster.connect(wait_for_all_pools=True)
                 pools = session.get_pool_state()
                 self.assertGreater(len(cluster.metadata.all_hosts()), 2)
-                self.assertEqual(set(h.address for h in pools), set(('127.0.0.1',)))
+                assert set(h.address for h in pools) == set(('127.0.0.1',))
 
                 node2 = ExecutionProfile(
                     load_balancing_policy=HostFilterPolicy(
@@ -1112,7 +1107,7 @@ class ClusterTests(unittest.TestCase):
             # default is passed down
             default_profile = cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT]
             rs = session.execute(query)
-            self.assertEqual(rs.response_future.timeout, default_profile.request_timeout)
+            assert rs.response_future.timeout == default_profile.request_timeout
 
             # tiny timeout times out as expected
             tmp_profile = copy(default_profile)
@@ -1227,31 +1222,27 @@ class ClusterTests(unittest.TestCase):
                 "({i}, 'a{i}{i}', {i}{i}, {i}{i}, textAsBlob('b{i}{i}'))".format(i=i))
 
         nc_results = nc_session.execute("SELECT * FROM compact_table")
-        self.assertEqual(
-            set(nc_results.current_rows),
-            {(1, u'a1', 11, 11, 'b1'),
-             (1, u'a11', 11, 11, 'b11'),
-             (2, u'a2', 22, 22, 'b2'),
-             (2, u'a22', 22, 22, 'b22'),
-             (3, u'a3', 33, 33, 'b3'),
-             (3, u'a33', 33, 33, 'b33'),
-             (4, u'a4', 44, 44, 'b4'),
-             (4, u'a44', 44, 44, 'b44')})
+        assert set(nc_results.current_rows) == {(1, u'a1', 11, 11, 'b1'),
+         (1, u'a11', 11, 11, 'b11'),
+         (2, u'a2', 22, 22, 'b2'),
+         (2, u'a22', 22, 22, 'b22'),
+         (3, u'a3', 33, 33, 'b3'),
+         (3, u'a33', 33, 33, 'b33'),
+         (4, u'a4', 44, 44, 'b4'),
+         (4, u'a44', 44, 44, 'b44')}
 
         results = session.execute("SELECT * FROM compact_table")
-        self.assertEqual(
-            set(results.current_rows),
-            {(1, 11, 11),
-             (2, 22, 22),
-             (3, 33, 33),
-             (4, 44, 44)})
+        assert set(results.current_rows) == {(1, 11, 11),
+         (2, 22, 22),
+         (3, 33, 33),
+         (4, 44, 44)}
 
     def _assert_replica_queried(self, trace, only_replicas=True):
         queried_hosts = set()
         for row in trace.events:
             queried_hosts.add(row.source)
         if only_replicas:
-            self.assertEqual(len(queried_hosts), 1, "The hosts queried where {}".format(queried_hosts))
+            assert len(queried_hosts) == 1, "The hosts queried where {}".format(queried_hosts)
         else:
             self.assertGreater(len(queried_hosts), 1, "The host queried was {}".format(queried_hosts))
         return queried_hosts
@@ -1293,7 +1284,7 @@ class TestAddressTranslation(unittest.TestCase):
         lh_ad = LocalHostAdressTranslator({'127.0.0.1': '127.0.0.1', '127.0.0.2': '127.0.0.1', '127.0.0.3': '127.0.0.1'})
         c = TestCluster(address_translator=lh_ad)
         c.connect()
-        self.assertEqual(len(c.metadata.all_hosts()), 1)
+        assert len(c.metadata.all_hosts()) == 1
         c.shutdown()
 
     def test_address_translator_with_mixed_nodes(self):
@@ -1314,7 +1305,7 @@ class TestAddressTranslation(unittest.TestCase):
         c = TestCluster(address_translator=lh_ad)
         c.connect()
         for host in c.metadata.all_hosts():
-            self.assertEqual(adder_map.get(host.address), host.broadcast_address)
+            assert adder_map.get(host.address) == host.broadcast_address
         c.shutdown()
 
 @local
@@ -1475,7 +1466,7 @@ class DontPrepareOnIgnoredHostsTest(unittest.TestCase):
         # the length of mock_calls will vary, but all should use the unignored
         # address
         for c in cluster.connection_factory.mock_calls:
-            self.assertEqual(unignored_address, c.args[0].address)
+            assert unignored_address == c.args[0].address
         cluster.shutdown()
 
 
@@ -1515,7 +1506,7 @@ class BetaProtocolTest(unittest.TestCase):
         """
         cluster = Cluster(protocol_version=cassandra.ProtocolVersion.V6, allow_beta_protocol_version=True)
         session = cluster.connect()
-        self.assertEqual(cluster.protocol_version, cassandra.ProtocolVersion.V6)
+        assert cluster.protocol_version == cassandra.ProtocolVersion.V6
         self.assertTrue(session.execute("select release_version from system.local").one())
         cluster.shutdown()
 

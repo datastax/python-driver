@@ -92,12 +92,12 @@ class ClusterTest(unittest.TestCase):
         localhost_addr = set([addr[0] for addr in [t for (_,_,_,_,t) in socket.getaddrinfo("localhost",80)]])
         for cp in cluster.endpoints_resolved:
             if cp.address in localhost_addr:
-                self.assertEqual(cp.port, 9045)
+                assert cp.port == 9045
             elif cp.address == '127.0.0.2':
-                self.assertEqual(cp.port, 9046)
+                assert cp.port == 9046
             else:
-                self.assertEqual(cp.address, '127.0.0.3')
-                self.assertEqual(cp.port, 9999)
+                assert cp.address == '127.0.0.3'
+                assert cp.port == 9999
 
     def test_invalid_contact_point_types(self):
         with self.assertRaises(ValueError):
@@ -110,7 +110,7 @@ class ClusterTest(unittest.TestCase):
         cluster = Cluster(contact_points=['127.0.0.1'], port='1111')
         for cp in cluster.endpoints_resolved:
             if cp.address in ('::1', '127.0.0.1'):
-                self.assertEqual(cp.port, 1111)
+                assert cp.port == 1111
 
         with self.assertRaises(ValueError):
             cluster = Cluster(contact_points=['127.0.0.1'], port='string')
@@ -166,13 +166,13 @@ class SessionTest(unittest.TestCase):
 
             # default is passed through
             f = s.execute_async(query='')
-            self.assertEqual(f.message.serial_consistency_level, cl)
+            assert f.message.serial_consistency_level == cl
 
             # any non-None statement setting takes precedence
             for cl_override in (ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
                 f = s.execute_async(SimpleStatement(query_string='', serial_consistency_level=cl_override))
-                self.assertEqual(default_profile.serial_consistency_level, cl)
-                self.assertEqual(f.message.serial_consistency_level, cl_override)
+                assert default_profile.serial_consistency_level == cl
+                assert f.message.serial_consistency_level == cl_override
 
     @mock_session_pools
     def test_default_serial_consistency_level_legacy(self, *_):
@@ -200,23 +200,23 @@ class SessionTest(unittest.TestCase):
             # any non-None statement setting takes precedence
             for cl_override in (ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
                 f = s.execute_async(SimpleStatement(query_string='', serial_consistency_level=cl_override))
-                self.assertEqual(s.default_serial_consistency_level, cl)
-                self.assertEqual(f.message.serial_consistency_level, cl_override)
+                assert s.default_serial_consistency_level == cl
+                assert f.message.serial_consistency_level == cl_override
 
 
 class ProtocolVersionTests(unittest.TestCase):
 
     def test_protocol_downgrade_test(self):
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V2)
-        self.assertEqual(ProtocolVersion.DSE_V1, lower)
+        assert ProtocolVersion.DSE_V1 == lower
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.DSE_V1)
-        self.assertEqual(ProtocolVersion.V5,lower)
+        assert ProtocolVersion.V5 == lower
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V5)
-        self.assertEqual(ProtocolVersion.V4,lower)
+        assert ProtocolVersion.V4 == lower
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V4)
-        self.assertEqual(ProtocolVersion.V3,lower)
+        assert ProtocolVersion.V3 == lower
         lower = ProtocolVersion.get_lower_supported(ProtocolVersion.V3)
-        self.assertEqual(0, lower)
+        assert 0 == lower
 
         self.assertTrue(ProtocolVersion.uses_error_code_map(ProtocolVersion.DSE_V1))
         self.assertTrue(ProtocolVersion.uses_int_query_flags(ProtocolVersion.DSE_V1))
@@ -232,35 +232,35 @@ class ExecutionProfileTest(unittest.TestCase):
         connection_class.initialize_reactor()
 
     def _verify_response_future_profile(self, rf, prof):
-        self.assertEqual(rf._load_balancer, prof.load_balancing_policy)
-        self.assertEqual(rf._retry_policy, prof.retry_policy)
-        self.assertEqual(rf.message.consistency_level, prof.consistency_level)
-        self.assertEqual(rf.message.serial_consistency_level, prof.serial_consistency_level)
-        self.assertEqual(rf.timeout, prof.request_timeout)
-        self.assertEqual(rf.row_factory, prof.row_factory)
+        assert rf._load_balancer == prof.load_balancing_policy
+        assert rf._retry_policy == prof.retry_policy
+        assert rf.message.consistency_level == prof.consistency_level
+        assert rf.message.serial_consistency_level == prof.serial_consistency_level
+        assert rf.timeout == prof.request_timeout
+        assert rf.row_factory == prof.row_factory
 
     @mock_session_pools
     def test_default_exec_parameters(self):
         cluster = Cluster()
-        self.assertEqual(cluster._config_mode, _ConfigMode.UNCOMMITTED)
-        self.assertEqual(cluster.load_balancing_policy.__class__, default_lbp_factory().__class__)
-        self.assertEqual(cluster.profile_manager.default.load_balancing_policy.__class__, default_lbp_factory().__class__)
-        self.assertEqual(cluster.default_retry_policy.__class__, RetryPolicy)
-        self.assertEqual(cluster.profile_manager.default.retry_policy.__class__, RetryPolicy)
+        assert cluster._config_mode == _ConfigMode.UNCOMMITTED
+        assert cluster.load_balancing_policy.__class__ == default_lbp_factory().__class__
+        assert cluster.profile_manager.default.load_balancing_policy.__class__ == default_lbp_factory().__class__
+        assert cluster.default_retry_policy.__class__ == RetryPolicy
+        assert cluster.profile_manager.default.retry_policy.__class__ == RetryPolicy
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
-        self.assertEqual(session.default_timeout, 10.0)
-        self.assertEqual(cluster.profile_manager.default.request_timeout, 10.0)
-        self.assertEqual(session.default_consistency_level, ConsistencyLevel.LOCAL_ONE)
-        self.assertEqual(cluster.profile_manager.default.consistency_level, ConsistencyLevel.LOCAL_ONE)
-        self.assertEqual(session.default_serial_consistency_level, None)
-        self.assertEqual(cluster.profile_manager.default.serial_consistency_level, None)
-        self.assertEqual(session.row_factory, named_tuple_factory)
-        self.assertEqual(cluster.profile_manager.default.row_factory, named_tuple_factory)
+        assert session.default_timeout == 10.0
+        assert cluster.profile_manager.default.request_timeout == 10.0
+        assert session.default_consistency_level == ConsistencyLevel.LOCAL_ONE
+        assert cluster.profile_manager.default.consistency_level == ConsistencyLevel.LOCAL_ONE
+        assert session.default_serial_consistency_level == None
+        assert cluster.profile_manager.default.serial_consistency_level == None
+        assert session.row_factory == named_tuple_factory
+        assert cluster.profile_manager.default.row_factory == named_tuple_factory
 
     @mock_session_pools
     def test_default_legacy(self):
         cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), default_retry_policy=DowngradingConsistencyRetryPolicy())
-        self.assertEqual(cluster._config_mode, _ConfigMode.LEGACY)
+        assert cluster._config_mode == _ConfigMode.LEGACY
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
         session.default_timeout = 3.7
         session.default_consistency_level = ConsistencyLevel.ALL
@@ -277,7 +277,7 @@ class ExecutionProfileTest(unittest.TestCase):
         cluster = Cluster(execution_profiles={'non-default': non_default_profile})
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
 
-        self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
+        assert cluster._config_mode == _ConfigMode.PROFILES
 
         default_profile = cluster.profile_manager.profiles[EXEC_PROFILE_DEFAULT]
         rf = session.execute_async("query")
@@ -287,7 +287,7 @@ class ExecutionProfileTest(unittest.TestCase):
         self._verify_response_future_profile(rf, non_default_profile)
 
         for name, ep in cluster.profile_manager.profiles.items():
-            self.assertEqual(ep, session.get_execution_profile(name))
+            assert ep == session.get_execution_profile(name)
 
         # invalid ep
         with self.assertRaises(ValueError):
@@ -307,7 +307,7 @@ class ExecutionProfileTest(unittest.TestCase):
     @mock_session_pools
     def test_statement_params_override_legacy(self):
         cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), default_retry_policy=DowngradingConsistencyRetryPolicy())
-        self.assertEqual(cluster._config_mode, _ConfigMode.LEGACY)
+        assert cluster._config_mode == _ConfigMode.LEGACY
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
 
         ss = SimpleStatement("query", retry_policy=DowngradingConsistencyRetryPolicy(),
@@ -331,7 +331,7 @@ class ExecutionProfileTest(unittest.TestCase):
         cluster = Cluster(execution_profiles={'non-default': non_default_profile})
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
 
-        self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
+        assert cluster._config_mode == _ConfigMode.PROFILES
 
         rf = session.execute_async("query", execution_profile='non-default')
 
@@ -399,7 +399,7 @@ class ExecutionProfileTest(unittest.TestCase):
         internalized_profile = ExecutionProfile(RoundRobinPolicy(), *[object() for _ in range(2)])
         cluster = Cluster(execution_profiles={'by-name': internalized_profile})
         session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
-        self.assertEqual(cluster._config_mode, _ConfigMode.PROFILES)
+        assert cluster._config_mode == _ConfigMode.PROFILES
 
         rf = session.execute_async("query", execution_profile='by-name')
         self._verify_response_future_profile(rf, internalized_profile)
@@ -431,7 +431,7 @@ class ExecutionProfileTest(unittest.TestCase):
             all_updated = session.execution_profile_clone_update(clone, **profile_attrs)
             self.assertIsNot(all_updated, clone)
             for attr, value in profile_attrs.items():
-                self.assertEqual(getattr(clone, attr), getattr(active, attr))
+                assert getattr(clone, attr) == getattr(active, attr)
                 if attr in reference_attributes:
                     self.assertIs(getattr(clone, attr), getattr(active, attr))
                 self.assertNotEqual(getattr(all_updated, attr), getattr(active, attr))

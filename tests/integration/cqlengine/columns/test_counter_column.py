@@ -120,12 +120,12 @@ class TestCounterColumn(BaseCassEngTestCase):
 
         # read back
         instance = TestCounterModel.get(partition=instance.partition)
-        self.assertEqual(instance.counter, expected_value)
+        assert instance.counter == expected_value
 
         # save after doing nothing
         instance.save()
-        self.assertEqual(instance.counter, expected_value)
+        assert instance.counter == expected_value
 
         # make sure there was no increment
         instance = TestCounterModel.get(partition=instance.partition)
-        self.assertEqual(instance.counter, expected_value)
+        assert instance.counter == expected_value

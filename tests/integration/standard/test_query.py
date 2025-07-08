@@ -66,9 +66,9 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         self.assertIsInstance(bound, BoundStatement)
-        self.assertEqual(2, len(bound.values))
+        assert 2 == len(bound.values)
         self.session.execute(bound)
-        self.assertEqual(bound.routing_key, b'\x00\x00\x00\x01')
+        assert bound.routing_key == b'\x00\x00\x00\x01'
 
     def test_trace_prints_okay(self):
         """
@@ -112,9 +112,9 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.assertIsNotNone(future_trace)
 
         rs_trace = rs.get_query_trace()
-        self.assertEqual(rs_trace, future_trace)
+        assert rs_trace == future_trace
         self.assertTrue(rs_trace.events)
-        self.assertEqual(len(rs_trace.events), len(future_trace.events))
+        assert len(rs_trace.events) == len(future_trace.events)
 
         self.assertListEqual([rs_trace], rs.get_all_query_traces())
 
@@ -222,7 +222,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         response_future = self.session.execute_async("SELECT i FROM {0} WHERE k=0".format(self.keyspace_table_name), trace=True)
         response_future.result()
 
-        self.assertEqual(len(response_future._query_traces), 1)
+        assert len(response_future._query_traces) == 1
         trace = response_future._query_traces[0]
         self.assertTrue(self._wait_for_trace_to_populate(trace.trace_id))
 
@@ -284,16 +284,16 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         results1 = self.session.execute("select id, m from {0}.{1}".format(self.keyspace_name, self.function_table_name))
 
         self.assertIsNotNone(results1.column_types)
-        self.assertEqual(results1.column_types[0].typename, 'int')
-        self.assertEqual(results1.column_types[1].typename, 'map')
-        self.assertEqual(results1.column_types[0].cassname, 'Int32Type')
-        self.assertEqual(results1.column_types[1].cassname, 'MapType')
-        self.assertEqual(len(results1.column_types[0].subtypes), 0)
-        self.assertEqual(len(results1.column_types[1].subtypes), 2)
-        self.assertEqual(results1.column_types[1].subtypes[0].typename, "int")
-        self.assertEqual(results1.column_types[1].subtypes[1].typename, "varchar")
-        self.assertEqual(results1.column_types[1].subtypes[0].cassname, "Int32Type")
-        self.assertEqual(results1.column_types[1].subtypes[1].cassname, "VarcharType")
+        assert results1.column_types[0].typename == 'int'
+        assert results1.column_types[1].typename == 'map'
+        assert results1.column_types[0].cassname == 'Int32Type'
+        assert results1.column_types[1].cassname == 'MapType'
+        assert len(results1.column_types[0].subtypes) == 0
+        assert len(results1.column_types[1].subtypes) == 2
+        assert results1.column_types[1].subtypes[0].typename == "int"
+        assert results1.column_types[1].subtypes[1].typename == "varchar"
+        assert results1.column_types[1].subtypes[0].cassname == "Int32Type"
+        assert results1.column_types[1].subtypes[1].cassname == "VarcharType"
 
     def test_column_names(self):
         """
@@ -321,7 +321,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         result_set = self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
         self.assertIsNotNone(result_set.column_types)
 
-        self.assertEqual(result_set.column_names, [u'user', u'game', u'year', u'month', u'day', u'score'])
+        assert result_set.column_names == [u'user', u'game', u'year', u'month', u'day', u'score']
 
     @greaterthanorequalcass30
     def test_basic_json_query(self):
@@ -330,8 +330,8 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         self.session.execute(insert_query)
         results = self.session.execute(json_query)
-        self.assertEqual(results.column_names, ["[json]"])
-        self.assertEqual(results.one()[0], '{"k": 1, "v": 1}')
+        assert results.column_names == ["[json]"]
+        assert results.one()[0] == '{"k": 1, "v": 1}'
 
     def test_host_targeting_query(self):
         """
@@ -356,7 +356,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
             future = self.session.execute_async(query, host=host, execution_profile=checkable_ep)
             future.result()
             # check we're using the selected host
-            self.assertEqual(host, future.coordinator_host)
+            assert host == future.coordinator_host
             # check that this bypasses the LBP
             self.assertFalse(checkable_ep.load_balancing_policy.make_query_plan.called)
 
@@ -381,7 +381,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
-        self.assertEqual(bound.routing_key, b'\x00\x00\x00\x01')
+        assert bound.routing_key == b'\x00\x00\x00\x01'
 
     def test_empty_routing_key_indexes(self):
         """
@@ -396,7 +396,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
-        self.assertEqual(bound.routing_key, None)
+        assert bound.routing_key == None
 
     def test_predefined_routing_key(self):
         """
@@ -411,7 +411,7 @@ class PreparedStatementTests(unittest.TestCase):
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, None))
         bound._set_routing_key('fake_key')
-        self.assertEqual(bound.routing_key, 'fake_key')
+        assert bound.routing_key == 'fake_key'
 
     def test_multiple_routing_key_indexes(self):
         """
@@ -425,11 +425,11 @@ class PreparedStatementTests(unittest.TestCase):
 
         prepared.routing_key_indexes = [0, 1]
         bound = prepared.bind((1, 2))
-        self.assertEqual(bound.routing_key, b'\x00\x04\x00\x00\x00\x01\x00\x00\x04\x00\x00\x00\x02\x00')
+        assert bound.routing_key == b'\x00\x04\x00\x00\x00\x01\x00\x00\x04\x00\x00\x00\x02\x00'
 
         prepared.routing_key_indexes = [1, 0]
         bound = prepared.bind((1, 2))
-        self.assertEqual(bound.routing_key, b'\x00\x04\x00\x00\x00\x02\x00\x00\x04\x00\x00\x00\x01\x00')
+        assert bound.routing_key == b'\x00\x04\x00\x00\x00\x02\x00\x00\x04\x00\x00\x00\x01\x00'
 
     def test_bound_keyspace(self):
         """
@@ -442,7 +442,7 @@ class PreparedStatementTests(unittest.TestCase):
 
         self.assertIsInstance(prepared, PreparedStatement)
         bound = prepared.bind((1, 2))
-        self.assertEqual(bound.keyspace, 'test3rf')
+        assert bound.keyspace == 'test3rf'
 
 
 class ForcedHostIndexPolicy(RoundRobinPolicy):
@@ -490,7 +490,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
             session = cluster.connect()
             select_statement = session.prepare("SELECT * FROM system.local WHERE key='local'")
             if proto_version == 1:
-                self.assertEqual(select_statement.result_metadata, None)
+                assert select_statement.result_metadata == None
             else:
                 self.assertNotEqual(select_statement.result_metadata, None)
             future = session.execute_async(select_statement)
@@ -498,7 +498,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
             if base_line is None:
                 base_line = results.one()._asdict().keys()
             else:
-                self.assertEqual(base_line, results.one()._asdict().keys())
+                assert base_line == results.one()._asdict().keys()
             cluster.shutdown()
 
 
@@ -522,7 +522,7 @@ class PreparedStatementArgTest(unittest.TestCase):
             select_statement = session.prepare("SELECT k FROM test3rf.test WHERE k = ?")
             for host in clus.metadata.all_hosts():
                 session.execute(select_statement, (1, ), host=host)
-            self.assertEqual(2, mock_handler.get_message_count('debug', "Re-preparing"))
+            assert 2 == mock_handler.get_message_count('debug', "Re-preparing")
 
     def test_prepare_batch_statement(self):
         """
@@ -562,12 +562,12 @@ class PreparedStatementArgTest(unittest.TestCase):
             session.execute(batch_statement)
 
             # To verify our test assumption that queries are getting re-prepared properly
-            self.assertEqual(1, mock_handler.get_message_count('debug', "Re-preparing"))
+            assert 1 == mock_handler.get_message_count('debug', "Re-preparing")
 
             select_results = session.execute(SimpleStatement("SELECT * FROM %s WHERE k = 1" % table,
                                                             consistency_level=ConsistencyLevel.ALL))
             first_row = select_results.one()[:2]
-            self.assertEqual((1, 2), first_row)
+            assert (1, 2) == first_row
 
     def test_prepare_batch_statement_after_alter(self):
         """
@@ -615,10 +615,10 @@ class PreparedStatementArgTest(unittest.TestCase):
                 (4, None, 5, None, 6)
             ]
 
-            self.assertEqual(set(expected_results), set(select_results._current_rows))
+            assert set(expected_results) == set(select_results._current_rows)
 
             # To verify our test assumption that queries are getting re-prepared properly
-            self.assertEqual(3, mock_handler.get_message_count('debug', "Re-preparing"))
+            assert 3 == mock_handler.get_message_count('debug', "Re-preparing")
 
 
 class PrintStatementTests(unittest.TestCase):
@@ -632,8 +632,7 @@ class PrintStatementTests(unittest.TestCase):
         """
 
         ss = SimpleStatement('SELECT * FROM test3rf.test', consistency_level=ConsistencyLevel.ONE)
-        self.assertEqual(str(ss),
-                         '<SimpleStatement query="SELECT * FROM test3rf.test", consistency=ONE>')
+        assert str(ss) == '<SimpleStatement query="SELECT * FROM test3rf.test", consistency=ONE>'
 
     def test_prepared_statement(self):
         """
@@ -646,12 +645,10 @@ class PrintStatementTests(unittest.TestCase):
         prepared = session.prepare('INSERT INTO test3rf.test (k, v) VALUES (?, ?)')
         prepared.consistency_level = ConsistencyLevel.ONE
 
-        self.assertEqual(str(prepared),
-                         '<PreparedStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", consistency=ONE>')
+        assert str(prepared) == '<PreparedStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", consistency=ONE>'
 
         bound = prepared.bind((1, 2))
-        self.assertEqual(str(bound),
-                         '<BoundStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", values=(1, 2), consistency=ONE>')
+        assert str(bound) == '<BoundStatement query="INSERT INTO test3rf.test (k, v) VALUES (?, ?)", values=(1, 2), consistency=ONE>'
 
         cluster.shutdown()
 
@@ -683,8 +680,8 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
             keys.add(result.k)
             values.add(result.v)
 
-        self.assertEqual(set(range(10)), keys, msg=results)
-        self.assertEqual(set(range(10)), values, msg=results)
+        assert set(range(10)) == keys, results
+        assert set(range(10)) == values, results
 
     def test_string_statements(self):
         batch = BatchStatement(BatchType.LOGGED)
@@ -810,20 +807,20 @@ class SerialConsistencyTests(unittest.TestCase):
             serial_consistency_level=ConsistencyLevel.SERIAL)
         # crazy test, but PYTHON-299
         # TODO: expand to check more parameters get passed to statement, and on to messages
-        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.SERIAL)
+        assert statement.serial_consistency_level == ConsistencyLevel.SERIAL
         future = self.session.execute_async(statement)
         result = future.result()
-        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
+        assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
         self.assertTrue(result)
         self.assertFalse(result.one().applied)
 
         statement = SimpleStatement(
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0",
             serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
-        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        assert statement.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
         future = self.session.execute_async(statement)
         result = future.result()
-        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        assert future.message.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
         self.assertTrue(result)
         self.assertTrue(result.one().applied)
 
@@ -835,7 +832,7 @@ class SerialConsistencyTests(unittest.TestCase):
         statement.serial_consistency_level = ConsistencyLevel.SERIAL
         future = self.session.execute_async(statement)
         result = future.result()
-        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
+        assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
         self.assertTrue(result)
         self.assertFalse(result.one().applied)
 
@@ -845,7 +842,7 @@ class SerialConsistencyTests(unittest.TestCase):
         bound.serial_consistency_level = ConsistencyLevel.LOCAL_SERIAL
         future = self.session.execute_async(bound)
         result = future.result()
-        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        assert future.message.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
         self.assertTrue(result)
         self.assertTrue(result.one().applied)
 
@@ -853,19 +850,19 @@ class SerialConsistencyTests(unittest.TestCase):
         self.session.execute("INSERT INTO test3rf.test (k, v) VALUES (0, 0)")
         statement = BatchStatement(serial_consistency_level=ConsistencyLevel.SERIAL)
         statement.add("UPDATE test3rf.test SET v=1 WHERE k=0 IF v=1")
-        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.SERIAL)
+        assert statement.serial_consistency_level == ConsistencyLevel.SERIAL
         future = self.session.execute_async(statement)
         result = future.result()
-        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.SERIAL)
+        assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
         self.assertTrue(result)
         self.assertFalse(result.one().applied)
 
         statement = BatchStatement(serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
         statement.add("UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0")
-        self.assertEqual(statement.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        assert statement.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
         future = self.session.execute_async(statement)
         result = future.result()
-        self.assertEqual(future.message.serial_consistency_level, ConsistencyLevel.LOCAL_SERIAL)
+        assert future.message.serial_consistency_level == ConsistencyLevel.LOCAL_SERIAL
         self.assertTrue(result)
         self.assertTrue(result.one().applied)
 
@@ -989,7 +986,7 @@ class LightweightTransactionTests(unittest.TestCase):
 
             all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             # Verify the non conditional insert hasn't been inserted
-            self.assertEqual(len(all_rows.current_rows), 3)
+            assert len(all_rows.current_rows) == 3
 
             # Should fail since (0, 0, 10) have already been written
             batch_statement = BatchStatement(batch_type)
@@ -1015,7 +1012,7 @@ class LightweightTransactionTests(unittest.TestCase):
 
             all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             for i, row in enumerate(all_rows):
-                self.assertEqual((0, i, 10), (row[0], row[1], row[2]))
+                assert (0, i, 10) == (row[0], row[1], row[2])
 
             self.session.execute("TRUNCATE TABLE test3rf.lwt_clustering")
 
@@ -1092,7 +1089,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         batch = BatchStatement()
         batch.add(bound)
         self.assertIsNotNone(batch.routing_key)
-        self.assertEqual(batch.routing_key, bound.routing_key)
+        assert batch.routing_key == bound.routing_key
 
     def test_rk_from_simple(self):
         """
@@ -1101,7 +1098,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         batch = BatchStatement()
         batch.add(self.simple_statement)
         self.assertIsNotNone(batch.routing_key)
-        self.assertEqual(batch.routing_key, self.simple_statement.routing_key)
+        assert batch.routing_key == self.simple_statement.routing_key
 
     def test_inherit_first_rk_bound(self):
         """
@@ -1117,7 +1114,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
             batch.add(self.prepared, (i, i))
 
         self.assertIsNotNone(batch.routing_key)
-        self.assertEqual(batch.routing_key, bound.routing_key)
+        assert batch.routing_key == bound.routing_key
 
     def test_inherit_first_rk_simple_statement(self):
         """
@@ -1133,7 +1130,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
             batch.add(self.prepared, (i, i))
 
         self.assertIsNotNone(batch.routing_key)
-        self.assertEqual(batch.routing_key, self.simple_statement.routing_key)
+        assert batch.routing_key == self.simple_statement.routing_key
 
     def test_inherit_first_rk_prepared_param(self):
         """
@@ -1147,7 +1144,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         batch.add(self.simple_statement)
 
         self.assertIsNotNone(batch.routing_key)
-        self.assertEqual(batch.routing_key, self.prepared.bind((1, 0)).routing_key)
+        assert batch.routing_key == self.prepared.bind((1, 0)).routing_key
 
 
 @greaterthanorequalcass30
@@ -1243,73 +1240,73 @@ class MaterializedViewQueryTest(BasicSharedKeyspaceUnitTestCase):
         query_statement = SimpleStatement("SELECT * FROM {0}.alltimehigh WHERE game='Coup'".format(self.keyspace_name),
                                           consistency_level=ConsistencyLevel.QUORUM)
         results = self.session.execute(query_statement)
-        self.assertEqual(results.one().game, 'Coup')
-        self.assertEqual(results.one().year, 2015)
-        self.assertEqual(results.one().month, 5)
-        self.assertEqual(results.one().day, 1)
-        self.assertEqual(results.one().score, 4000)
-        self.assertEqual(results.one().user, "pcmanus")
+        assert results.one().game == 'Coup'
+        assert results.one().year == 2015
+        assert results.one().month == 5
+        assert results.one().day == 1
+        assert results.one().score == 4000
+        assert results.one().user == "pcmanus"
 
         # Test prepared statement and daily high filtering
         prepared_query = self.session.prepare("SELECT * FROM {0}.dailyhigh WHERE game=? AND year=? AND month=? and day=?".format(self.keyspace_name))
         bound_query = prepared_query.bind(("Coup", 2015, 6, 2))
         results = self.session.execute(bound_query)
-        self.assertEqual(results.one().game, 'Coup')
-        self.assertEqual(results.one().year, 2015)
-        self.assertEqual(results.one().month, 6)
-        self.assertEqual(results.one().day, 2)
-        self.assertEqual(results.one().score, 2000)
-        self.assertEqual(results.one().user, "pcmanus")
+        assert results.one().game == 'Coup'
+        assert results.one().year == 2015
+        assert results.one().month == 6
+        assert results.one().day == 2
+        assert results.one().score == 2000
+        assert results.one().user == "pcmanus"
 
-        self.assertEqual(results[1].game, 'Coup')
-        self.assertEqual(results[1].year, 2015)
-        self.assertEqual(results[1].month, 6)
-        self.assertEqual(results[1].day, 2)
-        self.assertEqual(results[1].score, 1000)
-        self.assertEqual(results[1].user, "tjake")
+        assert results[1].game == 'Coup'
+        assert results[1].year == 2015
+        assert results[1].month == 6
+        assert results[1].day == 2
+        assert results[1].score == 1000
+        assert results[1].user == "tjake"
 
         # Test montly high range queries
         prepared_query = self.session.prepare("SELECT * FROM {0}.monthlyhigh WHERE game=? AND year=? AND month=? and score >= ? and score <= ?".format(self.keyspace_name))
         bound_query = prepared_query.bind(("Coup", 2015, 6, 2500, 3500))
         results = self.session.execute(bound_query)
-        self.assertEqual(results.one().game, 'Coup')
-        self.assertEqual(results.one().year, 2015)
-        self.assertEqual(results.one().month, 6)
-        self.assertEqual(results.one().day, 20)
-        self.assertEqual(results.one().score, 3500)
-        self.assertEqual(results.one().user, "jbellis")
+        assert results.one().game == 'Coup'
+        assert results.one().year == 2015
+        assert results.one().month == 6
+        assert results.one().day == 20
+        assert results.one().score == 3500
+        assert results.one().user == "jbellis"
 
-        self.assertEqual(results[1].game, 'Coup')
-        self.assertEqual(results[1].year, 2015)
-        self.assertEqual(results[1].month, 6)
-        self.assertEqual(results[1].day, 9)
-        self.assertEqual(results[1].score, 2700)
-        self.assertEqual(results[1].user, "jmckenzie")
+        assert results[1].game == 'Coup'
+        assert results[1].year == 2015
+        assert results[1].month == 6
+        assert results[1].day == 9
+        assert results[1].score == 2700
+        assert results[1].user == "jmckenzie"
 
-        self.assertEqual(results[2].game, 'Coup')
-        self.assertEqual(results[2].year, 2015)
-        self.assertEqual(results[2].month, 6)
-        self.assertEqual(results[2].day, 1)
-        self.assertEqual(results[2].score, 2500)
-        self.assertEqual(results[2].user, "iamaleksey")
+        assert results[2].game == 'Coup'
+        assert results[2].year == 2015
+        assert results[2].month == 6
+        assert results[2].day == 1
+        assert results[2].score == 2500
+        assert results[2].user == "iamaleksey"
 
         # Test filtered user high scores
         query_statement = SimpleStatement("SELECT * FROM {0}.filtereduserhigh WHERE game='Chess'".format(self.keyspace_name),
                                           consistency_level=ConsistencyLevel.QUORUM)
         results = self.session.execute(query_statement)
-        self.assertEqual(results.one().game, 'Chess')
-        self.assertEqual(results.one().year, 2015)
-        self.assertEqual(results.one().month, 6)
-        self.assertEqual(results.one().day, 21)
-        self.assertEqual(results.one().score, 3500)
-        self.assertEqual(results.one().user, "jbellis")
+        assert results.one().game == 'Chess'
+        assert results.one().year == 2015
+        assert results.one().month == 6
+        assert results.one().day == 21
+        assert results.one().score == 3500
+        assert results.one().user == "jbellis"
 
-        self.assertEqual(results[1].game, 'Chess')
-        self.assertEqual(results[1].year, 2015)
-        self.assertEqual(results[1].month, 1)
-        self.assertEqual(results[1].day, 25)
-        self.assertEqual(results[1].score, 3200)
-        self.assertEqual(results[1].user, "pcmanus")
+        assert results[1].game == 'Chess'
+        assert results[1].year == 2015
+        assert results[1].month == 1
+        assert results[1].day == 25
+        assert results[1].score == 3200
+        assert results[1].user == "pcmanus"
 
 
 class UnicodeQueryTest(BasicSharedKeyspaceUnitTestCase):
@@ -1477,12 +1474,12 @@ class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
     def _check_set_keyspace_in_statement(self, session):
         simple_stmt = SimpleStatement("SELECT * from {}".format(self.table_name), keyspace=self.ks_name)
         results = session.execute(simple_stmt)
-        self.assertEqual(results.one(), (1, 1))
+        assert results.one() == (1, 1)
 
         simple_stmt = SimpleStatement("SELECT * from {}".format(self.table_name))
         simple_stmt.keyspace = self.ks_name
         results = session.execute(simple_stmt)
-        self.assertEqual(results.one(), (1, 1))
+        assert results.one() == (1, 1)
 
 
 @greaterthanorequalcass40
@@ -1507,8 +1504,8 @@ class BatchWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
             keys.add(result.k)
             values.add(result.v)
 
-        self.assertEqual(set(range(10)), keys, msg=results)
-        self.assertEqual(set(range(10)), values, msg=results)
+        assert set(range(10)) == keys, results
+        assert set(range(10)) == values, results
 
 
 @greaterthanorequalcass40
@@ -1536,14 +1533,14 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
         prepared_statement = self.session.prepare(query, keyspace=self.ks_name)
 
         results = self.session.execute(prepared_statement, (1, ))
-        self.assertEqual(results.one(), (1, 1))
+        assert results.one() == (1, 1)
 
         prepared_statement_alternative = self.session.prepare(query, keyspace=self.alternative_ks)
 
         self.assertNotEqual(prepared_statement.query_id, prepared_statement_alternative.query_id)
 
         results = self.session.execute(prepared_statement_alternative, (2,))
-        self.assertEqual(results.one(), (2, 2))
+        assert results.one() == (2, 2)
 
     def test_reprepare_after_host_is_down(self):
         """
@@ -1570,13 +1567,13 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
             # We wait for cluster._prepare_all_queries to be called
             time.sleep(5)
-            self.assertEqual(1, mock_handler.get_message_count('debug', 'Preparing all known prepared statements'))
+            assert 1 == mock_handler.get_message_count('debug', 'Preparing all known prepared statements')
 
             results = self.session.execute(prepared_statement, (1,), execution_profile="only_first")
-            self.assertEqual(results.one(), (1, ))
+            assert results.one() == (1, )
 
             results = self.session.execute(prepared_statement_alternative, (2,), execution_profile="only_first")
-            self.assertEqual(results.one(), (2, ))
+            assert results.one() == (2, )
 
     def test_prepared_not_found(self):
         """
@@ -1600,7 +1597,7 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
         for _ in range(10):
             results = session.execute(prepared_statement, (1, ))
-            self.assertEqual(results.one(), (1,))
+            assert results.one() == (1,)
 
     def test_prepared_in_query_keyspace(self):
         """
@@ -1619,12 +1616,12 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
         query = "SELECT k from {}.{} WHERE k = ?".format(self.ks_name, self.table_name)
         prepared_statement = session.prepare(query)
         results = session.execute(prepared_statement, (1,))
-        self.assertEqual(results.one(), (1,))
+        assert results.one() == (1,)
 
         query = "SELECT k from {}.{} WHERE k = ?".format(self.alternative_ks, self.table_name)
         prepared_statement = session.prepare(query)
         results = session.execute(prepared_statement, (2,))
-        self.assertEqual(results.one(), (2,))
+        assert results.one() == (2,)
 
     def test_prepared_in_query_keyspace_and_explicit(self):
         """
@@ -1641,9 +1638,9 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
         query = "SELECT k from {}.{} WHERE k = ?".format(self.ks_name, self.table_name)
         prepared_statement = self.session.prepare(query, keyspace="system")
         results = self.session.execute(prepared_statement, (1,))
-        self.assertEqual(results.one(), (1,))
+        assert results.one() == (1,)
 
         query = "SELECT k from {}.{} WHERE k = ?".format(self.ks_name, self.table_name)
         prepared_statement = self.session.prepare(query, keyspace=self.alternative_ks)
         results = self.session.execute(prepared_statement, (1,))
-        self.assertEqual(results.one(), (1,))
+        assert results.one() == (1,)

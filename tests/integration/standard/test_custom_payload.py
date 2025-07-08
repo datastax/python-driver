@@ -164,4 +164,4 @@ class CustomPayloadTests(unittest.TestCase):
         response_future = self.session.execute_async(statement, custom_payload=custom_payload)
         response_future.result()
         returned_custom_payload = response_future.custom_payload
-        self.assertEqual(custom_payload, returned_custom_payload)
+        assert custom_payload == returned_custom_payload

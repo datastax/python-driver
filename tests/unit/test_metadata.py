@@ -42,16 +42,16 @@ class ReplicationFactorTest(unittest.TestCase):
 
     def test_replication_factor_parsing(self):
         rf = ReplicationFactor.create('3')
-        self.assertEqual(rf.all_replicas, 3)
-        self.assertEqual(rf.full_replicas, 3)
-        self.assertEqual(rf.transient_replicas, None)
-        self.assertEqual(str(rf), '3')
+        assert rf.all_replicas == 3
+        assert rf.full_replicas == 3
+        assert rf.transient_replicas == None
+        assert str(rf) == '3'
 
         rf = ReplicationFactor.create('3/1')
-        self.assertEqual(rf.all_replicas, 3)
-        self.assertEqual(rf.full_replicas, 2)
-        self.assertEqual(rf.transient_replicas, 1)
-        self.assertEqual(str(rf), '3/1')
+        assert rf.all_replicas == 3
+        assert rf.full_replicas == 2
+        assert rf.transient_replicas == 1
+        assert str(rf) == '3/1'
 
         self.assertRaises(ValueError, ReplicationFactor.create, '3/')
         self.assertRaises(ValueError, ReplicationFactor.create, 'a/1')
@@ -59,8 +59,8 @@ class ReplicationFactorTest(unittest.TestCase):
         self.assertRaises(ValueError, ReplicationFactor.create, '3/a')
 
     def test_replication_factor_equality(self):
-        self.assertEqual(ReplicationFactor.create('3/1'), ReplicationFactor.create('3/1'))
-        self.assertEqual(ReplicationFactor.create('3'), ReplicationFactor.create('3'))
+        assert ReplicationFactor.create('3/1') == ReplicationFactor.create('3/1')
+        assert ReplicationFactor.create('3') == ReplicationFactor.create('3')
         self.assertNotEqual(ReplicationFactor.create('3'), ReplicationFactor.create('3/1'))
         self.assertNotEqual(ReplicationFactor.create('3'), ReplicationFactor.create('3/1'))
 
@@ -82,16 +82,15 @@ class StrategiesTest(unittest.TestCase):
 
         rs = ReplicationStrategy()
 
-        self.assertEqual(rs.create('OldNetworkTopologyStrategy', None), _UnknownStrategy('OldNetworkTopologyStrategy', None))
+        assert rs.create('OldNetworkTopologyStrategy', None) == _UnknownStrategy('OldNetworkTopologyStrategy', None)
         fake_options_map = {'options': 'map'}
         uks = rs.create('OldNetworkTopologyStrategy', fake_options_map)
-        self.assertEqual(uks, _UnknownStrategy('OldNetworkTopologyStrategy', fake_options_map))
-        self.assertEqual(uks.make_token_replica_map({}, []), {})
+        assert uks == _UnknownStrategy('OldNetworkTopologyStrategy', fake_options_map)
+        assert uks.make_token_replica_map({}, []) == {}
 
         fake_options_map = {'dc1': '3'}
         self.assertIsInstance(rs.create('NetworkTopologyStrategy', fake_options_map), NetworkTopologyStrategy)
-        self.assertEqual(rs.create('NetworkTopologyStrategy', fake_options_map).dc_replication_factors,
-                         NetworkTopologyStrategy(fake_options_map).dc_replication_factors)
+        assert rs.create('NetworkTopologyStrategy', fake_options_map).dc_replication_factors == NetworkTopologyStrategy(fake_options_map).dc_replication_factors
 
         fake_options_map = {'options': 'map'}
         self.assertIsNone(rs.create('SimpleStrategy', fake_options_map))
@@ -101,10 +100,9 @@ class StrategiesTest(unittest.TestCase):
 
         fake_options_map = {'options': 'map', 'replication_factor': 3}
         self.assertIsInstance(rs.create('SimpleStrategy', fake_options_map), SimpleStrategy)
-        self.assertEqual(rs.create('SimpleStrategy', fake_options_map).replication_factor,
-                         SimpleStrategy(fake_options_map).replication_factor)
+        assert rs.create('SimpleStrategy', fake_options_map).replication_factor == SimpleStrategy(fake_options_map).replication_factor
 
-        self.assertEqual(rs.create('xxxxxxxx', fake_options_map), _UnknownStrategy('xxxxxxxx', fake_options_map))
+        assert rs.create('xxxxxxxx', fake_options_map) == _UnknownStrategy('xxxxxxxx', fake_options_map)
 
         self.assertRaises(NotImplementedError, rs.make_token_replica_map, None, None)
         self.assertRaises(NotImplementedError, rs.export_for_schema)
@@ -116,25 +114,22 @@ class StrategiesTest(unittest.TestCase):
         simple_int = rs.create('SimpleStrategy', {'replication_factor': 3})
         simple_str = rs.create('SimpleStrategy', {'replication_factor': '3'})
 
-        self.assertEqual(simple_int.export_for_schema(), simple_str.export_for_schema())
-        self.assertEqual(simple_int, simple_str)
+        assert simple_int.export_for_schema() == simple_str.export_for_schema()
+        assert simple_int == simple_str
 
         # make token replica map
         ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
         hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
         token_to_host = dict(zip(ring, hosts))
-        self.assertEqual(
-            simple_int.make_token_replica_map(token_to_host, ring),
-            simple_str.make_token_replica_map(token_to_host, ring)
-        )
+        assert simple_int.make_token_replica_map(token_to_host, ring) == simple_str.make_token_replica_map(token_to_host, ring)
 
     def test_transient_replication_parsing(self):
         """ Test that we can PARSE a transient replication factor for SimpleStrategy """
         rs = ReplicationStrategy()
 
         simple_transient = rs.create('SimpleStrategy', {'replication_factor': '3/1'})
-        self.assertEqual(simple_transient.replication_factor_info, ReplicationFactor(3, 1))
-        self.assertEqual(simple_transient.replication_factor, 2)
+        assert simple_transient.replication_factor_info == ReplicationFactor(3, 1)
+        assert simple_transient.replication_factor == 2
         self.assertIn("'replication_factor': '3/1'", simple_transient.export_for_schema())
 
         simple_str = rs.create('SimpleStrategy', {'replication_factor': '2'})
@@ -144,10 +139,7 @@ class StrategiesTest(unittest.TestCase):
         ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
         hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
         token_to_host = dict(zip(ring, hosts))
-        self.assertEqual(
-            simple_transient.make_token_replica_map(token_to_host, ring),
-            simple_str.make_token_replica_map(token_to_host, ring)
-        )
+        assert simple_transient.make_token_replica_map(token_to_host, ring) == simple_str.make_token_replica_map(token_to_host, ring)
 
     def test_nts_replication_parsing(self):
         """ Test equality between passing numeric and string replication factor for NTS """
@@ -156,32 +148,29 @@ class StrategiesTest(unittest.TestCase):
         nts_int = rs.create('NetworkTopologyStrategy', {'dc1': 3, 'dc2': 5})
         nts_str = rs.create('NetworkTopologyStrategy', {'dc1': '3', 'dc2': '5'})
 
-        self.assertEqual(nts_int.dc_replication_factors['dc1'], 3)
-        self.assertEqual(nts_str.dc_replication_factors['dc1'], 3)
-        self.assertEqual(nts_int.dc_replication_factors_info['dc1'], ReplicationFactor(3))
-        self.assertEqual(nts_str.dc_replication_factors_info['dc1'], ReplicationFactor(3))
+        assert nts_int.dc_replication_factors['dc1'] == 3
+        assert nts_str.dc_replication_factors['dc1'] == 3
+        assert nts_int.dc_replication_factors_info['dc1'] == ReplicationFactor(3)
+        assert nts_str.dc_replication_factors_info['dc1'] == ReplicationFactor(3)
 
-        self.assertEqual(nts_int.export_for_schema(), nts_str.export_for_schema())
-        self.assertEqual(nts_int, nts_str)
+        assert nts_int.export_for_schema() == nts_str.export_for_schema()
+        assert nts_int == nts_str
 
         # make token replica map
         ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
         hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
         token_to_host = dict(zip(ring, hosts))
-        self.assertEqual(
-            nts_int.make_token_replica_map(token_to_host, ring),
-            nts_str.make_token_replica_map(token_to_host, ring)
-        )
+        assert nts_int.make_token_replica_map(token_to_host, ring) == nts_str.make_token_replica_map(token_to_host, ring)
 
     def test_nts_transient_parsing(self):
         """ Test that we can PARSE a transient replication factor for NTS """
         rs = ReplicationStrategy()
 
         nts_transient = rs.create('NetworkTopologyStrategy', {'dc1': '3/1', 'dc2': '5/1'})
-        self.assertEqual(nts_transient.dc_replication_factors_info['dc1'], ReplicationFactor(3, 1))
-        self.assertEqual(nts_transient.dc_replication_factors_info['dc2'], ReplicationFactor(5, 1))
-        self.assertEqual(nts_transient.dc_replication_factors['dc1'], 2)
-        self.assertEqual(nts_transient.dc_replication_factors['dc2'], 4)
+        assert nts_transient.dc_replication_factors_info['dc1'] == ReplicationFactor(3, 1)
+        assert nts_transient.dc_replication_factors_info['dc2'] == ReplicationFactor(5, 1)
+        assert nts_transient.dc_replication_factors['dc1'] == 2
+        assert nts_transient.dc_replication_factors['dc2'] == 4
         self.assertIn("'dc1': '3/1', 'dc2': '5/1'", nts_transient.export_for_schema())
 
         nts_str = rs.create('NetworkTopologyStrategy', {'dc1': '3', 'dc2': '5'})
@@ -191,10 +180,7 @@ class StrategiesTest(unittest.TestCase):
         ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
         hosts = [Host('dc1.{}'.format(host), SimpleConvictionPolicy) for host in range(3)]
         token_to_host = dict(zip(ring, hosts))
-        self.assertEqual(
-            nts_transient.make_token_replica_map(token_to_host, ring),
-            nts_str.make_token_replica_map(token_to_host, ring)
-        )
+        assert nts_transient.make_token_replica_map(token_to_host, ring) == nts_str.make_token_replica_map(token_to_host, ring)
 
     def test_nts_make_token_replica_map(self):
         token_to_host_owner = {}
@@ -320,12 +306,11 @@ class StrategiesTest(unittest.TestCase):
         nts = NetworkTopologyStrategy({'dc1': 1, 'dc2': 0})
 
         replica_map = nts.make_token_replica_map(token_to_host_owner, ring)
-        self.assertEqual(set(replica_map[MD5Token(0)]), set([host]))
+        assert set(replica_map[MD5Token(0)]) == set([host])
 
     def test_nts_export_for_schema(self):
         strategy = NetworkTopologyStrategy({'dc1': '1', 'dc2': '2'})
-        self.assertEqual("{'class': 'NetworkTopologyStrategy', 'dc1': '1', 'dc2': '2'}",
-                         strategy.export_for_schema())
+        assert "{'class': 'NetworkTopologyStrategy', 'dc1': '1', 'dc2': '2'}" == strategy.export_for_schema()
 
     def test_simple_strategy_make_token_replica_map(self):
         host1 = Host('1', SimpleConvictionPolicy)
@@ -363,58 +348,57 @@ class NameEscapingTest(unittest.TestCase):
         """
         Test cassandra.metadata.protect_name output
         """
-        self.assertEqual(protect_name('tests'), 'tests')
-        self.assertEqual(protect_name('test\'s'), '"test\'s"')
-        self.assertEqual(protect_name('test\'s'), "\"test's\"")
-        self.assertEqual(protect_name('tests ?!@#$%^&*()'), '"tests ?!@#$%^&*()"')
-        self.assertEqual(protect_name('1'), '"1"')
-        self.assertEqual(protect_name('1test'), '"1test"')
+        assert protect_name('tests') == 'tests'
+        assert protect_name('test\'s') == '"test\'s"'
+        assert protect_name('test\'s') == "\"test's\""
+        assert protect_name('tests ?!@#$%^&*()') == '"tests ?!@#$%^&*()"'
+        assert protect_name('1') == '"1"'
+        assert protect_name('1test') == '"1test"'
 
     def test_protect_names(self):
         """
         Test cassandra.metadata.protect_names output
         """
-        self.assertEqual(protect_names(['tests']), ['tests'])
-        self.assertEqual(protect_names(
+        assert protect_names(['tests']) == ['tests']
+        assert protect_names(
             [
                 'tests',
                 'test\'s',
                 'tests ?!@#$%^&*()',
                 '1'
-            ]),
-            [
-                'tests',
-                "\"test's\"",
-                '"tests ?!@#$%^&*()"',
-                '"1"'
-            ])
+            ]) == [
+            'tests',
+            "\"test's\"",
+            '"tests ?!@#$%^&*()"',
+            '"1"'
+        ]
 
     def test_protect_value(self):
         """
         Test cassandra.metadata.protect_value output
         """
-        self.assertEqual(protect_value(True), "true")
-        self.assertEqual(protect_value(False), "false")
-        self.assertEqual(protect_value(3.14), '3.14')
-        self.assertEqual(protect_value(3), '3')
-        self.assertEqual(protect_value('test'), "'test'")
-        self.assertEqual(protect_value('test\'s'), "'test''s'")
-        self.assertEqual(protect_value(None), 'NULL')
+        assert protect_value(True) == "true"
+        assert protect_value(False) == "false"
+        assert protect_value(3.14) == '3.14'
+        assert protect_value(3) == '3'
+        assert protect_value('test') == "'test'"
+        assert protect_value('test\'s') == "'test''s'"
+        assert protect_value(None) == 'NULL'
 
     def test_is_valid_name(self):
         """
         Test cassandra.metadata.is_valid_name output
         """
-        self.assertEqual(is_valid_name(None), False)
-        self.assertEqual(is_valid_name('test'), True)
-        self.assertEqual(is_valid_name('Test'), False)
-        self.assertEqual(is_valid_name('t_____1'), True)
-        self.assertEqual(is_valid_name('test1'), True)
-        self.assertEqual(is_valid_name('1test1'), False)
+        assert is_valid_name(None) == False
+        assert is_valid_name('test') == True
+        assert is_valid_name('Test') == False
+        assert is_valid_name('t_____1') == True
+        assert is_valid_name('test1') == True
+        assert is_valid_name('1test1') == False
 
         invalid_keywords = cassandra.metadata.cql_keywords - cassandra.metadata.cql_keywords_unreserved
         for keyword in invalid_keywords:
-            self.assertEqual(is_valid_name(keyword), False)
+            assert is_valid_name(keyword) == False
 
 
 class GetReplicasTest(unittest.TestCase):
@@ -429,18 +413,18 @@ class GetReplicasTest(unittest.TestCase):
         # tokens match node tokens exactly
         for token, expected_host in zip(tokens, hosts):
             replicas = token_map.get_replicas("ks", token)
-            self.assertEqual(set(replicas), {expected_host})
+            assert set(replicas) == {expected_host}
 
         # shift the tokens back by one
         for token, expected_host in zip(tokens, hosts):
             replicas = token_map.get_replicas("ks", token_klass(token.value - 1))
-            self.assertEqual(set(replicas), {expected_host})
+            assert set(replicas) == {expected_host}
 
         # shift the tokens forward by one
         for i, token in enumerate(tokens):
             replicas = token_map.get_replicas("ks", token_klass(token.value + 1))
             expected_host = hosts[(i + 1) % len(hosts)]
-            self.assertEqual(set(replicas), {expected_host})
+            assert set(replicas) == {expected_host}
 
     def test_murmur3_tokens(self):
         self._get_replicas(Murmur3Token)
@@ -456,7 +440,7 @@ class Murmur3TokensTest(unittest.TestCase):
 
     def test_murmur3_init(self):
         murmur3_token = Murmur3Token(cassandra.metadata.MIN_LONG - 1)
-        self.assertEqual(str(murmur3_token), '<Murmur3Token: -9223372036854775809>')
+        assert str(murmur3_token) == '<Murmur3Token: -9223372036854775809>'
 
     def test_python_vs_c(self):
         from cassandra.murmur3 import _murmur3 as mm3_python
@@ -467,7 +451,7 @@ class Murmur3TokensTest(unittest.TestCase):
             for _ in range(iterations):
                 for len in range(0, 32):  # zero to one block plus full range of tail lengths
                     key = os.urandom(len)
-                    self.assertEqual(mm3_python(key), mm3_c(key))
+                    assert mm3_python(key) == mm3_c(key)
 
         except ImportError:
             raise unittest.SkipTest('The cmurmur3 extension is not available')
@@ -484,36 +468,36 @@ class Murmur3TokensTest(unittest.TestCase):
             raise unittest.SkipTest('The cmurmur3 extension is not available')
 
     def _verify_hash(self, fn):
-        self.assertEqual(fn(b'123'), -7468325962851647638)
-        self.assertEqual(fn(b'\x00\xff\x10\xfa\x99' * 10), 5837342703291459765)
-        self.assertEqual(fn(b'\xfe' * 8), -8927430733708461935)
-        self.assertEqual(fn(b'\x10' * 8), 1446172840243228796)
-        self.assertEqual(fn(str(cassandra.metadata.MAX_LONG).encode()), 7162290910810015547)
+        assert fn(b'123') == -7468325962851647638
+        assert fn(b'\x00\xff\x10\xfa\x99' * 10) == 5837342703291459765
+        assert fn(b'\xfe' * 8) == -8927430733708461935
+        assert fn(b'\x10' * 8) == 1446172840243228796
+        assert fn(str(cassandra.metadata.MAX_LONG).encode()) == 7162290910810015547
 
 
 class MD5TokensTest(unittest.TestCase):
 
     def test_md5_tokens(self):
         md5_token = MD5Token(cassandra.metadata.MIN_LONG - 1)
-        self.assertEqual(md5_token.hash_fn('123'), 42767516990368493138776584305024125808)
-        self.assertEqual(md5_token.hash_fn(str(cassandra.metadata.MAX_LONG)), 28528976619278518853815276204542453639)
-        self.assertEqual(str(md5_token), '<MD5Token: %s>' % -9223372036854775809)
+        assert md5_token.hash_fn('123') == 42767516990368493138776584305024125808
+        assert md5_token.hash_fn(str(cassandra.metadata.MAX_LONG)) == 28528976619278518853815276204542453639
+        assert str(md5_token) == '<MD5Token: %s>' % -9223372036854775809
 
 
 class BytesTokensTest(unittest.TestCase):
 
     def test_bytes_tokens(self):
         bytes_token = BytesToken(unhexlify(b'01'))
-        self.assertEqual(bytes_token.value, b'\x01')
-        self.assertEqual(str(bytes_token), "<BytesToken: %s>" % bytes_token.value)
-        self.assertEqual(bytes_token.hash_fn('123'), '123')
-        self.assertEqual(bytes_token.hash_fn(123), 123)
-        self.assertEqual(bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)), str(cassandra.metadata.MAX_LONG))
+        assert bytes_token.value == b'\x01'
+        assert str(bytes_token) == "<BytesToken: %s>" % bytes_token.value
+        assert bytes_token.hash_fn('123') == '123'
+        assert bytes_token.hash_fn(123) == 123
+        assert bytes_token.hash_fn(str(cassandra.metadata.MAX_LONG)) == str(cassandra.metadata.MAX_LONG)
 
     def test_from_string(self):
         from_unicode = BytesToken.from_string('0123456789abcdef')
         from_bin = BytesToken.from_string(b'0123456789abcdef')
-        self.assertEqual(from_unicode, from_bin)
+        assert from_unicode == from_bin
         self.assertIsInstance(from_unicode.value, bytes)
         self.assertIsInstance(from_bin.value, bytes)
 
@@ -541,7 +525,7 @@ class KeyspaceMetadataTest(unittest.TestCase):
         keyspace.user_types['c'] = UserType(keyspace_name, 'c', ['one'], ['int'])
         keyspace.user_types['d'] = UserType(keyspace_name, 'd', ['one'], ['c'])
 
-        self.assertEqual("""CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}  AND durable_writes = true;
+        assert """CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}  AND durable_writes = true;
 
 CREATE TYPE test.c (
     one int
@@ -560,7 +544,7 @@ CREATE TYPE test.b (
     one d,
     two int,
     three a
-);""", keyspace.export_as_string())
+);""" == keyspace.export_as_string()
 
 
 class UserTypesTest(unittest.TestCase):
@@ -568,17 +552,17 @@ class UserTypesTest(unittest.TestCase):
     def test_as_cql_query(self):
         field_types = ['varint', 'ascii', 'frozen<tuple<varint, ascii>>']
         udt = UserType("ks1", "mytype", ["a", "b", "c"], field_types)
-        self.assertEqual("CREATE TYPE ks1.mytype (a varint, b ascii, c frozen<tuple<varint, ascii>>)", udt.as_cql_query(formatted=False))
+        assert "CREATE TYPE ks1.mytype (a varint, b ascii, c frozen<tuple<varint, ascii>>)" == udt.as_cql_query(formatted=False)
 
-        self.assertEqual("""CREATE TYPE ks1.mytype (
+        assert """CREATE TYPE ks1.mytype (
     a varint,
     b ascii,
     c frozen<tuple<varint, ascii>>
-);""", udt.export_as_string())
+);""" == udt.export_as_string()
 
     def test_as_cql_query_name_escaping(self):
         udt = UserType("MyKeyspace", "MyType", ["AbA", "keyspace"], ['ascii', 'ascii'])
-        self.assertEqual('CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii)', udt.as_cql_query(formatted=False))
+        assert 'CREATE TYPE "MyKeyspace"."MyType" ("AbA" ascii, "keyspace" ascii)' == udt.as_cql_query(formatted=False)
 
 
 class UserDefinedFunctionTest(unittest.TestCase):
@@ -594,7 +578,7 @@ class UserDefinedFunctionTest(unittest.TestCase):
             "LANGUAGE java "
             "AS $$return 0;$$"
         )
-        self.assertEqual(expected_result, func.as_cql_query(formatted=False))
+        assert expected_result == func.as_cql_query(formatted=False)
 
 
 class UserDefinedAggregateTest(unittest.TestCase):
@@ -607,7 +591,7 @@ class UserDefinedAggregateTest(unittest.TestCase):
             "FINALFUNC finalfunc "
             "INITCOND (0)"
         )
-        self.assertEqual(expected_result, aggregate.as_cql_query(formatted=False))
+        assert expected_result == aggregate.as_cql_query(formatted=False)
 
 
 class IndexTest(unittest.TestCase):
@@ -622,14 +606,12 @@ class IndexTest(unittest.TestCase):
 
         row = {'index_name': 'index_name_here', 'index_type': 'index_type_here'}
         index_meta = parser._build_index_metadata(column_meta, row)
-        self.assertEqual(index_meta.as_cql_query(),
-                'CREATE INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here)')
+        assert index_meta.as_cql_query() == 'CREATE INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here)'
 
         row['index_options'] = '{ "class_name": "class_name_here" }'
         row['index_type'] = 'CUSTOM'
         index_meta = parser._build_index_metadata(column_meta, row)
-        self.assertEqual(index_meta.as_cql_query(),
-                "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'")
+        assert index_meta.as_cql_query() == "CREATE CUSTOM INDEX index_name_here ON keyspace_name_here.table_name_here (column_name_here) USING 'class_name_here'"
 
 
 class UnicodeIdentifiersTests(unittest.TestCase):
@@ -832,12 +814,12 @@ class HostsTests(unittest.TestCase):
         metadata.add_or_return_host(Host('dc1.1', SimpleConvictionPolicy))
         metadata.add_or_return_host(Host('dc1.2', SimpleConvictionPolicy))
 
-        self.assertEqual(len(metadata.all_hosts()), 2)
+        assert len(metadata.all_hosts()) == 2
 
         for host in metadata.all_hosts():  # this would previously raise in Py3
             metadata.remove_host(host)
 
-        self.assertEqual(len(metadata.all_hosts()), 0)
+        assert len(metadata.all_hosts()) == 0
 
 
 class MetadataHelpersTest(unittest.TestCase):
@@ -856,4 +838,4 @@ class MetadataHelpersTest(unittest.TestCase):
         ]
         for argument, expected_result in argument_to_expected_results:
             result = strip_frozen(argument)
-            self.assertEqual(result, expected_result, "strip_frozen() arg: {}".format(argument))
+            assert result == expected_result, "strip_frozen() arg: {}".format(argument)

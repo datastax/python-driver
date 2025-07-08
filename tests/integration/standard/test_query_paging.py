@@ -60,12 +60,12 @@ class QueryPagingTests(unittest.TestCase):
 
         for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
             self.session.default_fetch_size = fetch_size
-            self.assertEqual(100, len(list(self.session.execute("SELECT * FROM test3rf.test"))))
+            assert 100 == len(list(self.session.execute("SELECT * FROM test3rf.test")))
 
             statement = SimpleStatement("SELECT * FROM test3rf.test")
-            self.assertEqual(100, len(list(self.session.execute(statement))))
+            assert 100 == len(list(self.session.execute(statement)))
 
-            self.assertEqual(100, len(list(self.session.execute(prepared))))
+            assert 100 == len(list(self.session.execute(prepared)))
 
     def test_paging_state(self):
         """
@@ -93,7 +93,7 @@ class QueryPagingTests(unittest.TestCase):
 
         if(len(result_set.current_rows) > 0):
             list_all_results.append(result_set.current_rows)
-        self.assertEqual(len(list_all_results), 100)
+        assert len(list_all_results) == 100
 
     def test_paging_verify_writes(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
@@ -111,8 +111,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.add(result.k)
                 result_set.add(result.v)
 
-            self.assertEqual(set(range(100)), result_array)
-            self.assertEqual(set([0]), result_set)
+            assert set(range(100)) == result_array
+            assert set([0]) == result_set
 
             statement = SimpleStatement("SELECT * FROM test3rf.test")
             results = self.session.execute(statement)
@@ -122,8 +122,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.add(result.k)
                 result_set.add(result.v)
 
-            self.assertEqual(set(range(100)), result_array)
-            self.assertEqual(set([0]), result_set)
+            assert set(range(100)) == result_array
+            assert set([0]) == result_set
 
             results = self.session.execute(prepared)
             result_array = set()
@@ -132,8 +132,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.add(result.k)
                 result_set.add(result.v)
 
-            self.assertEqual(set(range(100)), result_array)
-            self.assertEqual(set([0]), result_set)
+            assert set(range(100)) == result_array
+            assert set([0]) == result_set
 
     def test_paging_verify_with_composite_keys(self):
         ddl = '''
@@ -194,12 +194,12 @@ class QueryPagingTests(unittest.TestCase):
 
         for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
             self.session.default_fetch_size = fetch_size
-            self.assertEqual(100, len(list(self.session.execute_async("SELECT * FROM test3rf.test").result())))
+            assert 100 == len(list(self.session.execute_async("SELECT * FROM test3rf.test").result()))
 
             statement = SimpleStatement("SELECT * FROM test3rf.test")
-            self.assertEqual(100, len(list(self.session.execute_async(statement).result())))
+            assert 100 == len(list(self.session.execute_async(statement).result()))
 
-            self.assertEqual(100, len(list(self.session.execute_async(prepared).result())))
+            assert 100 == len(list(self.session.execute_async(prepared).result()))
 
     def test_async_paging_verify_writes(self):
         ddl = '''
@@ -292,8 +292,8 @@ class QueryPagingTests(unittest.TestCase):
             future.add_callbacks(callback=handle_page, callback_args=(future, counter, number_of_calls),
                                  errback=handle_error)
             event.wait()
-            self.assertEqual(next(number_of_calls), 100 // fetch_size + 1)
-            self.assertEqual(next(counter), 100)
+            assert next(number_of_calls) == 100 // fetch_size + 1
+            assert next(counter) == 100
 
             # simple statement
             future = self.session.execute_async(SimpleStatement("SELECT * FROM test3rf.test"), timeout=20)
@@ -304,8 +304,8 @@ class QueryPagingTests(unittest.TestCase):
             future.add_callbacks(callback=handle_page, callback_args=(future, counter, number_of_calls),
                                  errback=handle_error)
             event.wait()
-            self.assertEqual(next(number_of_calls), 100 // fetch_size + 1)
-            self.assertEqual(next(counter), 100)
+            assert next(number_of_calls) == 100 // fetch_size + 1
+            assert next(counter) == 100
 
             # prepared statement
             future = self.session.execute_async(prepared, timeout=20)
@@ -316,8 +316,8 @@ class QueryPagingTests(unittest.TestCase):
             future.add_callbacks(callback=handle_page, callback_args=(future, counter, number_of_calls),
                                  errback=handle_error)
             event.wait()
-            self.assertEqual(next(number_of_calls), 100 // fetch_size + 1)
-            self.assertEqual(next(counter), 100)
+            assert next(number_of_calls) == 100 // fetch_size + 1
+            assert next(counter) == 100
 
     def test_concurrent_with_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
@@ -329,10 +329,10 @@ class QueryPagingTests(unittest.TestCase):
         for fetch_size in (2, 3, 7, 10, 99, 100, 101, 10000):
             self.session.default_fetch_size = fetch_size
             results = execute_concurrent_with_args(self.session, prepared, [None] * 10)
-            self.assertEqual(10, len(results))
+            assert 10 == len(results)
             for (success, result) in results:
                 self.assertTrue(success)
-                self.assertEqual(100, len(list(result)))
+                assert 100 == len(list(result))
 
     def test_fetch_size(self):
         """

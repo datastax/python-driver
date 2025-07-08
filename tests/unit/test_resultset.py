@@ -55,8 +55,8 @@ class ResultSetTests(unittest.TestCase):
         expected = list(range(10))
         rs = ResultSet(Mock(has_more_pages=False), expected)
         for i in range(10):
-            self.assertEqual(rs[i], expected[i])
-        self.assertEqual(list(rs), expected)
+            assert rs[i] == expected[i]
+        assert list(rs) == expected
 
     def test_list_paged(self):
         # list access on RS for backwards-compatibility
@@ -66,8 +66,8 @@ class ResultSetTests(unittest.TestCase):
         rs = ResultSet(response_future, expected[:5])
         # this is brittle, depends on internal impl details. Would like to find a better way
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, True, False))  # First two True are consumed on check entering list mode
-        self.assertEqual(rs[9], expected[9])
-        self.assertEqual(list(rs), expected)
+        assert rs[9] == expected[9]
+        assert list(rs) == expected
 
     def test_has_more_pages(self):
         response_future = Mock()
@@ -118,7 +118,7 @@ class ResultSetTests(unittest.TestCase):
         rs = ResultSet(Mock(has_more_pages=False), expected)
 
         # index access before iteration causes list to be materialized
-        self.assertEqual(rs[0], expected[0])
+        assert rs[0] == expected[0]
 
         # resusable iteration
         self.assertListEqual(list(rs), expected)
@@ -133,8 +133,8 @@ class ResultSetTests(unittest.TestCase):
         # this is brittle, depends on internal impl details. Would like to find a better way
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, True, False))  # First two True are consumed on check entering list mode
         # index access before iteration causes list to be materialized
-        self.assertEqual(rs[0], expected[0])
-        self.assertEqual(rs[9], expected[9])
+        assert rs[0] == expected[0]
+        assert rs[9] == expected[9]
         # resusable iteration
         self.assertListEqual(list(rs), expected)
         self.assertListEqual(list(rs), expected)
@@ -147,11 +147,11 @@ class ResultSetTests(unittest.TestCase):
         rs = ResultSet(Mock(has_more_pages=False), expected)
 
         # eq before iteration causes list to be materialized
-        self.assertEqual(rs, expected)
+        assert rs == expected
 
         # results can be iterated or indexed once we're materialized
         self.assertListEqual(list(rs), expected)
-        self.assertEqual(rs[9], expected[9])
+        assert rs[9] == expected[9]
         self.assertTrue(rs)
 
         # pages
@@ -160,11 +160,11 @@ class ResultSetTests(unittest.TestCase):
         rs = ResultSet(response_future, expected[:5])
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, True, False))
         # eq before iteration causes list to be materialized
-        self.assertEqual(rs, expected)
+        assert rs == expected
 
         # results can be iterated or indexed once we're materialized
         self.assertListEqual(list(rs), expected)
-        self.assertEqual(rs[9], expected[9])
+        assert rs[9] == expected[9]
         self.assertTrue(rs)
 
     def test_bool(self):
@@ -190,26 +190,26 @@ class ResultSetTests(unittest.TestCase):
         for row_factory in (named_tuple_factory, tuple_factory):
             for applied in (True, False):
                 rs = ResultSet(Mock(row_factory=row_factory), [(applied,)])
-                self.assertEqual(rs.was_applied, applied)
+                assert rs.was_applied == applied
 
         row_factory = dict_factory
         for applied in (True, False):
             rs = ResultSet(Mock(row_factory=row_factory), [{'[applied]': applied}])
-            self.assertEqual(rs.was_applied, applied)
+            assert rs.was_applied == applied
 
     def test_one(self):
         # no pages
         first, second = Mock(), Mock()
         rs = ResultSet(Mock(has_more_pages=False), [first, second])
 
-        self.assertEqual(rs.one(), first)
+        assert rs.one() == first
 
     def test_all(self):
         first, second = Mock(), Mock()
         rs1 = ResultSet(Mock(has_more_pages=False), [first, second])
         rs2 = ResultSet(Mock(has_more_pages=False), [first, second])
 
-        self.assertEqual(rs1.all(), list(rs2))
+        assert rs1.all() == list(rs2)
 
     @patch('cassandra.cluster.warn')
     def test_indexing_deprecation(self, mocked_warn):
@@ -217,8 +217,8 @@ class ResultSetTests(unittest.TestCase):
         # pre-Py3.0 for some reason
         first, second = Mock(), Mock()
         rs = ResultSet(Mock(has_more_pages=False), [first, second])
-        self.assertEqual(rs[0], first)
-        self.assertEqual(len(mocked_warn.mock_calls), 1)
+        assert rs[0] == first
+        assert len(mocked_warn.mock_calls) == 1
         index_warning_args = tuple(mocked_warn.mock_calls[0])[1]
         self.assertIn('indexing support will be removed in 4.0',
                       str(index_warning_args[0]))

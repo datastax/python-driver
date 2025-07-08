@@ -54,83 +54,82 @@ class TypeTests(unittest.TestCase):
         Ensure lookup_casstype_simple returns the correct classes
         """
 
-        self.assertEqual(lookup_casstype_simple('AsciiType'), cassandra.cqltypes.AsciiType)
-        self.assertEqual(lookup_casstype_simple('LongType'), cassandra.cqltypes.LongType)
-        self.assertEqual(lookup_casstype_simple('BytesType'), cassandra.cqltypes.BytesType)
-        self.assertEqual(lookup_casstype_simple('BooleanType'), cassandra.cqltypes.BooleanType)
-        self.assertEqual(lookup_casstype_simple('CounterColumnType'), cassandra.cqltypes.CounterColumnType)
-        self.assertEqual(lookup_casstype_simple('DecimalType'), cassandra.cqltypes.DecimalType)
-        self.assertEqual(lookup_casstype_simple('DoubleType'), cassandra.cqltypes.DoubleType)
-        self.assertEqual(lookup_casstype_simple('FloatType'), cassandra.cqltypes.FloatType)
-        self.assertEqual(lookup_casstype_simple('InetAddressType'), cassandra.cqltypes.InetAddressType)
-        self.assertEqual(lookup_casstype_simple('Int32Type'), cassandra.cqltypes.Int32Type)
-        self.assertEqual(lookup_casstype_simple('UTF8Type'), cassandra.cqltypes.UTF8Type)
-        self.assertEqual(lookup_casstype_simple('DateType'), cassandra.cqltypes.DateType)
-        self.assertEqual(lookup_casstype_simple('SimpleDateType'), cassandra.cqltypes.SimpleDateType)
-        self.assertEqual(lookup_casstype_simple('ByteType'), cassandra.cqltypes.ByteType)
-        self.assertEqual(lookup_casstype_simple('ShortType'), cassandra.cqltypes.ShortType)
-        self.assertEqual(lookup_casstype_simple('TimeUUIDType'), cassandra.cqltypes.TimeUUIDType)
-        self.assertEqual(lookup_casstype_simple('TimeType'), cassandra.cqltypes.TimeType)
-        self.assertEqual(lookup_casstype_simple('UUIDType'), cassandra.cqltypes.UUIDType)
-        self.assertEqual(lookup_casstype_simple('IntegerType'), cassandra.cqltypes.IntegerType)
-        self.assertEqual(lookup_casstype_simple('MapType'), cassandra.cqltypes.MapType)
-        self.assertEqual(lookup_casstype_simple('ListType'), cassandra.cqltypes.ListType)
-        self.assertEqual(lookup_casstype_simple('SetType'), cassandra.cqltypes.SetType)
-        self.assertEqual(lookup_casstype_simple('CompositeType'), cassandra.cqltypes.CompositeType)
-        self.assertEqual(lookup_casstype_simple('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
-        self.assertEqual(lookup_casstype_simple('ReversedType'), cassandra.cqltypes.ReversedType)
-        self.assertEqual(lookup_casstype_simple('DurationType'), cassandra.cqltypes.DurationType)
-        self.assertEqual(lookup_casstype_simple('DateRangeType'), cassandra.cqltypes.DateRangeType)
+        assert lookup_casstype_simple('AsciiType') == cassandra.cqltypes.AsciiType
+        assert lookup_casstype_simple('LongType') == cassandra.cqltypes.LongType
+        assert lookup_casstype_simple('BytesType') == cassandra.cqltypes.BytesType
+        assert lookup_casstype_simple('BooleanType') == cassandra.cqltypes.BooleanType
+        assert lookup_casstype_simple('CounterColumnType') == cassandra.cqltypes.CounterColumnType
+        assert lookup_casstype_simple('DecimalType') == cassandra.cqltypes.DecimalType
+        assert lookup_casstype_simple('DoubleType') == cassandra.cqltypes.DoubleType
+        assert lookup_casstype_simple('FloatType') == cassandra.cqltypes.FloatType
+        assert lookup_casstype_simple('InetAddressType') == cassandra.cqltypes.InetAddressType
+        assert lookup_casstype_simple('Int32Type') == cassandra.cqltypes.Int32Type
+        assert lookup_casstype_simple('UTF8Type') == cassandra.cqltypes.UTF8Type
+        assert lookup_casstype_simple('DateType') == cassandra.cqltypes.DateType
+        assert lookup_casstype_simple('SimpleDateType') == cassandra.cqltypes.SimpleDateType
+        assert lookup_casstype_simple('ByteType') == cassandra.cqltypes.ByteType
+        assert lookup_casstype_simple('ShortType') == cassandra.cqltypes.ShortType
+        assert lookup_casstype_simple('TimeUUIDType') == cassandra.cqltypes.TimeUUIDType
+        assert lookup_casstype_simple('TimeType') == cassandra.cqltypes.TimeType
+        assert lookup_casstype_simple('UUIDType') == cassandra.cqltypes.UUIDType
+        assert lookup_casstype_simple('IntegerType') == cassandra.cqltypes.IntegerType
+        assert lookup_casstype_simple('MapType') == cassandra.cqltypes.MapType
+        assert lookup_casstype_simple('ListType') == cassandra.cqltypes.ListType
+        assert lookup_casstype_simple('SetType') == cassandra.cqltypes.SetType
+        assert lookup_casstype_simple('CompositeType') == cassandra.cqltypes.CompositeType
+        assert lookup_casstype_simple('ColumnToCollectionType') == cassandra.cqltypes.ColumnToCollectionType
+        assert lookup_casstype_simple('ReversedType') == cassandra.cqltypes.ReversedType
+        assert lookup_casstype_simple('DurationType') == cassandra.cqltypes.DurationType
+        assert lookup_casstype_simple('DateRangeType') == cassandra.cqltypes.DateRangeType
 
-        self.assertEqual(str(lookup_casstype_simple('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
+        assert str(lookup_casstype_simple('unknown')) == str(cassandra.cqltypes.mkUnrecognizedType('unknown'))
 
     def test_lookup_casstype(self):
         """
         Ensure lookup_casstype returns the correct classes
         """
 
-        self.assertEqual(lookup_casstype('AsciiType'), cassandra.cqltypes.AsciiType)
-        self.assertEqual(lookup_casstype('LongType'), cassandra.cqltypes.LongType)
-        self.assertEqual(lookup_casstype('BytesType'), cassandra.cqltypes.BytesType)
-        self.assertEqual(lookup_casstype('BooleanType'), cassandra.cqltypes.BooleanType)
-        self.assertEqual(lookup_casstype('CounterColumnType'), cassandra.cqltypes.CounterColumnType)
-        self.assertEqual(lookup_casstype('DateType'), cassandra.cqltypes.DateType)
-        self.assertEqual(lookup_casstype('DecimalType'), cassandra.cqltypes.DecimalType)
-        self.assertEqual(lookup_casstype('DoubleType'), cassandra.cqltypes.DoubleType)
-        self.assertEqual(lookup_casstype('FloatType'), cassandra.cqltypes.FloatType)
-        self.assertEqual(lookup_casstype('InetAddressType'), cassandra.cqltypes.InetAddressType)
-        self.assertEqual(lookup_casstype('Int32Type'), cassandra.cqltypes.Int32Type)
-        self.assertEqual(lookup_casstype('UTF8Type'), cassandra.cqltypes.UTF8Type)
-        self.assertEqual(lookup_casstype('DateType'), cassandra.cqltypes.DateType)
-        self.assertEqual(lookup_casstype('TimeType'), cassandra.cqltypes.TimeType)
-        self.assertEqual(lookup_casstype('ByteType'), cassandra.cqltypes.ByteType)
-        self.assertEqual(lookup_casstype('ShortType'), cassandra.cqltypes.ShortType)
-        self.assertEqual(lookup_casstype('TimeUUIDType'), cassandra.cqltypes.TimeUUIDType)
-        self.assertEqual(lookup_casstype('UUIDType'), cassandra.cqltypes.UUIDType)
-        self.assertEqual(lookup_casstype('IntegerType'), cassandra.cqltypes.IntegerType)
-        self.assertEqual(lookup_casstype('MapType'), cassandra.cqltypes.MapType)
-        self.assertEqual(lookup_casstype('ListType'), cassandra.cqltypes.ListType)
-        self.assertEqual(lookup_casstype('SetType'), cassandra.cqltypes.SetType)
-        self.assertEqual(lookup_casstype('CompositeType'), cassandra.cqltypes.CompositeType)
-        self.assertEqual(lookup_casstype('ColumnToCollectionType'), cassandra.cqltypes.ColumnToCollectionType)
-        self.assertEqual(lookup_casstype('ReversedType'), cassandra.cqltypes.ReversedType)
-        self.assertEqual(lookup_casstype('DurationType'), cassandra.cqltypes.DurationType)
-        self.assertEqual(lookup_casstype('DateRangeType'), cassandra.cqltypes.DateRangeType)
+        assert lookup_casstype('AsciiType') == cassandra.cqltypes.AsciiType
+        assert lookup_casstype('LongType') == cassandra.cqltypes.LongType
+        assert lookup_casstype('BytesType') == cassandra.cqltypes.BytesType
+        assert lookup_casstype('BooleanType') == cassandra.cqltypes.BooleanType
+        assert lookup_casstype('CounterColumnType') == cassandra.cqltypes.CounterColumnType
+        assert lookup_casstype('DateType') == cassandra.cqltypes.DateType
+        assert lookup_casstype('DecimalType') == cassandra.cqltypes.DecimalType
+        assert lookup_casstype('DoubleType') == cassandra.cqltypes.DoubleType
+        assert lookup_casstype('FloatType') == cassandra.cqltypes.FloatType
+        assert lookup_casstype('InetAddressType') == cassandra.cqltypes.InetAddressType
+        assert lookup_casstype('Int32Type') == cassandra.cqltypes.Int32Type
+        assert lookup_casstype('UTF8Type') == cassandra.cqltypes.UTF8Type
+        assert lookup_casstype('DateType') == cassandra.cqltypes.DateType
+        assert lookup_casstype('TimeType') == cassandra.cqltypes.TimeType
+        assert lookup_casstype('ByteType') == cassandra.cqltypes.ByteType
+        assert lookup_casstype('ShortType') == cassandra.cqltypes.ShortType
+        assert lookup_casstype('TimeUUIDType') == cassandra.cqltypes.TimeUUIDType
+        assert lookup_casstype('UUIDType') == cassandra.cqltypes.UUIDType
+        assert lookup_casstype('IntegerType') == cassandra.cqltypes.IntegerType
+        assert lookup_casstype('MapType') == cassandra.cqltypes.MapType
+        assert lookup_casstype('ListType') == cassandra.cqltypes.ListType
+        assert lookup_casstype('SetType') == cassandra.cqltypes.SetType
+        assert lookup_casstype('CompositeType') == cassandra.cqltypes.CompositeType
+        assert lookup_casstype('ColumnToCollectionType') == cassandra.cqltypes.ColumnToCollectionType
+        assert lookup_casstype('ReversedType') == cassandra.cqltypes.ReversedType
+        assert lookup_casstype('DurationType') == cassandra.cqltypes.DurationType
+        assert lookup_casstype('DateRangeType') == cassandra.cqltypes.DateRangeType
 
-        self.assertEqual(str(lookup_casstype('unknown')), str(cassandra.cqltypes.mkUnrecognizedType('unknown')))
+        assert str(lookup_casstype('unknown')) == str(cassandra.cqltypes.mkUnrecognizedType('unknown'))
 
         self.assertRaises(ValueError, lookup_casstype, 'AsciiType~')
 
     def test_casstype_parameterized(self):
-        self.assertEqual(LongType.cass_parameterized_type_with(()), 'LongType')
-        self.assertEqual(LongType.cass_parameterized_type_with((), full=True), 'org.apache.cassandra.db.marshal.LongType')
-        self.assertEqual(SetType.cass_parameterized_type_with([DecimalType], full=True), 'org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.DecimalType)')
+        assert LongType.cass_parameterized_type_with(()) == 'LongType'
+        assert LongType.cass_parameterized_type_with((), full=True) == 'org.apache.cassandra.db.marshal.LongType'
+        assert SetType.cass_parameterized_type_with([DecimalType], full=True) == 'org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.DecimalType)'
 
-        self.assertEqual(LongType.cql_parameterized_type(), 'bigint')
+        assert LongType.cql_parameterized_type() == 'bigint'
 
         subtypes = (cassandra.cqltypes.UTF8Type, cassandra.cqltypes.UTF8Type)
-        self.assertEqual('map<text, text>',
-                         cassandra.cqltypes.MapType.apply_parameters(subtypes).cql_parameterized_type())
+        assert 'map<text, text>' == cassandra.cqltypes.MapType.apply_parameters(subtypes).cql_parameterized_type()
 
     def test_datetype_from_string(self):
         # Ensure all formats can be parsed, without exception
@@ -143,18 +142,18 @@ class TypeTests(unittest.TestCase):
         Smoke test cql_typename
         """
 
-        self.assertEqual(cql_typename('DateType'), 'timestamp')
-        self.assertEqual(cql_typename('org.apache.cassandra.db.marshal.ListType(IntegerType)'), 'list<varint>')
+        assert cql_typename('DateType') == 'timestamp'
+        assert cql_typename('org.apache.cassandra.db.marshal.ListType(IntegerType)') == 'list<varint>'
 
     def test_named_tuple_colname_substitution(self):
         colnames = ("func(abc)", "[applied]", "func(func(abc))", "foo_bar", "foo_bar_")
         rows = [(1, 2, 3, 4, 5)]
         result = named_tuple_factory(colnames, rows)[0]
-        self.assertEqual(result[0], result.func_abc)
-        self.assertEqual(result[1], result.applied)
-        self.assertEqual(result[2], result.func_func_abc)
-        self.assertEqual(result[3], result.foo_bar)
-        self.assertEqual(result[4], result.foo_bar_)
+        assert result[0] == result.func_abc
+        assert result[1] == result.applied
+        assert result[2] == result.func_func_abc
+        assert result[3] == result.foo_bar
+        assert result[4] == result.foo_bar_
 
     def test_parse_casstype_args(self):
         class FooType(CassandraType):
@@ -178,36 +177,36 @@ class TypeTests(unittest.TestCase):
             '7a6970:org.apache.cassandra.db.marshal.UTF8Type',
             ')')))
 
-        self.assertEqual(FooType, ctype.__class__)
+        assert FooType == ctype.__class__
 
-        self.assertEqual(UTF8Type, ctype.subtypes[0])
+        assert UTF8Type == ctype.subtypes[0]
 
         # middle subtype should be a BarType instance with its own subtypes and names
         self.assertIsInstance(ctype.subtypes[1], BarType)
-        self.assertEqual([UTF8Type], ctype.subtypes[1].subtypes)
-        self.assertEqual([b"address"], ctype.subtypes[1].names)
+        assert [UTF8Type] == ctype.subtypes[1].subtypes
+        assert [b"address"] == ctype.subtypes[1].names
 
-        self.assertEqual(UTF8Type, ctype.subtypes[2])
-        self.assertEqual([b'city', None, b'zip'], ctype.names)
+        assert UTF8Type == ctype.subtypes[2]
+        assert [b'city', None, b'zip'] == ctype.names
 
     def test_parse_casstype_vector(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)")
         self.assertTrue(issubclass(ctype, VectorType))
-        self.assertEqual(3, ctype.vector_size)
-        self.assertEqual(FloatType, ctype.subtype)
+        assert 3 == ctype.vector_size
+        assert FloatType == ctype.subtype
 
     def test_parse_casstype_vector_of_vectors(self):
         inner_type = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)"
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
         self.assertTrue(issubclass(ctype, VectorType))
-        self.assertEqual(3, ctype.vector_size)
+        assert 3 == ctype.vector_size
         sub_ctype = ctype.subtype
         self.assertTrue(issubclass(sub_ctype, VectorType))
-        self.assertEqual(4, sub_ctype.vector_size)
-        self.assertEqual(FloatType, sub_ctype.subtype)
+        assert 4 == sub_ctype.vector_size
+        assert FloatType == sub_ctype.subtype
 
     def test_empty_value(self):
-        self.assertEqual(str(EmptyValue()), 'EMPTY')
+        assert str(EmptyValue()) == 'EMPTY'
 
     def test_datetype(self):
         now_time_seconds = time.time()
@@ -217,28 +216,28 @@ class TypeTests(unittest.TestCase):
         now_timestamp = now_time_seconds * 1e3
 
         # same results serialized
-        self.assertEqual(DateType.serialize(now_datetime, 0), DateType.serialize(now_timestamp, 0))
+        assert DateType.serialize(now_datetime, 0) == DateType.serialize(now_timestamp, 0)
 
         # deserialize
         # epoc
         expected = 0
-        self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime.fromtimestamp(expected, tz=datetime.timezone.utc).replace(tzinfo=None))
+        assert DateType.deserialize(int64_pack(1000 * expected), 0) == datetime.datetime.fromtimestamp(expected, tz=datetime.timezone.utc).replace(tzinfo=None)
 
         # beyond 32b
         expected = 2 ** 33
-        self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime(2242, 3, 16, 12, 56, 32, tzinfo=datetime.timezone.utc).replace(tzinfo=None))
+        assert DateType.deserialize(int64_pack(1000 * expected), 0) == datetime.datetime(2242, 3, 16, 12, 56, 32, tzinfo=datetime.timezone.utc).replace(tzinfo=None)
 
         # less than epoc (PYTHON-119)
         expected = -770172256
-        self.assertEqual(DateType.deserialize(int64_pack(1000 * expected), 0), datetime.datetime(1945, 8, 5, 23, 15, 44, tzinfo=datetime.timezone.utc).replace(tzinfo=None))
+        assert DateType.deserialize(int64_pack(1000 * expected), 0) == datetime.datetime(1945, 8, 5, 23, 15, 44, tzinfo=datetime.timezone.utc).replace(tzinfo=None)
 
         # work around rounding difference among Python versions (PYTHON-230)
         expected = 1424817268.274
-        self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2015, 2, 24, 22, 34, 28, 274000, tzinfo=datetime.timezone.utc).replace(tzinfo=None))
+        assert DateType.deserialize(int64_pack(int(1000 * expected)), 0) == datetime.datetime(2015, 2, 24, 22, 34, 28, 274000, tzinfo=datetime.timezone.utc).replace(tzinfo=None)
 
         # Large date overflow (PYTHON-452)
         expected = 2177403010.123
-        self.assertEqual(DateType.deserialize(int64_pack(int(1000 * expected)), 0), datetime.datetime(2038, 12, 31, 10, 10, 10, 123000, tzinfo=datetime.timezone.utc).replace(tzinfo=None))
+        assert DateType.deserialize(int64_pack(int(1000 * expected)), 0) == datetime.datetime(2038, 12, 31, 10, 10, 10, 123000, tzinfo=datetime.timezone.utc).replace(tzinfo=None)
 
     def test_collection_null_support(self):
         """
@@ -253,16 +252,10 @@ class TypeTests(unittest.TestCase):
                 int32_pack(4) +  # size of item2
                 int32_pack(42)  # item2
         )
-        self.assertEqual(
-            [None, 42],
-            int_list.deserialize(value, 3)
-        )
+        assert [None, 42] == int_list.deserialize(value, 3)
 
         set_list = SetType.apply_parameters([Int32Type])
-        self.assertEqual(
-            {None, 42},
-            set(set_list.deserialize(value, 3))
-        )
+        assert {None, 42} == set(set_list.deserialize(value, 3))
 
         value = (
                 int32_pack(2) +  # num items
@@ -275,49 +268,47 @@ class TypeTests(unittest.TestCase):
         )
 
         map_list = MapType.apply_parameters([Int32Type, Int32Type])
-        self.assertEqual(
-            [(42, None), (None, 42)],
-            map_list.deserialize(value, 3)._items  # OrderedMapSerializedKey
-        )
+
+        assert [(42, None), (None, 42)] == map_list.deserialize(value, 3)._items  # OrderedMapSerializedKey
 
     def test_write_read_string(self):
         with tempfile.TemporaryFile() as f:
             value = u'test'
             write_string(f, value)
             f.seek(0)
-            self.assertEqual(read_string(f), value)
+            assert read_string(f) == value
 
     def test_write_read_longstring(self):
         with tempfile.TemporaryFile() as f:
             value = u'test'
             write_longstring(f, value)
             f.seek(0)
-            self.assertEqual(read_longstring(f), value)
+            assert read_longstring(f) == value
 
     def test_write_read_stringmap(self):
         with tempfile.TemporaryFile() as f:
             value = {'key': 'value'}
             write_stringmap(f, value)
             f.seek(0)
-            self.assertEqual(read_stringmap(f), value)
+            assert read_stringmap(f) == value
 
     def test_write_read_inet(self):
         with tempfile.TemporaryFile() as f:
             value = ('192.168.1.1', 9042)
             write_inet(f, value)
             f.seek(0)
-            self.assertEqual(read_inet(f), value)
+            assert read_inet(f) == value
 
         with tempfile.TemporaryFile() as f:
             value = ('2001:db8:0:f101::1', 9042)
             write_inet(f, value)
             f.seek(0)
-            self.assertEqual(read_inet(f), value)
+            assert read_inet(f) == value
 
     def test_cql_quote(self):
-        self.assertEqual(cql_quote(u'test'), "'test'")
-        self.assertEqual(cql_quote('test'), "'test'")
-        self.assertEqual(cql_quote(0), '0')
+        assert cql_quote(u'test') == "'test'"
+        assert cql_quote('test') == "'test'"
+        assert cql_quote(0) == '0'
 
 
 class VectorTests(unittest.TestCase):
@@ -330,29 +321,29 @@ class VectorTests(unittest.TestCase):
         if isinstance(first, float):
             self.assertAlmostEqual(first, second, places=5)
         elif isinstance(first, list):
-            self.assertEqual(len(first), len(second))
+            assert len(first) == len(second)
             for (felem, selem) in zip(first, second):
                 self._round_trip_compare_fn(felem, selem)
         elif isinstance(first, set) or isinstance(first, frozenset):
-            self.assertEqual(len(first), len(second))
+            assert len(first) == len(second)
             first_norm = self._normalize_set(first)
             second_norm = self._normalize_set(second)
-            self.assertEqual(first_norm, second_norm)
+            assert first_norm == second_norm
         elif isinstance(first, dict):
             for ((fk,fv), (sk,sv)) in zip(first.items(), second.items()):
                 self._round_trip_compare_fn(fk, sk)
                 self._round_trip_compare_fn(fv, sv)
         else:
-            self.assertEqual(first,second)
+            assert first == second
 
     def _round_trip_test(self, data, ctype_str):
         ctype = parse_casstype_args(ctype_str)
         data_bytes = ctype.serialize(data, 0)
         serialized_size = ctype.subtype.serial_size()
         if serialized_size:
-            self.assertEqual(serialized_size * len(data), len(data_bytes))
+            assert serialized_size * len(data) == len(data_bytes)
         result = ctype.deserialize(data_bytes, 0)
-        self.assertEqual(len(data), len(result))
+        assert len(data) == len(result)
         for idx in range(0,len(data)):
             self._round_trip_compare_fn(data[idx], result[idx])
 
@@ -460,13 +451,13 @@ class VectorTests(unittest.TestCase):
     def test_cql_parameterized_type(self):
         # Base vector functionality
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
-        self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<float, 4>")
+        assert ctype.cql_parameterized_type() == "org.apache.cassandra.db.marshal.VectorType<float, 4>"
 
         # Test vector-of-vectors
         inner_type = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)"
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
         inner_parsed_type = "org.apache.cassandra.db.marshal.VectorType<float, 4>"
-        self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<%s, 3>" % (inner_parsed_type))
+        assert ctype.cql_parameterized_type() == "org.apache.cassandra.db.marshal.VectorType<%s, 3>" % (inner_parsed_type)
 
     def test_serialization_fixed_size_too_small(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
@@ -553,7 +544,7 @@ class DateRangeTypeTests(unittest.TestCase):
         dr = DateRange(OPEN_BOUND,
                   DateRangeBound(feb_stamp, DateRangePrecision.MONTH))
         dt = datetime_from_timestamp(dr.upper_bound.milliseconds / 1000)
-        self.assertEqual(dt.day, 28)
+        assert dt.day == 28
 
         # Leap year
         feb_stamp_leap_year = ms_timestamp_from_datetime(
@@ -562,17 +553,17 @@ class DateRangeTypeTests(unittest.TestCase):
         dr = DateRange(OPEN_BOUND,
                        DateRangeBound(feb_stamp_leap_year, DateRangePrecision.MONTH))
         dt = datetime_from_timestamp(dr.upper_bound.milliseconds / 1000)
-        self.assertEqual(dt.day, 29)
+        assert dt.day == 29
 
     def test_decode_precision(self):
-        self.assertEqual(DateRangeType._decode_precision(6), 'MILLISECOND')
+        assert DateRangeType._decode_precision(6) == 'MILLISECOND'
 
     def test_decode_precision_error(self):
         with self.assertRaises(ValueError):
             DateRangeType._decode_precision(-1)
 
     def test_encode_precision(self):
-        self.assertEqual(DateRangeType._encode_precision('SECOND'), 5)
+        assert DateRangeType._encode_precision('SECOND') == 5
 
     def test_encode_precision_error(self):
         with self.assertRaises(ValueError):
@@ -582,12 +573,9 @@ class DateRangeTypeTests(unittest.TestCase):
         serialized = (int8_pack(0) +
                       int64_pack(self.timestamp) +
                       int8_pack(3))
-        self.assertEqual(
-            DateRangeType.deserialize(serialized, 5),
-            util.DateRange(value=util.DateRangeBound(
-                value=datetime.datetime(2017, 2, 1, 15, 42, 12, 404000),
-                precision='HOUR')
-            )
+        assert DateRangeType.deserialize(serialized, 5) == util.DateRange(value=util.DateRangeBound(
+            value=datetime.datetime(2017, 2, 1, 15, 42, 12, 404000),
+            precision='HOUR')
         )
 
     def test_deserialize_closed_range(self):
@@ -596,17 +584,14 @@ class DateRangeTypeTests(unittest.TestCase):
                       int8_pack(2) +
                       int64_pack(self.timestamp) +
                       int8_pack(6))
-        self.assertEqual(
-            DateRangeType.deserialize(serialized, 5),
-            util.DateRange(
-                lower_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1, 0, 0),
-                    precision='DAY'
-                ),
-                upper_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1, 15, 42, 12, 404000),
-                    precision='MILLISECOND'
-                )
+        assert DateRangeType.deserialize(serialized, 5) == util.DateRange(
+            lower_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1, 0, 0),
+                precision='DAY'
+            ),
+            upper_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1, 15, 42, 12, 404000),
+                precision='MILLISECOND'
             )
         )
 
@@ -615,15 +600,12 @@ class DateRangeTypeTests(unittest.TestCase):
                       int64_pack(self.timestamp) +
                       int8_pack(3))
         deserialized = DateRangeType.deserialize(serialized, 5)
-        self.assertEqual(
-            deserialized,
-            util.DateRange(
-                lower_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1, 15, 0),
-                    precision='HOUR'
-                ),
-                upper_bound=util.OPEN_BOUND
-            )
+        assert deserialized == util.DateRange(
+            lower_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1, 15, 0),
+                precision='HOUR'
+            ),
+            upper_bound=util.OPEN_BOUND
         )
 
     def test_deserialize_open_low(self):
@@ -631,35 +613,26 @@ class DateRangeTypeTests(unittest.TestCase):
                       int64_pack(self.timestamp) +
                       int8_pack(4))
         deserialized = DateRangeType.deserialize(serialized, 5)
-        self.assertEqual(
-            deserialized,
-            util.DateRange(
-                lower_bound=util.OPEN_BOUND,
-                upper_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1, 15, 42, 20, 1000),
-                    precision='MINUTE'
-                )
+        assert deserialized == util.DateRange(
+            lower_bound=util.OPEN_BOUND,
+            upper_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1, 15, 42, 20, 1000),
+                precision='MINUTE'
             )
         )
 
     def test_deserialize_single_open(self):
-        self.assertEqual(
-            util.DateRange(value=util.OPEN_BOUND),
-            DateRangeType.deserialize(int8_pack(5), 5)
-        )
+        assert util.DateRange(value=util.OPEN_BOUND) == DateRangeType.deserialize(int8_pack(5), 5)
 
     def test_serialize_single_value(self):
         serialized = (int8_pack(0) +
                       int64_pack(self.timestamp) +
                       int8_pack(5))
         deserialized = DateRangeType.deserialize(serialized, 5)
-        self.assertEqual(
-            deserialized,
-            util.DateRange(
-                value=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1, 15, 42, 12),
-                    precision='SECOND'
-                )
+        assert deserialized == util.DateRange(
+            value=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1, 15, 42, 12),
+                precision='SECOND'
             )
         )
 
@@ -670,17 +643,14 @@ class DateRangeTypeTests(unittest.TestCase):
                       int64_pack(self.timestamp) +
                       int8_pack(0))
         deserialized = DateRangeType.deserialize(serialized, 5)
-        self.assertEqual(
-            deserialized,
-            util.DateRange(
-                lower_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1, 15, 42, 12),
-                    precision='SECOND'
-                ),
-                upper_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 12, 31),
-                    precision='YEAR'
-                )
+        assert deserialized == util.DateRange(
+            lower_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1, 15, 42, 12),
+                precision='SECOND'
+            ),
+            upper_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 12, 31),
+                precision='YEAR'
             )
         )
 
@@ -689,15 +659,12 @@ class DateRangeTypeTests(unittest.TestCase):
                       int64_pack(self.timestamp) +
                       int8_pack(2))
         deserialized = DateRangeType.deserialize(serialized, 5)
-        self.assertEqual(
-            deserialized,
-            util.DateRange(
-                lower_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1),
-                    precision='DAY'
-                ),
-                upper_bound=util.OPEN_BOUND
-            )
+        assert deserialized == util.DateRange(
+            lower_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1),
+                precision='DAY'
+            ),
+            upper_bound=util.OPEN_BOUND
         )
 
     def test_serialize_open_low(self):
@@ -705,40 +672,34 @@ class DateRangeTypeTests(unittest.TestCase):
                       int64_pack(self.timestamp) +
                       int8_pack(3))
         deserialized = DateRangeType.deserialize(serialized, 5)
-        self.assertEqual(
-            deserialized,
-            util.DateRange(
-                lower_bound=util.DateRangeBound(
-                    value=datetime.datetime(2017, 2, 1, 15),
-                    precision='HOUR'
-                ),
-                upper_bound=util.OPEN_BOUND
-            )
+        assert deserialized == util.DateRange(
+            lower_bound=util.DateRangeBound(
+                value=datetime.datetime(2017, 2, 1, 15),
+                precision='HOUR'
+            ),
+            upper_bound=util.OPEN_BOUND
         )
 
     def test_deserialize_both_open(self):
         serialized = (int8_pack(4))
         deserialized = DateRangeType.deserialize(serialized, 5)
-        self.assertEqual(
-            deserialized,
-            util.DateRange(
-                lower_bound=util.OPEN_BOUND,
-                upper_bound=util.OPEN_BOUND
-            )
+        assert deserialized == util.DateRange(
+            lower_bound=util.OPEN_BOUND,
+            upper_bound=util.OPEN_BOUND
         )
 
     def test_serialize_single_open(self):
         serialized = DateRangeType.serialize(util.DateRange(
             value=util.OPEN_BOUND,
         ), 5)
-        self.assertEqual(int8_pack(5), serialized)
+        assert int8_pack(5) == serialized
 
     def test_serialize_both_open(self):
         serialized = DateRangeType.serialize(util.DateRange(
             lower_bound=util.OPEN_BOUND,
             upper_bound=util.OPEN_BOUND
         ), 5)
-        self.assertEqual(int8_pack(4), serialized)
+        assert int8_pack(4) == serialized
 
     def test_failure_to_serialize_no_value_object(self):
         self.assertRaises(ValueError, DateRangeType.serialize, object(), 5)
@@ -752,10 +713,7 @@ class DateRangeTypeTests(unittest.TestCase):
         vals = [b'\x01\x00\x00\x01%\xe9a\xf9\xd1\x06\x00\x00\x01v\xbb>o\xff\x00',
                 b'\x01\x00\x00\x00\xdcm\x03-\xd1\x06\x00\x00\x01v\xbb>o\xff\x00']
         for serialized in vals:
-            self.assertEqual(
-                serialized,
-                DateRangeType.serialize(DateRangeType.deserialize(serialized, 0), 0)
-            )
+            assert serialized == DateRangeType.serialize(DateRangeType.deserialize(serialized, 0), 0)
 
     def test_serialize_zero_datetime(self):
         """
@@ -826,8 +784,8 @@ class DateRangeDeserializationTests(unittest.TestCase):
             upper_value = self.starting_upper_value + i
             dr = DateRange(DateRangeBound(lower_value, DateRangePrecision.MILLISECOND),
                            DateRangeBound(upper_value, DateRangePrecision.MILLISECOND))
-            self.assertEqual(lower_value, dr.lower_bound.milliseconds)
-            self.assertEqual(upper_value, dr.upper_bound.milliseconds)
+            assert lower_value == dr.lower_bound.milliseconds
+            assert upper_value == dr.upper_bound.milliseconds
 
     def test_deserialize_date_range_seconds(self):
         """
@@ -852,9 +810,9 @@ class DateRangeDeserializationTests(unittest.TestCase):
             dr = DateRange(DateRangeBound(lower_value, DateRangePrecision.SECOND),
                            DateRangeBound(upper_value, DateRangePrecision.SECOND))
 
-            self.assertEqual(truncate_last_figures(lower_value), dr.lower_bound.milliseconds)
+            assert truncate_last_figures(lower_value) == dr.lower_bound.milliseconds
             upper_value = truncate_last_figures(upper_value) + 999
-            self.assertEqual(upper_value, dr.upper_bound.milliseconds)
+            assert upper_value == dr.upper_bound.milliseconds
 
     def test_deserialize_date_range_minutes(self):
         """
@@ -1021,9 +979,9 @@ class DateRangeDeserializationTests(unittest.TestCase):
                            DateRangeBound(upper_value, precision))
 
             # We verify that rounded value corresponds with what we would expect
-            self.assertEqual(truncate_date(lower_value), dr.lower_bound.milliseconds)
+            assert truncate_date(lower_value) == dr.lower_bound.milliseconds
             upper_value = round_up_truncated_upper_value(truncate_date(upper_value))
-            self.assertEqual(upper_value, dr.upper_bound.milliseconds)
+            assert upper_value == dr.upper_bound.milliseconds
 
 
 class TestOrdering(unittest.TestCase):

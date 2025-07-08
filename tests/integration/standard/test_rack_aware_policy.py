@@ -66,7 +66,7 @@ class RackAwareRoundRobinPolicyTests(unittest.TestCase):
         for i in range (10):
             bound = prepared.bind([i])
             results = self.session.execute(bound)
-            self.assertEqual(results, [(i, i%5, i%2)])
+            assert results == [(i, i%5, i%2)]
             coordinator = str(results.response_future.coordinator_host.endpoint)
             self.assertTrue(coordinator in set(["127.0.0.1:9042", "127.0.0.2:9042"]))
 
@@ -75,15 +75,15 @@ class RackAwareRoundRobinPolicyTests(unittest.TestCase):
         for i in range (10):
             bound = prepared.bind([i])
             results = self.session.execute(bound)
-            self.assertEqual(results, [(i, i%5, i%2)])
+            assert results == [(i, i%5, i%2)]
             coordinator =str(results.response_future.coordinator_host.endpoint)
-            self.assertEqual(coordinator, "127.0.0.1:9042")
+            assert coordinator == "127.0.0.1:9042"
 
         self.node1.stop(wait_other_notice=True, gently=True)
 
         for i in range (10):
             bound = prepared.bind([i])
             results = self.session.execute(bound)
-            self.assertEqual(results, [(i, i%5, i%2)])
+            assert results == [(i, i%5, i%2)]
             coordinator = str(results.response_future.coordinator_host.endpoint)
             self.assertTrue(coordinator in set(["127.0.0.3:9042", "127.0.0.4:9042"]))

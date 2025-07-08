@@ -53,7 +53,7 @@ class TestDatetime(BaseCassEngTestCase):
         now = datetime.now()
         self.DatetimeTest.objects.create(test_id=0, created_at=now)
         dt2 = self.DatetimeTest.objects(test_id=0).first()
-        self.assertEqual(dt2.created_at.timetuple()[:6], now.timetuple()[:6])
+        assert dt2.created_at.timetuple()[:6] == now.timetuple()[:6]
 
     def test_datetime_tzinfo_io(self):
         class TZ(tzinfo):
@@ -65,20 +65,20 @@ class TestDatetime(BaseCassEngTestCase):
         now = datetime(1982, 1, 1, tzinfo=TZ())
         dt = self.DatetimeTest.objects.create(test_id=1, created_at=now)
         dt2 = self.DatetimeTest.objects(test_id=1).first()
-        self.assertEqual(dt2.created_at.timetuple()[:6], (now + timedelta(hours=1)).timetuple()[:6])
+        assert dt2.created_at.timetuple()[:6] == (now + timedelta(hours=1)).timetuple()[:6]
 
     @greaterthanorequalcass30
     def test_datetime_date_support(self):
         today = date.today()
         self.DatetimeTest.objects.create(test_id=2, created_at=today)
         dt2 = self.DatetimeTest.objects(test_id=2).first()
-        self.assertEqual(dt2.created_at.isoformat(), datetime(today.year, today.month, today.day).isoformat())
+        assert dt2.created_at.isoformat() == datetime(today.year, today.month, today.day).isoformat()
 
         result = self.DatetimeTest.objects.all().allow_filtering().filter(test_id=2).first()
-        self.assertEqual(result.created_at, datetime.combine(today, datetime.min.time()))
+        assert result.created_at == datetime.combine(today, datetime.min.time())
 
         result = self.DatetimeTest.objects.all().allow_filtering().filter(test_id=2, created_at=today).first()
-        self.assertEqual(result.created_at, datetime.combine(today, datetime.min.time()))
+        assert result.created_at == datetime.combine(today, datetime.min.time())
 
     def test_datetime_none(self):
         dt = self.DatetimeTest.objects.create(test_id=3, created_at=None)
@@ -97,13 +97,13 @@ class TestDatetime(BaseCassEngTestCase):
         dt_value = 1454520554
         self.DatetimeTest.objects.create(test_id=5, created_at=dt_value)
         dt2 = self.DatetimeTest.objects(test_id=5).first()
-        self.assertEqual(dt2.created_at, datetime.fromtimestamp(dt_value, tz=timezone.utc).replace(tzinfo=None))
+        assert dt2.created_at == datetime.fromtimestamp(dt_value, tz=timezone.utc).replace(tzinfo=None)
 
     def test_datetime_large(self):
         dt_value = datetime(2038, 12, 31, 10, 10, 10, 123000)
         self.DatetimeTest.objects.create(test_id=6, created_at=dt_value)
         dt2 = self.DatetimeTest.objects(test_id=6).first()
-        self.assertEqual(dt2.created_at, dt_value)
+        assert dt2.created_at == dt_value
 
     def test_datetime_truncate_microseconds(self):
         """
@@ -123,7 +123,7 @@ class TestDatetime(BaseCassEngTestCase):
             dt_truncated = datetime(2024, 12, 31, 10, 10, 10, 923000)
             self.DatetimeTest.objects.create(test_id=6, created_at=dt_value)
             dt2 = self.DatetimeTest.objects(test_id=6).first()
-            self.assertEqual(dt2.created_at,dt_truncated)
+            assert dt2.created_at == dt_truncated
         finally:
             # We need to always return behavior to default
             DateTime.truncate_microseconds = False
@@ -141,9 +141,9 @@ class TestBoolDefault(BaseCassEngTestCase):
 
     def test_default_is_set(self):
         tmp = self.BoolDefaultValueTest.create(test_id=1)
-        self.assertEqual(True, tmp.stuff)
+        assert True == tmp.stuff
         tmp2 = self.BoolDefaultValueTest.get(test_id=1)
-        self.assertEqual(True, tmp2.stuff)
+        assert True == tmp2.stuff
 
 
 class TestBoolValidation(BaseCassEngTestCase):
@@ -183,7 +183,7 @@ class TestVarInt(BaseCassEngTestCase):
         long_int = 92834902384092834092384028340283048239048203480234823048230482304820348239
         int1 = self.VarIntTest.objects.create(test_id=0, bignum=long_int)
         int2 = self.VarIntTest.objects(test_id=0).first()
-        self.assertEqual(int1.bignum, int2.bignum)
+        assert int1.bignum == int2.bignum
 
         with self.assertRaises(ValidationError):
             self.VarIntTest.objects.create(test_id=0, bignum="not_a_number")
@@ -235,15 +235,15 @@ class DataType():
 
             result = self.model_class.objects(test_id=0).first()
             self.assertIsInstance(result.class_param, self.python_klass)
-            self.assertEqual(result.class_param, value_to_compare)
+            assert result.class_param == value_to_compare
 
             result = self.model_class.objects.all().allow_filtering().filter(test_id=0).first()
             self.assertIsInstance(result.class_param, self.python_klass)
-            self.assertEqual(result.class_param, value_to_compare)
+            assert result.class_param == value_to_compare
 
             result = self.model_class.objects.all().allow_filtering().filter(test_id=0, class_param=value).first()
             self.assertIsInstance(result.class_param, self.python_klass)
-            self.assertEqual(result.class_param, value_to_compare)
+            assert result.class_param == value_to_compare
 
         return result
 
@@ -616,9 +616,9 @@ class TestAscii(BaseCassEngTestCase):
 
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
-        self.assertEqual(Ascii().validate(''), '')
-        self.assertEqual(Ascii().validate(None), None)
-        self.assertEqual(Ascii().validate('yo'), 'yo')
+        assert Ascii().validate('') == ''
+        assert Ascii().validate(None) == None
+        assert Ascii().validate('yo') == 'yo'
 
     def test_non_required_validation(self):
         """ Tests that validation is ok on none and blank values if required is False. """
@@ -739,9 +739,9 @@ class TestText(BaseCassEngTestCase):
 
     def test_unaltering_validation(self):
         """ Test the validation step doesn't re-interpret values. """
-        self.assertEqual(Text().validate(''), '')
-        self.assertEqual(Text().validate(None), None)
-        self.assertEqual(Text().validate('yo'), 'yo')
+        assert Text().validate('') == ''
+        assert Text().validate(None) == None
+        assert Text().validate('yo') == 'yo'
 
     def test_non_required_validation(self):
         """ Tests that validation is ok on none and blank values if required is False """

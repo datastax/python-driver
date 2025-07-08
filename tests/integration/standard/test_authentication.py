@@ -109,7 +109,7 @@ class AuthenticationTests(unittest.TestCase):
                 assert_quiescent_pool_state(self, cluster, wait=1)
                 for pool in session.get_pools():
                     connection, _ = pool.borrow_connection(timeout=0)
-                    self.assertEqual(connection.authenticator.server_authenticator_class, 'org.apache.cassandra.auth.PasswordAuthenticator')
+                    assert connection.authenticator.server_authenticator_class == 'org.apache.cassandra.auth.PasswordAuthenticator'
                     pool.return_connection(connection)
             finally:
                 cluster.shutdown()
@@ -184,7 +184,7 @@ class SaslAuthenticatorTests(AuthenticationTests):
         provider = SaslAuthProvider(**sasl_kwargs)
         host = 'thehostname'
         authenticator = provider.new_authenticator(host)
-        self.assertEqual(authenticator.sasl.host, host)
+        assert authenticator.sasl.host == host
 
     def test_host_rejected(self):
         sasl_kwargs = {'host': 'something'}

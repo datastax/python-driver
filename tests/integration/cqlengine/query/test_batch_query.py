@@ -88,12 +88,12 @@ class BatchQueryTests(BaseCassEngTestCase):
         inst.batch(b).save()
 
         inst2 = TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-        self.assertEqual(inst2.count, 3)
+        assert inst2.count == 3
 
         b.execute()
 
         inst3 = TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-        self.assertEqual(inst3.count, 4)
+        assert inst3.count == 4
 
     @execute_count(4)
     def test_delete_success_case(self):
@@ -134,9 +134,9 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         with BatchQuery() as b:
             TestMultiKeyModel.objects.batch(b).filter(partition=0).delete()
-            self.assertEqual(TestMultiKeyModel.filter(partition=0).count(), 5)
+            assert TestMultiKeyModel.filter(partition=0).count() == 5
 
-        self.assertEqual(TestMultiKeyModel.filter(partition=0).count(), 0)
+        assert TestMultiKeyModel.filter(partition=0).count() == 0
         #cleanup
         for m in TestMultiKeyModel.all():
             m.delete()
@@ -147,7 +147,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         b = BatchQuery()
 
         q = TestMultiKeyModel.objects.batch(b)
-        self.assertEqual(q._batch, b)
+        assert q._batch == b
 
         q = q.batch(None)
         self.assertIsNone(q._batch)
@@ -158,7 +158,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         b = BatchQuery()
 
         q = DMLQuery(TestMultiKeyModel, batch=b)
-        self.assertEqual(q._batch, b)
+        assert q._batch == b
 
         q.batch(None)
         self.assertIsNone(q._batch)
@@ -170,7 +170,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         sync_table(BatchQueryLogModel)
 
         obj = BatchQueryLogModel.objects(k=1)
-        self.assertEqual(0, len(obj))
+        assert 0 == len(obj)
 
         try:
             with BatchQuery(execute_on_exception=True) as b:
@@ -181,7 +181,7 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         obj = BatchQueryLogModel.objects(k=1)
         # should be 1 because the batch should execute
-        self.assertEqual(1, len(obj))
+        assert 1 == len(obj)
 
     @execute_count(2)
     def test_batch_execute_on_exception_skips_if_not_specified(self):
@@ -190,7 +190,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         sync_table(BatchQueryLogModel)
 
         obj = BatchQueryLogModel.objects(k=2)
-        self.assertEqual(0, len(obj))
+        assert 0 == len(obj)
 
         try:
             with BatchQuery() as b:
@@ -202,21 +202,21 @@ class BatchQueryTests(BaseCassEngTestCase):
         obj = BatchQueryLogModel.objects(k=2)
 
         # should be 0 because the batch should not execute
-        self.assertEqual(0, len(obj))
+        assert 0 == len(obj)
 
     @execute_count(1)
     def test_batch_execute_timeout(self):
         with mock.patch.object(Session, 'execute') as mock_execute:
             with BatchQuery(timeout=1) as b:
                 BatchQueryLogModel.batch(b).create(k=2, v=2)
-            self.assertEqual(mock_execute.call_args[-1]['timeout'], 1)
+            assert mock_execute.call_args[-1]['timeout'] == 1
 
     @execute_count(1)
     def test_batch_execute_no_timeout(self):
         with mock.patch.object(Session, 'execute') as mock_execute:
             with BatchQuery() as b:
                 BatchQueryLogModel.batch(b).create(k=2, v=2)
-            self.assertEqual(mock_execute.call_args[-1]['timeout'], NOT_SET)
+            assert mock_execute.call_args[-1]['timeout'] == NOT_SET
 
 
 class BatchTypeQueryTests(BaseCassEngTestCase):
@@ -245,7 +245,7 @@ class BatchTypeQueryTests(BaseCassEngTestCase):
             TestMultiKeyModel.batch(b).create(partition=1, cluster=2)
 
         obj = TestMultiKeyModel.objects(partition=1)
-        self.assertEqual(2, len(obj))
+        assert 2 == len(obj)
 
         with BatchQuery(batch_type=cassandra_BatchType.COUNTER) as b:
             CounterBatchQueryModel.batch(b).create(k=1, v=1)
@@ -253,15 +253,15 @@ class BatchTypeQueryTests(BaseCassEngTestCase):
             CounterBatchQueryModel.batch(b).create(k=1, v=10)
 
         obj = CounterBatchQueryModel.objects(k=1)
-        self.assertEqual(1, len(obj))
-        self.assertEqual(obj[0].v, 13)
+        assert 1 == len(obj)
+        assert obj[0].v == 13
 
         with BatchQuery(batch_type=cassandra_BatchType.LOGGED) as b:
             TestMultiKeyModel.batch(b).create(partition=1, cluster=1)
             TestMultiKeyModel.batch(b).create(partition=1, cluster=2)
 
         obj = TestMultiKeyModel.objects(partition=1)
-        self.assertEqual(2, len(obj))
+        assert 2 == len(obj)
 
     @execute_count(4)
     def test_cqlengine_batch_type(self):
@@ -280,7 +280,7 @@ class BatchTypeQueryTests(BaseCassEngTestCase):
             TestMultiKeyModel.batch(b).create(partition=1, cluster=2)
 
         obj = TestMultiKeyModel.objects(partition=1)
-        self.assertEqual(2, len(obj))
+        assert 2 == len(obj)
 
         with BatchQuery(batch_type=cqlengine_BatchType.Counter) as b:
             CounterBatchQueryModel.batch(b).create(k=1, v=1)
@@ -288,5 +288,5 @@ class BatchTypeQueryTests(BaseCassEngTestCase):
             CounterBatchQueryModel.batch(b).create(k=1, v=10)
 
         obj = CounterBatchQueryModel.objects(k=1)
-        self.assertEqual(1, len(obj))
-        self.assertEqual(obj[0].v, 13)
+        assert 1 == len(obj)
+        assert obj[0].v == 13

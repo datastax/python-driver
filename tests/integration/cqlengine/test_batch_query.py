@@ -73,12 +73,12 @@ class BatchQueryTests(BaseCassEngTestCase):
         inst.batch(b).save()
 
         inst2 = TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-        self.assertEqual(inst2.count, 3)
+        assert inst2.count == 3
 
         b.execute()
 
         inst3 = TestMultiKeyModel.get(partition=self.pkey, cluster=2)
-        self.assertEqual(inst3.count, 4)
+        assert inst3.count == 4
 
     def test_delete_success_case(self):
 
@@ -116,9 +116,9 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         with BatchQuery() as b:
             TestMultiKeyModel.objects.batch(b).filter(partition=0).delete()
-            self.assertEqual(TestMultiKeyModel.filter(partition=0).count(), 5)
+            assert TestMultiKeyModel.filter(partition=0).count() == 5
 
-        self.assertEqual(TestMultiKeyModel.filter(partition=0).count(), 0)
+        assert TestMultiKeyModel.filter(partition=0).count() == 0
         #cleanup
         for m in TestMultiKeyModel.all():
             m.delete()
@@ -146,11 +146,11 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         batch.add_callback(my_callback, 2, named_arg='value')
         batch.add_callback(my_callback, 1, 3)
 
-        self.assertEqual(batch._callbacks, [
+        assert batch._callbacks == [
             (my_callback, (), {}),
             (my_callback, (2,), {'named_arg':'value'}),
             (my_callback, (1, 3), {})
-        ])
+        ]
 
     def test_callbacks_properly_execute_callables_and_tuples(self):
 
@@ -166,8 +166,8 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
 
         batch.execute()
 
-        self.assertEqual(len(call_history), 2)
-        self.assertEqual([(), ('more', 'args')], call_history)
+        assert len(call_history) == 2
+        assert [(), ('more', 'args')] == call_history
 
     def test_callbacks_tied_to_execute(self):
         """Batch callbacks should NOT fire if batch is not executed in context manager mode"""
@@ -179,7 +179,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         with BatchQuery() as batch:
             batch.add_callback(my_callback)
 
-        self.assertEqual(len(call_history), 1)
+        assert len(call_history) == 1
 
         class SomeError(Exception):
             pass
@@ -192,7 +192,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
                 raise SomeError
 
         # still same call history. Nothing added
-        self.assertEqual(len(call_history), 1)
+        assert len(call_history) == 1
 
         # but if execute ran, even with an error bubbling through
         # the callbacks also would have fired
@@ -202,7 +202,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
                 raise SomeError
 
         # updated call history
-        self.assertEqual(len(call_history), 2)
+        assert len(call_history) == 2
 
     def test_callbacks_work_multiple_times(self):
         """
@@ -224,7 +224,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
                 batch.add_callback(my_callback)
                 batch.execute()
             batch.execute()
-        self.assertEqual(len(w), 2)  # package filter setup to warn always
+        assert len(w) == 2  # package filter setup to warn always
         self.assertRegex(str(w[0].message), r"^Batch.*multiple.*")
 
     def test_disable_multiple_callback_warning(self):

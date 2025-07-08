@@ -68,9 +68,9 @@ class ContextQueryTests(BaseCassEngTestCase):
         # model keyspace write/read
         for ks in self.KEYSPACES:
             with ContextQuery(TestModel, keyspace=ks) as tm:
-                self.assertEqual(tm.__keyspace__, ks)
+                assert tm.__keyspace__ == ks
 
-        self.assertEqual(TestModel._get_keyspace(), 'ks1')
+        assert TestModel._get_keyspace() == 'ks1'
 
     def test_default_keyspace(self):
         """
@@ -87,14 +87,14 @@ class ContextQueryTests(BaseCassEngTestCase):
             TestModel.objects.create(partition=i, cluster=i)
 
         with ContextQuery(TestModel) as tm:
-            self.assertEqual(5, len(tm.objects.all()))
+            assert 5 == len(tm.objects.all())
 
         with ContextQuery(TestModel, keyspace='ks1') as tm:
-            self.assertEqual(5, len(tm.objects.all()))
+            assert 5 == len(tm.objects.all())
 
         for ks in self.KEYSPACES[1:]:
             with ContextQuery(TestModel, keyspace=ks) as tm:
-                self.assertEqual(0, len(tm.objects.all()))
+                assert 0 == len(tm.objects.all())
 
     def test_context_keyspace(self):
         """
@@ -111,20 +111,20 @@ class ContextQueryTests(BaseCassEngTestCase):
                 tm.objects.create(partition=i, cluster=i)
 
         with ContextQuery(TestModel, keyspace='ks4') as tm:
-            self.assertEqual(5, len(tm.objects.all()))
+            assert 5 == len(tm.objects.all())
 
-        self.assertEqual(0, len(TestModel.objects.all()))
+        assert 0 == len(TestModel.objects.all())
 
         for ks in self.KEYSPACES[:2]:
             with ContextQuery(TestModel, keyspace=ks) as tm:
-                self.assertEqual(0, len(tm.objects.all()))
+                assert 0 == len(tm.objects.all())
 
         # simple data update
         with ContextQuery(TestModel, keyspace='ks4') as tm:
             obj = tm.objects.get(partition=1)
             obj.update(count=42)
 
-            self.assertEqual(42, tm.objects.get(partition=1).count)
+            assert 42 == tm.objects.get(partition=1).count
 
     def test_context_multiple_models(self):
         """
@@ -140,8 +140,8 @@ class ContextQueryTests(BaseCassEngTestCase):
         with ContextQuery(TestModel, TestModel, keyspace='ks4') as (tm1, tm2):
 
             self.assertNotEqual(tm1, tm2)
-            self.assertEqual(tm1.__keyspace__, 'ks4')
-            self.assertEqual(tm2.__keyspace__, 'ks4')
+            assert tm1.__keyspace__ == 'ks4'
+            assert tm2.__keyspace__ == 'ks4'
 
     def test_context_invalid_parameters(self):
         """

@@ -62,7 +62,7 @@ class HostFilterPolicyTests(unittest.TestCase):
             response = session.execute("SELECT * from system.local WHERE key='local'")
             queried_hosts.update(response.response_future.attempted_hosts)
 
-        self.assertEqual(queried_hosts, single_host)
+        assert queried_hosts == single_host
 
         external_event = False
         futures = session.update_created_pools()
@@ -72,7 +72,7 @@ class HostFilterPolicyTests(unittest.TestCase):
         for _ in range(10):
             response = session.execute("SELECT * from system.local WHERE key='local'")
             queried_hosts.update(response.response_future.attempted_hosts)
-        self.assertEqual(queried_hosts, all_hosts)
+        assert queried_hosts == all_hosts
 
 
 class WhiteListRoundRobinPolicyTests(unittest.TestCase):
@@ -89,7 +89,7 @@ class WhiteListRoundRobinPolicyTests(unittest.TestCase):
             response = session.execute("SELECT * from system.local WHERE key='local'", execution_profile="white_list")
             queried_hosts.update(response.response_future.attempted_hosts)
         queried_hosts = set(host.address for host in queried_hosts)
-        self.assertEqual(queried_hosts, only_connect_hosts)
+        assert queried_hosts == only_connect_hosts
 
 
 class ExponentialRetryPolicyTests(unittest.TestCase):

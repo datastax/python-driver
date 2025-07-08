@@ -37,17 +37,17 @@ class ConsistencyExceptionTest(unittest.TestCase):
         Verify that Timeout exception object translates consistency from input value to correct output string
         """
         consistency_str = self.extract_consistency(repr(Timeout("Timeout Message", consistency=None)))
-        self.assertEqual(consistency_str, 'Not Set')
+        assert consistency_str == 'Not Set'
         for c in ConsistencyLevel.value_to_name.keys():
             consistency_str = self.extract_consistency(repr(Timeout("Timeout Message", consistency=c)))
-        self.assertEqual(consistency_str, ConsistencyLevel.value_to_name[c])
+        assert consistency_str == ConsistencyLevel.value_to_name[c]
 
     def test_unavailable_consistency(self):
         """
         Verify that Unavailable exception object translates consistency from input value to correct output string
         """
         consistency_str = self.extract_consistency(repr(Unavailable("Unavailable Message", consistency=None)))
-        self.assertEqual(consistency_str, 'Not Set')
+        assert consistency_str == 'Not Set'
         for c in ConsistencyLevel.value_to_name.keys():
             consistency_str = self.extract_consistency(repr(Unavailable("Timeout Message", consistency=c)))
-        self.assertEqual(consistency_str, ConsistencyLevel.value_to_name[c])
+        assert consistency_str == ConsistencyLevel.value_to_name[c]

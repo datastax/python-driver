@@ -57,9 +57,9 @@ class UpgradeTests(UpgradeBase):
             time.sleep(0.0001)
 
         total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all").one()[0]
-        self.assertEqual(total_number_of_inserted, next(c))
+        assert total_number_of_inserted == next(c)
 
-        self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
+        assert self.logger_handler.get_message_count("error", "") == 0
 
     @two_to_three_path
     def test_can_connect(self):
@@ -80,9 +80,9 @@ class UpgradeTests(UpgradeBase):
             for _ in range(10):
                 results = session.execute("SELECT * from system.local WHERE key='local'")
                 self.assertGreater(len(results.current_rows), 0)
-                self.assertEqual(len(results.response_future.attempted_hosts), 1)
+                assert len(results.response_future.attempted_hosts) == 1
                 queried_hosts.add(results.response_future.attempted_hosts[0])
-            self.assertEqual(len(queried_hosts), 3)
+            assert len(queried_hosts) == 3
             cluster.shutdown()
 
         connect_and_shutdown()
@@ -116,9 +116,9 @@ class UpgradeTestsMetadata(UpgradeBase):
             time.sleep(0.0001)
 
         total_number_of_inserted = self.session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all").one()[0]
-        self.assertEqual(total_number_of_inserted, next(c))
+        assert total_number_of_inserted == next(c)
 
-        self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
+        assert self.logger_handler.get_message_count("error", "") == 0
 
     @two_to_three_path
     def test_schema_metadata_gets_refreshed(self):
@@ -177,9 +177,9 @@ class UpgradeTestsMetadata(UpgradeBase):
 
     def _assert_same_token_map(self, original, new):
         self.assertIsNot(original, new)
-        self.assertEqual(original.tokens_to_hosts_by_ks, new.tokens_to_hosts_by_ks)
-        self.assertEqual(original.token_to_host_owner, new.token_to_host_owner)
-        self.assertEqual(original.ring, new.ring)
+        assert original.tokens_to_hosts_by_ks == new.tokens_to_hosts_by_ks
+        assert original.token_to_host_owner == new.token_to_host_owner
+        assert original.ring == new.ring
 
 
 two_to_three_with_auth_path = upgrade_paths([
@@ -244,9 +244,9 @@ class UpgradeTestsAuthentication(UpgradeBaseAuth):
         for _ in range(10):
             results = session.execute("SELECT * from system.local WHERE key='local'")
             self.assertGreater(len(results.current_rows), 0)
-            self.assertEqual(len(results.response_future.attempted_hosts), 1)
+            assert len(results.response_future.attempted_hosts) == 1
             queried_hosts.add(results.response_future.attempted_hosts[0])
-        self.assertEqual(len(queried_hosts), 3)
+        assert len(queried_hosts) == 3
         cluster.shutdown()
 
 
@@ -280,6 +280,6 @@ class UpgradeTestsPolicies(UpgradeBase):
             time.sleep(0.0001)
 
         total_number_of_inserted = session.execute("SELECT COUNT(*) from test3rf.test", execution_profile="all").one()[0]
-        self.assertEqual(total_number_of_inserted, next(c))
+        assert total_number_of_inserted == next(c)
 
-        self.assertEqual(self.logger_handler.get_message_count("error", ""), 0)
+        assert self.logger_handler.get_message_count("error", "") == 0

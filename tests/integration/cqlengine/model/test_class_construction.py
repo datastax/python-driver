@@ -63,13 +63,13 @@ class TestModelClassFunction(BaseCassEngTestCase):
         inst1 = TestPerson()
         self.assertHasAttr(inst1, 'first_name')
         self.assertHasAttr(inst1, 'last_name')
-        self.assertEqual(inst1.first_name, 'kevin')
-        self.assertEqual(inst1.last_name, 'deldycke')
+        assert inst1.first_name == 'kevin'
+        assert inst1.last_name == 'deldycke'
 
         # Check that values on instantiation overrides defaults.
         inst2 = TestPerson(first_name='bob', last_name='joe')
-        self.assertEqual(inst2.first_name, 'bob')
-        self.assertEqual(inst2.last_name, 'joe')
+        assert inst2.first_name == 'bob'
+        assert inst2.last_name == 'joe'
 
     def test_db_map(self):
         """
@@ -83,8 +83,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
             numbers = columns.Integer(db_field='integers_etc')
 
         db_map = WildDBNames._db_map
-        self.assertEqual(db_map['words_and_whatnot'], 'content')
-        self.assertEqual(db_map['integers_etc'], 'numbers')
+        assert db_map['words_and_whatnot'] == 'content'
+        assert db_map['integers_etc'] == 'numbers'
 
     def test_attempting_to_make_duplicate_column_names_fails(self):
         """
@@ -108,7 +108,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
             content = columns.Text()
             numbers = columns.Integer()
 
-        self.assertEqual([x for x in Stuff._columns.keys()], ['id', 'words', 'content', 'numbers'])
+        assert [x for x in Stuff._columns.keys()] == ['id', 'words', 'content', 'numbers']
 
     def test_exception_raised_when_creating_class_without_pk(self):
         with self.assertRaises(ModelDefinitionException):
@@ -130,8 +130,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
         inst2 = Stuff(num=7)
 
         self.assertNotEqual(inst1.num, inst2.num)
-        self.assertEqual(inst1.num, 5)
-        self.assertEqual(inst2.num, 7)
+        assert inst1.num == 5
+        assert inst2.num == 7
 
     def test_superclass_fields_are_inherited(self):
         """
@@ -179,7 +179,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         self.assertTrue(cols['p2'].partition_key)
 
         obj = ModelWithPartitionKeys(p1='a', p2='b')
-        self.assertEqual(obj.pk, ('a', 'b'))
+        assert obj.pk == ('a', 'b')
 
     def test_del_attribute_is_assigned_properly(self):
         """ Tests that columns that can be deleted have the del attribute """
@@ -236,7 +236,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
                 __abstract__ = True
                 key = columns.UUID(primary_key=True)
 
-        self.assertEqual(len(warn), 0)
+        assert len(warn) == 0
 
 
 class TestManualTableNaming(BaseCassEngTestCase):
@@ -278,8 +278,8 @@ class TestManualTableNamingCaseSensitive(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=False), 'manual_name')
-        self.assertEqual(self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=True), 'whatever.manual_name')
+        assert self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=False) == 'manual_name'
+        assert self.RenamedCaseInsensitiveTest.column_family_name(include_keyspace=True) == 'whatever.manual_name'
 
     def test_proper_table_naming_case_sensitive(self):
         """
@@ -292,8 +292,8 @@ class TestManualTableNamingCaseSensitive(BaseCassEngTestCase):
         @test_category object_mapper
         """
 
-        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=False), '"Manual_Name"')
-        self.assertEqual(self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True), 'whatever."Manual_Name"')
+        assert self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=False) == '"Manual_Name"'
+        assert self.RenamedCaseSensitiveTest.column_family_name(include_keyspace=True) == 'whatever."Manual_Name"'
 
 
 class AbstractModel(Model):

@@ -63,7 +63,7 @@ class ConnectionTest(unittest.TestCase):
         number_of_clusters_before = len(_clusters_for_shutdown)
         connection.default()
         number_of_clusters_after = len(_clusters_for_shutdown)
-        self.assertEqual(number_of_clusters_after - number_of_clusters_before, 1)
+        assert number_of_clusters_after - number_of_clusters_before == 1
 
 
 class SeveralConnectionsTest(BaseCassEngTestCase):
@@ -119,11 +119,11 @@ class SeveralConnectionsTest(BaseCassEngTestCase):
         sync_table(TestConnectModel)
         TCM2 = TestConnectModel.create(id=1, keyspace=self.keyspace2)
         connection.set_session(self.session1)
-        self.assertEqual(1, TestConnectModel.objects.count())
-        self.assertEqual(TestConnectModel.objects.first(), TCM1)
+        assert 1 == TestConnectModel.objects.count()
+        assert TestConnectModel.objects.first() == TCM1
         connection.set_session(self.session2)
-        self.assertEqual(1, TestConnectModel.objects.count())
-        self.assertEqual(TestConnectModel.objects.first(), TCM2)
+        assert 1 == TestConnectModel.objects.count()
+        assert TestConnectModel.objects.first() == TCM2
 
 
 class ConnectionModel(Model):
@@ -135,7 +135,7 @@ class ConnectionInitTest(unittest.TestCase):
     def test_default_connection_uses_legacy(self):
         connection.default()
         conn = connection.get_connection()
-        self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
+        assert conn.cluster._config_mode == _ConfigMode.LEGACY
 
     def test_connection_with_legacy_settings(self):
         connection.setup(
@@ -144,7 +144,7 @@ class ConnectionInitTest(unittest.TestCase):
             consistency=ConsistencyLevel.LOCAL_ONE
         )
         conn = connection.get_connection()
-        self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
+        assert conn.cluster._config_mode == _ConfigMode.LEGACY
 
     def test_connection_from_session_with_execution_profile(self):
         cluster = TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
@@ -152,7 +152,7 @@ class ConnectionInitTest(unittest.TestCase):
         connection.default()
         connection.set_session(session)
         conn = connection.get_connection()
-        self.assertEqual(conn.cluster._config_mode, _ConfigMode.PROFILES)
+        assert conn.cluster._config_mode == _ConfigMode.PROFILES
 
     def test_connection_from_session_with_legacy_settings(self):
         cluster = TestCluster(load_balancing_policy=RoundRobinPolicy())
@@ -160,7 +160,7 @@ class ConnectionInitTest(unittest.TestCase):
         session.row_factory = dict_factory
         connection.set_session(session)
         conn = connection.get_connection()
-        self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
+        assert conn.cluster._config_mode == _ConfigMode.LEGACY
 
     def test_uncommitted_session_uses_legacy(self):
         cluster = TestCluster()
@@ -168,7 +168,7 @@ class ConnectionInitTest(unittest.TestCase):
         session.row_factory = dict_factory
         connection.set_session(session)
         conn = connection.get_connection()
-        self.assertEqual(conn.cluster._config_mode, _ConfigMode.LEGACY)
+        assert conn.cluster._config_mode == _ConfigMode.LEGACY
 
     def test_legacy_insert_query(self):
         connection.setup(
@@ -176,21 +176,21 @@ class ConnectionInitTest(unittest.TestCase):
             default_keyspace=DEFAULT_KEYSPACE,
             consistency=ConsistencyLevel.LOCAL_ONE
         )
-        self.assertEqual(connection.get_connection().cluster._config_mode, _ConfigMode.LEGACY)
+        assert connection.get_connection().cluster._config_mode == _ConfigMode.LEGACY
 
         sync_table(ConnectionModel)
         ConnectionModel.objects.create(key=0, some_data='text0')
         ConnectionModel.objects.create(key=1, some_data='text1')
-        self.assertEqual(ConnectionModel.objects(key=0)[0].some_data, 'text0')
+        assert ConnectionModel.objects(key=0)[0].some_data == 'text0'
 
     def test_execution_profile_insert_query(self):
         cluster = TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(row_factory=dict_factory)})
         session = cluster.connect()
         connection.default()
         connection.set_session(session)
-        self.assertEqual(connection.get_connection().cluster._config_mode, _ConfigMode.PROFILES)
+        assert connection.get_connection().cluster._config_mode == _ConfigMode.PROFILES
 
         sync_table(ConnectionModel)
         ConnectionModel.objects.create(key=0, some_data='text0')
         ConnectionModel.objects.create(key=1, some_data='text1')
-        self.assertEqual(ConnectionModel.objects(key=0)[0].some_data, 'text0')
+        assert ConnectionModel.objects(key=0)[0].some_data == 'text0'

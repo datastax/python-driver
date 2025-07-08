@@ -37,7 +37,7 @@ class DSELoadBalancingPolicyTest(unittest.TestCase):
         policy.populate(Mock(metadata=ClusterMetaMock()), hosts)
         for _ in range(node_count):
             query_plan = list(policy.make_query_plan(None, Mock(target_host=None)))
-            self.assertEqual(sorted(query_plan), hosts)
+            assert sorted(query_plan) == hosts
 
     def test_status_updates(self):
         node_count = 4
@@ -49,7 +49,7 @@ class DSELoadBalancingPolicyTest(unittest.TestCase):
         policy.on_up(4)
         policy.on_add(5)
         query_plan = list(policy.make_query_plan())
-        self.assertEqual(sorted(query_plan), [2, 3, 4, 5])
+        assert sorted(query_plan) == [2, 3, 4, 5]
 
     def test_no_live_nodes(self):
         hosts = [0, 1, 2, 3]
@@ -60,7 +60,7 @@ class DSELoadBalancingPolicyTest(unittest.TestCase):
             policy.on_down(i)
 
         query_plan = list(policy.make_query_plan())
-        self.assertEqual(query_plan, [])
+        assert query_plan == []
 
     def test_target_no_host(self):
         node_count = 4
@@ -68,7 +68,7 @@ class DSELoadBalancingPolicyTest(unittest.TestCase):
         policy = DSELoadBalancingPolicy(RoundRobinPolicy())
         policy.populate(Mock(metadata=ClusterMetaMock()), hosts)
         query_plan = list(policy.make_query_plan(None, Mock(target_host='127.0.0.1')))
-        self.assertEqual(sorted(query_plan), hosts)
+        assert sorted(query_plan) == hosts
 
     def test_target_host_down(self):
         node_count = 4
@@ -78,7 +78,7 @@ class DSELoadBalancingPolicyTest(unittest.TestCase):
         policy = DSELoadBalancingPolicy(RoundRobinPolicy())
         policy.populate(Mock(metadata=ClusterMetaMock({'127.0.0.1': target_host})), hosts)
         query_plan = list(policy.make_query_plan(None, Mock(target_host='127.0.0.1')))
-        self.assertEqual(sorted(query_plan), hosts)
+        assert sorted(query_plan) == hosts
 
         target_host.is_up = False
         policy.on_down(target_host)
@@ -95,5 +95,5 @@ class DSELoadBalancingPolicyTest(unittest.TestCase):
         policy.populate(Mock(metadata=ClusterMetaMock({'127.0.0.1': target_host})), hosts)
         for _ in range(10):
             query_plan = list(policy.make_query_plan(None, Mock(target_host='127.0.0.1')))
-            self.assertEqual(sorted(query_plan), hosts)
-            self.assertEqual(query_plan[0], target_host)
+            assert sorted(query_plan) == hosts
+            assert query_plan[0] == target_host
