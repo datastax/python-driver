@@ -1134,15 +1134,18 @@ class HostConnectionPool(object):
                     self.shutdown()
                 else:
                     self._replace(connection)
-        else:
-            if connection in self._trash:
-                with connection.lock:
-                    if connection.in_flight == 0:
-                        with self._lock:
-                            if connection in self._trash:
-                                self._trash.remove(connection)
-                        log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
-                        connection.close()
+        elif connection in self._trash:
+            with connection.lock:
+                no_pending_requests = connection.in_flight <= len(connection.orphaned_request_ids)
+            if no_pending_requests:
+                with self._lock:
+                    close_connection = False
+                    if connection in self._trash:
+                        self._trash.remove(connection)
+                        close_connection = True
+                if close_connection:
+                    log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
+                    connection.close()
                 return
 
             core_conns = self._session.cluster.get_core_connections_per_host(self.host_distance)
