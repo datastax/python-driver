@@ -139,7 +139,7 @@ class SpecExecTest(unittest.TestCase):
         # idempotent
         prepared_statement.is_idempotent = True
         result = self.session.execute(prepared_statement, ("0",), execution_profile='spec_ep_brr')
-        self.assertLess(1, len(result.response_future.attempted_hosts))
+        assert 1 < len(result.response_future.attempted_hosts)
 
     def test_speculative_and_timeout(self):
         """

@@ -69,7 +69,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         session.client_protocol_handler = LazyProtocolHandler
         session.default_fetch_size = 2
 
-        self.assertLess(session.default_fetch_size, self.N_ITEMS)
+        assert session.default_fetch_size < self.N_ITEMS
 
         results = session.execute("SELECT * FROM test_table")
 
@@ -105,7 +105,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
 
         expected_pages = (self.N_ITEMS + session.default_fetch_size - 1) // session.default_fetch_size
 
-        self.assertLess(session.default_fetch_size, self.N_ITEMS)
+        assert session.default_fetch_size < self.N_ITEMS
 
         results = session.execute("SELECT * FROM test_table")
 

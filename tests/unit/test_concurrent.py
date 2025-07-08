@@ -236,7 +236,7 @@ class ConcurrencyTest((unittest.TestCase)):
             if "Windows" in platform.system():
                 assert last_time_added <= current_time_added
             else:
-                self.assertLess(last_time_added, current_time_added)
+                assert last_time_added < current_time_added
             last_time_added = current_time_added
 
     @mock_session_pools

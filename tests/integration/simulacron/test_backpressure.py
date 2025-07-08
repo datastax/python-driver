@@ -121,8 +121,8 @@ class TCPBackpressureTests(SimulacronBase):
 
         # Simulacron will respond to a couple queries before cutting off reads, so we'll just verify
         # that only "a few" successes happened here
-        self.assertLess(successes, 50)
-        self.assertLess(self.callback_successes, 50)
+        assert successes < 50
+        assert self.callback_successes < 50
         assert self.callback_errors == len(futures) - self.callback_successes
 
     def test_cluster_busy(self):

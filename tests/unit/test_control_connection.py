@@ -644,5 +644,5 @@ class EventTimingTest(unittest.TestCase):
                 self.cluster.scheduler.mock_calls
                 # Grabs the delay parameter from the scheduler invocation
                 current_delay = self.cluster.scheduler.mock_calls[0][1][0]
-                self.assertLess(prior_delay, current_delay)
+                assert prior_delay < current_delay
                 prior_delay = current_delay

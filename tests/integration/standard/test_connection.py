@@ -154,7 +154,7 @@ class HeartbeatTest(unittest.TestCase):
             current_host = str(rs._current_host)
             count += 1
             time.sleep(.1)
-        self.assertLess(count, 100, "Never connected to the first node")
+        assert count < 100, "Never connected to the first node"
         new_connections = self.wait_for_connections(host, self.cluster)
         assert not test_listener.host_down
         # Make sure underlying new connections don't match previous ones

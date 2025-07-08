@@ -33,7 +33,7 @@ class ColumnTest(unittest.TestCase):
         assert not c0 == object()
 
         # __lt__
-        self.assertLess(c0, c1)
+        assert c0 < c1
         try:
             c0 < object()  # this raises for Python 3
         except TypeError:

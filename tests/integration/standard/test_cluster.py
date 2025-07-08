@@ -513,7 +513,7 @@ class ClusterTests(unittest.TestCase):
             start_time = time.time()
             c.refresh_schema_metadata(max_schema_agreement_wait=0)
             end_time = time.time()
-            self.assertLess(end_time - start_time, agreement_timeout)
+            assert end_time - start_time < agreement_timeout
             self.assertIsNot(original_meta, c.metadata.keyspaces)
             assert original_meta == c.metadata.keyspaces
 
@@ -525,7 +525,7 @@ class ClusterTests(unittest.TestCase):
             start_time = time.time()
             s = c.connect()
             end_time = time.time()
-            self.assertLess(end_time - start_time, refresh_threshold)
+            assert end_time - start_time < refresh_threshold
             assert c.metadata.keyspaces
 
             # cluster agreement wait used for refresh
@@ -533,7 +533,7 @@ class ClusterTests(unittest.TestCase):
             start_time = time.time()
             c.refresh_schema_metadata()
             end_time = time.time()
-            self.assertLess(end_time - start_time, refresh_threshold)
+            assert end_time - start_time < refresh_threshold
             self.assertIsNot(original_meta, c.metadata.keyspaces)
             assert original_meta == c.metadata.keyspaces
 

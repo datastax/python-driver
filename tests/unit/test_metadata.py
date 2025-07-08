@@ -504,7 +504,7 @@ class BytesTokensTest(unittest.TestCase):
     def test_comparison(self):
         tok = BytesToken.from_string('0123456789abcdef')
         token_high_order = uint16_unpack(tok.value[0:2])
-        self.assertLess(BytesToken(uint16_pack(token_high_order - 1)), tok)
+        assert BytesToken(uint16_pack(token_high_order - 1)) < tok
         assert BytesToken(uint16_pack(token_high_order + 1)) > tok
 
     def test_comparison_unicode(self):
