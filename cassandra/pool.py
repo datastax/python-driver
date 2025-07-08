@@ -580,16 +580,18 @@ class HostConnection(object):
                         return
                     self._is_replacing = True
                     self._session.submit(self._replace, connection)
-        else:
-            if connection in self._trash:
-                with connection.lock:
-                    if connection.in_flight == len(connection.orphaned_request_ids):
-                        with self._lock:
-                            if connection in self._trash:
-                                self._trash.remove(connection)
-                                log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
-                                connection.close()
-                return
+        elif connection in self._trash:
+            with connection.lock:
+                no_pending_requests = connection.in_flight <= len(connection.orphaned_request_ids)
+            if no_pending_requests:
+                with self._lock:
+                    close_connection = False
+                    if connection in self._trash:
+                        self._trash.remove(connection)
+                        close_connection = True
+                if close_connection:
+                    log.debug("Closing trashed connection (%s) to %s", id(connection), self.host)
+                    connection.close()
 
     def on_orphaned_stream_released(self):
         """
