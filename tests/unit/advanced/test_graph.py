@@ -350,27 +350,27 @@ class GraphOptionTests(unittest.TestCase):
     def test_graph_source_convenience_attributes(self):
         opts = GraphOptions()
         assert opts.graph_source == b'g'
-        self.assertFalse(opts.is_analytics_source)
+        assert not opts.is_analytics_source
         assert opts.is_graph_source
-        self.assertFalse(opts.is_default_source)
+        assert not opts.is_default_source
 
         opts.set_source_default()
         self.assertIsNotNone(opts.graph_source)
-        self.assertFalse(opts.is_analytics_source)
-        self.assertFalse(opts.is_graph_source)
+        assert not opts.is_analytics_source
+        assert not opts.is_graph_source
         assert opts.is_default_source
 
         opts.set_source_analytics()
         self.assertIsNotNone(opts.graph_source)
         assert opts.is_analytics_source
-        self.assertFalse(opts.is_graph_source)
-        self.assertFalse(opts.is_default_source)
+        assert not opts.is_graph_source
+        assert not opts.is_default_source
 
         opts.set_source_graph()
         self.assertIsNotNone(opts.graph_source)
-        self.assertFalse(opts.is_analytics_source)
+        assert not opts.is_analytics_source
         assert opts.is_graph_source
-        self.assertFalse(opts.is_default_source)
+        assert not opts.is_default_source
 
 class GraphStatementTests(unittest.TestCase):
 

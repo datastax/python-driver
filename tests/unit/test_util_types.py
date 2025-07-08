@@ -70,7 +70,7 @@ class DateTests(unittest.TestCase):
     def test_equals(self):
         assert Date(1234) == 1234
         assert Date(1) == datetime.date(1970, 1, 2)
-        self.assertFalse(Date(2932897) == datetime.date(9999, 12, 31))  # date can't represent year > 9999
+        assert not Date(2932897) == datetime.date(9999, 12, 31)  # date can't represent year > 9999
         assert Date(2932897) == 2932897
 
 

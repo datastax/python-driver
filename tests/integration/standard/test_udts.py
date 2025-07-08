@@ -65,7 +65,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute("INSERT INTO {0} (a, b) VALUES (%s, %s)".format(self.function_table_name), (0, User("Nebraska", True)))
         self.session.execute("UPDATE {0} SET b.has_corn = False where a = 0".format(self.function_table_name))
         result = self.session.execute("SELECT * FROM {0}".format(self.function_table_name))
-        self.assertFalse(result.one().b.has_corn)
+        assert not result.one().b.has_corn
         table_sql = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].as_cql_query()
         assert "<frozen>" not in table_sql
 
@@ -737,7 +737,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         results = self.session.execute("SELECT * from {0}".format(self.function_table_name))
         for result in results:
             assert hasattr(result.typetoalter, 'a')
-            self.assertFalse(hasattr(result.typetoalter, 'b'))
+            assert not hasattr(result.typetoalter, 'b')
 
         # Alter UDT and ensure the alter is honored in results
         self.session.execute("ALTER TYPE typetoalter add b int")

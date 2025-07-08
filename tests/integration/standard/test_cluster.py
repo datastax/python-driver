@@ -168,7 +168,7 @@ class ClusterTests(unittest.TestCase):
             CREATE KEYSPACE clustertests
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
             """)
-        self.assertFalse(result)
+        assert not result
 
         result = execute_with_long_wait_retry(session,
             """
@@ -179,13 +179,13 @@ class ClusterTests(unittest.TestCase):
                 PRIMARY KEY (a, b)
             )
             """)
-        self.assertFalse(result)
+        assert not result
 
         result = session.execute(
             """
             INSERT INTO clustertests.cf0 (a, b, c) VALUES ('a', 'b', 'c')
             """)
-        self.assertFalse(result)
+        assert not result
 
         result = session.execute("SELECT * FROM clustertests.cf0")
         assert [('a', 'b', 'c')] == result
@@ -331,7 +331,7 @@ class ClusterTests(unittest.TestCase):
             """
             INSERT INTO test1rf.test (k, v) VALUES (8889, 8889)
             """)
-        self.assertFalse(result)
+        assert not result
 
         result = session.execute("SELECT * FROM test1rf.test")
         assert [(8889, 8889)] == result, "Rows in ResultSet are {0}".format(result.current_rows)
@@ -729,7 +729,7 @@ class ClusterTests(unittest.TestCase):
         for h in cluster.get_connection_holders():
             for c in h.get_connections():
                 # make sure none are idle (should have startup messages
-                self.assertFalse(c.is_idle)
+                assert not c.is_idle
                 with c.lock:
                     connection_request_ids[id(c)] = deque(c.request_ids)  # copy of request ids
 
@@ -755,7 +755,7 @@ class ClusterTests(unittest.TestCase):
             assert success
 
         # assert not idle status
-        self.assertFalse(any(c.is_idle if not c.is_control_connection else False for c in connections))
+        assert not any(c.is_idle if not c.is_control_connection else False for c in connections)
 
         # holders include session pools and cc
         holders = cluster.get_connection_holders()
@@ -790,7 +790,7 @@ class ClusterTests(unittest.TestCase):
         connections = [c for holders in cluster.get_connection_holders() for c in holders.get_connections()]
 
         # assert not idle status (should never get reset because there is not heartbeat)
-        self.assertFalse(any(c.is_idle for c in connections))
+        assert not any(c.is_idle for c in connections)
 
         cluster.shutdown()
 
@@ -1327,7 +1327,7 @@ class ContextManagementTest(unittest.TestCase):
         @test_category configuration
         """
         with TestCluster() as cluster:
-            self.assertFalse(cluster.is_shutdown)
+            assert not cluster.is_shutdown
         assert cluster.is_shutdown
 
     def test_simple_nested(self):
@@ -1342,8 +1342,8 @@ class ContextManagementTest(unittest.TestCase):
         """
         with TestCluster(**self.cluster_kwargs) as cluster:
             with cluster.connect() as session:
-                self.assertFalse(cluster.is_shutdown)
-                self.assertFalse(session.is_shutdown)
+                assert not cluster.is_shutdown
+                assert not session.is_shutdown
                 assert session.execute('select release_version from system.local').one()
             assert session.is_shutdown
         assert cluster.is_shutdown
@@ -1360,8 +1360,8 @@ class ContextManagementTest(unittest.TestCase):
         """
         with TestCluster(**self.cluster_kwargs) as cluster:
             session = cluster.connect()
-            self.assertFalse(cluster.is_shutdown)
-            self.assertFalse(session.is_shutdown)
+            assert not cluster.is_shutdown
+            assert not session.is_shutdown
             assert session.execute('select release_version from system.local').one()
         assert session.is_shutdown
         assert cluster.is_shutdown
@@ -1379,16 +1379,16 @@ class ContextManagementTest(unittest.TestCase):
         cluster = TestCluster(**self.cluster_kwargs)
         unmanaged_session = cluster.connect()
         with cluster.connect() as session:
-            self.assertFalse(cluster.is_shutdown)
-            self.assertFalse(session.is_shutdown)
-            self.assertFalse(unmanaged_session.is_shutdown)
+            assert not cluster.is_shutdown
+            assert not session.is_shutdown
+            assert not unmanaged_session.is_shutdown
             assert session.execute('select release_version from system.local').one()
         assert session.is_shutdown
-        self.assertFalse(cluster.is_shutdown)
-        self.assertFalse(unmanaged_session.is_shutdown)
+        assert not cluster.is_shutdown
+        assert not unmanaged_session.is_shutdown
         unmanaged_session.shutdown()
         assert unmanaged_session.is_shutdown
-        self.assertFalse(cluster.is_shutdown)
+        assert not cluster.is_shutdown
         cluster.shutdown()
         assert cluster.is_shutdown
 

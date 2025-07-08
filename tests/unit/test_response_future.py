@@ -104,7 +104,7 @@ class ResponseFutureTests(unittest.TestCase):
                       results="keyspace1")
         rf._set_result(None, None, None, result)
         rf._set_keyspace_completed({})
-        self.assertFalse(rf.result())
+        assert not rf.result()
 
     def test_schema_change_result(self):
         session = self.make_session()
@@ -237,7 +237,7 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=UnavailableErrorMessage, info={})
         rf._set_result(None, None, None, result)
-        self.assertFalse(rf.result())
+        assert not rf.result()
 
     def test_retry_policy_says_retry(self):
         session = self.make_session()

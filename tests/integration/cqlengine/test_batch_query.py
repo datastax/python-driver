@@ -250,4 +250,4 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
                     batch.add_callback(my_callback)
                     batch.execute()
                 batch.execute()
-            self.assertFalse(w)
+            assert not w

@@ -98,7 +98,7 @@ class GeoTypes(unittest.TestCase):
 
             # does not blow up on other types
             # specifically use assertFalse(eq) to make sure we're using the geo __eq__ operator
-            self.assertFalse(geo == object())
+            assert not geo == object()
 
 @unittest.skipUnless(_HAS_GEOMET, "Skip wkt geometry tests when geomet is not installed")
 class WKTTest(unittest.TestCase):

@@ -30,7 +30,7 @@ class ColumnTest(unittest.TestCase):
 
         # __eq__
         assert c0 == c0
-        self.assertFalse(c0 == object())
+        assert not c0 == object()
 
         # __lt__
         self.assertLess(c0, c1)

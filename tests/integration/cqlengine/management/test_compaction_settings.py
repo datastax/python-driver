@@ -53,7 +53,7 @@ class AlterTableTest(BaseCassEngTestCase):
         drop_table(LeveledCompactionChangesDetectionTest)
         sync_table(LeveledCompactionChangesDetectionTest)
 
-        self.assertFalse(_update_options(LeveledCompactionChangesDetectionTest))
+        assert not _update_options(LeveledCompactionChangesDetectionTest)
 
     def test_compaction_not_altered_without_changes_sizetiered(self):
         class SizeTieredCompactionChangesDetectionTest(Model):
@@ -71,7 +71,7 @@ class AlterTableTest(BaseCassEngTestCase):
         drop_table(SizeTieredCompactionChangesDetectionTest)
         sync_table(SizeTieredCompactionChangesDetectionTest)
 
-        self.assertFalse(_update_options(SizeTieredCompactionChangesDetectionTest))
+        assert not _update_options(SizeTieredCompactionChangesDetectionTest)
 
     def test_alter_actually_alters(self):
         tmp = copy.deepcopy(LeveledCompactionTestTable)

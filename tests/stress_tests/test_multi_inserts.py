@@ -77,4 +77,4 @@ class StressInsertsTests(unittest.TestCase):
                         break
             i = i + 1
 
-        self.assertFalse(leaking_connections, 'Detected leaking connection after %s iterations' % i)
+        assert not leaking_connections, 'Detected leaking connection after %s iterations' % i

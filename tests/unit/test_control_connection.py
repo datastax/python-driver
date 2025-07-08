@@ -241,7 +241,7 @@ class ControlConnectionTest(unittest.TestCase):
         """
         # change the schema version on one node
         self.connection.peer_results[1][1][2] = 'b'
-        self.assertFalse(self.control_connection.wait_for_schema_agreement())
+        assert not self.control_connection.wait_for_schema_agreement()
         # the control connection should have slept until it hit the limit
         self.assertGreaterEqual(self.time.clock, self.cluster.max_schema_agreement_wait)
 
@@ -284,7 +284,7 @@ class ControlConnectionTest(unittest.TestCase):
 
         # but once we mark it up, the control connection will care
         host.is_up = True
-        self.assertFalse(self.control_connection.wait_for_schema_agreement())
+        assert not self.control_connection.wait_for_schema_agreement()
         self.assertGreaterEqual(self.time.clock, self.cluster.max_schema_agreement_wait)
 
     def test_refresh_nodes_and_tokens(self):
@@ -489,7 +489,7 @@ class ControlConnectionTest(unittest.TestCase):
             'address': ('1.2.3.4', 9000)
         }
         self.control_connection._handle_status_change(event)
-        self.assertFalse(self.cluster.scheduler.schedule.called)
+        assert not self.cluster.scheduler.schedule.called
 
         # do the same with a known Host
         event = {
@@ -545,8 +545,8 @@ class ControlConnectionTest(unittest.TestCase):
 
         # no call on schema refresh
         cc_no_schema_refresh._handle_schema_change(schema_event)
-        self.assertFalse(cluster.scheduler.schedule.called)
-        self.assertFalse(cluster.scheduler.schedule_unique.called)
+        assert not cluster.scheduler.schedule.called
+        assert not cluster.scheduler.schedule_unique.called
 
         # topo and status changes as normal
         cc_no_schema_refresh._handle_status_change(status_event)
@@ -559,8 +559,8 @@ class ControlConnectionTest(unittest.TestCase):
 
         # no call on topo refresh
         cc_no_topo_refresh._handle_topology_change(topo_event)
-        self.assertFalse(cluster.scheduler.schedule.called)
-        self.assertFalse(cluster.scheduler.schedule_unique.called)
+        assert not cluster.scheduler.schedule.called
+        assert not cluster.scheduler.schedule_unique.called
 
         # schema and status change refresh as normal
         cc_no_topo_refresh._handle_status_change(status_event)

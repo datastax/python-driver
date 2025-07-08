@@ -512,7 +512,7 @@ class BytesTokensTest(unittest.TestCase):
         t0 = BytesToken(value)
         t1 = BytesToken.from_string('00')
         self.assertGreater(t0, t1)
-        self.assertFalse(t0 < t1)
+        assert not t0 < t1
 
 
 class KeyspaceMetadataTest(unittest.TestCase):

@@ -93,7 +93,7 @@ class ClusterTests(unittest.TestCase):
             assert num_statements == len(results)
             for success, result in results:
                 assert success
-                self.assertFalse(result)
+                assert not result
 
             # read
             statement = SimpleStatement(
@@ -156,13 +156,13 @@ class ClusterTests(unittest.TestCase):
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
             for success, result in results:
                 assert success
-                self.assertFalse(result)
+                assert not result
 
             results = self.execute_concurrent_args_helper(self.session, statement, parameters, results_generator=True)
             for result in results:
                 assert isinstance(result, ExecutionResult)
                 assert result.success
-                self.assertFalse(result.result_or_exc)
+                assert not result.result_or_exc
 
             # read
             statement = SimpleStatement(
@@ -193,7 +193,7 @@ class ClusterTests(unittest.TestCase):
         assert num_statements == len(results)
         for success, result in results:
             assert success
-            self.assertFalse(result)
+            assert not result
 
         # read
         statement = SimpleStatement(
@@ -290,11 +290,11 @@ class ClusterTests(unittest.TestCase):
         results = execute_concurrent(self.session, list(zip(statements, parameters)), raise_on_first_error=False)
         for i, (success, result) in enumerate(results):
             if i == 57:
-                self.assertFalse(success)
+                assert not success
                 assert isinstance(result, InvalidRequest)
             else:
                 assert success
-                self.assertFalse(result)
+                assert not result
 
     def test_no_raise_on_first_failure_client_side(self):
         statement = SimpleStatement(
@@ -309,8 +309,8 @@ class ClusterTests(unittest.TestCase):
         results = execute_concurrent(self.session, list(zip(statements, parameters)), raise_on_first_error=False)
         for i, (success, result) in enumerate(results):
             if i == 57:
-                self.assertFalse(success)
+                assert not success
                 assert isinstance(result, TypeError)
             else:
                 assert success
-                self.assertFalse(result)
+                assert not result

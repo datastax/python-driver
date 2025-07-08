@@ -344,7 +344,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute(create_statement)
         tablemeta = self.get_table_metadata()
         b_column = tablemeta.columns['b']
-        self.assertFalse(b_column.is_reversed)
+        assert not b_column.is_reversed
         c_column = tablemeta.columns['c']
         assert c_column.is_reversed
 
@@ -609,7 +609,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.keyspace_name))
         assert cluster2.metadata.keyspaces[self.keyspace_name].durable_writes
         cluster2.refresh_schema_metadata()
-        self.assertFalse(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
+        assert not cluster2.metadata.keyspaces[self.keyspace_name].durable_writes
 
         # Table metadata modification
         table_name = "test"
@@ -683,7 +683,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.keyspace_name))
         assert cluster2.metadata.keyspaces[self.keyspace_name].durable_writes
         cluster2.refresh_keyspace_metadata(self.keyspace_name)
-        self.assertFalse(cluster2.metadata.keyspaces[self.keyspace_name].durable_writes)
+        assert not cluster2.metadata.keyspaces[self.keyspace_name].durable_writes
 
         cluster2.shutdown()
 
@@ -2276,7 +2276,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         assert mv.keyspace_name == self.keyspace_name
         assert mv.name == "monthlyhigh"
         assert mv.base_table_name == "scores"
-        self.assertFalse(mv.include_all_columns)
+        assert not mv.include_all_columns
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
@@ -2489,7 +2489,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         assert mv.keyspace_name == self.keyspace_name
         assert mv.name == "mv1"
         assert mv.base_table_name == "t1"
-        self.assertFalse(mv.include_all_columns)
+        assert not mv.include_all_columns
 
         # Validate that all columns are preset and correct
         mv_columns = list(mv.columns.values())
@@ -2569,7 +2569,4 @@ class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):
             if name in self.virtual_ks_names:
                 assert ks.virtual, 'incorrect .virtual value for {}'.format(name)
             else:
-                self.assertFalse(
-                    ks.virtual,
-                    'incorrect .virtual value for {}'.format(name)
-                )
+                assert not ks.virtual, 'incorrect .virtual value for {}'.format(name)

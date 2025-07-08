@@ -86,7 +86,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         """
         # arrays = { 'a': arr1, 'b': arr2, ... }
         result = get_data(NumpyProtocolHandler)
-        self.assertFalse(result.has_more_pages)
+        assert not result.has_more_pages
         self._verify_numpy_page(result[0])
 
     @notprotocolv1

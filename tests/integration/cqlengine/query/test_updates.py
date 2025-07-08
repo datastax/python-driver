@@ -308,7 +308,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
         obj = TestQueryUpdateModel.objects(
             partition=partition, cluster=cluster).first()
 
-        self.assertFalse({k: v for (k, v) in obj._values.items() if v.deleted})
+        assert not {k: v for (k, v) in obj._values.items() if v.deleted}
 
         obj.text = 'foo'
         obj.save()

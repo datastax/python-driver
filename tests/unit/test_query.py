@@ -36,20 +36,20 @@ class BatchStatementTest(unittest.TestCase):
         assert batch.custom_payload == custom_payload
 
         batch.clear()
-        self.assertFalse(batch._statements_and_parameters)
+        assert not batch._statements_and_parameters
         assert batch.keyspace is None
         assert batch.routing_key is None
-        self.assertFalse(batch.custom_payload)
+        assert not batch.custom_payload
 
         batch.add(ss)
 
     def test_clear_empty(self):
         batch = BatchStatement()
         batch.clear()
-        self.assertFalse(batch._statements_and_parameters)
+        assert not batch._statements_and_parameters
         assert batch.keyspace is None
         assert batch.routing_key is None
-        self.assertFalse(batch.custom_payload)
+        assert not batch.custom_payload
 
         batch.add('something')
 

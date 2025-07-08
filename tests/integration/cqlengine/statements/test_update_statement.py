@@ -68,19 +68,19 @@ class UpdateStatementTests(unittest.TestCase):
     def test_update_empty_set_add_does_not_assign(self):
         us = UpdateStatement('table')
         us.add_update(Set(Text, db_field='a'), set(), 'add')
-        self.assertFalse(us.assignments)
+        assert not us.assignments
 
     def test_update_empty_set_removal_does_not_assign(self):
         us = UpdateStatement('table')
         us.add_update(Set(Text, db_field='a'), set(), 'remove')
-        self.assertFalse(us.assignments)
+        assert not us.assignments
 
     def test_update_list_prepend_with_empty_list(self):
         us = UpdateStatement('table')
         us.add_update(List(Text, db_field='a'), [], 'prepend')
-        self.assertFalse(us.assignments)
+        assert not us.assignments
 
     def test_update_list_append_with_empty_list(self):
         us = UpdateStatement('table')
         us.add_update(List(Text, db_field='a'), [], 'append')
-        self.assertFalse(us.assignments)
+        assert not us.assignments

@@ -156,10 +156,10 @@ class HeartbeatTest(unittest.TestCase):
             time.sleep(.1)
         self.assertLess(count, 100, "Never connected to the first node")
         new_connections = self.wait_for_connections(host, self.cluster)
-        self.assertFalse(test_listener.host_down)
+        assert not test_listener.host_down
         # Make sure underlying new connections don't match previous ones
         for connection in initial_connections:
-            self.assertFalse(connection in new_connections)
+            assert not connection in new_connections
 
     def fetch_connections(self, host, cluster):
         # Given a cluster object and host grab all connection associated with that host

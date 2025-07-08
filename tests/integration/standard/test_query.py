@@ -233,7 +233,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         # should raise because duration is not set
         self.assertRaises(TraceUnavailable, trace.populate, max_wait=0.2, wait_for_complete=True)
-        self.assertFalse(trace.events)
+        assert not trace.events
 
         # should get the events with wait False
         trace.populate(wait_for_complete=False)
@@ -358,7 +358,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
             # check we're using the selected host
             assert host == future.coordinator_host
             # check that this bypasses the LBP
-            self.assertFalse(checkable_ep.load_balancing_policy.make_query_plan.called)
+            assert not checkable_ep.load_balancing_policy.make_query_plan.called
 
 
 class PreparedStatementTests(unittest.TestCase):
@@ -812,7 +812,7 @@ class SerialConsistencyTests(unittest.TestCase):
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
         assert result
-        self.assertFalse(result.one().applied)
+        assert not result.one().applied
 
         statement = SimpleStatement(
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0",
@@ -834,7 +834,7 @@ class SerialConsistencyTests(unittest.TestCase):
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
         assert result
-        self.assertFalse(result.one().applied)
+        assert not result.one().applied
 
         statement = self.session.prepare(
             "UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0")
@@ -855,7 +855,7 @@ class SerialConsistencyTests(unittest.TestCase):
         result = future.result()
         assert future.message.serial_consistency_level == ConsistencyLevel.SERIAL
         assert result
-        self.assertFalse(result.one().applied)
+        assert not result.one().applied
 
         statement = BatchStatement(serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
         statement.add("UPDATE test3rf.test SET v=1 WHERE k=0 IF v=0")
@@ -982,7 +982,7 @@ class LightweightTransactionTests(unittest.TestCase):
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 4, 10);",
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 4)
             result = self.session.execute(batch_statement)
-            self.assertFalse(result.was_applied)
+            assert not result.was_applied
 
             all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering", execution_profile='serial')
             # Verify the non conditional insert hasn't been inserted
@@ -994,12 +994,12 @@ class LightweightTransactionTests(unittest.TestCase):
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;",
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 3)
             result = self.session.execute(batch_statement)
-            self.assertFalse(result.was_applied)
+            assert not result.was_applied
 
             # Should fail since (0, 0, 10) have already been written
             batch_statement.add("INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;")
             result = self.session.execute(batch_statement)
-            self.assertFalse(result.was_applied)
+            assert not result.was_applied
 
             # Should succeed
             batch_statement = BatchStatement(batch_type)
@@ -1049,7 +1049,7 @@ class LightweightTransactionTests(unittest.TestCase):
                     APPLY batch;
                     """
         result = self.session.execute(batch_str)
-        self.assertFalse(result.was_applied)
+        assert not result.was_applied
 
         batch_str = """
                     BEGIN unlogged batch

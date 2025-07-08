@@ -45,8 +45,7 @@ class BaseCassEngTestCase(unittest.TestCase):
         assert hasattr(obj, attr), "{0} doesn't have attribute: {1}".format(obj, attr)
 
     def assertNotHasAttr(self, obj, attr):
-        self.assertFalse(hasattr(obj, attr),
-                "{0} shouldn't have the attribute: {1}".format(obj, attr))
+        assert not hasattr(obj, attr), "{0} shouldn't have the attribute: {1}".format(obj, attr)
 
     if sys.version_info > (3, 0):
         def assertItemsEqual(self, first, second, msg=None):

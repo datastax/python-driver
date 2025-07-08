@@ -142,7 +142,7 @@ class TestSetColumn(BaseCassEngTestCase):
                 del tb
             except OperationTimedOut:
                 #This will happen if the host is remote
-                self.assertFalse(CASSANDRA_IP.startswith("127.0.0."))
+                assert not CASSANDRA_IP.startswith("127.0.0.")
         self.assertRaises(ValidationError, TestSetModel.create, **{'text_set': set(str(uuid4()) for i in range(65536))})
 
     def test_partial_updates(self):

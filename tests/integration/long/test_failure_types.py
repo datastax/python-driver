@@ -404,4 +404,4 @@ class TimeoutTimerTest(unittest.TestCase):
         # check timeout and ensure it's within a reasonable range
         self.assertAlmostEqual(expected_time, total_time, delta=.05)
         assert mock_errorback.called
-        self.assertFalse(mock_callback.called)
+        assert not mock_callback.called

@@ -38,13 +38,13 @@ class SortedSetTest(unittest.TestCase):
 
         for i in expected:
             assert i in ss
-            self.assertFalse(i not in ss)
+            assert not i not in ss
 
         hi = max(expected)+1
         lo = min(expected)-1
 
-        self.assertFalse(hi in ss)
-        self.assertFalse(lo in ss)
+        assert not hi in ss
+        assert not lo in ss
 
     def test_mutable_contents(self):
         ba = bytearray(b'some data here')
@@ -95,22 +95,22 @@ class SortedSetTest(unittest.TestCase):
         assert s2.isdisjoint(ss1)
         assert s2.isdisjoint(ss13)
         # s ss not disjoint
-        self.assertFalse(s12.isdisjoint(ss1))
-        self.assertFalse(s12.isdisjoint(ss13))
+        assert not s12.isdisjoint(ss1)
+        assert not s12.isdisjoint(ss13)
         # ss s disjoint
         assert ss1.isdisjoint(s2)
         assert ss13.isdisjoint(s2)
         # ss s not disjoint
-        self.assertFalse(ss1.isdisjoint(s12))
-        self.assertFalse(ss13.isdisjoint(s12))
+        assert not ss1.isdisjoint(s12)
+        assert not ss13.isdisjoint(s12)
         # ss ss disjoint
         assert ss1.isdisjoint(ss3)
         assert ss3.isdisjoint(ss1)
         # ss ss not disjoint
-        self.assertFalse(ss1.isdisjoint(ss13))
-        self.assertFalse(ss13.isdisjoint(ss1))
-        self.assertFalse(ss3.isdisjoint(ss13))
-        self.assertFalse(ss13.isdisjoint(ss3))
+        assert not ss1.isdisjoint(ss13)
+        assert not ss13.isdisjoint(ss1)
+        assert not ss3.isdisjoint(ss13)
+        assert not ss13.isdisjoint(ss3)
 
     def test_issubset(self):
         s12 = set([1, 2])
@@ -121,10 +121,10 @@ class SortedSetTest(unittest.TestCase):
         assert ss1.issubset(s12)
         assert ss1.issubset(ss13)
 
-        self.assertFalse(ss1.issubset(ss3))
-        self.assertFalse(ss13.issubset(ss3))
-        self.assertFalse(ss13.issubset(ss1))
-        self.assertFalse(ss13.issubset(s12))
+        assert not ss1.issubset(ss3)
+        assert not ss13.issubset(ss3)
+        assert not ss13.issubset(ss1)
+        assert not ss13.issubset(s12)
 
     def test_issuperset(self):
         s12 = set([1, 2])
@@ -136,9 +136,9 @@ class SortedSetTest(unittest.TestCase):
         assert ss13.issuperset(ss3)
         assert ss13.issuperset(ss13)
 
-        self.assertFalse(s12.issuperset(ss13))
-        self.assertFalse(ss1.issuperset(ss3))
-        self.assertFalse(ss1.issuperset(ss13))
+        assert not s12.issuperset(ss13)
+        assert not ss1.issuperset(ss3)
+        assert not ss1.issuperset(ss13)
 
     def test_union(self):
         s1 = set([1])
@@ -176,7 +176,7 @@ class SortedSetTest(unittest.TestCase):
         ss2 = sortedset([5, 6, 7])
 
         assert ss.symmetric_difference(s) == sortedset([1, 2, 4, 5])
-        self.assertFalse(ss.symmetric_difference(ss))
+        assert not ss.symmetric_difference(ss)
         assert ss.symmetric_difference(s) == sortedset([1, 2, 4, 5])
         assert ss2.symmetric_difference(ss) == sortedset([2, 3, 4, 5, 6, 7])
 
@@ -198,9 +198,9 @@ class SortedSetTest(unittest.TestCase):
         ss.remove(1)
         assert len(ss) == 1
         ss.remove(2)
-        self.assertFalse(ss)
+        assert not ss
         self.assertRaises(KeyError, ss.remove, 2)
-        self.assertFalse(ss)
+        assert not ss
 
     def test_getitem(self):
         ss = sortedset(range(3))
@@ -228,7 +228,7 @@ class SortedSetTest(unittest.TestCase):
         del ss[1:]
         self.assertListEqual(list(ss), [1])
         del ss[:]
-        self.assertFalse(ss)
+        assert not ss
         with self.assertRaises(IndexError):
             del ss[0]
 
@@ -241,28 +241,28 @@ class SortedSetTest(unittest.TestCase):
         ss1 = sortedset([1])
         ss12 = sortedset([1, 2])
         # __ne__
-        self.assertFalse(ss12 != ss12)
-        self.assertFalse(ss12 != sortedset([1, 2]))
+        assert not ss12 != ss12
+        assert not ss12 != sortedset([1, 2])
         assert ss12 != sortedset()
 
         # __le__
         assert ss1 <= ss12
         assert ss12 <= ss12
-        self.assertFalse(ss12 <= ss1)
+        assert not ss12 <= ss1
 
         # __lt__
         assert ss1 < ss12
-        self.assertFalse(ss12 < ss12)
-        self.assertFalse(ss12 < ss1)
+        assert not ss12 < ss12
+        assert not ss12 < ss1
 
         # __ge__
-        self.assertFalse(ss1 >= ss12)
+        assert not ss1 >= ss12
         assert ss12 >= ss12
         assert ss12 >= ss1
 
         # __gt__
-        self.assertFalse(ss1 > ss12)
-        self.assertFalse(ss12 > ss12)
+        assert not ss1 > ss12
+        assert not ss12 > ss12
         assert ss12 > ss1
 
         # __and__

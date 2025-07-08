@@ -171,7 +171,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         cols = ModelWithPartitionKeys._columns
 
         assert cols['c1'].primary_key
-        self.assertFalse(cols['c1'].partition_key)
+        assert not cols['c1'].partition_key
 
         assert cols['p1'].primary_key
         assert cols['p1'].partition_key

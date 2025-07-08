@@ -75,7 +75,7 @@ class ResultSetTests(unittest.TestCase):
         rs = ResultSet(response_future, [])
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, False))  # after init to avoid side effects being consumed by init
         assert rs.has_more_pages
-        self.assertFalse(rs.has_more_pages)
+        assert not rs.has_more_pages
 
     def test_iterate_then_index(self):
         # RuntimeError if indexing with no pages
@@ -90,8 +90,8 @@ class ResultSetTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             rs[0]
 
-        self.assertFalse(rs)
-        self.assertFalse(list(rs))
+        assert not rs
+        assert not list(rs)
 
         # RuntimeError if indexing during or after pages
         response_future = Mock(has_more_pages=True, _continuous_paging_session=None)
@@ -109,8 +109,8 @@ class ResultSetTests(unittest.TestCase):
         # after consuming
         with self.assertRaises(RuntimeError):
             rs[0]
-        self.assertFalse(rs)
-        self.assertFalse(list(rs))
+        assert not rs
+        assert not list(rs)
 
     def test_index_list_mode(self):
         # no pages
@@ -168,7 +168,7 @@ class ResultSetTests(unittest.TestCase):
         assert rs
 
     def test_bool(self):
-        self.assertFalse(ResultSet(Mock(has_more_pages=False), []))
+        assert not ResultSet(Mock(has_more_pages=False), [])
         assert ResultSet(Mock(has_more_pages=False), [1])
 
     def test_was_applied(self):

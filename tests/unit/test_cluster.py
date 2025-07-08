@@ -221,8 +221,8 @@ class ProtocolVersionTests(unittest.TestCase):
         assert ProtocolVersion.uses_error_code_map(ProtocolVersion.DSE_V1)
         assert ProtocolVersion.uses_int_query_flags(ProtocolVersion.DSE_V1)
 
-        self.assertFalse(ProtocolVersion.uses_error_code_map(ProtocolVersion.V4))
-        self.assertFalse(ProtocolVersion.uses_int_query_flags(ProtocolVersion.V4))
+        assert not ProtocolVersion.uses_error_code_map(ProtocolVersion.V4)
+        assert not ProtocolVersion.uses_int_query_flags(ProtocolVersion.V4)
 
 
 class ExecutionProfileTest(unittest.TestCase):

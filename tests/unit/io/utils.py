@@ -181,9 +181,9 @@ class TimerTestMixin(object):
         time.sleep(timeout * 2)
         timer_manager = self._timers
         # Assert that the cancellation was honored
-        self.assertFalse(timer_manager._queue)
-        self.assertFalse(timer_manager._new_timers)
-        self.assertFalse(callback.was_invoked())
+        assert not timer_manager._queue
+        assert not timer_manager._new_timers
+        assert not callback.was_invoked()
 
 
 class ReactorTestMixin(object):
@@ -378,12 +378,12 @@ class ReactorTestMixin(object):
                                                            "socket busy")
         c.handle_write(*self.null_handle_function_args)
 
-        self.assertFalse(c.is_defunct)
+        assert not c.is_defunct
 
         # try again with normal behavior
         self.get_socket(c).send.side_effect = lambda x: len(x)
         c.handle_write(*self.null_handle_function_args)
-        self.assertFalse(c.is_defunct)
+        assert not c.is_defunct
         assert self.get_socket(c).send.call_args is not None
 
     def test_partial_send(self):
@@ -399,7 +399,7 @@ class ReactorTestMixin(object):
         expected_writes = int(math.ceil(float(msg_size) / write_size))
         size_mod = msg_size % write_size
         last_write_size = size_mod if size_mod else write_size
-        self.assertFalse(c.is_defunct)
+        assert not c.is_defunct
         assert expected_writes == self.get_socket(c).send.call_count
         assert last_write_size == len(self.get_socket(c).send.call_args[0][0])
 
@@ -442,7 +442,7 @@ class ReactorTestMixin(object):
         c.handle_read(*self.null_handle_function_args)
 
         assert c.connected_event.is_set()
-        self.assertFalse(c.is_defunct)
+        assert not c.is_defunct
 
     def test_partial_message_read(self):
         c = self.make_connection()
@@ -469,7 +469,7 @@ class ReactorTestMixin(object):
         c.handle_read(*self.null_handle_function_args)
 
         assert c.connected_event.is_set()
-        self.assertFalse(c.is_defunct)
+        assert not c.is_defunct
 
     def test_mixed_message_and_buffer_sizes(self):
         """

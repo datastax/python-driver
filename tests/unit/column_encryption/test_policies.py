@@ -122,10 +122,10 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         policy = AES256ColumnEncryptionPolicy()
         policy.add_column(coldesc, self._random_key(), "blob")
         assert policy.contains_column(coldesc)
-        self.assertFalse(policy.contains_column(ColDesc('ks2','table1','col1')))
-        self.assertFalse(policy.contains_column(ColDesc('ks1','table2','col1')))
-        self.assertFalse(policy.contains_column(ColDesc('ks1','table1','col2')))
-        self.assertFalse(policy.contains_column(ColDesc('ks2','table2','col2')))
+        assert not policy.contains_column(ColDesc('ks2','table1','col1'))
+        assert not policy.contains_column(ColDesc('ks1','table2','col1'))
+        assert not policy.contains_column(ColDesc('ks1','table1','col2'))
+        assert not policy.contains_column(ColDesc('ks2','table2','col2'))
 
     def test_encrypt_unknown_column(self):
         with self.assertRaises(ValueError):

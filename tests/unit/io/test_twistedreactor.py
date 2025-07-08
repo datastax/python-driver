@@ -157,7 +157,7 @@ class TestTwistedConnection(unittest.TestCase):
         assert self.obj_ut._current_frame.end_pos == 30
 
         # verify we never attempted to process the incomplete message
-        self.assertFalse(self.obj_ut.process_msg.called)
+        assert not self.obj_ut.process_msg.called
 
     def test_handle_read__fullmessage(self):
         """

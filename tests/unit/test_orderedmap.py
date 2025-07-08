@@ -45,10 +45,10 @@ class OrderedMapTest(unittest.TestCase):
 
         for k in keys:
             assert k in om
-            self.assertFalse(k not in om)
+            assert not k not in om
 
         assert 'notthere' not in om
-        self.assertFalse('notthere' in om)
+        assert not 'notthere' in om
 
     def test_keys(self):
         keys = ['first', 'middle', 'last']
@@ -97,7 +97,7 @@ class OrderedMapTest(unittest.TestCase):
         assert om12 != d1
         assert om1 != EMPTY
 
-        self.assertFalse(OrderedMap([('three', 3), ('four', 4)]) == d12)
+        assert not OrderedMap([('three', 3), ('four', 4)]) == d12
 
     def test_getitem(self):
         keys = ['first', 'middle', 'last']
@@ -154,7 +154,7 @@ class OrderedMapTest(unittest.TestCase):
         del om[1]
         assert om == {2: 2}
         del om[2]
-        self.assertFalse(om)
+        assert not om
 
         self.assertRaises(KeyError, om.__delitem__, 1)
 

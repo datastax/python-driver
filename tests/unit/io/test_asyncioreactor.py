@@ -74,4 +74,4 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
         # Release context allow for timer thread to run.
         time.sleep(.2)
         # Assert that the cancellation was honored
-        self.assertFalse(callback.was_invoked())
+        assert not callback.was_invoked()

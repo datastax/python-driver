@@ -26,10 +26,7 @@ class ConnectionTest(unittest.TestCase):
 
     def setUp(self):
         super(ConnectionTest, self).setUp()
-        self.assertFalse(
-            connection._connections,
-            'Test precondition not met: connections are registered: {cs}'.format(cs=connection._connections)
-        )
+        assert not connection._connections, 'Test precondition not met: connections are registered: {cs}'.format(cs=connection._connections)
 
     def test_set_session_without_existing_connection(self):
         """
