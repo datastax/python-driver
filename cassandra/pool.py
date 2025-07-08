@@ -1180,14 +1180,14 @@ class HostConnectionPool(object):
                 new_connections.remove(connection)
                 self._connections = new_connections
 
-                with connection.lock:
-                    if connection.in_flight == 0:
-                        log.debug("Skipping trash and closing unused connection (%s) to %s", id(connection), self.host)
-                        connection.close()
-
-                        # skip adding it to the trash if we're already closing it
-                        return
-
+        if did_trash:
+            with connection.lock:
+                no_pending_requests = connection.in_flight <= len(connection.orphaned_request_ids)
+            if no_pending_requests:
+                log.debug("Skipping trash and closing unused connection (%s) to %s", id(connection), self.host)
+                connection.close()
+                return
+            with self._lock:
                 self._trash.add(connection)
 
         if did_trash:
