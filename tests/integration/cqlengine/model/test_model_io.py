@@ -507,7 +507,7 @@ class TestUpdating(BaseCassEngTestCase):
         assert instance.int3 == 7777
         self.assertIsNotNone(instance.int4)
         assert isinstance(instance.int4, int)
-        self.assertGreaterEqual(instance.int4, 0)
+        assert instance.int4 >= 0
         assert instance.int4 <= 1000
         assert instance.int5 == 5555
         assert instance.int6 is None

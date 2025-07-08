@@ -55,8 +55,8 @@ class ColumnTest(unittest.TestCase):
             pass
 
         # __ge__
-        self.assertGreaterEqual(c1, c0)
-        self.assertGreaterEqual(c1, c1)
+        assert c1 >= c0
+        assert c1 >= c1
         try:
             c1 >= object()  # this raises for Python 3
         except TypeError:

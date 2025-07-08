@@ -286,7 +286,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
 
         self.run_heartbeat(get_holders, count)
 
-        self.assertGreaterEqual(get_holders.call_count, count-1)
+        assert get_holders.call_count >= count-1
         assert get_holders.call_count <= count
         holder = get_holders.return_value[0]
         holder.get_connections.assert_has_calls([call()] * get_holders.call_count)

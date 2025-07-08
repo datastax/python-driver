@@ -505,7 +505,7 @@ class ClusterTests(unittest.TestCase):
             start_time = time.time()
             self.assertRaisesRegex(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
             end_time = time.time()
-            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            assert end_time - start_time >= agreement_timeout
             self.assertIs(original_meta, c.metadata.keyspaces)
 
             # refresh wait overrides cluster value
@@ -543,7 +543,7 @@ class ClusterTests(unittest.TestCase):
             self.assertRaisesRegex(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata,
                                     max_schema_agreement_wait=agreement_timeout)
             end_time = time.time()
-            self.assertGreaterEqual(end_time - start_time, agreement_timeout)
+            assert end_time - start_time >= agreement_timeout
             self.assertIs(original_meta, c.metadata.keyspaces)
             c.shutdown()
 
@@ -712,7 +712,7 @@ class ClusterTests(unittest.TestCase):
 
             # Three conenctions to nodes plus the control connection
             auth_warning = mock_handler.get_message_count('warning', "An authentication challenge was not sent")
-            self.assertGreaterEqual(auth_warning, 4)
+            assert auth_warning >= 4
             assert auth_warning == mock_handler.get_message_count("debug", "Got ReadyMessage on new connection")
 
     def test_idle_heartbeat(self):
@@ -1524,7 +1524,7 @@ class DeprecationWarningTest(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             TestCluster(load_balancing_policy=RoundRobinPolicy())
             logging.info(w)
-            self.assertGreaterEqual(len(w), 1)
+            assert len(w) >= 1
             assert any(["Legacy execution parameters will be removed in 4.0. "
                                  "Consider using execution profiles." in
                             str(wa.message) for wa in w])
@@ -1544,7 +1544,7 @@ class DeprecationWarningTest(unittest.TestCase):
             cluster = TestCluster()
             cluster.set_meta_refresh_enabled(True)
             logging.info(w)
-            self.assertGreaterEqual(len(w), 1)
+            assert len(w) >= 1
             assert any(["Cluster.set_meta_refresh_enabled is deprecated and will be removed in 4.0." in
                             str(wa.message) for wa in w])
 
@@ -1563,6 +1563,6 @@ class DeprecationWarningTest(unittest.TestCase):
             cluster = TestCluster()
             session = cluster.connect()
             session.default_consistency_level = ConsistencyLevel.ONE
-            self.assertGreaterEqual(len(w), 1)
+            assert len(w) >= 1
             assert any(["Setting the consistency level at the session level will be removed in 4.0" in
                             str(wa.message) for wa in w])

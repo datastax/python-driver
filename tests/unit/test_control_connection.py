@@ -243,7 +243,7 @@ class ControlConnectionTest(unittest.TestCase):
         self.connection.peer_results[1][1][2] = 'b'
         assert not self.control_connection.wait_for_schema_agreement()
         # the control connection should have slept until it hit the limit
-        self.assertGreaterEqual(self.time.clock, self.cluster.max_schema_agreement_wait)
+        assert self.time.clock >= self.cluster.max_schema_agreement_wait
 
     def test_wait_for_schema_agreement_skipping(self):
         """
@@ -285,7 +285,7 @@ class ControlConnectionTest(unittest.TestCase):
         # but once we mark it up, the control connection will care
         host.is_up = True
         assert not self.control_connection.wait_for_schema_agreement()
-        self.assertGreaterEqual(self.time.clock, self.cluster.max_schema_agreement_wait)
+        assert self.time.clock >= self.cluster.max_schema_agreement_wait
 
     def test_refresh_nodes_and_tokens(self):
         self.control_connection.refresh_node_list_and_token_map()

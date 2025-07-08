@@ -202,7 +202,7 @@ class LargeDataTests(unittest.TestCase):
         for i, row in enumerate(results):
             assert row['v'] == bb
 
-        self.assertGreaterEqual(i, expected_results, "Verification failed only found {0} inserted we were expecting {1}".format(i,expected_results))
+        assert i >= expected_results, "Verification failed only found {0} inserted we were expecting {1}".format(i,expected_results)
 
         session.cluster.shutdown()
 
