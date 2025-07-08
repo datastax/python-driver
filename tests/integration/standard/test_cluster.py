@@ -656,11 +656,11 @@ class ClusterTests(unittest.TestCase):
         statement = SimpleStatement(query)
         future = session.execute_async(statement)
 
-        self.assertIn(query, str(future))
+        assert query in str(future)
         future.result()
 
-        self.assertIn(query, str(future))
-        self.assertIn('result', str(future))
+        assert query in str(future)
+        assert 'result' in str(future)
         cluster.shutdown()
 
     def test_can_connect_with_plainauth(self):
@@ -759,14 +759,14 @@ class ClusterTests(unittest.TestCase):
 
         # holders include session pools and cc
         holders = cluster.get_connection_holders()
-        self.assertIn(cluster.control_connection, holders)
+        assert cluster.control_connection in holders
         assert len(holders) == len(cluster.metadata.all_hosts()) + 1  # hosts pools, 1 for cc
 
         # include additional sessions
         session2 = cluster.connect(wait_for_all_pools=True)
 
         holders = cluster.get_connection_holders()
-        self.assertIn(cluster.control_connection, holders)
+        assert cluster.control_connection in holders
         assert len(holders) == 2 * len(cluster.metadata.all_hosts()) + 1  # 2 sessions' hosts pools, 1 for cc
 
         cluster._idle_heartbeat.stop()

@@ -86,7 +86,7 @@ class EndPointTests(SimulacronCluster):
         self.assertIsInstance(self.cluster.control_connection._connection.endpoint, DefaultEndPoint)
         self.assertIsNotNone(self.cluster.control_connection._connection.endpoint)
         endpoints = [host.endpoint for host in hosts]
-        self.assertIn(self.cluster.control_connection._connection.endpoint, endpoints)
+        assert self.cluster.control_connection._connection.endpoint in endpoints
 
     def test_custom_endpoint(self):
         cluster = Cluster(
@@ -109,6 +109,6 @@ class EndPointTests(SimulacronCluster):
         self.assertIsInstance(cluster.control_connection._connection.endpoint, AddressEndPoint)
         self.assertIsNotNone(cluster.control_connection._connection.endpoint)
         endpoints = [host.endpoint for host in hosts]
-        self.assertIn(cluster.control_connection._connection.endpoint, endpoints)
+        assert cluster.control_connection._connection.endpoint in endpoints
 
         cluster.shutdown()

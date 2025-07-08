@@ -251,7 +251,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         )
 
         for option in tablemeta.options:
-            self.assertIn(option, parser.recognized_table_options)
+            assert option in parser.recognized_table_options
 
         self.check_create_statement(tablemeta, create_statement)
 
@@ -497,14 +497,14 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         statements = [s.strip() for s in statements.split(';')]
         statements = list(filter(bool, statements))
         assert 3 == len(statements)
-        self.assertIn(d_index, statements)
-        self.assertIn(e_index, statements)
+        assert d_index in statements
+        assert e_index in statements
 
         # make sure indexes are included in KeyspaceMetadata.export_as_string()
         ksmeta = self.cluster.metadata.keyspaces[self.keyspace_name]
         statement = ksmeta.export_as_string()
-        self.assertIn('CREATE INDEX d_index', statement)
-        self.assertIn('CREATE INDEX e_index', statement)
+        assert 'CREATE INDEX d_index' in statement
+        assert 'CREATE INDEX e_index' in statement
 
     @greaterthancass21
     @requires_collection_indexes
@@ -517,7 +517,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
                              % (self.keyspace_name, self.function_table_name))
 
         tablemeta = self.get_table_metadata()
-        self.assertIn('(keys(b))', tablemeta.export_as_string())
+        assert '(keys(b))' in tablemeta.export_as_string()
 
         self.session.execute("DROP INDEX %s.index1" % (self.keyspace_name,))
         self.session.execute("CREATE INDEX index2 ON %s.%s (b)"
@@ -525,7 +525,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         tablemeta = self.get_table_metadata()
         target = ' (b)' if CASSANDRA_VERSION < Version("3.0") else 'values(b))'  # explicit values in C* 3+
-        self.assertIn(target, tablemeta.export_as_string())
+        assert target in tablemeta.export_as_string()
 
         # test full indexes on frozen collections, if available
         if CASSANDRA_VERSION >= Version("2.1.3"):
@@ -536,7 +536,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
                                  % (self.keyspace_name, self.function_table_name))
 
             tablemeta = self.get_table_metadata()
-            self.assertIn('(full(b))', tablemeta.export_as_string())
+            assert '(full(b))' in tablemeta.export_as_string()
 
     def test_compression_disabled(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
@@ -546,7 +546,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         expected = "compression = {'enabled': 'false'}"
         if SCYLLA_VERSION is not None or CASSANDRA_VERSION < Version("3.0"):
             expected = "compression = {}"
-        self.assertIn(expected, tablemeta.export_as_string())
+        assert expected in tablemeta.export_as_string()
 
     def test_non_size_tiered_compaction(self):
         """
@@ -567,8 +567,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         table_meta = self.get_table_metadata()
         cql = table_meta.export_as_string()
-        self.assertIn("'tombstone_threshold': '0.3'", cql)
-        self.assertIn("LeveledCompactionStrategy", cql)
+        assert "'tombstone_threshold': '0.3'" in cql
+        assert "LeveledCompactionStrategy" in cql
         # formerly legacy options; reintroduced in 4.0
         if CASSANDRA_VERSION < Version('4.0-a'):
             self.assertNotIn("min_threshold", cql)
@@ -603,7 +603,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
 
         cluster2.refresh_schema_metadata()
-        self.assertIn("new_keyspace", cluster2.metadata.keyspaces)
+        assert "new_keyspace" in cluster2.metadata.keyspaces
 
         # Keyspace metadata modification
         self.session.execute("ALTER KEYSPACE {0} WITH durable_writes = false".format(self.keyspace_name))
@@ -619,14 +619,14 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.session.execute("ALTER TABLE {0}.{1} ADD c double".format(self.keyspace_name, table_name))
         self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
         cluster2.refresh_schema_metadata()
-        self.assertIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
+        assert "c" in cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns
 
         if PROTOCOL_VERSION >= 3:
             # UDT metadata modification
             self.session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
             assert cluster2.metadata.keyspaces[self.keyspace_name].user_types == {}
             cluster2.refresh_schema_metadata()
-            self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
+            assert "user" in cluster2.metadata.keyspaces[self.keyspace_name].user_types
 
         if PROTOCOL_VERSION >= 4:
             # UDF metadata modification
@@ -637,7 +637,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
             assert cluster2.metadata.keyspaces[self.keyspace_name].functions == {}
             cluster2.refresh_schema_metadata()
-            self.assertIn("sum_int(int,int)", cluster2.metadata.keyspaces[self.keyspace_name].functions)
+            assert "sum_int(int,int)" in cluster2.metadata.keyspaces[self.keyspace_name].functions
 
             # UDA metadata modification
             self.session.execute("""CREATE AGGREGATE {0}.sum_agg(int)
@@ -648,11 +648,11 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
             assert cluster2.metadata.keyspaces[self.keyspace_name].aggregates == {}
             cluster2.refresh_schema_metadata()
-            self.assertIn("sum_agg(int)", cluster2.metadata.keyspaces[self.keyspace_name].aggregates)
+            assert "sum_agg(int)" in cluster2.metadata.keyspaces[self.keyspace_name].aggregates
 
         # Cluster metadata modification
         self.session.execute("DROP KEYSPACE new_keyspace")
-        self.assertIn("new_keyspace", cluster2.metadata.keyspaces)
+        assert "new_keyspace" in cluster2.metadata.keyspaces
 
         cluster2.refresh_schema_metadata()
         self.assertNotIn("new_keyspace", cluster2.metadata.keyspaces)
@@ -715,7 +715,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.assertNotIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
 
         cluster2.refresh_table_metadata(self.keyspace_name, table_name)
-        self.assertIn("c", cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns)
+        assert "c" in cluster2.metadata.keyspaces[self.keyspace_name].tables[table_name].columns
 
         cluster2.shutdown()
 
@@ -752,7 +752,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             self.assertNotIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
 
             cluster2.refresh_table_metadata(self.keyspace_name, "mv1")
-            self.assertIn("mv1", cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            assert "mv1" in cluster2.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
         finally:
             cluster2.shutdown()
 
@@ -776,7 +776,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             )
             self.assertNotIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
             cluster3.refresh_materialized_view_metadata(self.keyspace_name, 'mv2')
-            self.assertIn("mv2", cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+            assert "mv2" in cluster3.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
         finally:
             cluster3.shutdown()
 
@@ -808,7 +808,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         assert cluster2.metadata.keyspaces[self.keyspace_name].user_types == {}
 
         cluster2.refresh_user_type_metadata(self.keyspace_name, "user")
-        self.assertIn("user", cluster2.metadata.keyspaces[self.keyspace_name].user_types)
+        assert "user" in cluster2.metadata.keyspaces[self.keyspace_name].user_types
 
         cluster2.shutdown()
 
@@ -833,15 +833,15 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             assert cluster.metadata.keyspaces[self.keyspace_name].user_types == {}
 
             session.execute("CREATE TYPE {0}.user (age int, name text)".format(self.keyspace_name))
-            self.assertIn("user", cluster.metadata.keyspaces[self.keyspace_name].user_types)
-            self.assertIn("age", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
-            self.assertIn("name", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+            assert "user" in cluster.metadata.keyspaces[self.keyspace_name].user_types
+            assert "age" in cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names
+            assert "name" in cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names
 
             session.execute("ALTER TYPE {0}.user ADD flag boolean".format(self.keyspace_name))
-            self.assertIn("flag", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+            assert "flag" in cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names
 
             session.execute("ALTER TYPE {0}.user RENAME flag TO something".format(self.keyspace_name))
-            self.assertIn("something", cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names)
+            assert "something" in cluster.metadata.keyspaces[self.keyspace_name].user_types["user"].field_names
 
             session.execute("DROP TYPE {0}.user".format(self.keyspace_name))
             assert cluster.metadata.keyspaces[self.keyspace_name].user_types == {}
@@ -880,7 +880,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         assert cluster2.metadata.keyspaces[self.keyspace_name].functions == {}
         cluster2.refresh_user_function_metadata(self.keyspace_name, UserFunctionDescriptor("sum_int", ["int", "int"]))
-        self.assertIn("sum_int(int,int)", cluster2.metadata.keyspaces[self.keyspace_name].functions)
+        assert "sum_int(int,int)" in cluster2.metadata.keyspaces[self.keyspace_name].functions
 
         cluster2.shutdown()
 
@@ -923,7 +923,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
 
         assert cluster2.metadata.keyspaces[self.keyspace_name].aggregates == {}
         cluster2.refresh_user_aggregate_metadata(self.keyspace_name, UserAggregateDescriptor("sum_agg", ["int"]))
-        self.assertIn("sum_agg(int)", cluster2.metadata.keyspaces[self.keyspace_name].aggregates)
+        assert "sum_agg(int)" in cluster2.metadata.keyspaces[self.keyspace_name].aggregates
 
         cluster2.shutdown()
 
@@ -993,8 +993,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         class Ext1(Ext0):
             name = t + '##'
 
-        self.assertIn(Ext0.name, _RegisteredExtensionType._extension_registry)
-        self.assertIn(Ext1.name, _RegisteredExtensionType._extension_registry)
+        assert Ext0.name in _RegisteredExtensionType._extension_registry
+        assert Ext1.name in _RegisteredExtensionType._extension_registry
         # There will bee the RLAC extension here.
         assert len(_RegisteredExtensionType._extension_registry) == 3
 
@@ -1017,16 +1017,16 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         table_meta = ks_meta.tables[t]
         view_meta = table_meta.views[v]
 
-        self.assertIn(Ext0.name, table_meta.extensions)
+        assert Ext0.name in table_meta.extensions
         new_cql = table_meta.export_as_string()
         self.assertNotEqual(new_cql, original_table_cql)
-        self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        assert Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]) in new_cql
         self.assertNotIn(Ext1.name, new_cql)
 
-        self.assertIn(Ext0.name, view_meta.extensions)
+        assert Ext0.name in view_meta.extensions
         new_cql = view_meta.export_as_string()
         self.assertNotEqual(new_cql, original_view_cql)
-        self.assertIn(Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
+        assert Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]) in new_cql
         self.assertNotIn(Ext1.name, new_cql)
 
         # extensions registered, one present
@@ -1040,19 +1040,19 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         table_meta = ks_meta.tables[t]
         view_meta = table_meta.views[v]
 
-        self.assertIn(Ext0.name, table_meta.extensions)
-        self.assertIn(Ext1.name, table_meta.extensions)
+        assert Ext0.name in table_meta.extensions
+        assert Ext1.name in table_meta.extensions
         new_cql = table_meta.export_as_string()
         self.assertNotEqual(new_cql, original_table_cql)
-        self.assertIn(Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
-        self.assertIn(Ext1.after_table_cql(table_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
+        assert Ext0.after_table_cql(table_meta, Ext0.name, ext_map[Ext0.name]) in new_cql
+        assert Ext1.after_table_cql(table_meta, Ext1.name, ext_map[Ext1.name]) in new_cql
 
-        self.assertIn(Ext0.name, view_meta.extensions)
-        self.assertIn(Ext1.name, view_meta.extensions)
+        assert Ext0.name in view_meta.extensions
+        assert Ext1.name in view_meta.extensions
         new_cql = view_meta.export_as_string()
         self.assertNotEqual(new_cql, original_view_cql)
-        self.assertIn(Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]), new_cql)
-        self.assertIn(Ext1.after_table_cql(view_meta, Ext1.name, ext_map[Ext1.name]), new_cql)
+        assert Ext0.after_table_cql(view_meta, Ext0.name, ext_map[Ext0.name]) in new_cql
+        assert Ext1.after_table_cql(view_meta, Ext1.name, ext_map[Ext1.name]) in new_cql
 
     def test_metadata_pagination(self):
         self.cluster.refresh_schema_metadata()
@@ -1247,15 +1247,15 @@ CREATE TABLE export_udts.users (
 
         ksmeta = cluster.metadata.keyspaces[ksname]
         schema = ksmeta.export_as_string()
-        self.assertIn('CREATE KEYSPACE "AnInterestingKeyspace"', schema)
-        self.assertIn('CREATE TABLE "AnInterestingKeyspace"."AnInterestingTable"', schema)
-        self.assertIn('"A" int', schema)
-        self.assertIn('"B" int', schema)
-        self.assertIn('"MyColumn" int', schema)
-        self.assertIn('PRIMARY KEY (k, "A")', schema)
-        self.assertIn('WITH CLUSTERING ORDER BY ("A" DESC)', schema)
-        self.assertIn('CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")', schema)
-        self.assertIn('CREATE INDEX "AnotherIndex" ON "AnInterestingKeyspace"."AnInterestingTable" ("B")', schema)
+        assert 'CREATE KEYSPACE "AnInterestingKeyspace"' in schema
+        assert 'CREATE TABLE "AnInterestingKeyspace"."AnInterestingTable"' in schema
+        assert '"A" int' in schema
+        assert '"B" int' in schema
+        assert '"MyColumn" int' in schema
+        assert 'PRIMARY KEY (k, "A")' in schema
+        assert 'WITH CLUSTERING ORDER BY ("A" DESC)' in schema
+        assert 'CREATE INDEX myindex ON "AnInterestingKeyspace"."AnInterestingTable" ("MyColumn")' in schema
+        assert 'CREATE INDEX "AnotherIndex" ON "AnInterestingKeyspace"."AnInterestingTable" ("B")' in schema
         cluster.shutdown()
 
     def test_already_exists_exceptions(self):
@@ -2021,7 +2021,7 @@ class BadMetaTest(unittest.TestCase):
             self.cluster.refresh_keyspace_metadata(self.keyspace_name)
             m = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.assertIs(m._exc_info[0], self.BadMetaException)
-            self.assertIn("/*\nWarning:", m.export_as_string())
+            assert "/*\nWarning:" in m.export_as_string()
 
     def test_bad_table(self):
         self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
@@ -2029,7 +2029,7 @@ class BadMetaTest(unittest.TestCase):
             self.cluster.refresh_table_metadata(self.keyspace_name, self.function_name)
             m = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
             self.assertIs(m._exc_info[0], self.BadMetaException)
-            self.assertIn("/*\nWarning:", m.export_as_string())
+            assert "/*\nWarning:" in m.export_as_string()
 
     def test_bad_index(self):
         self.session.execute('CREATE TABLE %s (k int PRIMARY KEY, v int)' % self.function_name)
@@ -2038,7 +2038,7 @@ class BadMetaTest(unittest.TestCase):
             self.cluster.refresh_table_metadata(self.keyspace_name, self.function_name)
             m = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
             self.assertIs(m._exc_info[0], self.BadMetaException)
-            self.assertIn("/*\nWarning:", m.export_as_string())
+            assert "/*\nWarning:" in m.export_as_string()
 
     @greaterthancass20
     def test_bad_user_type(self):
@@ -2047,7 +2047,7 @@ class BadMetaTest(unittest.TestCase):
             self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
             m = self.cluster.metadata.keyspaces[self.keyspace_name]
             self.assertIs(m._exc_info[0], self.BadMetaException)
-            self.assertIn("/*\nWarning:", m.export_as_string())
+            assert "/*\nWarning:" in m.export_as_string()
 
     @greaterthancass21
     @requires_java_udf
@@ -2066,7 +2066,7 @@ class BadMetaTest(unittest.TestCase):
                 self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
                 m = self.cluster.metadata.keyspaces[self.keyspace_name]
                 self.assertIs(m._exc_info[0], self.BadMetaException)
-                self.assertIn("/*\nWarning:", m.export_as_string())
+                assert "/*\nWarning:" in m.export_as_string()
 
     @greaterthancass21
     @requires_java_udf
@@ -2085,7 +2085,7 @@ class BadMetaTest(unittest.TestCase):
                 self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
                 m = self.cluster.metadata.keyspaces[self.keyspace_name]
                 self.assertIs(m._exc_info[0], self.BadMetaException)
-                self.assertIn("/*\nWarning:", m.export_as_string())
+                assert "/*\nWarning:" in m.export_as_string()
 
 
 class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
@@ -2112,13 +2112,13 @@ class DynamicCompositeTypeTest(BasicSharedKeyspaceUnitTestCase):
         # Format can very slightly between versions, strip out whitespace for consistency sake
         table_text = dct_table.as_cql_query().replace(" ", "")
         dynamic_type_text = "c1'org.apache.cassandra.db.marshal.DynamicCompositeType("
-        self.assertIn("c1'org.apache.cassandra.db.marshal.DynamicCompositeType(", table_text)
+        assert "c1'org.apache.cassandra.db.marshal.DynamicCompositeType(" in table_text
         # Types within in the composite can come out in random order, so grab the type definition and find each one
         type_definition_start = table_text.index("(", table_text.find(dynamic_type_text))
         type_definition_end = table_text.index(")")
         type_definition_text = table_text[type_definition_start:type_definition_end]
-        self.assertIn("s=>org.apache.cassandra.db.marshal.UTF8Type", type_definition_text)
-        self.assertIn("i=>org.apache.cassandra.db.marshal.Int32Type", type_definition_text)
+        assert "s=>org.apache.cassandra.db.marshal.UTF8Type" in type_definition_text
+        assert "i=>org.apache.cassandra.db.marshal.Int32Type" in type_definition_text
 
 
 @greaterthanorequalcass30
@@ -2153,8 +2153,8 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         @test_category metadata
         """
 
-        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].views)
-        self.assertIn("mv1", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        assert "mv1" in self.cluster.metadata.keyspaces[self.keyspace_name].views
+        assert "mv1" in self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
 
         assert self.keyspace_name == self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].keyspace_name
         assert self.function_table_name == self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].base_table_name
@@ -2174,10 +2174,10 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
         @test_category metadata
         """
-        self.assertIn("SizeTieredCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
+        assert "SizeTieredCompactionStrategy" in self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"]
 
         self.session.execute("ALTER MATERIALIZED VIEW {0}.mv1 WITH compaction = {{ 'class' : 'LeveledCompactionStrategy' }}".format(self.keyspace_name))
-        self.assertIn("LeveledCompactionStrategy", self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"])
+        assert "LeveledCompactionStrategy" in self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views["mv1"].options["compaction"]["class"]
 
     def test_materialized_view_metadata_drop(self):
         """
@@ -2367,7 +2367,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         assert len(self.cluster.metadata.keyspaces[self.keyspace_name].views) == 2
 
         score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
-        self.assertIn("fouls", score_table.columns)
+        assert "fouls" in score_table.columns
 
         # This is a workaround for mv notifications being separate from base table schema responses.
         # This maybe fixed with future protocol changes
@@ -2377,7 +2377,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
                 break
             time.sleep(.2)
 
-        self.assertIn("fouls", mv_alltime.columns)
+        assert "fouls" in mv_alltime.columns
 
         mv_alltime_fouls_comumn = self.cluster.metadata.keyspaces[self.keyspace_name].views["alltimehigh"].columns['fouls']
         assert mv_alltime_fouls_comumn.cql_type == 'int'
@@ -2558,7 +2558,7 @@ class GroupPerHost(BasicSharedKeyspaceUnitTestCase):
             routing_key = prepared_stmt.bind(key).routing_key
             hosts = self.cluster.metadata.get_replicas(self.ks_name, routing_key)
             assert 1 == len(hosts)  # RF is 1 for this keyspace
-            self.assertIn(key, keys_per_host[hosts[0]])
+            assert key in keys_per_host[hosts[0]]
 
 
 class VirtualKeypaceTest(BasicSharedKeyspaceUnitTestCase):

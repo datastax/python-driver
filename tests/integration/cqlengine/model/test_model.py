@@ -259,9 +259,7 @@ class TestDeprecationWarning(unittest.TestCase):
             # ignore DeprecationWarning('The loop argument is deprecated since Python 3.8, and scheduled for removal in Python 3.10.')
             relevant_warnings = [warn for warn in w if "The loop argument is deprecated" not in str(warn.message)]
 
-            self.assertIn("__table_name_case_sensitive__ will be removed in 4.0.", str(relevant_warnings[0].message))
-            self.assertIn("__table_name_case_sensitive__ will be removed in 4.0.", str(relevant_warnings[1].message))
-            self.assertIn("ModelQuerySet indexing with negative indices support will be removed in 4.0.",
-                          str(relevant_warnings[2].message))
-            self.assertIn("ModelQuerySet slicing with negative indices support will be removed in 4.0.",
-                          str(relevant_warnings[3].message))
+            assert "__table_name_case_sensitive__ will be removed in 4.0." in str(relevant_warnings[0].message)
+            assert "__table_name_case_sensitive__ will be removed in 4.0." in str(relevant_warnings[1].message)
+            assert "ModelQuerySet indexing with negative indices support will be removed in 4.0." in str(relevant_warnings[2].message)
+            assert "ModelQuerySet slicing with negative indices support will be removed in 4.0." in str(relevant_warnings[3].message)

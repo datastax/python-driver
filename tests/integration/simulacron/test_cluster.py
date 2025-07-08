@@ -55,10 +55,10 @@ class ClusterTests(SimulacronCluster):
         assert wt.consistency == ConsistencyLevel.name_to_value[consistency]
         assert wt.received_responses == received_responses
         assert wt.required_responses == required_responses
-        self.assertIn(write_type, str(wt))
-        self.assertIn(consistency, str(wt))
-        self.assertIn(str(received_responses), str(wt))
-        self.assertIn(str(required_responses), str(wt))
+        assert write_type in str(wt)
+        assert consistency in str(wt)
+        assert str(received_responses) in str(wt)
+        assert str(required_responses) in str(wt)
 
 
 @requiressimulacron

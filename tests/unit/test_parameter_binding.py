@@ -50,7 +50,7 @@ class ParamBindingTest(unittest.TestCase):
 
     def test_set_collection(self):
         result = bind_params("%s", (set(['a', 'b']),), Encoder())
-        self.assertIn(result, ("{'a', 'b'}", "{'b', 'a'}"))
+        assert result in ("{'a', 'b'}", "{'b', 'a'}")
 
     def test_map_collection(self):
         vals = OrderedDict()
@@ -92,9 +92,9 @@ class BoundStatementTestV3(unittest.TestCase):
         try:
             self.bound.bind(values)
         except TypeError as e:
-            self.assertIn('v0', str(e))
-            self.assertIn('Int32Type', str(e))
-            self.assertIn('str', str(e))
+            assert 'v0' in str(e)
+            assert 'Int32Type' in str(e)
+            assert 'str' in str(e)
         else:
             self.fail('Passed invalid type but exception was not thrown')
 
@@ -103,9 +103,9 @@ class BoundStatementTestV3(unittest.TestCase):
         try:
             self.bound.bind(values)
         except TypeError as e:
-            self.assertIn('rk0', str(e))
-            self.assertIn('Int32Type', str(e))
-            self.assertIn('list', str(e))
+            assert 'rk0' in str(e)
+            assert 'Int32Type' in str(e)
+            assert 'list' in str(e)
         else:
             self.fail('Passed invalid type but exception was not thrown')
 

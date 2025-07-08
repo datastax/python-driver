@@ -147,8 +147,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         # This should raise NoHostAvailable because continuous paging is not supported under ProtocolVersion.DSE_V1
         with self.assertRaises(NoHostAvailable) as context:
             future.result()
-        self.assertIn("Continuous paging may only be used with protocol version ProtocolVersion.DSE_V1 or higher",
-                    str(context.exception))
+        assert "Continuous paging may only be used with protocol version ProtocolVersion.DSE_V1 or higher" in str(context.exception)
 
         cluster.shutdown()
 

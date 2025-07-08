@@ -94,7 +94,7 @@ class TTLModelTests(BaseTTLTest):
             TestTTLModel.ttl(60).create(text="hello blake")
 
         query = m.call_args[0][0].query_string
-        self.assertIn("USING TTL", query)
+        assert "USING TTL" in query
 
     def test_queryset_is_returned_on_class(self):
         """
@@ -113,7 +113,7 @@ class TTLInstanceUpdateTest(BaseTTLTest):
             model.ttl(60).update(text="goodbye forever")
 
         query = m.call_args[0][0].query_string
-        self.assertIn("USING TTL", query)
+        assert "USING TTL" in query
 
     def test_update_syntax_valid(self):
         # sanity test that ensures the TTL syntax is accepted by cassandra
@@ -143,7 +143,7 @@ class TTLInstanceTest(BaseTTLTest):
             o.save()
 
         query = m.call_args[0][0].query_string
-        self.assertIn("USING TTL", query)
+        assert "USING TTL" in query
 
 
 class TTLBlindUpdateTest(BaseTTLTest):
@@ -157,7 +157,7 @@ class TTLBlindUpdateTest(BaseTTLTest):
             TestTTLModel.objects(id=tid).ttl(60).update(text="bacon")
 
         query = m.call_args[0][0].query_string
-        self.assertIn("USING TTL", query)
+        assert "USING TTL" in query
 
 
 class TTLDefaultTest(BaseDefaultTTLTest):

@@ -83,7 +83,7 @@ class TCPBackpressureTests(SimulacronBase):
             except NoHostAvailable as e:
                 # We shouldn't have any timeouts here, but all of the queries beyond what can fit
                 # in the tcp buffer will have returned with a ConnectionBusy exception
-                self.assertIn("ConnectionBusy", str(e))
+                assert "ConnectionBusy" in str(e)
 
         # Verify that we can continue sending queries without any problems
         for host in session.cluster.metadata.all_hosts():
@@ -148,7 +148,7 @@ class TCPBackpressureTests(SimulacronBase):
         for i in range(1000):
             with self.assertRaises(NoHostAvailable) as e:
                 session.execute(query, [str(i)])
-            self.assertIn("ConnectionBusy", str(e.exception))
+            assert "ConnectionBusy" in str(e.exception)
 
     def test_node_busy(self):
         """ Verify that once TCP buffer is full, queries continue to get re-routed to other nodes """

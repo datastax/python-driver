@@ -58,7 +58,7 @@ class UpdateStatementTests(unittest.TestCase):
         us = UpdateStatement('table', ttl=60)
         us.add_assignment(Column(db_field='a'), 'b')
         us.add_where(Column(db_field='a'), EqualsOperator(), 'x')
-        self.assertIn('USING TTL 60', str(us))
+        assert 'USING TTL 60' in str(us)
 
     def test_update_set_add(self):
         us = UpdateStatement('table')

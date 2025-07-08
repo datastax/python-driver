@@ -63,8 +63,8 @@ class TestNamedTupleFactory(TestCase):
             rows = named_tuple_factory(self.long_colnames, self.long_rows)
         assert len(w) == 1
         warning = w[0]
-        self.assertIn('pseudo_namedtuple_factory', str(warning))
-        self.assertIn('3.7', str(warning))
+        assert 'pseudo_namedtuple_factory' in str(warning)
+        assert '3.7' in str(warning)
 
         for r in rows:
             assert r.col0 == self.long_rows[0][0]

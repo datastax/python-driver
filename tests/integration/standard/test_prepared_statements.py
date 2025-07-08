@@ -412,7 +412,7 @@ class PreparedStatementTests(unittest.TestCase):
         self.session.execute("USE {}".format(keyspace))
         with self.assertRaises(DriverException) as e:
             self.session.execute(prepared, [0])
-        self.assertIn("ID mismatch", str(e.exception))
+        assert "ID mismatch" in str(e.exception)
 
 
 @greaterthanorequalcass40

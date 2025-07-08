@@ -116,11 +116,11 @@ class TestSetColumn(BaseCassEngTestCase):
         self.assertIsInstance(m2.int_set, set)
         self.assertIsInstance(m2.text_set, set)
 
-        self.assertIn(1, m2.int_set)
-        self.assertIn(2, m2.int_set)
+        assert 1 in m2.int_set
+        assert 2 in m2.int_set
 
-        self.assertIn('kai', m2.text_set)
-        self.assertIn('andreas', m2.text_set)
+        assert 'kai' in m2.text_set
+        assert 'andreas' in m2.text_set
 
     def test_type_validation(self):
         """

@@ -688,7 +688,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         type_name = "type_name"
         self.assertNotIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
         s.execute('CREATE TYPE %s (v0 int)' % (type_name,))
-        self.assertIn(type_name, s.cluster.metadata.keyspaces['udttests'].user_types)
+        assert type_name in s.cluster.metadata.keyspaces['udttests'].user_types
 
         s.execute('CREATE TABLE %s (k int PRIMARY KEY, v frozen<%s>)' % (self.table_name, type_name))
         s.execute('INSERT INTO %s (k, v) VALUES (0, {v0 : 1})' % (self.table_name,))

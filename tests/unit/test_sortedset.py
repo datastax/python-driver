@@ -376,7 +376,7 @@ class SortedSetTest(unittest.TestCase):
                 assert ss.difference(subset) == s.difference(subset)
                 assert ss.intersection(subset) == s.intersection(subset)
             for x in ss:
-                self.assertIn(x, ss)
+                assert x in ss
                 ss.remove(x)
                 self.assertNotIn(x, ss)
 

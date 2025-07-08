@@ -130,7 +130,7 @@ class StrategiesTest(unittest.TestCase):
         simple_transient = rs.create('SimpleStrategy', {'replication_factor': '3/1'})
         assert simple_transient.replication_factor_info == ReplicationFactor(3, 1)
         assert simple_transient.replication_factor == 2
-        self.assertIn("'replication_factor': '3/1'", simple_transient.export_for_schema())
+        assert "'replication_factor': '3/1'" in simple_transient.export_for_schema()
 
         simple_str = rs.create('SimpleStrategy', {'replication_factor': '2'})
         self.assertNotEqual(simple_transient, simple_str)
@@ -171,7 +171,7 @@ class StrategiesTest(unittest.TestCase):
         assert nts_transient.dc_replication_factors_info['dc2'] == ReplicationFactor(5, 1)
         assert nts_transient.dc_replication_factors['dc1'] == 2
         assert nts_transient.dc_replication_factors['dc2'] == 4
-        self.assertIn("'dc1': '3/1', 'dc2': '5/1'", nts_transient.export_for_schema())
+        assert "'dc1': '3/1', 'dc2': '5/1'" in nts_transient.export_for_schema()
 
         nts_str = rs.create('NetworkTopologyStrategy', {'dc1': '3', 'dc2': '5'})
         self.assertNotEqual(nts_transient, nts_str)
@@ -723,28 +723,16 @@ class FunctionToCQLTests(unittest.TestCase):
             monotonic=True,
             monotonic_on=()
         )
-        self.assertIn(
-            'MONOTONIC LANG',
-            mono_function.as_cql_query(formatted=False)
-        )
-        self.assertIn(
-            'MONOTONIC\n    LANG',
-            mono_function.as_cql_query(formatted=True)
-        )
+        assert 'MONOTONIC LANG' in mono_function.as_cql_query(formatted=False)
+        assert 'MONOTONIC\n    LANG' in mono_function.as_cql_query(formatted=True)
 
     def test_monotonic_one(self):
         mono_on_function = self._function_with_kwargs(
             monotonic=False,
             monotonic_on=('x',)
         )
-        self.assertIn(
-            'MONOTONIC ON x LANG',
-            mono_on_function.as_cql_query(formatted=False)
-        )
-        self.assertIn(
-            'MONOTONIC ON x\n    LANG',
-            mono_on_function.as_cql_query(formatted=True)
-        )
+        assert 'MONOTONIC ON x LANG' in mono_on_function.as_cql_query(formatted=False)
+        assert 'MONOTONIC ON x\n    LANG' in mono_on_function.as_cql_query(formatted=True)
 
     def test_nondeterministic(self):
         self.assertNotIn(
@@ -755,18 +743,12 @@ class FunctionToCQLTests(unittest.TestCase):
         )
 
     def test_deterministic(self):
-        self.assertIn(
-            'DETERMINISTIC',
-            self._function_with_kwargs(
-                deterministic=True
-            ).as_cql_query(formatted=False)
-        )
-        self.assertIn(
-            'DETERMINISTIC\n',
-            self._function_with_kwargs(
-                deterministic=True
-            ).as_cql_query(formatted=True)
-        )
+        assert 'DETERMINISTIC' in self._function_with_kwargs(
+            deterministic=True
+        ).as_cql_query(formatted=False)
+        assert 'DETERMINISTIC\n' in self._function_with_kwargs(
+            deterministic=True
+        ).as_cql_query(formatted=True)
 
 
 class AggregateToCQLTests(unittest.TestCase):

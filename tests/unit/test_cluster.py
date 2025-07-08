@@ -493,8 +493,8 @@ class ExecutionProfileTest(unittest.TestCase):
             Cluster(**cluster_kwargs)
         patched_logger.warning.assert_called_once()
         warning_message = patched_logger.warning.call_args[0][0]
-        self.assertIn('please specify a load-balancing policy', warning_message)
-        self.assertIn("contact_points = ['127.0.0.1']", warning_message)
+        assert 'please specify a load-balancing policy' in warning_message
+        assert "contact_points = ['127.0.0.1']" in warning_message
 
     def test_no_warning_on_contact_points_with_lbp_legacy_mode(self):
         """
@@ -562,9 +562,9 @@ class ExecutionProfileTest(unittest.TestCase):
 
         patched_logger.warning.assert_called_once()
         warning_message = patched_logger.warning.call_args[0][0]
-        self.assertIn('no_lbp', warning_message)
-        self.assertIn('trying to add', warning_message)
-        self.assertIn('please specify a load-balancing policy', warning_message)
+        assert 'no_lbp' in warning_message
+        assert 'trying to add' in warning_message
+        assert 'please specify a load-balancing policy' in warning_message
 
     @mock_session_pools
     def test_no_warning_adding_lbp_ep_to_cluster_with_contact_points(self):

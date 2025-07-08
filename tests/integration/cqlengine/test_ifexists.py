@@ -264,7 +264,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
             TestIfExistsModel.objects(id=uuid4()).if_exists().update(count=42)
 
         query = m.call_args[0][0].query_string
-        self.assertIn("IF EXISTS", query)
+        assert "IF EXISTS" in query
 
     def test_if_exists_included_on_update(self):
         """ tests that if_exists on models update works as expected """
@@ -273,7 +273,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
             TestIfExistsModel(id=uuid4()).if_exists().update(count=8)
 
         query = m.call_args[0][0].query_string
-        self.assertIn("IF EXISTS", query)
+        assert "IF EXISTS" in query
 
     def test_if_exists_included_on_delete(self):
         """ tests that if_exists on models delete works as expected """
@@ -282,7 +282,7 @@ class IfExistsQueryTest(BaseIfExistsTest):
             TestIfExistsModel(id=uuid4()).if_exists().delete()
 
         query = m.call_args[0][0].query_string
-        self.assertIn("IF EXISTS", query)
+        assert "IF EXISTS" in query
 
 
 class IfExistWithCounterTest(BaseIfExistsWithCounterTest):

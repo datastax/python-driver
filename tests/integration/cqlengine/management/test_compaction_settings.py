@@ -110,7 +110,7 @@ class OptionsTest(BaseCassEngTestCase):
 
         for name, value in expected_options.items():
             if isinstance(value, str):
-                self.assertIn("%s = '%s'" % (name, value), cql)
+                assert "%s = '%s'" % (name, value) in cql
             else:
                 start = cql.find("%s = {" % (name,))
                 end = cql.find('}', start)

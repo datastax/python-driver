@@ -221,8 +221,8 @@ class EmptyColumnTests(SimulacronCluster):
 
         table_metadata = self.cluster.metadata.keyspaces['testks'].tables['testtable']
         assert len(table_metadata.columns) == 2
-        self.assertIn('', table_metadata.columns)
-        self.assertIn(' ', table_metadata.columns)
+        assert '' in table_metadata.columns
+        assert ' ' in table_metadata.columns
 
     def test_empty_columns_with_cqlengine(self):
         self._prime_testtable_query()

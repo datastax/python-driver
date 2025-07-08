@@ -138,7 +138,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
             TestIfNotExistsModel.if_not_exists().create(count=8)
 
         query = m.call_args[0][0].query_string
-        self.assertIn("IF NOT EXISTS", query)
+        assert "IF NOT EXISTS" in query
 
     def test_if_not_exists_included_on_save(self):
         """ tests if we correctly put 'IF NOT EXISTS' for insert statement """
@@ -148,7 +148,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
             tm.if_not_exists().save()
 
         query = m.call_args[0][0].query_string
-        self.assertIn("IF NOT EXISTS", query)
+        assert "IF NOT EXISTS" in query
 
     def test_queryset_is_returned_on_class(self):
         """ ensure we get a queryset description back """
@@ -161,7 +161,7 @@ class IfNotExistsModelTest(BaseIfNotExistsTest):
             with BatchQuery() as b:
                 TestIfNotExistsModel.batch(b).if_not_exists().create(count=8)
 
-        self.assertIn("IF NOT EXISTS", m.call_args[0][0].query_string)
+        assert "IF NOT EXISTS" in m.call_args[0][0].query_string
 
 
 class IfNotExistsInstanceTest(BaseIfNotExistsTest):

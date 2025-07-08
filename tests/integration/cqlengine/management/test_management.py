@@ -41,7 +41,7 @@ class KeyspaceManagementTest(BaseCassEngTestCase):
         keyspace_ss = 'test_ks_ss'
         self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
         management.create_keyspace_simple(keyspace_ss, 2)
-        self.assertIn(keyspace_ss, cluster.metadata.keyspaces)
+        assert keyspace_ss in cluster.metadata.keyspaces
 
         management.drop_keyspace(keyspace_ss)
         self.assertNotIn(keyspace_ss, cluster.metadata.keyspaces)
@@ -49,7 +49,7 @@ class KeyspaceManagementTest(BaseCassEngTestCase):
         keyspace_nts = 'test_ks_nts'
         self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
         management.create_keyspace_network_topology(keyspace_nts, {'dc1': 1})
-        self.assertIn(keyspace_nts, cluster.metadata.keyspaces)
+        assert keyspace_nts in cluster.metadata.keyspaces
 
         management.drop_keyspace(keyspace_nts)
         self.assertNotIn(keyspace_nts, cluster.metadata.keyspaces)
@@ -187,20 +187,20 @@ class AddColumnTest(BaseCassEngTestCase):
         meta_columns = _get_table_metadata(FirstModel).columns
         assert len(meta_columns) == 5
         assert len(ThirdModel._columns) == 4
-        self.assertIn('fourth_key', meta_columns)
+        assert 'fourth_key' in meta_columns
         self.assertNotIn('fourth_key', ThirdModel._columns)
-        self.assertIn('blah', ThirdModel._columns)
-        self.assertIn('blah', meta_columns)
+        assert 'blah' in ThirdModel._columns
+        assert 'blah' in meta_columns
 
         sync_table(FourthModel)
         meta_columns = _get_table_metadata(FirstModel).columns
         assert len(meta_columns) == 5
         assert len(ThirdModel._columns) == 4
-        self.assertIn('fourth_key', meta_columns)
+        assert 'fourth_key' in meta_columns
         self.assertNotIn('fourth_key', FourthModel._columns)
-        self.assertIn('renamed', FourthModel._columns)
+        assert 'renamed' in FourthModel._columns
         self.assertNotIn('renamed', meta_columns)
-        self.assertIn('blah', meta_columns)
+        assert 'blah' in meta_columns
 
 
 class ModelWithTableProperties(Model):
@@ -277,14 +277,14 @@ class SyncTableTests(BaseCassEngTestCase):
         # blows up with DoesNotExist if table does not exist
         table_meta = management._get_table_metadata(PrimaryKeysOnlyModel)
 
-        self.assertIn('LeveledCompactionStrategy', table_meta.as_cql_query())
+        assert 'LeveledCompactionStrategy' in table_meta.as_cql_query()
 
         PrimaryKeysOnlyModel.__options__['compaction']['class'] = 'SizeTieredCompactionStrategy'
 
         sync_table(PrimaryKeysOnlyModel)
 
         table_meta = management._get_table_metadata(PrimaryKeysOnlyModel)
-        self.assertIn('SizeTieredCompactionStrategy', table_meta.as_cql_query())
+        assert 'SizeTieredCompactionStrategy' in table_meta.as_cql_query()
 
     def test_primary_key_validation(self):
         """
@@ -476,7 +476,7 @@ class StaticColumnTests(BaseCassEngTestCase):
 
         self.assertGreater(m.call_count, 0)
         statement = m.call_args[0][0].query_string
-        self.assertIn('"name" text static', statement)
+        assert '"name" text static' in statement
 
         # if we sync again, we should not apply an alter w/ a static
         sync_table(StaticModel)

@@ -408,7 +408,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         connection.udt_by_keyspace.clear()
         User.register_for_keyspace(None)
         assert len(connection.udt_by_keyspace) == 1
-        self.assertIn(None, connection.udt_by_keyspace)
+        assert None in connection.udt_by_keyspace
 
         # register should be with default keyspace, not None
         cluster = Mock()
@@ -445,7 +445,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         assert len(type_meta.field_names) == len(type_fields)
         for f in type_fields:
-            self.assertIn(f.db_field_name, type_meta.field_names)
+            assert f.db_field_name in type_meta.field_names
 
         id = 0
         age = 42

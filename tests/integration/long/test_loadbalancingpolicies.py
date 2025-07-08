@@ -500,16 +500,14 @@ class LoadBalancingPolicyTests(unittest.TestCase):
                                    '(?, ?, ?)' % table)
         bound = prepared.bind((1, 2, 3))
         result = session.execute(bound)
-        self.assertIn(result.response_future.attempted_hosts[0],
-                      cluster.metadata.get_replicas(keyspace, bound.routing_key))
+        assert result.response_future.attempted_hosts[0] in cluster.metadata.get_replicas(keyspace, bound.routing_key)
 
         # There could be race condition with querying a node
         # which doesn't yet have the data so we query one of
         # the replicas
         results = session.execute(SimpleStatement('SELECT * FROM %s WHERE k1 = 1 AND k2 = 2' % table,
                                                   routing_key=bound.routing_key))
-        self.assertIn(results.response_future.attempted_hosts[0],
-                      cluster.metadata.get_replicas(keyspace, bound.routing_key))
+        assert results.response_future.attempted_hosts[0] in cluster.metadata.get_replicas(keyspace, bound.routing_key)
 
         self.assertTrue(results[0].i)
 
@@ -650,9 +648,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             trace_hosts = [cluster.metadata.get_host(e.source) for e in f.get_query_trace().events]
 
             for h in f.attempted_hosts:
-                self.assertIn(h, full_dc1_replicas)
+                assert h in full_dc1_replicas
             for h in trace_hosts:
-                self.assertIn(h, full_dc1_replicas)
+                assert h in full_dc1_replicas
 
 
     def _set_up_shuffle_test(self, keyspace, replication_factor):

@@ -150,7 +150,7 @@ class ConnectionTests(SimulacronBase):
         time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval) * 2.5)
 
         for host in cluster.metadata.all_hosts():
-            self.assertIn(host, listener.hosts_marked_down)
+            assert host in listener.hosts_marked_down
 
         # In this case HostConnection._replace shouldn't be called
         self.assertNotIn("_replace", executor.called_functions)
@@ -461,7 +461,7 @@ class ConnectionTests(SimulacronBase):
         time.sleep((idle_heartbeat_timeout + idle_heartbeat_interval) * 2)
 
         for host in cluster.metadata.all_hosts():
-            self.assertIn(host, listener.hosts_marked_down)
+            assert host in listener.hosts_marked_down
 
         self.assertRaises(NoHostAvailable, session.execute, "SELECT * from system.local WHERE key='local'")
 

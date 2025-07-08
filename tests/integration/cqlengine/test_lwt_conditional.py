@@ -62,7 +62,7 @@ class TestConditional(BaseCassEngTestCase):
             t.iff(text='blah blah').save()
 
         args = m.call_args
-        self.assertIn('IF "text" = %(0)s', args[0][0].query_string)
+        assert 'IF "text" = %(0)s' in args[0][0].query_string
 
     def test_update_conditional_success(self):
         t = TestConditionalModel.if_not_exists().create(text='blah blah', count=5)
@@ -96,7 +96,7 @@ class TestConditional(BaseCassEngTestCase):
             TestConditionalModel.objects(id=uid).iff(text='blah blah').update(text='oh hey der')
 
         args = m.call_args
-        self.assertIn('IF "text" = %(1)s', args[0][0].query_string)
+        assert 'IF "text" = %(1)s' in args[0][0].query_string
 
     def test_blind_update_fail(self):
         t = TestConditionalModel.if_not_exists().create(text='blah blah')

@@ -40,4 +40,4 @@ class InsertStatementTests(unittest.TestCase):
         ist = InsertStatement('table', ttl=60)
         ist.add_assignment(Column(db_field='a'), 'b')
         ist.add_assignment(Column(db_field='c'), 'd')
-        self.assertIn('USING TTL 60', str(ist))
+        assert 'USING TTL 60' in str(ist)

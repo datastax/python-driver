@@ -631,7 +631,7 @@ class TokenAwarePolicyTest(unittest.TestCase):
             replicas = get_replicas(None, struct.pack('>i', i))
 
             # first should be the only local replica
-            self.assertIn(qplan[0], replicas)
+            assert qplan[0] in replicas
             assert qplan[0].datacenter == "dc1"
 
             # then the local non-replica
