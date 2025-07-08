@@ -708,7 +708,7 @@ class ClusterTests(unittest.TestCase):
         with MockLoggingHandler().set_module_name(connection.__name__) as mock_handler:
             with TestCluster(auth_provider=auth_provider) as cluster:
                 session = cluster.connect()
-                self.assertIsNotNone(session.execute("SELECT * from system.local WHERE key='local'"))
+                assert session.execute("SELECT * from system.local WHERE key='local'") is not None
 
             # Three conenctions to nodes plus the control connection
             auth_warning = mock_handler.get_message_count('warning', "An authentication challenge was not sent")
@@ -1246,11 +1246,11 @@ class ClusterTests(unittest.TestCase):
         return queried_hosts
 
     def _check_trace(self, trace):
-        self.assertIsNotNone(trace.request_type)
-        self.assertIsNotNone(trace.duration)
-        self.assertIsNotNone(trace.started_at)
-        self.assertIsNotNone(trace.coordinator)
-        self.assertIsNotNone(trace.events)
+        assert trace.request_type is not None
+        assert trace.duration is not None
+        assert trace.started_at is not None
+        assert trace.coordinator is not None
+        assert trace.events is not None
 
 
 class LocalHostAdressTranslator(AddressTranslator):

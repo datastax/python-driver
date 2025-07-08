@@ -80,7 +80,7 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
 
         # Use encode_and_encrypt helper function to populate date
         for i in range(1,100):
-            self.assertIsNotNone(i)
+            assert i is not None
             encrypted = cl_policy.encode_and_encrypt(col_desc, i)
             session.execute("insert into foo.bar (encrypted, unencrypted) values (%s,%s)", (encrypted, i))
 
@@ -119,7 +119,7 @@ class ColumnEncryptionPolicyTest(unittest.TestCase):
 
         # Use encode_and_encrypt helper function to populate date
         for i in range(1,100):
-            self.assertIsNotNone(i)
+            assert i is not None
             encrypted = cl_policy1.encode_and_encrypt(col_desc1, i)
             session1.execute("insert into foo.bar (encrypted, unencrypted) values (%s,%s)", (encrypted, i))
         session1.shutdown()

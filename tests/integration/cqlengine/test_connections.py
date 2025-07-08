@@ -230,7 +230,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         session = cluster.connect()
         connection_name = 'from_session'
         conn.register_connection(connection_name, session=session)
-        self.assertIsNotNone(conn.get_connection(connection_name).cluster.metadata.get_host(CASSANDRA_IP))
+        assert conn.get_connection(connection_name).cluster.metadata.get_host(CASSANDRA_IP) is not None
         self.addCleanup(conn.unregister_connection, connection_name)
         cluster.shutdown()
 
@@ -245,7 +245,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         """
         connection_name = 'from_hosts'
         conn.register_connection(connection_name, hosts=[CASSANDRA_IP])
-        self.assertIsNotNone(conn.get_connection(connection_name).cluster.metadata.get_host(CASSANDRA_IP))
+        assert conn.get_connection(connection_name).cluster.metadata.get_host(CASSANDRA_IP) is not None
         self.addCleanup(conn.unregister_connection, connection_name)
 
     def test_connection_param_validation(self):

@@ -526,9 +526,9 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         t.nested = [NestedUdt(something='test')]
         t.simple = NestedUdt(something="")
         t.save()
-        self.assertIsNotNone(t.nested[0].test_id)
+        assert t.nested[0].test_id is not None
         assert t.nested[0].default_text == "default text"
-        self.assertIsNotNone(t.simple.test_id)
+        assert t.simple.test_id is not None
         assert t.simple.default_text == "default text"
 
     def test_udt_validate(self):

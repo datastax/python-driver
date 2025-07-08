@@ -109,7 +109,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         # future should have the current trace
         rs = future.result()
         future_trace = future.get_query_trace()
-        self.assertIsNotNone(future_trace)
+        assert future_trace is not None
 
         rs_trace = rs.get_query_trace()
         assert rs_trace == future_trace
@@ -170,7 +170,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         pat = re.compile(r'127.0.0.\d{1,3}')
 
         # Ensure that ip is set
-        self.assertIsNotNone(client_ip, "Client IP was not set in trace with C* >= 2.2")
+        assert client_ip is not None, "Client IP was not set in trace with C* >= 2.2"
         assert pat.match(client_ip), "Client IP from trace did not match the expected value"
 
     def test_trace_cl(self):
@@ -189,15 +189,15 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         with self.assertRaises(Unavailable):
             response_future.get_query_trace(query_cl=ConsistencyLevel.THREE)
         # Try again with a smattering of other CL's
-        self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.TWO).trace_id)
+        assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.TWO).trace_id is not None
         response_future = self.session.execute_async(statement, trace=True)
         response_future.result()
-        self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ONE).trace_id)
+        assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ONE).trace_id is not None
         response_future = self.session.execute_async(statement, trace=True)
         response_future.result()
         with self.assertRaises(InvalidRequest):
-            self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ANY).trace_id)
-        self.assertIsNotNone(response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.QUORUM).trace_id)
+            assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ANY).trace_id is not None
+        assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.QUORUM).trace_id is not None
 
     @notwindows
     def test_incomplete_query_trace(self):
@@ -238,11 +238,11 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         # should get the events with wait False
         trace.populate(wait_for_complete=False)
         assert trace.duration is None
-        self.assertIsNotNone(trace.trace_id)
-        self.assertIsNotNone(trace.request_type)
-        self.assertIsNotNone(trace.parameters)
+        assert trace.trace_id is not None
+        assert trace.request_type is not None
+        assert trace.parameters is not None
         assert trace.events  # non-zero list len
-        self.assertIsNotNone(trace.started_at)
+        assert trace.started_at is not None
 
     def _wait_for_trace_to_populate(self, trace_id):
         count = 0
@@ -283,7 +283,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("insert into "+self.keyspace_name+"."+self.function_table_name+" (id, m) VALUES ( 1, {1: 'one', 2: 'two', 3:'three'})")
         results1 = self.session.execute("select id, m from {0}.{1}".format(self.keyspace_name, self.function_table_name))
 
-        self.assertIsNotNone(results1.column_types)
+        assert results1.column_types is not None
         assert results1.column_types[0].typename == 'int'
         assert results1.column_types[1].typename == 'map'
         assert results1.column_types[0].cassname == 'Int32Type'
@@ -319,7 +319,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
 
         self.session.execute(create_table)
         result_set = self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
-        self.assertIsNotNone(result_set.column_types)
+        assert result_set.column_types is not None
 
         assert result_set.column_names == [u'user', u'game', u'year', u'month', u'day', u'score']
 
@@ -1088,7 +1088,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         bound = self.prepared.bind((1, None))
         batch = BatchStatement()
         batch.add(bound)
-        self.assertIsNotNone(batch.routing_key)
+        assert batch.routing_key is not None
         assert batch.routing_key == bound.routing_key
 
     def test_rk_from_simple(self):
@@ -1097,7 +1097,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         """
         batch = BatchStatement()
         batch.add(self.simple_statement)
-        self.assertIsNotNone(batch.routing_key)
+        assert batch.routing_key is not None
         assert batch.routing_key == self.simple_statement.routing_key
 
     def test_inherit_first_rk_bound(self):
@@ -1113,7 +1113,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         for i in range(3):
             batch.add(self.prepared, (i, i))
 
-        self.assertIsNotNone(batch.routing_key)
+        assert batch.routing_key is not None
         assert batch.routing_key == bound.routing_key
 
     def test_inherit_first_rk_simple_statement(self):
@@ -1129,7 +1129,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         for i in range(10):
             batch.add(self.prepared, (i, i))
 
-        self.assertIsNotNone(batch.routing_key)
+        assert batch.routing_key is not None
         assert batch.routing_key == self.simple_statement.routing_key
 
     def test_inherit_first_rk_prepared_param(self):
@@ -1143,7 +1143,7 @@ class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
         batch.add(bound)
         batch.add(self.simple_statement)
 
-        self.assertIsNotNone(batch.routing_key)
+        assert batch.routing_key is not None
         assert batch.routing_key == self.prepared.bind((1, 0)).routing_key
 
 

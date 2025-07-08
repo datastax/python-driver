@@ -88,7 +88,7 @@ class ClientWarningTests(unittest.TestCase):
         future.result()
         assert len(future.warnings) == 1
         self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
-        self.assertIsNotNone(future.get_query_trace())
+        assert future.get_query_trace() is not None
 
     @local
     @requires_custom_payload
@@ -128,5 +128,5 @@ class ClientWarningTests(unittest.TestCase):
         future.result()
         assert len(future.warnings) == 1
         self.assertRegex(future.warnings[0], 'Batch.*exceeding.*')
-        self.assertIsNotNone(future.get_query_trace())
+        assert future.get_query_trace() is not None
         self.assertDictEqual(future.custom_payload, payload)

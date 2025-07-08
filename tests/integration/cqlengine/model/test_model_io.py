@@ -88,7 +88,7 @@ class TestModelIO(BaseCassEngTestCase):
         """
         tm = TestModel(count=8, text='123456789')
         # Tests that values are available on instantiation.
-        self.assertIsNotNone(tm['id'])
+        assert tm['id'] is not None
         assert tm.count == 8
         assert tm.text == '123456789'
         tm.save()
@@ -217,7 +217,7 @@ class TestModelIO(BaseCassEngTestCase):
             assert input[i] == output[chr(i_char)]
 
     def test_can_specify_none_instead_of_default(self):
-        self.assertIsNotNone(TestModel.a_bool.column.default)
+        assert TestModel.a_bool.column.default is not None
 
         # override default
         inst = TestModel.create(a_bool=None)
@@ -505,7 +505,7 @@ class TestUpdating(BaseCassEngTestCase):
         assert instance.int1 == 9999
         assert instance.int2 == 456
         assert instance.int3 == 7777
-        self.assertIsNotNone(instance.int4)
+        assert instance.int4 is not None
         assert isinstance(instance.int4, int)
         assert instance.int4 >= 0
         assert instance.int4 <= 1000

@@ -400,12 +400,12 @@ class IndexTests(BaseCassEngTestCase):
         """
         sync_table(IndexModel)
         table_meta = management._get_table_metadata(IndexModel)
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+        assert management._get_index_name_by_column(table_meta, 'second_key') is not None
 
         # index already exists
         sync_table(IndexModel)
         table_meta = management._get_table_metadata(IndexModel)
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+        assert management._get_index_name_by_column(table_meta, 'second_key') is not None
 
     def test_sync_index_case_sensitive(self):
         """
@@ -420,12 +420,12 @@ class IndexTests(BaseCassEngTestCase):
         """
         sync_table(IndexCaseSensitiveModel)
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+        assert management._get_index_name_by_column(table_meta, 'second_key') is not None
 
         # index already exists
         sync_table(IndexCaseSensitiveModel)
         table_meta = management._get_table_metadata(IndexCaseSensitiveModel)
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'second_key'))
+        assert management._get_index_name_by_column(table_meta, 'second_key') is not None
 
     @greaterthancass20
     @requires_collection_indexes
@@ -442,10 +442,10 @@ class IndexTests(BaseCassEngTestCase):
         """
         sync_table(TestIndexSetModel)
         table_meta = management._get_table_metadata(TestIndexSetModel)
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'int_set'))
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'int_list'))
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'text_map'))
-        self.assertIsNotNone(management._get_index_name_by_column(table_meta, 'mixed_tuple'))
+        assert management._get_index_name_by_column(table_meta, 'int_set') is not None
+        assert management._get_index_name_by_column(table_meta, 'int_list') is not None
+        assert management._get_index_name_by_column(table_meta, 'text_map') is not None
+        assert management._get_index_name_by_column(table_meta, 'mixed_tuple') is not None
 
 
 class NonModelFailureTest(BaseCassEngTestCase):

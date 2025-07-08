@@ -42,12 +42,12 @@ class ConnectionTest(unittest.TestCase):
     @local
     def test_connection_setup_with_setup(self):
         connection.setup(hosts=None, default_keyspace=None)
-        self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
+        assert connection.get_connection("default").cluster.metadata.get_host("127.0.0.1") is not None
 
     @local
     def test_connection_setup_with_default(self):
         connection.default()
-        self.assertIsNotNone(connection.get_connection("default").cluster.metadata.get_host("127.0.0.1"))
+        assert connection.get_connection("default").cluster.metadata.get_host("127.0.0.1") is not None
 
     def test_only_one_connection_is_created(self):
         """

@@ -355,19 +355,19 @@ class GraphOptionTests(unittest.TestCase):
         assert not opts.is_default_source
 
         opts.set_source_default()
-        self.assertIsNotNone(opts.graph_source)
+        assert opts.graph_source is not None
         assert not opts.is_analytics_source
         assert not opts.is_graph_source
         assert opts.is_default_source
 
         opts.set_source_analytics()
-        self.assertIsNotNone(opts.graph_source)
+        assert opts.graph_source is not None
         assert opts.is_analytics_source
         assert not opts.is_graph_source
         assert not opts.is_default_source
 
         opts.set_source_graph()
-        self.assertIsNotNone(opts.graph_source)
+        assert opts.graph_source is not None
         assert not opts.is_analytics_source
         assert opts.is_graph_source
         assert not opts.is_default_source

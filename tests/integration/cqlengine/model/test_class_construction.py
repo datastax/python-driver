@@ -47,7 +47,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         inst = TestModel()
         self.assertHasAttr(inst, 'id')
         self.assertHasAttr(inst, 'text')
-        self.assertIsNotNone(inst.id)
+        assert inst.id is not None
         assert inst.text is None
 
     def test_values_on_instantiation(self):

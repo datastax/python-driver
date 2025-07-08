@@ -470,7 +470,7 @@ class ConnectionTests(SimulacronBase):
 
         time.sleep(idle_heartbeat_timeout + idle_heartbeat_interval + 2)
 
-        self.assertIsNotNone(session.execute("SELECT * from system.local WHERE key='local'"))
+        assert session.execute("SELECT * from system.local WHERE key='local'") is not None
 
     def test_max_in_flight(self):
         """ Verify we don't exceed max_in_flight when borrowing connections or sending heartbeats """

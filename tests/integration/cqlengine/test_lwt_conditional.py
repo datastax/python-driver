@@ -248,7 +248,7 @@ class TestConditional(BaseCassEngTestCase):
         assert TestConditionalModel.objects(id=t.id).count() == 1
         with self.assertRaises(LWTException):
             t.iff(count=9999).update(text=None)
-        self.assertIsNotNone(TestConditionalModel.objects(id=t.id).first().text)
+        assert TestConditionalModel.objects(id=t.id).first().text is not None
         t.iff(count=5).update(text=None)
         assert TestConditionalModel.objects(id=t.id).first().text is None
 
@@ -257,7 +257,7 @@ class TestConditional(BaseCassEngTestCase):
         assert TestConditionalModel.objects(id=t.id).count() == 1
         with self.assertRaises(LWTException):
             TestConditionalModel.objects(id=t.id).iff(count=9999).update(text=None)
-        self.assertIsNotNone(TestConditionalModel.objects(id=t.id).first().text)
+        assert TestConditionalModel.objects(id=t.id).first().text is not None
         TestConditionalModel.objects(id=t.id).iff(count=5).update(text=None)
         assert TestConditionalModel.objects(id=t.id).first().text is None
 

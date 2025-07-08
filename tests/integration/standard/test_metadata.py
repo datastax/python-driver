@@ -71,13 +71,13 @@ class HostMetaDataTests(BasicExistingKeyspaceUnitTestCase):
         """
         # All nodes should have the broadcast_address, rpc_address and host_id set
         for host in self.cluster.metadata.all_hosts():
-            self.assertIsNotNone(host.broadcast_address)
-            self.assertIsNotNone(host.broadcast_rpc_address)
-            self.assertIsNotNone(host.host_id)
+            assert host.broadcast_address is not None
+            assert host.broadcast_rpc_address is not None
+            assert host.host_id is not None
 
             if CASSANDRA_VERSION >= Version('4-a'):
-                self.assertIsNotNone(host.broadcast_port)
-                self.assertIsNotNone(host.broadcast_rpc_port)
+                assert host.broadcast_port is not None
+                assert host.broadcast_rpc_port is not None
 
         con = self.cluster.control_connection.get_connections()[0]
         local_host = con.host
@@ -164,8 +164,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         query = "SELECT * FROM system.local WHERE key='local'"
         no_schema_rs = no_schema_session.execute(query)
         no_token_rs = no_token_session.execute(query)
-        self.assertIsNotNone(no_schema_rs.one())
-        self.assertIsNotNone(no_token_rs.one())
+        assert no_schema_rs.one() is not None
+        assert no_token_rs.one() is not None
         no_schema.shutdown()
         no_token.shutdown()
 
@@ -2247,30 +2247,30 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
         mv = self.cluster.metadata.keyspaces[self.keyspace_name].views['monthlyhigh']
 
-        self.assertIsNotNone(score_table.views["monthlyhigh"])
-        self.assertIsNotNone(len(score_table.views), 1)
+        assert score_table.views["monthlyhigh"] is not None
+        assert len(score_table.views) is not None, 1
 
         # Make sure user is a partition key, and not null
         assert len(score_table.partition_key) == 1
-        self.assertIsNotNone(score_table.columns['user'])
+        assert score_table.columns['user'] is not None
         assert score_table.columns['user'], score_table.partition_key[0]
 
         # Validate clustering keys
         assert len(score_table.clustering_key) == 4
 
-        self.assertIsNotNone(score_table.columns['game'])
+        assert score_table.columns['game'] is not None
         assert score_table.columns['game'], score_table.clustering_key[0]
 
-        self.assertIsNotNone(score_table.columns['year'])
+        assert score_table.columns['year'] is not None
         assert score_table.columns['year'], score_table.clustering_key[1]
 
-        self.assertIsNotNone(score_table.columns['month'])
+        assert score_table.columns['month'] is not None
         assert score_table.columns['month'], score_table.clustering_key[2]
 
-        self.assertIsNotNone(score_table.columns['day'])
+        assert score_table.columns['day'] is not None
         assert score_table.columns['day'], score_table.clustering_key[3]
 
-        self.assertIsNotNone(score_table.columns['score'])
+        assert score_table.columns['score'] is not None
 
         # Validate basic mv information
         assert mv.keyspace_name == self.keyspace_name
@@ -2283,17 +2283,17 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         assert len(mv_columns) == 6
 
         game_column = mv_columns[0]
-        self.assertIsNotNone(game_column)
+        assert game_column is not None
         assert game_column.name == 'game'
         assert game_column == mv.partition_key[0]
 
         year_column = mv_columns[1]
-        self.assertIsNotNone(year_column)
+        assert year_column is not None
         assert year_column.name == 'year'
         assert year_column == mv.partition_key[1]
 
         month_column = mv_columns[2]
-        self.assertIsNotNone(month_column)
+        assert month_column is not None
         assert month_column.name == 'month'
         assert month_column == mv.partition_key[2]
 
@@ -2357,8 +2357,8 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
 
         score_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['scores']
 
-        self.assertIsNotNone(score_table.views["monthlyhigh"])
-        self.assertIsNotNone(score_table.views["alltimehigh"])
+        assert score_table.views["monthlyhigh"] is not None
+        assert score_table.views["alltimehigh"] is not None
         assert len(self.cluster.metadata.keyspaces[self.keyspace_name].views) == 2
 
         insert_fouls = """ALTER TABLE {0}.scores ADD fouls INT""".format((self.keyspace_name))
@@ -2469,21 +2469,21 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         t1_table = self.cluster.metadata.keyspaces[self.keyspace_name].tables['t1']
         mv = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
 
-        self.assertIsNotNone(t1_table.views["mv1"])
-        self.assertIsNotNone(len(t1_table.views), 1)
+        assert t1_table.views["mv1"] is not None
+        assert len(t1_table.views) is not None, 1
 
         # Validate partition key, and not null
         assert len(t1_table.partition_key) == 1
-        self.assertIsNotNone(t1_table.columns['theKey'])
+        assert t1_table.columns['theKey'] is not None
         assert t1_table.columns['theKey'], t1_table.partition_key[0]
 
         # Validate clustering key column
         assert len(t1_table.clustering_key) == 1
-        self.assertIsNotNone(t1_table.columns['the;Clustering'])
+        assert t1_table.columns['the;Clustering'] is not None
         assert t1_table.columns['the;Clustering'], t1_table.clustering_key[0]
 
         # Validate regular column
-        self.assertIsNotNone(t1_table.columns['the Value'])
+        assert t1_table.columns['the Value'] is not None
 
         # Validate basic mv information
         assert mv.keyspace_name == self.keyspace_name
@@ -2496,12 +2496,12 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         assert len(mv_columns) == 3
 
         theKey_column = mv_columns[0]
-        self.assertIsNotNone(theKey_column)
+        assert theKey_column is not None
         assert theKey_column.name == 'theKey'
         assert theKey_column == mv.partition_key[0]
 
         cluster_column = mv_columns[1]
-        self.assertIsNotNone(cluster_column)
+        assert cluster_column is not None
         assert cluster_column.name == 'the;Clustering'
         assert cluster_column.name == mv.clustering_key[0].name
         assert cluster_column.table == mv.clustering_key[0].table
@@ -2509,7 +2509,7 @@ class MaterializedViewMetadataTestComplex(BasicSegregatedKeyspaceUnitTestCase):
         assert cluster_column.is_reversed == mv.clustering_key[0].is_reversed
 
         value_column = mv_columns[2]
-        self.assertIsNotNone(value_column)
+        assert value_column is not None
         assert value_column.name == 'the Value'
 
 
