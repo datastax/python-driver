@@ -772,7 +772,7 @@ class TestModelRoutingKeys(BaseCassEngTestCase):
         mrk = BasicModelNoRouting._routing_key_from_values([1], self.session.cluster.protocol_version)
         simple = SimpleStatement("")
         simple.routing_key = mrk
-        self.assertNotEqual(bound.routing_key, simple.routing_key)
+        assert bound.routing_key != simple.routing_key
 
         # Verify that basic create, update and delete work with no routing key
         t = BasicModelNoRouting.create(k=2, v=3)

@@ -90,12 +90,12 @@ class OrderedMapTest(unittest.TestCase):
         assert om1 == d1
         assert om12 == d12
         assert om21 == d12
-        self.assertNotEqual(om1, om12)
-        self.assertNotEqual(om12, om1)
-        self.assertNotEqual(om12, om21)
-        self.assertNotEqual(om1, d12)
-        self.assertNotEqual(om12, d1)
-        self.assertNotEqual(om1, EMPTY)
+        assert om1 != om12
+        assert om12 != om1
+        assert om12 != om21
+        assert om1 != d12
+        assert om12 != d1
+        assert om1 != EMPTY
 
         self.assertFalse(OrderedMap([('three', 3), ('four', 4)]) == d12)
 

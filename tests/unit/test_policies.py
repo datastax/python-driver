@@ -1457,8 +1457,7 @@ class HostFilterPolicyDistanceTest(unittest.TestCase):
 
     def test_ignored_with_filter(self):
         assert self.hfp.distance(self.ignored_host) == HostDistance.IGNORED
-        self.assertNotEqual(self.hfp.distance(self.accepted_host),
-                            HostDistance.IGNORED)
+        assert self.hfp.distance(self.accepted_host) != HostDistance.IGNORED
 
     def test_accepted_filter_defers_to_child_policy(self):
         self.hfp._child_policy.distance.side_effect = distances = Mock(), Mock()

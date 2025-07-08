@@ -66,11 +66,11 @@ class SortedSetTest(unittest.TestCase):
         assert ss12 == s12
         assert ss12 == s12
         assert ss1.__eq__(None) == NotImplemented
-        self.assertNotEqual(ss1, ss12)
-        self.assertNotEqual(ss12, ss1)
-        self.assertNotEqual(ss1, s12)
-        self.assertNotEqual(ss12, s1)
-        self.assertNotEqual(ss1, EMPTY)
+        assert ss1 != ss12
+        assert ss12 != ss1
+        assert ss1 != s12
+        assert ss12 != s1
+        assert ss1 != EMPTY
 
     def test_copy(self):
         class comparable(object):
@@ -80,7 +80,7 @@ class SortedSetTest(unittest.TestCase):
         o = comparable()
         ss = sortedset([comparable(), o])
         ss2 = ss.copy()
-        self.assertNotEqual(id(ss), id(ss2))
+        assert id(ss) != id(ss2)
         self.assertTrue(o in ss)
         self.assertTrue(o in ss2)
 

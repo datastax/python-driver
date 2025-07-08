@@ -36,7 +36,7 @@ class TestModel(unittest.TestCase):
         m1 = EqualityModel(pk=1)
 
         assert m0 == m0
-        self.assertNotEqual(m0, m1)
+        assert m0 != m1
 
     def test_model_equality(self):
         """ tests the model equality functionality """
@@ -52,7 +52,7 @@ class TestModel(unittest.TestCase):
         m1 = EqualityModel1(kk=1)
 
         assert m0 == m0
-        self.assertNotEqual(m0, m1)
+        assert m0 != m1
 
     def test_keywords_as_names(self):
         """
@@ -217,7 +217,7 @@ class TestColumnComparison(unittest.TestCase):
              TestQueryUpdateModel.text_map.column]
 
         assert l == sorted(l)
-        self.assertNotEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
+        assert TestQueryUpdateModel.partition.column != TestQueryUpdateModel.cluster.column
         self.assertLessEqual(TestQueryUpdateModel.partition.column, TestQueryUpdateModel.cluster.column)
         self.assertGreater(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)
         self.assertGreaterEqual(TestQueryUpdateModel.cluster.column, TestQueryUpdateModel.partition.column)

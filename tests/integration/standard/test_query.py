@@ -492,7 +492,7 @@ class PreparedStatementMetdataTest(unittest.TestCase):
             if proto_version == 1:
                 assert select_statement.result_metadata == None
             else:
-                self.assertNotEqual(select_statement.result_metadata, None)
+                assert select_statement.result_metadata != None
             future = session.execute_async(select_statement)
             results = future.result()
             if base_line is None:
@@ -1537,7 +1537,7 @@ class PreparedWithKeyspaceTests(BaseKeyspaceTests, unittest.TestCase):
 
         prepared_statement_alternative = self.session.prepare(query, keyspace=self.alternative_ks)
 
-        self.assertNotEqual(prepared_statement.query_id, prepared_statement_alternative.query_id)
+        assert prepared_statement.query_id != prepared_statement_alternative.query_id
 
         results = self.session.execute(prepared_statement_alternative, (2,))
         assert results.one() == (2, 2)

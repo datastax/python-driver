@@ -886,9 +886,7 @@ class ClusterTests(unittest.TestCase):
         cluster.load_balancing_policy = RoundRobinPolicy()
         assert list(cluster.load_balancing_policy.make_query_plan()) == []
         cluster.connect()
-        self.assertNotEqual(
-            list(cluster.load_balancing_policy.make_query_plan()), []
-        )
+        assert list(cluster.load_balancing_policy.make_query_plan()) != []
 
     def test_profile_lb_swap(self):
         """
@@ -967,7 +965,7 @@ class ClusterTests(unittest.TestCase):
             rr1_queried_hosts.add(rs.response_future._current_host)
             rs = session.execute(query, execution_profile='rr1_clone')
             rr1_clone_queried_hosts.add(rs.response_future._current_host)
-            self.assertNotEqual(rr1_clone_queried_hosts, rr1_queried_hosts)
+            assert rr1_clone_queried_hosts != rr1_queried_hosts
 
     def test_missing_exec_prof(self):
         """

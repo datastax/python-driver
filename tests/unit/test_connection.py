@@ -453,15 +453,9 @@ class DefaultEndPointTest(unittest.TestCase):
 
         assert DefaultEndPoint('10.0.0.1') == DefaultEndPoint('10.0.0.1', 9042)
 
-        self.assertNotEqual(
-            DefaultEndPoint('10.0.0.1'),
-            DefaultEndPoint('10.0.0.2')
-        )
+        assert DefaultEndPoint('10.0.0.1') != DefaultEndPoint('10.0.0.2')
 
-        self.assertNotEqual(
-            DefaultEndPoint('10.0.0.1'),
-            DefaultEndPoint('10.0.0.1', 0000)
-        )
+        assert DefaultEndPoint('10.0.0.1') != DefaultEndPoint('10.0.0.1', 0000)
 
     def test_endpoint_resolve(self):
         assert DefaultEndPoint('10.0.0.1').resolve() == ('10.0.0.1', 9042)

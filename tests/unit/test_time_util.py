@@ -65,7 +65,7 @@ class TimeUtilTest(unittest.TestCase):
         self.assertAlmostEqual(util.unix_time_from_uuid1(u2), t, 4)
         assert u.clock_seq == seq
         # not impossible, but we shouldn't get the same value twice
-        self.assertNotEqual(u1.node, u2.node)
+        assert u1.node != u2.node
 
         # random seq
         u1 = util.uuid_from_time(t, node=node)
@@ -74,7 +74,7 @@ class TimeUtilTest(unittest.TestCase):
         self.assertAlmostEqual(util.unix_time_from_uuid1(u2), t, 4)
         assert u.node == node
         # not impossible, but we shouldn't get the same value twice
-        self.assertNotEqual(u1.clock_seq, u2.clock_seq)
+        assert u1.clock_seq != u2.clock_seq
 
         # node too large
         with self.assertRaises(ValueError):

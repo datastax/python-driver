@@ -314,10 +314,10 @@ class ExecutionProfileTest(unittest.TestCase):
                              consistency_level=ConsistencyLevel.ALL, serial_consistency_level=ConsistencyLevel.SERIAL)
         my_timeout = 1.1234
 
-        self.assertNotEqual(ss.retry_policy.__class__, cluster.default_retry_policy)
-        self.assertNotEqual(ss.consistency_level, session.default_consistency_level)
-        self.assertNotEqual(ss._serial_consistency_level, session.default_serial_consistency_level)
-        self.assertNotEqual(my_timeout, session.default_timeout)
+        assert ss.retry_policy.__class__ != cluster.default_retry_policy
+        assert ss.consistency_level != session.default_consistency_level
+        assert ss._serial_consistency_level != session.default_serial_consistency_level
+        assert my_timeout != session.default_timeout
 
         rf = session.execute_async(ss, timeout=my_timeout)
         expected_profile = ExecutionProfile(load_balancing_policy=cluster.load_balancing_policy, retry_policy=ss.retry_policy,
@@ -339,10 +339,10 @@ class ExecutionProfileTest(unittest.TestCase):
                              consistency_level=ConsistencyLevel.ALL, serial_consistency_level=ConsistencyLevel.SERIAL)
         my_timeout = 1.1234
 
-        self.assertNotEqual(ss.retry_policy.__class__, rf._load_balancer.__class__)
-        self.assertNotEqual(ss.consistency_level, rf.message.consistency_level)
-        self.assertNotEqual(ss._serial_consistency_level, rf.message.serial_consistency_level)
-        self.assertNotEqual(my_timeout, rf.timeout)
+        assert ss.retry_policy.__class__ != rf._load_balancer.__class__
+        assert ss.consistency_level != rf.message.consistency_level
+        assert ss._serial_consistency_level != rf.message.serial_consistency_level
+        assert my_timeout != rf.timeout
 
         rf = session.execute_async(ss, timeout=my_timeout, execution_profile='non-default')
         expected_profile = ExecutionProfile(non_default_profile.load_balancing_policy, ss.retry_policy,
@@ -434,7 +434,7 @@ class ExecutionProfileTest(unittest.TestCase):
                 assert getattr(clone, attr) == getattr(active, attr)
                 if attr in reference_attributes:
                     self.assertIs(getattr(clone, attr), getattr(active, attr))
-                self.assertNotEqual(getattr(all_updated, attr), getattr(active, attr))
+                assert getattr(all_updated, attr) != getattr(active, attr)
 
         # cannot clone nonexistent profile
         self.assertRaises(ValueError, session.execution_profile_clone_update, 'DOES NOT EXIST', **profile_attrs)

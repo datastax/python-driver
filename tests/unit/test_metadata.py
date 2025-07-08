@@ -61,8 +61,8 @@ class ReplicationFactorTest(unittest.TestCase):
     def test_replication_factor_equality(self):
         assert ReplicationFactor.create('3/1') == ReplicationFactor.create('3/1')
         assert ReplicationFactor.create('3') == ReplicationFactor.create('3')
-        self.assertNotEqual(ReplicationFactor.create('3'), ReplicationFactor.create('3/1'))
-        self.assertNotEqual(ReplicationFactor.create('3'), ReplicationFactor.create('3/1'))
+        assert ReplicationFactor.create('3') != ReplicationFactor.create('3/1')
+        assert ReplicationFactor.create('3') != ReplicationFactor.create('3/1')
 
 
 
@@ -133,7 +133,7 @@ class StrategiesTest(unittest.TestCase):
         assert "'replication_factor': '3/1'" in simple_transient.export_for_schema()
 
         simple_str = rs.create('SimpleStrategy', {'replication_factor': '2'})
-        self.assertNotEqual(simple_transient, simple_str)
+        assert simple_transient != simple_str
 
         # make token replica map
         ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
@@ -174,7 +174,7 @@ class StrategiesTest(unittest.TestCase):
         assert "'dc1': '3/1', 'dc2': '5/1'" in nts_transient.export_for_schema()
 
         nts_str = rs.create('NetworkTopologyStrategy', {'dc1': '3', 'dc2': '5'})
-        self.assertNotEqual(nts_transient, nts_str)
+        assert nts_transient != nts_str
 
         # make token replica map
         ring = [MD5Token(0), MD5Token(1), MD5Token(2)]
@@ -339,7 +339,7 @@ class StrategiesTest(unittest.TestCase):
         self.assertItemsEqual(rf3_replicas[MD5Token(200)], [host3, host1, host2])
 
     def test_ss_equals(self):
-        self.assertNotEqual(SimpleStrategy({'replication_factor': '1'}), NetworkTopologyStrategy({'dc1': 2}))
+        assert SimpleStrategy({'replication_factor': '1'}) != NetworkTopologyStrategy({'dc1': 2})
 
 
 class NameEscapingTest(unittest.TestCase):

@@ -131,7 +131,7 @@ class HeartbeatTest(unittest.TestCase):
         host = "127.0.0.1:9042"
         node = get_node(1)
         initial_connections = self.fetch_connections(host, self.cluster)
-        self.assertNotEqual(len(initial_connections), 0)
+        assert len(initial_connections) != 0
         self.cluster.register_listener(test_listener)
         # Pause the node
         try:

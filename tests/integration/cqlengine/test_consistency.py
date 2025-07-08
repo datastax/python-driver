@@ -84,7 +84,7 @@ class TestConsistency(BaseConsistencyTest):
                 TestConsistencyModel.batch(b).create(text="monkey")
 
         args = m.call_args
-        self.assertNotEqual(CL.ALL, args[0][0].consistency_level)
+        assert CL.ALL != args[0][0].consistency_level
 
     def test_blind_update(self):
         t = TestConsistencyModel.create(text="bacon and eggs")

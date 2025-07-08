@@ -175,7 +175,7 @@ class DurationTests(unittest.TestCase):
 
         first = Duration(1, 1, 1)
         second = Duration(-1, 1, 1)
-        self.assertNotEqual(first, second)
+        assert first != second
 
         first = Duration(1, 1, 1)
         second = Duration(1, 1, 1)

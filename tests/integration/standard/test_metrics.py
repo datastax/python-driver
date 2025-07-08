@@ -233,11 +233,11 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         assert 0 == cluster2.metrics.stats.write_timeouts
 
         # Test direct access to a child stats
-        self.assertNotEqual(0.0, self.cluster.metrics.request_timer['mean'])
+        assert 0.0 != self.cluster.metrics.request_timer['mean']
         assert 0.0 == cluster2.metrics.request_timer['mean']
 
         # Test access via metrics.get_stats()
-        self.assertNotEqual(0.0, stats_cluster1['request_timer']['mean'])
+        assert 0.0 != stats_cluster1['request_timer']['mean']
         assert 0.0 == stats_cluster2['request_timer']['mean']
 
         # Test access by stats_name

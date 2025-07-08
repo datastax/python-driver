@@ -476,7 +476,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
 
         id_after = prepared_statement.result_metadata_id
 
-        self.assertNotEqual(id_before, id_after)
+        assert id_before != id_after
         assert len(prepared_statement.result_metadata) == 4
 
     def test_prepared_id_is_updated_across_pages(self):
@@ -506,7 +506,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         id_after = prepared_statement.result_metadata_id
 
         assert result_set == expected_result_set
-        self.assertNotEqual(id_before, id_after)
+        assert id_before != id_after
         assert len(prepared_statement.result_metadata) == 4
 
     def test_prepare_id_is_updated_across_session(self):
@@ -532,7 +532,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         one_session.execute(one_prepared_stm, (1, ))
 
         one_id_after = one_prepared_stm.result_metadata_id
-        self.assertNotEqual(one_id_before, one_id_after)
+        assert one_id_before != one_id_after
         assert len(one_prepared_stm.result_metadata) == 4
 
     def test_not_reprepare_invalid_statements(self):

@@ -218,8 +218,8 @@ class _PoolTests(unittest.TestCase):
         c = Host('127.0.0.2', SimpleConvictionPolicy)
 
         assert a == b, 'Two Host instances should be equal when sharing.'
-        self.assertNotEqual(a, c, 'Two Host instances should NOT be equal when using two different addresses.')
-        self.assertNotEqual(b, c, 'Two Host instances should NOT be equal when using two different addresses.')
+        assert a != c, 'Two Host instances should NOT be equal when using two different addresses.'
+        assert b != c, 'Two Host instances should NOT be equal when using two different addresses.'
 
 
 class HostConnectionTests(_PoolTests):

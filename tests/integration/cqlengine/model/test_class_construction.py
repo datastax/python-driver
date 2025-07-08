@@ -129,7 +129,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         inst1 = Stuff(num=5)
         inst2 = Stuff(num=7)
 
-        self.assertNotEqual(inst1.num, inst2.num)
+        assert inst1.num != inst2.num
         assert inst1.num == 5
         assert inst2.num == 7
 

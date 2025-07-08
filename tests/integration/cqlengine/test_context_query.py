@@ -139,7 +139,7 @@ class ContextQueryTests(BaseCassEngTestCase):
 
         with ContextQuery(TestModel, TestModel, keyspace='ks4') as (tm1, tm2):
 
-            self.assertNotEqual(tm1, tm2)
+            assert tm1 != tm2
             assert tm1.__keyspace__ == 'ks4'
             assert tm2.__keyspace__ == 'ks4'
 

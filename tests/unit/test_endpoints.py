@@ -37,22 +37,13 @@ class SniEndPointTest(unittest.TestCase):
         assert str(endpoint) == 'proxy.datastax.com:30002:test'
 
     def test_endpoint_equality(self):
-        self.assertNotEqual(
-            DefaultEndPoint('10.0.0.1'),
-            self.endpoint_factory.create_from_sni('10.0.0.1')
-        )
+        assert DefaultEndPoint('10.0.0.1') != self.endpoint_factory.create_from_sni('10.0.0.1')
 
         assert self.endpoint_factory.create_from_sni('10.0.0.1') == self.endpoint_factory.create_from_sni('10.0.0.1')
 
-        self.assertNotEqual(
-            self.endpoint_factory.create_from_sni('10.0.0.1'),
-            self.endpoint_factory.create_from_sni('10.0.0.0')
-        )
+        assert self.endpoint_factory.create_from_sni('10.0.0.1') != self.endpoint_factory.create_from_sni('10.0.0.0')
 
-        self.assertNotEqual(
-            self.endpoint_factory.create_from_sni('10.0.0.1'),
-            SniEndPointFactory("proxy.datastax.com", 9999).create_from_sni('10.0.0.1')
-        )
+        assert self.endpoint_factory.create_from_sni('10.0.0.1') != SniEndPointFactory("proxy.datastax.com", 9999).create_from_sni('10.0.0.1')
 
     def test_endpoint_resolve(self):
         ips = ['127.0.0.1', '127.0.0.2', '127.0.0.3']

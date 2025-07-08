@@ -98,7 +98,7 @@ class ControlConnectionTests(unittest.TestCase):
         # reconnect and make sure that the new host is reflected correctly
         self.cluster.control_connection._reconnect()
         new_host = self.cluster.get_control_connection_host()
-        self.assertNotEqual(host, new_host)
+        assert host != new_host
 
     # TODO: enable after https://github.com/scylladb/python-driver/issues/121 is fixed
     @unittest.skip('Fails on scylla due to the broadcast_rpc_port is None')

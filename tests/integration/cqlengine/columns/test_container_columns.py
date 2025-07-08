@@ -464,7 +464,7 @@ class TestMapColumn(BaseCassEngTestCase):
         m2.int_map = None
         m2.save()
         m3 = TestMapModel.get(partition=m.partition)
-        self.assertNotEqual(m3.int_map, expected)
+        assert m3.int_map != expected
 
     def test_blind_updates_from_none(self):
         """ Tests that updates from None work as expected """
@@ -479,7 +479,7 @@ class TestMapColumn(BaseCassEngTestCase):
         TestMapModel.objects(partition=m.partition).update(int_map={})
 
         m3 = TestMapModel.get(partition=m.partition)
-        self.assertNotEqual(m3.int_map, expected)
+        assert m3.int_map != expected
 
     def test_updates_to_none(self):
         """ Tests that setting the field to None works as expected """

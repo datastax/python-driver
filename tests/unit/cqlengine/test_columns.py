@@ -25,8 +25,8 @@ class ColumnTest(unittest.TestCase):
         assert c1.position - c0.position == 1
 
         # __ne__
-        self.assertNotEqual(c0, c1)
-        self.assertNotEqual(c0, object())
+        assert c0 != c1
+        assert c0 != object()
 
         # __eq__
         assert c0 == c0

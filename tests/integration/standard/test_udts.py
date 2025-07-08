@@ -675,7 +675,7 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
 
         k, v = row.alphanum_type_map.popitem()
         assert v == 1
-        self.assertNotEqual(k.__class__, tuple)  # should be the namedtuple type
+        assert k.__class__ != tuple  # should be the namedtuple type
         assert k[0] == 'alphanum'
         assert k.field_0_ == 'alphanum'  # named tuple with positional field name
 

@@ -150,7 +150,7 @@ class UpgradeTestsMetadata(UpgradeBase):
         # Wait for the control connection to reconnect
         time.sleep(20)
         self.cluster_driver.refresh_schema_metadata(max_schema_agreement_wait=40)
-        self.assertNotEqual(original_meta, self.cluster_driver.metadata.keyspaces)
+        assert original_meta != self.cluster_driver.metadata.keyspaces
 
     @two_to_three_path
     def test_schema_nodes_gets_refreshed(self):
