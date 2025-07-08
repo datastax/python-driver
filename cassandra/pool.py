@@ -758,23 +758,26 @@ class HostConnection(object):
             )
             old_conn = None
             with self._lock:
-                if self.is_shutdown:
-                    conn.close()
-                    return
-                if conn.features.shard_id in self._connections.keys():
-                    # Move the current connection to the trash and use the new one from now on
-                    old_conn = self._connections[conn.features.shard_id]
-                    log.debug(
-                        "Replacing overloaded connection (%s) with (%s) for shard %i for host %s",
-                        id(old_conn),
-                        id(conn),
-                        conn.features.shard_id,
-                        self.host
-                    )
-                if self._keyspace:
-                    conn.set_keyspace_blocking(self._keyspace)
+                is_shutdown = self.is_shutdown
+                if not is_shutdown:
+                    if conn.features.shard_id in self._connections.keys():
+                        # Move the current connection to the trash and use the new one from now on
+                        old_conn = self._connections[conn.features.shard_id]
+                        log.debug(
+                            "Replacing overloaded connection (%s) with (%s) for shard %i for host %s",
+                            id(old_conn),
+                            id(conn),
+                            conn.features.shard_id,
+                            self.host
+                        )
+                    if self._keyspace:
+                        conn.set_keyspace_blocking(self._keyspace)
+                    self._connections[conn.features.shard_id] = conn
 
-                self._connections[conn.features.shard_id] = conn
+            if is_shutdown:
+                conn.close()
+                return
+
             if old_conn is not None:
                 remaining = old_conn.in_flight - len(old_conn.orphaned_request_ids)
                 if remaining == 0:
@@ -794,10 +797,11 @@ class HostConnection(object):
                         remaining,
                     )
                     with self._lock:
-                        if self.is_shutdown:
-                            old_conn.close()
-                        else:
+                        is_shutdown = self.is_shutdown
+                        if not is_shutdown:
                             self._trash.add(old_conn)
+                    if is_shutdown:
+                        conn.close()
             num_missing_or_needing_replacement = self.num_missing_or_needing_replacement
             log.debug(
                 "Connected to %s/%i shards on host %s (%i missing or needs replacement)",
