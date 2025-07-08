@@ -453,7 +453,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         for f in futures:
             assert f.result()[0] == (1, 1)
 
-        self.assertIsNot(wildcard_prepared.result_metadata, original_result_metadata)
+        assert wildcard_prepared.result_metadata is not original_result_metadata
 
     def test_prepared_id_is_update(self):
         """

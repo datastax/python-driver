@@ -170,7 +170,7 @@ class BoundStatementTestV3(unittest.TestCase):
 
         old_values = self.bound.values
         self.bound.bind((0, 0, 0, None))
-        self.assertIsNot(self.bound.values, old_values)
+        assert self.bound.values is not old_values
         assert self.bound.values[-1] == None
 
     def test_unset_value(self):
@@ -194,7 +194,7 @@ class BoundStatementTestV4(BoundStatementTestV3):
 
         old_values = self.bound.values
         self.bound.bind((0, 0, 0))
-        self.assertIsNot(self.bound.values, old_values)
+        assert self.bound.values is not old_values
         assert self.bound.values[-1] == UNSET_VALUE
 
     def test_unset_value(self):

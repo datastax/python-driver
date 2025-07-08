@@ -176,7 +176,7 @@ class UpgradeTestsMetadata(UpgradeBase):
             self._assert_same_token_map(token_map, self.cluster_driver.metadata.token_map)
 
     def _assert_same_token_map(self, original, new):
-        self.assertIsNot(original, new)
+        assert original is not new
         assert original.tokens_to_hosts_by_ks == new.tokens_to_hosts_by_ks
         assert original.token_to_host_owner == new.token_to_host_owner
         assert original.ring == new.ring

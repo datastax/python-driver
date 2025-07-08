@@ -177,4 +177,4 @@ class OrderedMapSerializedKeyTest(unittest.TestCase):
         # PYTHON-231
         assert om[{'one': 1}] is om[{u'one': 1}]
         assert om[{'two': 2}] is om[{u'two': 2}]
-        self.assertIsNot(om[{'one': 1}], om[{'two': 2}])
+        assert om[{'one': 1}] is not om[{'two': 2}]

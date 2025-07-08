@@ -426,10 +426,10 @@ class ExecutionProfileTest(unittest.TestCase):
         for profile in (EXEC_PROFILE_DEFAULT, 'one'):
             active = session.get_execution_profile(profile)
             clone = session.execution_profile_clone_update(profile)
-            self.assertIsNot(clone, active)
+            assert clone is not active
 
             all_updated = session.execution_profile_clone_update(clone, **profile_attrs)
-            self.assertIsNot(all_updated, clone)
+            assert all_updated is not clone
             for attr, value in profile_attrs.items():
                 assert getattr(clone, attr) == getattr(active, attr)
                 if attr in reference_attributes:

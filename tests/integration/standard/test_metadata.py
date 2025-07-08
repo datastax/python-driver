@@ -761,8 +761,8 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.cluster.refresh_materialized_view_metadata(self.keyspace_name, 'mv1')
 
         current_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
-        self.assertIsNot(current_meta, original_meta)
-        self.assertIsNot(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
+        assert current_meta is not original_meta
+        assert original_meta is not self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1']
         assert original_meta.as_cql_query() == current_meta.as_cql_query()
 
         cluster3 = TestCluster(schema_event_refresh_window=-1)
@@ -1502,7 +1502,7 @@ class IndexMapTests(unittest.TestCase):
         self.session.execute('ALTER KEYSPACE %s WITH durable_writes = false' % self.keyspace_name)
         old_meta = ks_meta
         ks_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
-        self.assertIsNot(ks_meta, old_meta)
+        assert ks_meta is not old_meta
         table_meta = ks_meta.tables[self.table_name]
         assert isinstance(ks_meta.indexes[idx], IndexMetadata)
         assert isinstance(table_meta.indexes[idx], IndexMetadata)
