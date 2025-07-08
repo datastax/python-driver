@@ -433,7 +433,7 @@ class ExecutionProfileTest(unittest.TestCase):
             for attr, value in profile_attrs.items():
                 assert getattr(clone, attr) == getattr(active, attr)
                 if attr in reference_attributes:
-                    self.assertIs(getattr(clone, attr), getattr(active, attr))
+                    assert getattr(clone, attr) is getattr(active, attr)
                 assert getattr(all_updated, attr) != getattr(active, attr)
 
         # cannot clone nonexistent profile

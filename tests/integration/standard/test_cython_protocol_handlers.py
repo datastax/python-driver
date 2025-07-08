@@ -251,7 +251,8 @@ class NumpyNullTest(BasicSharedKeyspaceUnitTestCase):
             if isinstance(col_array, MaskedArray):
                 had_masked = True
                 [self.assertIsNot(col_array[i], masked) for i in mapped_index[:begin_unset]]
-                [self.assertIs(col_array[i], masked) for i in mapped_index[begin_unset:]]
+                for i in mapped_index[begin_unset:]:
+                    assert col_array[i] is masked
             else:
                 had_none = True
                 for i in mapped_index[:begin_unset]:

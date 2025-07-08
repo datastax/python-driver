@@ -52,7 +52,7 @@ class _PoolTests(unittest.TestCase):
         session.cluster.connection_factory.assert_called_once_with(host.endpoint, on_orphaned_stream_released=pool.on_orphaned_stream_released)
 
         c, request_id = pool.borrow_connection(timeout=0.01)
-        self.assertIs(c, conn)
+        assert c is conn
         assert 1 == conn.in_flight
         conn.set_keyspace_blocking.assert_called_once_with('foobarkeyspace')
 
@@ -94,7 +94,7 @@ class _PoolTests(unittest.TestCase):
 
         def get_second_conn():
             c, request_id = pool.borrow_connection(1.0)
-            self.assertIs(conn, c)
+            assert conn is c
             pool.return_connection(c)
 
         t = Thread(target=get_second_conn)

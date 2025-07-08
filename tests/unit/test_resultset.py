@@ -221,4 +221,4 @@ class ResultSetTests(unittest.TestCase):
         assert len(mocked_warn.mock_calls) == 1
         index_warning_args = tuple(mocked_warn.mock_calls[0])[1]
         assert 'indexing support will be removed in 4.0' in str(index_warning_args[0])
-        self.assertIs(index_warning_args[1], DeprecationWarning)
+        assert index_warning_args[1] is DeprecationWarning

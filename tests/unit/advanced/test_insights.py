@@ -74,8 +74,7 @@ class TestGetConfig(unittest.TestCase):
          'namespace': ns,
          }
         # with default
-        self.assertIs(insights_registry.serialize(obj, default=sentinel.attr_err_default),
-                      sentinel.attr_err_default)
+        assert insights_registry.serialize(obj, default=sentinel.attr_err_default) is sentinel.attr_err_default
 
     def test_successful_return(self):
 
@@ -89,14 +88,11 @@ class TestGetConfig(unittest.TestCase):
         def superclass_sentinel_serializer(obj):
             return sentinel.serialized_superclass
 
-        self.assertIs(insights_registry.serialize(SuperclassSentinel()),
-                      sentinel.serialized_superclass)
-        self.assertIs(insights_registry.serialize(SubclassSentinel()),
-                      sentinel.serialized_superclass)
+        assert insights_registry.serialize(SuperclassSentinel()) is sentinel.serialized_superclass
+        assert insights_registry.serialize(SubclassSentinel()) is sentinel.serialized_superclass
 
         # with default -- same behavior
-        self.assertIs(insights_registry.serialize(SubclassSentinel(), default=object()),
-                      sentinel.serialized_superclass)
+        assert insights_registry.serialize(SubclassSentinel(), default=object()) is sentinel.serialized_superclass
 
 class TestConfigAsDict(unittest.TestCase):
 

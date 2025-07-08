@@ -394,7 +394,7 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         try:
             Int32Type.support_empty_values = True
             results = execute_until_pass(s, "SELECT b FROM empty_values WHERE a='a'").one()
-            self.assertIs(EMPTY, results.b)
+            assert EMPTY is results.b
         finally:
             Int32Type.support_empty_values = False
 

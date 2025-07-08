@@ -757,7 +757,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
             cluster2.shutdown()
 
         original_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
-        self.assertIs(original_meta, self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1'])
+        assert original_meta is self.session.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views['mv1']
         self.cluster.refresh_materialized_view_metadata(self.keyspace_name, 'mv1')
 
         current_meta = self.cluster.metadata.keyspaces[self.keyspace_name].views['mv1']
@@ -1705,7 +1705,7 @@ class FunctionMetadata(FunctionTest):
             try:
                 new_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
                 assert original_keyspace_meta != new_keyspace_meta
-                self.assertIs(original_keyspace_meta.functions, new_keyspace_meta.functions)
+                assert original_keyspace_meta.functions is new_keyspace_meta.functions
             finally:
                 self.session.execute('ALTER KEYSPACE %s WITH durable_writes = true' % self.keyspace_name)
 
@@ -1911,7 +1911,7 @@ class AggregateMetadata(FunctionTest):
             try:
                 new_keyspace_meta = self.cluster.metadata.keyspaces[self.keyspace_name]
                 assert original_keyspace_meta != new_keyspace_meta
-                self.assertIs(original_keyspace_meta.aggregates, new_keyspace_meta.aggregates)
+                assert original_keyspace_meta.aggregates is new_keyspace_meta.aggregates
             finally:
                 self.session.execute('ALTER KEYSPACE %s WITH durable_writes = true' % self.keyspace_name)
 
@@ -2020,7 +2020,7 @@ class BadMetaTest(unittest.TestCase):
         with patch.object(self.parser_class, '_build_keyspace_metadata_internal', side_effect=self.BadMetaException):
             self.cluster.refresh_keyspace_metadata(self.keyspace_name)
             m = self.cluster.metadata.keyspaces[self.keyspace_name]
-            self.assertIs(m._exc_info[0], self.BadMetaException)
+            assert m._exc_info[0] is self.BadMetaException
             assert "/*\nWarning:" in m.export_as_string()
 
     def test_bad_table(self):
@@ -2028,7 +2028,7 @@ class BadMetaTest(unittest.TestCase):
         with patch.object(self.parser_class, '_build_column_metadata', side_effect=self.BadMetaException):
             self.cluster.refresh_table_metadata(self.keyspace_name, self.function_name)
             m = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
-            self.assertIs(m._exc_info[0], self.BadMetaException)
+            assert m._exc_info[0] is self.BadMetaException
             assert "/*\nWarning:" in m.export_as_string()
 
     def test_bad_index(self):
@@ -2037,7 +2037,7 @@ class BadMetaTest(unittest.TestCase):
         with patch.object(self.parser_class, '_build_index_metadata', side_effect=self.BadMetaException):
             self.cluster.refresh_table_metadata(self.keyspace_name, self.function_name)
             m = self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_name]
-            self.assertIs(m._exc_info[0], self.BadMetaException)
+            assert m._exc_info[0] is self.BadMetaException
             assert "/*\nWarning:" in m.export_as_string()
 
     @greaterthancass20
@@ -2046,7 +2046,7 @@ class BadMetaTest(unittest.TestCase):
         with patch.object(self.parser_class, '_build_user_type', side_effect=self.BadMetaException):
             self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
             m = self.cluster.metadata.keyspaces[self.keyspace_name]
-            self.assertIs(m._exc_info[0], self.BadMetaException)
+            assert m._exc_info[0] is self.BadMetaException
             assert "/*\nWarning:" in m.export_as_string()
 
     @greaterthancass21
@@ -2065,7 +2065,7 @@ class BadMetaTest(unittest.TestCase):
             with patch.object(self.parser_class, '_build_function', side_effect=self.BadMetaException):
                 self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
                 m = self.cluster.metadata.keyspaces[self.keyspace_name]
-                self.assertIs(m._exc_info[0], self.BadMetaException)
+                assert m._exc_info[0] is self.BadMetaException
                 assert "/*\nWarning:" in m.export_as_string()
 
     @greaterthancass21
@@ -2084,7 +2084,7 @@ class BadMetaTest(unittest.TestCase):
             with patch.object(self.parser_class, '_build_aggregate', side_effect=self.BadMetaException):
                 self.cluster.refresh_schema_metadata()   # presently do not capture these errors on udt direct refresh -- make sure it's contained during full refresh
                 m = self.cluster.metadata.keyspaces[self.keyspace_name]
-                self.assertIs(m._exc_info[0], self.BadMetaException)
+                assert m._exc_info[0] is self.BadMetaException
                 assert "/*\nWarning:" in m.export_as_string()
 
 

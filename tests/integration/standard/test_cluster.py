@@ -424,7 +424,7 @@ class ClusterTests(unittest.TestCase):
         # only refresh one keyspace
         cluster.refresh_keyspace_metadata('system')
         current_meta = cluster.metadata.keyspaces
-        self.assertIs(original_meta, current_meta)
+        assert original_meta is current_meta
         current_system_meta = current_meta['system']
         self.assertIsNot(original_system_meta, current_system_meta)
         assert original_system_meta.as_cql_query() == current_system_meta.as_cql_query()
@@ -443,8 +443,8 @@ class ClusterTests(unittest.TestCase):
         current_meta = cluster.metadata.keyspaces
         current_system_meta = current_meta['system']
         current_system_schema_meta = current_system_meta.tables['local']
-        self.assertIs(original_meta, current_meta)
-        self.assertIs(original_system_meta, current_system_meta)
+        assert original_meta is current_meta
+        assert original_system_meta is current_system_meta
         self.assertIsNot(original_system_schema_meta, current_system_schema_meta)
         assert original_system_schema_meta.as_cql_query() == current_system_schema_meta.as_cql_query()
         cluster.shutdown()
@@ -473,7 +473,7 @@ class ClusterTests(unittest.TestCase):
         current_meta = cluster.metadata.keyspaces
         current_test1rf_meta = current_meta[keyspace_name]
         current_type_meta = current_test1rf_meta.user_types[type_name]
-        self.assertIs(original_meta, current_meta)
+        assert original_meta is current_meta
         assert original_test1rf_meta.export_as_string() == current_test1rf_meta.export_as_string()
         self.assertIsNot(original_type_meta, current_type_meta)
         assert original_type_meta.as_cql_query() == current_type_meta.as_cql_query()
@@ -506,7 +506,7 @@ class ClusterTests(unittest.TestCase):
             self.assertRaisesRegex(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
             end_time = time.time()
             assert end_time - start_time >= agreement_timeout
-            self.assertIs(original_meta, c.metadata.keyspaces)
+            assert original_meta is c.metadata.keyspaces
 
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
@@ -544,7 +544,7 @@ class ClusterTests(unittest.TestCase):
                                     max_schema_agreement_wait=agreement_timeout)
             end_time = time.time()
             assert end_time - start_time >= agreement_timeout
-            self.assertIs(original_meta, c.metadata.keyspaces)
+            assert original_meta is c.metadata.keyspaces
             c.shutdown()
 
     def test_trace(self):

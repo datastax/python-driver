@@ -1356,7 +1356,7 @@ class HostFilterPolicyInitTest(unittest.TestCase):
                                              Mock(name='predicate'))
 
     def _check_init(self, hfp):
-        self.assertIs(hfp._child_policy, self.child_policy)
+        assert hfp._child_policy is self.child_policy
         assert isinstance(hfp._hosts_lock, LockType)
 
         # we can't use a simple assertIs because we wrap the function
@@ -1408,7 +1408,7 @@ class HostFilterPolicyDeferralTest(unittest.TestCase):
         # method calls the child policy's method...
         child_policy_method.assert_called_once_with(arg, kw=kwarg)
         # and returns its return value
-        self.assertIs(result, child_policy_method.return_value)
+        assert result is child_policy_method.return_value
 
     def test_defer_on_up_to_child_policy(self):
         self._check_host_triggered_method(self.passthrough_hfp, 'on_up')

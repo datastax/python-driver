@@ -175,6 +175,6 @@ class OrderedMapSerializedKeyTest(unittest.TestCase):
 
         # type lookup is normalized by key_type
         # PYTHON-231
-        self.assertIs(om[{'one': 1}], om[{u'one': 1}])
-        self.assertIs(om[{'two': 2}], om[{u'two': 2}])
+        assert om[{'one': 1}] is om[{u'one': 1}]
+        assert om[{'two': 2}] is om[{u'two': 2}]
         self.assertIsNot(om[{'one': 1}], om[{'two': 2}])

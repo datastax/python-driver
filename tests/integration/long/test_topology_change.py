@@ -44,5 +44,5 @@ class TopologyChangeTests(TestCase):
         decommission(3)
 
         wait_until(condition=lambda: state_listener.removed_host is not None, delay=2, max_attempts=50)
-        self.assertIs(state_listener.downed_host, state_listener.removed_host)  # Just a sanity check
+        assert state_listener.downed_host is state_listener.removed_host  # Just a sanity check
         assert not state_listener.removed_host.is_currently_reconnecting()

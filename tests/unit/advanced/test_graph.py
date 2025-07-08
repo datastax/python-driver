@@ -384,7 +384,7 @@ class GraphStatementTests(unittest.TestCase):
                   'custom_payload': object()}
         statement = SimpleGraphStatement(**kwargs)
         for k, v in kwargs.items():
-            self.assertIs(getattr(statement, k), v)
+            assert getattr(statement, k) is v
 
         # but not a bogus parameter
         kwargs['bogus'] = object()

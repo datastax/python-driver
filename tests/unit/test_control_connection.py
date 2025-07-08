@@ -498,7 +498,7 @@ class ControlConnectionTest(unittest.TestCase):
         }
         self.control_connection._handle_status_change(event)
         host = self.cluster.metadata.get_host(DefaultEndPoint('192.168.1.0'))
-        self.assertIs(host, self.cluster.down_host)
+        assert host is self.cluster.down_host
 
     def test_handle_schema_change(self):
 
