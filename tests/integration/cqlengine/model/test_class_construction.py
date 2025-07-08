@@ -39,14 +39,14 @@ class TestModelClassFunction(BaseCassEngTestCase):
             text = columns.Text()
 
         # check class attibutes
-        self.assertHasAttr(TestModel, '_columns')
-        self.assertHasAttr(TestModel, 'id')
-        self.assertHasAttr(TestModel, 'text')
+        assert hasattr(TestModel, '_columns')
+        assert hasattr(TestModel, 'id')
+        assert hasattr(TestModel, 'text')
 
         # check instance attributes
         inst = TestModel()
-        self.assertHasAttr(inst, 'id')
-        self.assertHasAttr(inst, 'text')
+        assert hasattr(inst, 'id')
+        assert hasattr(inst, 'text')
         assert inst.id is not None
         assert inst.text is None
 
@@ -61,8 +61,8 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         # Check that defaults are available at instantiation.
         inst1 = TestPerson()
-        self.assertHasAttr(inst1, 'first_name')
-        self.assertHasAttr(inst1, 'last_name')
+        assert hasattr(inst1, 'first_name')
+        assert hasattr(inst1, 'last_name')
         assert inst1.first_name == 'kevin'
         assert inst1.last_name == 'deldycke'
 
