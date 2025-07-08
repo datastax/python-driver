@@ -48,7 +48,7 @@ class ColumnTest(unittest.TestCase):
             pass
 
         # __gt__
-        self.assertGreater(c1, c0)
+        assert c1 > c0
         try:
             c1 > object()  # this raises for Python 3
         except TypeError:

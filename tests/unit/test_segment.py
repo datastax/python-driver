@@ -158,7 +158,7 @@ class SegmentCodecTest(unittest.TestCase):
 
         assert header.is_self_contained == True
         assert header.uncompressed_payload_length == len(self.small_msg)
-        self.assertGreater(header.uncompressed_payload_length, header.payload_length)
+        assert header.uncompressed_payload_length > header.payload_length
         assert segment.payload == self.small_msg
 
     def test_decode_multi_segments(self):

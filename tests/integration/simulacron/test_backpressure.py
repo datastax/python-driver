@@ -70,10 +70,10 @@ class TCPBackpressureTests(SimulacronBase):
 
         # Make sure we actually have some stuck in-flight requests
         for in_flight in [pool._connection.in_flight for pool in session.get_pools()]:
-            self.assertGreater(in_flight, 100)
+            assert in_flight > 100
         time.sleep(.5)
         for in_flight in [pool._connection.in_flight for pool in session.get_pools()]:
-            self.assertGreater(in_flight, 100)
+            assert in_flight > 100
 
         prime_request(ResumeReads())
 

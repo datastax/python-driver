@@ -474,7 +474,7 @@ class StaticColumnTests(BaseCassEngTestCase):
         with mock.patch.object(session, "execute", wraps=session.execute) as m:
             sync_table(StaticModel)
 
-        self.assertGreater(m.call_count, 0)
+        assert m.call_count > 0
         statement = m.call_args[0][0].query_string
         assert '"name" text static' in statement
 

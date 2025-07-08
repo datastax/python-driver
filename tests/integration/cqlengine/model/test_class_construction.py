@@ -422,4 +422,4 @@ class TestCachedLengthIsNotCarriedToSubclasses(BaseCassEngTestCase):
         class AlreadyLoadedTest(ConcreteModelWithCol):
             new_field = columns.Integer()
 
-        self.assertGreater(len(AlreadyLoadedTest()), length)
+        assert len(AlreadyLoadedTest()) > length

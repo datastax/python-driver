@@ -114,7 +114,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
             assert isinstance(page, dict)
             for colname, arr in page.items():
                 if count <= expected_pages:
-                    self.assertGreater(len(arr), 0, "page count: %d" % (count,))
+                    assert len(arr) > 0, "page count: %d" % (count,)
                     assert len(arr) <= session.default_fetch_size
                 else:
                     # we get one extra item out of this iteration because of the way NumpyParser returns results

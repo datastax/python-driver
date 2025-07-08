@@ -345,7 +345,7 @@ class ConnectionTests(SimulacronBase):
         response_future = session.execute_async(query_to_prime, timeout=4 * idle_heartbeat_interval
                                                                         + idle_heartbeat_timeout)
         response_future.result()
-        self.assertGreater(len(response_future.attempted_hosts), 1)
+        assert len(response_future.attempted_hosts) > 1
 
         # No error should be raised here since the hosts have been marked
         # as down and there's still 1 DC available

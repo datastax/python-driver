@@ -77,7 +77,7 @@ class MetricsTests(unittest.TestCase):
             # Give some time for the cluster to come back up, for the next test
             time.sleep(5)
 
-        self.assertGreater(self.cluster.metrics.stats.connection_errors, 0)
+        assert self.cluster.metrics.stats.connection_errors > 0
 
     def test_write_timeout(self):
         """

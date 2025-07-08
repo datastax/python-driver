@@ -79,7 +79,7 @@ class UpgradeTests(UpgradeBase):
             queried_hosts = set()
             for _ in range(10):
                 results = session.execute("SELECT * from system.local WHERE key='local'")
-                self.assertGreater(len(results.current_rows), 0)
+                assert len(results.current_rows) > 0
                 assert len(results.response_future.attempted_hosts) == 1
                 queried_hosts.add(results.response_future.attempted_hosts[0])
             assert len(queried_hosts) == 3
@@ -243,7 +243,7 @@ class UpgradeTestsAuthentication(UpgradeBaseAuth):
         queried_hosts = set()
         for _ in range(10):
             results = session.execute("SELECT * from system.local WHERE key='local'")
-            self.assertGreater(len(results.current_rows), 0)
+            assert len(results.current_rows) > 0
             assert len(results.response_future.attempted_hosts) == 1
             queried_hosts.add(results.response_future.attempted_hosts[0])
         assert len(queried_hosts) == 3

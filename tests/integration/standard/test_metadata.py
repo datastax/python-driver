@@ -1630,7 +1630,7 @@ class FunctionMetadata(FunctionTest):
             type_idx = keyspace_cql.rfind("CREATE TYPE")
             func_idx = keyspace_cql.find("CREATE FUNCTION")
             assert -1 not in (type_idx, func_idx), "TYPE or FUNCTION not found in keyspace_cql: " + keyspace_cql
-            self.assertGreater(func_idx, type_idx)
+            assert func_idx > type_idx
 
     def test_function_same_name_diff_types(self):
         """
@@ -1650,8 +1650,8 @@ class FunctionMetadata(FunctionTest):
         with self.VerifiedFunction(self, **kwargs):
 
             # another function: same name, different type sig.
-            self.assertGreater(len(kwargs['argument_types']), 1)
-            self.assertGreater(len(kwargs['argument_names']), 1)
+            assert len(kwargs['argument_types']) > 1
+            assert len(kwargs['argument_names']) > 1
             kwargs['argument_types'] = kwargs['argument_types'][:1]
             kwargs['argument_names'] = kwargs['argument_names'][:1]
 
@@ -1867,7 +1867,7 @@ class AggregateMetadata(FunctionTest):
             func_idx = keyspace_cql.find("CREATE FUNCTION")
             aggregate_idx = keyspace_cql.rfind("CREATE AGGREGATE")
             assert -1 not in (aggregate_idx, func_idx), "AGGREGATE or FUNCTION not found in keyspace_cql: " + keyspace_cql
-            self.assertGreater(aggregate_idx, func_idx)
+            assert aggregate_idx > func_idx
 
     def test_same_name_diff_types(self):
         """
@@ -1951,7 +1951,7 @@ class AggregateMetadata(FunctionTest):
             assert meta.final_func is None
             cql = meta.as_cql_query()
             search_string = "INITCOND %s" % kwargs['initial_condition']
-            self.assertGreater(cql.find(search_string), 0, '"%s" search string not found in cql:\n%s' % (search_string, cql))
+            assert cql.find(search_string) > 0, '"%s" search string not found in cql:\n%s' % (search_string, cql)
             assert cql.find('FINALFUNC') == -1
 
         # no initial condition, final func
@@ -1964,7 +1964,7 @@ class AggregateMetadata(FunctionTest):
             cql = meta.as_cql_query()
             assert cql.find('INITCOND') == -1
             search_string = 'FINALFUNC "%s"' % kwargs['final_func']
-            self.assertGreater(cql.find(search_string), 0, '"%s" search string not found in cql:\n%s' % (search_string, cql))
+            assert cql.find(search_string) > 0, '"%s" search string not found in cql:\n%s' % (search_string, cql)
 
         # both
         kwargs['initial_condition'] = encoder.cql_encode_all_types(['init', 'cond'])
@@ -1977,7 +1977,7 @@ class AggregateMetadata(FunctionTest):
             init_cond_idx = cql.find("INITCOND %s" % kwargs['initial_condition'])
             final_func_idx = cql.find('FINALFUNC "%s"' % kwargs['final_func'])
             assert -1 not in (init_cond_idx, final_func_idx)
-            self.assertGreater(init_cond_idx, final_func_idx)
+            assert init_cond_idx > final_func_idx
 
 
 class BadMetaTest(unittest.TestCase):

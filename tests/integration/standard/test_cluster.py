@@ -955,7 +955,7 @@ class ClusterTests(unittest.TestCase):
         exec_profiles = {'rr1': rr1}
         with TestCluster(execution_profiles=exec_profiles) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
-            self.assertGreater(len(cluster.metadata.all_hosts()), 1, "We only have one host connected at this point")
+            assert len(cluster.metadata.all_hosts()) > 1, "We only have one host connected at this point"
 
             rr1_clone = session.execution_profile_clone_update('rr1', row_factory=tuple_factory)
             cluster.add_execution_profile("rr1_clone", rr1_clone)
@@ -1012,7 +1012,7 @@ class ClusterTests(unittest.TestCase):
             session = cluster.connect(wait_for_all_pools=True)
             pools = session.get_pool_state()
             # there are more hosts, but we connected to the ones in the lbp aggregate
-            self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+            assert len(cluster.metadata.all_hosts()) > 2
             assert set(h.address for h in pools) == set(('127.0.0.1', '127.0.0.2'))
 
             # dynamically update pools on add
@@ -1046,7 +1046,7 @@ class ClusterTests(unittest.TestCase):
             with TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: node1}) as cluster:
                 session = cluster.connect(wait_for_all_pools=True)
                 pools = session.get_pool_state()
-                self.assertGreater(len(cluster.metadata.all_hosts()), 2)
+                assert len(cluster.metadata.all_hosts()) > 2
                 assert set(h.address for h in pools) == set(('127.0.0.1',))
 
                 node2 = ExecutionProfile(
@@ -1242,7 +1242,7 @@ class ClusterTests(unittest.TestCase):
         if only_replicas:
             assert len(queried_hosts) == 1, "The hosts queried where {}".format(queried_hosts)
         else:
-            self.assertGreater(len(queried_hosts), 1, "The host queried was {}".format(queried_hosts))
+            assert len(queried_hosts) > 1, "The host queried was {}".format(queried_hosts)
         return queried_hosts
 
     def _check_trace(self, trace):
