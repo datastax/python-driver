@@ -17,6 +17,8 @@ import unittest
 from cassandra.util import sortedset
 from cassandra.cqltypes import EMPTY
 
+from tests.util import assertListEqual
+
 from datetime import datetime
 from itertools import permutations
 
@@ -213,7 +215,7 @@ class SortedSetTest(unittest.TestCase):
         expected = [1,2,3,4]
         ss = sortedset(expected)
         for i in range(len(ss)):
-            self.assertListEqual(list(ss), expected[i:])
+            assertListEqual(list(ss), expected[i:])
             del ss[0]
         with self.assertRaises(IndexError):
             ss[0]
@@ -222,11 +224,11 @@ class SortedSetTest(unittest.TestCase):
         expected = [1, 2, 3, 4, 5]
         ss = sortedset(expected)
         del ss[1:3]
-        self.assertListEqual(list(ss), [1, 4, 5])
+        assertListEqual(list(ss), [1, 4, 5])
         del ss[-1:]
-        self.assertListEqual(list(ss), [1, 4])
+        assertListEqual(list(ss), [1, 4])
         del ss[1:]
-        self.assertListEqual(list(ss), [1])
+        assertListEqual(list(ss), [1])
         del ss[:]
         assert not ss
         with self.assertRaises(IndexError):
@@ -234,7 +236,7 @@ class SortedSetTest(unittest.TestCase):
 
     def test_reversed(self):
         expected = range(10)
-        self.assertListEqual(list(reversed(sortedset(expected))), list(reversed(expected)))
+        assertListEqual(list(reversed(sortedset(expected))), list(reversed(expected)))
 
     def test_operators(self):
 

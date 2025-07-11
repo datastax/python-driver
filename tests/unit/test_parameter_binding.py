@@ -21,6 +21,8 @@ from cassandra.query import (bind_params, ValueSequence, PreparedStatement,
 from cassandra.cqltypes import Int32Type
 from cassandra.util import OrderedDict
 
+from tests.util import assertListEqual
+
 
 class ParamBindingTest(unittest.TestCase):
 
@@ -162,7 +164,7 @@ class BoundStatementTestV3(unittest.TestCase):
                                                result_metadata=None,
                                                result_metadata_id=None)
         bound = prepared_statement.bind(None)
-        self.assertListEqual(bound.values, [])
+        assertListEqual(bound.values, [])
 
     def test_bind_none(self):
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': None})

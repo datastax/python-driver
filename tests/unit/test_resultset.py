@@ -18,6 +18,8 @@ from unittest.mock import Mock, PropertyMock, patch
 from cassandra.cluster import ResultSet
 from cassandra.query import named_tuple_factory, dict_factory, tuple_factory
 
+from tests.util import assertListEqual
+
 
 class ResultSetTests(unittest.TestCase):
 
@@ -25,7 +27,7 @@ class ResultSetTests(unittest.TestCase):
         expected = list(range(10))
         rs = ResultSet(Mock(has_more_pages=False), expected)
         itr = iter(rs)
-        self.assertListEqual(list(itr), expected)
+        assertListEqual(list(itr), expected)
 
     def test_iter_paged(self):
         expected = list(range(10))
@@ -35,7 +37,7 @@ class ResultSetTests(unittest.TestCase):
         itr = iter(rs)
         # this is brittle, depends on internal impl details. Would like to find a better way
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, True, False))  # after init to avoid side effects being consumed by init
-        self.assertListEqual(list(itr), expected)
+        assertListEqual(list(itr), expected)
 
     def test_iter_paged_with_empty_pages(self):
         expected = list(range(10))
@@ -48,7 +50,7 @@ class ResultSetTests(unittest.TestCase):
         ]
         rs = ResultSet(response_future, [])
         itr = iter(rs)
-        self.assertListEqual(list(itr), expected)
+        assertListEqual(list(itr), expected)
 
     def test_list_non_paged(self):
         # list access on RS for backwards-compatibility
@@ -121,8 +123,8 @@ class ResultSetTests(unittest.TestCase):
         assert rs[0] == expected[0]
 
         # resusable iteration
-        self.assertListEqual(list(rs), expected)
-        self.assertListEqual(list(rs), expected)
+        assertListEqual(list(rs), expected)
+        assertListEqual(list(rs), expected)
 
         assert rs
 
@@ -136,8 +138,8 @@ class ResultSetTests(unittest.TestCase):
         assert rs[0] == expected[0]
         assert rs[9] == expected[9]
         # resusable iteration
-        self.assertListEqual(list(rs), expected)
-        self.assertListEqual(list(rs), expected)
+        assertListEqual(list(rs), expected)
+        assertListEqual(list(rs), expected)
 
         assert rs
 
@@ -150,7 +152,7 @@ class ResultSetTests(unittest.TestCase):
         assert rs == expected
 
         # results can be iterated or indexed once we're materialized
-        self.assertListEqual(list(rs), expected)
+        assertListEqual(list(rs), expected)
         assert rs[9] == expected[9]
         assert rs
 
@@ -163,7 +165,7 @@ class ResultSetTests(unittest.TestCase):
         assert rs == expected
 
         # results can be iterated or indexed once we're materialized
-        self.assertListEqual(list(rs), expected)
+        assertListEqual(list(rs), expected)
         assert rs[9] == expected[9]
         assert rs
 

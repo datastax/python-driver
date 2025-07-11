@@ -15,6 +15,7 @@
 import time
 from functools import wraps
 import re
+import unittest
 
 
 def wait_until(condition, delay, max_attempts):
@@ -76,3 +77,20 @@ def late(seconds=1):
 
 def assertRegex(text: str, pattern: str):
     assert re.search(pattern, text)
+
+unittest_test_case = unittest.TestCase()
+
+def assertSequenceEqual(a, b, seq_type = None):
+    unittest_test_case.assertSequenceEqual(a, b, seq_type=seq_type)
+
+def assertDictEqual(a, b):
+    assertSequenceEqual(a, b, seq_type=dict)
+
+def assertListEqual(a, b):
+    assertSequenceEqual(a, b, seq_type=list)
+
+def assertSetEqual(a, b):
+    assertSequenceEqual(a, b, seq_type=set)
+
+def assertCountEqual(a, b):
+    unittest_test_case.assertCountEqual(a, b)

@@ -16,6 +16,7 @@ import unittest
 
 from cassandra.util import OrderedMap, OrderedMapSerializedKey
 from cassandra.cqltypes import EMPTY, UTF8Type, lookup_casstype
+from tests.util import assertListEqual
 
 class OrderedMapTest(unittest.TestCase):
     def test_init(self):
@@ -54,21 +55,21 @@ class OrderedMapTest(unittest.TestCase):
         keys = ['first', 'middle', 'last']
         om = OrderedMap(zip(keys, range(len(keys))))
 
-        self.assertListEqual(list(om.keys()), keys)
+        assertListEqual(list(om.keys()), keys)
 
     def test_values(self):
         keys = ['first', 'middle', 'last']
         values = list(range(len(keys)))
         om = OrderedMap(zip(keys, values))
 
-        self.assertListEqual(list(om.values()), values)
+        assertListEqual(list(om.values()), values)
 
     def test_items(self):
         keys = ['first', 'middle', 'last']
         items = list(zip(keys, range(len(keys))))
         om = OrderedMap(items)
 
-        self.assertListEqual(list(om.items()), items)
+        assertListEqual(list(om.items()), items)
 
     def test_get(self):
         keys = ['first', 'middle', 'last']

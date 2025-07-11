@@ -29,6 +29,7 @@ from tests.integration import use_singledc, PROTOCOL_VERSION, BasicSharedKeyspac
     USE_CASS_EXTERNAL, greaterthanorequalcass40, TestCluster, xfail_scylla
 from tests import notwindows
 from tests.integration import greaterthanorequalcass30, get_node
+from tests.util import assertListEqual
 
 import time
 import random
@@ -116,7 +117,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         assert rs_trace.events
         assert len(rs_trace.events) == len(future_trace.events)
 
-        self.assertListEqual([rs_trace], rs.get_all_query_traces())
+        assertListEqual([rs_trace], rs.get_all_query_traces())
 
     def test_trace_ignores_row_factory(self):
         with TestCluster(

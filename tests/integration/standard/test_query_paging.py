@@ -27,6 +27,8 @@ from cassandra.concurrent import execute_concurrent, execute_concurrent_with_arg
 from cassandra.policies import HostDistance
 from cassandra.query import SimpleStatement
 
+from tests.util import assertSequenceEqual
+
 
 def setup_module():
     use_singledc()
@@ -161,8 +163,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.append(result.k2)
                 value_array.append(result.v)
 
-            self.assertSequenceEqual(range(100), result_array)
-            self.assertSequenceEqual(range(1, 101), value_array)
+            assertSequenceEqual(range(100), result_array)
+            assertSequenceEqual(range(1, 101), value_array)
 
             statement = SimpleStatement("SELECT * FROM test3rf.test_paging_verify_2")
             results = self.session.execute(statement)
@@ -172,8 +174,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.append(result.k2)
                 value_array.append(result.v)
 
-            self.assertSequenceEqual(range(100), result_array)
-            self.assertSequenceEqual(range(1, 101), value_array)
+            assertSequenceEqual(range(100), result_array)
+            assertSequenceEqual(range(1, 101), value_array)
 
             results = self.session.execute(prepared)
             result_array = []
@@ -182,8 +184,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.append(result.k2)
                 value_array.append(result.v)
 
-            self.assertSequenceEqual(range(100), result_array)
-            self.assertSequenceEqual(range(1, 101), value_array)
+            assertSequenceEqual(range(100), result_array)
+            assertSequenceEqual(range(1, 101), value_array)
 
     def test_async_paging(self):
         statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
@@ -227,8 +229,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.append(result.k2)
                 value_array.append(result.v)
 
-            self.assertSequenceEqual(range(100), result_array)
-            self.assertSequenceEqual(range(1, 101), value_array)
+            assertSequenceEqual(range(100), result_array)
+            assertSequenceEqual(range(1, 101), value_array)
 
             statement = SimpleStatement("SELECT * FROM test3rf.test_async_paging_verify")
             results = self.session.execute_async(statement).result()
@@ -238,8 +240,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.append(result.k2)
                 value_array.append(result.v)
 
-            self.assertSequenceEqual(range(100), result_array)
-            self.assertSequenceEqual(range(1, 101), value_array)
+            assertSequenceEqual(range(100), result_array)
+            assertSequenceEqual(range(1, 101), value_array)
 
             results = self.session.execute_async(prepared).result()
             result_array = []
@@ -248,8 +250,8 @@ class QueryPagingTests(unittest.TestCase):
                 result_array.append(result.k2)
                 value_array.append(result.v)
 
-            self.assertSequenceEqual(range(100), result_array)
-            self.assertSequenceEqual(range(1, 101), value_array)
+            assertSequenceEqual(range(100), result_array)
+            assertSequenceEqual(range(1, 101), value_array)
 
     def test_paging_callbacks(self):
         """

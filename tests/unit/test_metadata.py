@@ -33,6 +33,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
                                 Metadata, TokenMap, ReplicationFactor)
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
+from tests.util import assertCountEqual
 
 
 log = logging.getLogger(__name__)
@@ -215,7 +216,7 @@ class StrategiesTest(unittest.TestCase):
         nts = NetworkTopologyStrategy({'dc1': 2, 'dc2': 2, 'dc3': 1})
         replica_map = nts.make_token_replica_map(token_to_host_owner, ring)
 
-        self.assertItemsEqual(replica_map[MD5Token(0)], (dc1_1, dc1_2, dc2_1, dc2_2, dc3_1))
+        assertCountEqual(replica_map[MD5Token(0)], (dc1_1, dc1_2, dc2_1, dc2_2, dc3_1))
 
     def test_nts_token_performance(self):
         """
@@ -296,7 +297,7 @@ class StrategiesTest(unittest.TestCase):
         replica_map = nts.make_token_replica_map(token_to_host_owner, ring)
 
         token_replicas = replica_map[MD5Token(0)]
-        self.assertItemsEqual(token_replicas, (dc1_1, dc1_2, dc1_3, dc2_1, dc2_3))
+        assertCountEqual(token_replicas, (dc1_1, dc1_2, dc1_3, dc2_1, dc2_3))
 
     def test_nts_make_token_replica_map_empty_dc(self):
         host = Host('1', SimpleConvictionPolicy)
@@ -324,19 +325,19 @@ class StrategiesTest(unittest.TestCase):
         ring = [MD5Token(0), MD5Token(100), MD5Token(200)]
 
         rf1_replicas = SimpleStrategy({'replication_factor': '1'}).make_token_replica_map(token_to_host_owner, ring)
-        self.assertItemsEqual(rf1_replicas[MD5Token(0)], [host1])
-        self.assertItemsEqual(rf1_replicas[MD5Token(100)], [host2])
-        self.assertItemsEqual(rf1_replicas[MD5Token(200)], [host3])
+        assertCountEqual(rf1_replicas[MD5Token(0)], [host1])
+        assertCountEqual(rf1_replicas[MD5Token(100)], [host2])
+        assertCountEqual(rf1_replicas[MD5Token(200)], [host3])
 
         rf2_replicas = SimpleStrategy({'replication_factor': '2'}).make_token_replica_map(token_to_host_owner, ring)
-        self.assertItemsEqual(rf2_replicas[MD5Token(0)], [host1, host2])
-        self.assertItemsEqual(rf2_replicas[MD5Token(100)], [host2, host3])
-        self.assertItemsEqual(rf2_replicas[MD5Token(200)], [host3, host1])
+        assertCountEqual(rf2_replicas[MD5Token(0)], [host1, host2])
+        assertCountEqual(rf2_replicas[MD5Token(100)], [host2, host3])
+        assertCountEqual(rf2_replicas[MD5Token(200)], [host3, host1])
 
         rf3_replicas = SimpleStrategy({'replication_factor': '3'}).make_token_replica_map(token_to_host_owner, ring)
-        self.assertItemsEqual(rf3_replicas[MD5Token(0)], [host1, host2, host3])
-        self.assertItemsEqual(rf3_replicas[MD5Token(100)], [host2, host3, host1])
-        self.assertItemsEqual(rf3_replicas[MD5Token(200)], [host3, host1, host2])
+        assertCountEqual(rf3_replicas[MD5Token(0)], [host1, host2, host3])
+        assertCountEqual(rf3_replicas[MD5Token(100)], [host2, host3, host1])
+        assertCountEqual(rf3_replicas[MD5Token(200)], [host3, host1, host2])
 
     def test_ss_equals(self):
         assert SimpleStrategy({'replication_factor': '1'}) != NetworkTopologyStrategy({'dc1': 2})

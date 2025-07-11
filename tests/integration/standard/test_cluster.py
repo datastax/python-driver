@@ -44,6 +44,7 @@ from tests.integration import use_cluster, get_server_versions, CASSANDRA_VERSIO
     get_unsupported_upper_protocol, protocolv6, local, CASSANDRA_IP, greaterthanorequalcass30, \
     lessthanorequalcass40, TestCluster, PROTOCOL_VERSION, xfail_scylla, incorrect_test
 from tests.integration.util import assert_quiescent_pool_state
+from tests.util import assertListEqual
 import sys
 
 log = logging.getLogger(__name__)
@@ -743,7 +744,7 @@ class ClusterTests(unittest.TestCase):
             expected_ids = connection_request_ids[id(c)]
             expected_ids.rotate(-1)
             with c.lock:
-                self.assertListEqual(list(c.request_ids), list(expected_ids))
+                assertListEqual(list(c.request_ids), list(expected_ids))
 
         # assert idle status
         assert all(c.is_idle for c in connections)

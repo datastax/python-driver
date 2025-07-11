@@ -33,6 +33,7 @@ from cassandra.cqlengine.operators import EqualsOperator
 from tests.integration import PROTOCOL_VERSION, greaterthanorequalcass3_10
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
+from tests.util import assertSetEqual
 
 
 class TestModel(Model):
@@ -110,7 +111,7 @@ class TestModelIO(BaseCassEngTestCase):
         }
         assert sorted(tm.keys()) == sorted(column_dict.keys())
 
-        self.assertSetEqual(set(tm.values()), set(column_dict.values()))
+        assertSetEqual(set(tm.values()), set(column_dict.values()))
         assert sorted(tm.items(), key=itemgetter(0)) == sorted(column_dict.items(), key=itemgetter(0))
         assert len(tm) == len(column_dict)
         for column_id in column_dict.keys():

@@ -45,7 +45,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                requires_collection_indexes, SCYLLA_VERSION, xfail_scylla, xfail_scylla_version_lt,
                                requirescompactstorage)
 
-from tests.util import wait_until, assertRegex
+from tests.util import wait_until, assertRegex, assertDictEqual, assertListEqual
 
 log = logging.getLogger(__name__)
 
@@ -1832,7 +1832,7 @@ class AggregateMetadata(FunctionTest):
             cql_init = encoder.cql_encode_all_types(init_cond)
             with self.VerifiedAggregate(self, **self.make_aggregate_kwargs('extend_list', 'list<text>', init_cond=cql_init)) as va:
                 list_res = s.execute("SELECT %s(v) AS list_res FROM t" % va.function_kwargs['name']).one().list_res
-                self.assertListEqual(list_res[:len(init_cond)], init_cond)
+                assertListEqual(list_res[:len(init_cond)], init_cond)
                 assert set(i for i in list_res[len(init_cond):]) == set(str(i) for i in expected_values)
 
         # map<int,int>
@@ -2199,8 +2199,8 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
 
         assert "mv1" not in self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views
         assert "mv1" not in self.cluster.metadata.keyspaces[self.keyspace_name].views
-        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
-        self.assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
+        assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].tables[self.function_table_name].views)
+        assertDictEqual({}, self.cluster.metadata.keyspaces[self.keyspace_name].views)
 
         self.session.execute(
             "CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} "

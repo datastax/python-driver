@@ -19,7 +19,7 @@ from cassandra.query import BatchStatement
 
 from tests.integration import (use_singledc, PROTOCOL_VERSION, local, TestCluster,
                                requires_custom_payload, xfail_scylla)
-from tests.util import assertRegex
+from tests.util import assertRegex, assertDictEqual
 
 
 def setup_module():
@@ -109,7 +109,7 @@ class ClientWarningTests(unittest.TestCase):
         future.result()
         assert len(future.warnings) == 1
         assertRegex(future.warnings[0], 'Batch.*exceeding.*')
-        self.assertDictEqual(future.custom_payload, payload)
+        assertDictEqual(future.custom_payload, payload)
 
     @local
     @requires_custom_payload
@@ -130,4 +130,4 @@ class ClientWarningTests(unittest.TestCase):
         assert len(future.warnings) == 1
         assertRegex(future.warnings[0], 'Batch.*exceeding.*')
         assert future.get_query_trace() is not None
-        self.assertDictEqual(future.custom_payload, payload)
+        assertDictEqual(future.custom_payload, payload)
