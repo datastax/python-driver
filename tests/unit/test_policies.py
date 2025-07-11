@@ -161,8 +161,7 @@ class RoundRobinPolicyTest(unittest.TestCase):
             else:
                 sys.setswitchinterval(original_interval)
 
-        if errors:
-            self.fail("Saw errors: %s" % (errors,))
+        assert not errors, "Saw errors: %s" % (errors,)
 
     def test_no_live_nodes(self):
         """
@@ -913,11 +912,8 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
         delay = 2
         max_attempts = -100
 
-        try:
+        with pytest.raises(ValueError):
             ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
-            self.fail('max_attempts should throw ValueError when negative')
-        except ValueError:
-            pass
 
     def test_schedule_infinite_attempts(self):
         delay = 2

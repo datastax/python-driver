@@ -24,6 +24,7 @@ import logging
 import warnings
 from packaging.version import Version
 import os
+import pytest
 
 import cassandra
 from cassandra.cluster import NoHostAvailable, ExecutionProfile, EXEC_PROFILE_DEFAULT, ControlConnection, Cluster
@@ -1490,7 +1491,7 @@ class BetaProtocolTest(unittest.TestCase):
             with self.assertRaises(NoHostAvailable):
                 cluster.connect()
         except Exception as e:
-            self.fail("Unexpected error encountered {0}".format(e.message))
+            pytest.fail("Unexpected error encountered {0}".format(e.message))
 
     @protocolv6
     def test_valid_protocol_version_beta_options_connect(self):

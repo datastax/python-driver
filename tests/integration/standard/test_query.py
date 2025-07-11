@@ -937,13 +937,13 @@ class LightweightTransactionTests(unittest.TestCase):
                 # In this case result is an exception
                 exception_type = type(result).__name__
                 if exception_type == "NoHostAvailable":
-                    self.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
+                    pytest.fail("PYTHON-91: Disconnected from Cassandra: %s" % result.message)
                 if exception_type in ["WriteTimeout", "WriteFailure", "ReadTimeout", "ReadFailure", "ErrorMessageSub"]:
                     if type(result).__name__ in ["WriteTimeout", "WriteFailure"]:
                         received_timeout = True
                     continue
 
-                self.fail("Unexpected exception %s: %s" % (exception_type, result.message))
+                pytest.fail("Unexpected exception %s: %s" % (exception_type, result.message))
 
         # Make sure test passed
         assert received_timeout

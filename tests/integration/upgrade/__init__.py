@@ -26,7 +26,7 @@ from threading import Thread, Event
 from ccmlib.node import TimeoutError
 import time
 import logging
-
+import pytest
 import unittest
 
 
@@ -78,7 +78,7 @@ class UpgradeBase(unittest.TestCase):
         cls.logger_handler = MockLoggingHandler()
         cls.logger = logging.getLogger(cluster.__name__)
         cls.logger.addHandler(cls.logger_handler)
-    
+
     @classmethod
     def tearDownClass(cls):
         cls.logger.removeHandler(cls.logger_handler)
@@ -166,7 +166,7 @@ class UpgradeBase(unittest.TestCase):
         try:
             node.start(wait_for_binary_proto=True, wait_other_notice=True)
         except TimeoutError:
-            self.fail("Error starting C* node while upgrading")
+            pytest.fail("Error starting C* node while upgrading")
 
         return True
 

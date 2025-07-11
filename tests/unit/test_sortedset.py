@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+import pytest
 
 from cassandra.util import sortedset
 from cassandra.cqltypes import EMPTY
@@ -186,11 +187,9 @@ class SortedSetTest(unittest.TestCase):
         ss = sortedset([2, 1])
         assert ss.pop() == 2
         assert ss.pop() == 1
-        try:
+        with pytest.raises((KeyError, IndexError)):
             ss.pop()
-            self.fail("Error not thrown")
-        except (KeyError, IndexError) as e:
-            pass
+
 
     def test_remove(self):
         ss = sortedset([2, 1])

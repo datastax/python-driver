@@ -16,6 +16,7 @@ from tests.integration import get_server_versions, use_singledc, \
     BasicSharedKeyspaceUnitTestCaseWFunctionTable, BasicSharedKeyspaceUnitTestCase, execute_until_pass, TestCluster
 
 import unittest
+import pytest
 
 from cassandra.cluster import ResultSet, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.query import tuple_factory, named_tuple_factory, dict_factory, ordered_dict_factory
@@ -194,7 +195,7 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
         try:
             self.session.execute('SELECT * FROM test1rf.table_num_col')
         except ValueError as e:
-            self.fail("Unexpected ValueError exception: %s" % e.message)
+            pytest.fail("Unexpected ValueError exception: %s" % e.message)
 
     def test_can_select_using_alias(self):
         """
@@ -206,7 +207,7 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
         try:
             self.session.execute('SELECT key, "626972746864617465" AS my_col from test1rf.table_num_col')
         except ValueError as e:
-            self.fail("Unexpected ValueError exception: %s" % e.message)
+            pytest.fail("Unexpected ValueError exception: %s" % e.message)
 
     def test_can_select_with_dict_factory(self):
         """
@@ -218,4 +219,4 @@ class NamedTupleFactoryAndNumericColNamesTests(unittest.TestCase):
             try:
                 cluster.connect().execute('SELECT * FROM test1rf.table_num_col')
             except ValueError as e:
-                self.fail("Unexpected ValueError exception: %s" % e.message)
+                pytest.fail("Unexpected ValueError exception: %s" % e.message)

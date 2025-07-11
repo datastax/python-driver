@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+import pytest
 
 from cassandra.encoder import Encoder
 from cassandra.protocol import ColumnMetadata
@@ -91,25 +92,19 @@ class BoundStatementTestV3(unittest.TestCase):
 
     def test_invalid_argument_type(self):
         values = (0, 0, 0, 'string not int')
-        try:
+        with pytest.raises(TypeError) as e:
             self.bound.bind(values)
-        except TypeError as e:
-            assert 'v0' in str(e)
-            assert 'Int32Type' in str(e)
-            assert 'str' in str(e)
-        else:
-            self.fail('Passed invalid type but exception was not thrown')
+        assert 'v0' in str(e)
+        assert 'Int32Type' in str(e)
+        assert 'str' in str(e)
 
         values = (['1', '2'], 0, 0, 0)
 
-        try:
+        with pytest.raises(TypeError) as e:
             self.bound.bind(values)
-        except TypeError as e:
-            assert 'rk0' in str(e)
-            assert 'Int32Type' in str(e)
-            assert 'list' in str(e)
-        else:
-            self.fail('Passed invalid type but exception was not thrown')
+        assert 'rk0' in str(e)
+        assert 'Int32Type' in str(e)
+        assert 'list' in str(e)
 
     def test_inherit_fetch_size(self):
         keyspace = 'keyspace1'

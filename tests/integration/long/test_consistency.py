@@ -17,6 +17,7 @@ import struct
 import sys
 import time
 import traceback
+import pytest
 
 from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout, WriteTimeout, Unavailable
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
@@ -51,12 +52,12 @@ class ConsistencyTests(unittest.TestCase):
         self.coordinator_stats = CoordinatorStats()
 
     def _cl_failure(self, consistency_level, e):
-        self.fail('Instead of success, saw %s for CL.%s:\n\n%s' % (
+        pytest.fail('Instead of success, saw %s for CL.%s:\n\n%s' % (
             e, ConsistencyLevel.value_to_name[consistency_level],
             traceback.format_exc()))
 
     def _cl_expected_failure(self, cl):
-        self.fail('Test passed at ConsistencyLevel.%s:\n\n%s' % (
+        pytest.fail('Test passed at ConsistencyLevel.%s:\n\n%s' % (
                   ConsistencyLevel.value_to_name[cl], traceback.format_exc()))
 
     def _insert(self, session, keyspace, count, consistency_level=ConsistencyLevel.ONE):
@@ -360,6 +361,3 @@ class ConnectivityTest(unittest.TestCase):
             start(node_to_stop)
             wait_for_up(cluster, node_to_stop)
             cluster.shutdown()
-
-
-

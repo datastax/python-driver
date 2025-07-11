@@ -1349,8 +1349,7 @@ class MetadataTimeoutTest(unittest.TestCase):
         for stmt in stmts:
             if "SELECT now() FROM system.local WHERE key='local'" in stmt:
                 continue
-            if "USING TIMEOUT 2000ms" not in stmt:
-                self.fail(f"query `{stmt}` does not contain `USING TIMEOUT 2000ms`")
+            assert "USING TIMEOUT 2000ms" in stmt, f"query `{stmt}` does not contain `USING TIMEOUT 2000ms`"
 
 
 class KeyspaceAlterMetadata(unittest.TestCase):

@@ -20,6 +20,7 @@ import unittest
 
 from itertools import cycle, count
 from threading import Event
+import pytest
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import EXEC_PROFILE_DEFAULT, ExecutionProfile
@@ -289,7 +290,7 @@ class QueryPagingTests(unittest.TestCase):
 
             def handle_error(err):
                 event.set()
-                self.fail(err)
+                pytest.fail(err)
 
             future.add_callbacks(callback=handle_page, callback_args=(future, counter, number_of_calls),
                                  errback=handle_error)

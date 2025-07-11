@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from uuid import uuid4
+import pytest
 
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
@@ -32,37 +33,28 @@ class TestClassConstruction(BaseCassEngTestCase):
 
     def test_defining_a_non_counter_column_fails(self):
         """ Tests that defining a non counter column field in a model with a counter column fails """
-        try:
+        with pytest.raises(ModelDefinitionException):
             class model(Model):
                 partition = columns.UUID(primary_key=True, default=uuid4)
                 counter = columns.Counter()
                 text = columns.Text()
-            self.fail("did not raise expected ModelDefinitionException")
-        except ModelDefinitionException:
-            pass
 
 
     def test_defining_a_primary_key_counter_column_fails(self):
         """ Tests that defining primary keys on counter columns fails """
-        try:
+        with pytest.raises(TypeError):
             class model(Model):
                 partition = columns.UUID(primary_key=True, default=uuid4)
                 cluster = columns.Counter(primary_ley=True)
                 counter = columns.Counter()
-            self.fail("did not raise expected TypeError")
-        except TypeError:
-            pass
 
         # force it
-        try:
+        with pytest.raises(ModelDefinitionException):
             class model(Model):
                 partition = columns.UUID(primary_key=True, default=uuid4)
                 cluster = columns.Counter()
                 cluster.primary_key = True
                 counter = columns.Counter()
-            self.fail("did not raise expected ModelDefinitionException")
-        except ModelDefinitionException:
-            pass
 
 
 class TestCounterColumn(BaseCassEngTestCase):

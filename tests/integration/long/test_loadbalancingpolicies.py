@@ -16,6 +16,7 @@ import logging
 import struct
 import sys
 import traceback
+import pytest
 from cassandra import cqltypes
 
 from cassandra import ConsistencyLevel, Unavailable, OperationTimedOut, ReadTimeout, ReadFailure, \
@@ -397,11 +398,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.reset_counts()
         force_stop(2)
 
-        try:
+        with pytest.raises(NoHostAvailable):
             self._query(session, keyspace)
-            self.fail()
-        except NoHostAvailable:
-            pass
 
     def test_token_aware(self):
         keyspace = 'test_token_aware'
@@ -436,13 +434,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         force_stop(2)
         self._wait_for_nodes_down([2], cluster)
 
-        try:
+        with pytest.raises(Unavailable) as e:
             self._query(session, keyspace, use_prepared=use_prepared)
-            self.fail()
-        except Unavailable as e:
-            assert e.consistency == 1
-            assert e.required_replicas == 1
-            assert e.alive_replicas == 0
+        assert e.value.consistency == 1
+        assert e.value.required_replicas == 1
+        assert e.value.alive_replicas == 0
 
         self.coordinator_stats.reset_counts()
         start(2)
@@ -458,11 +454,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         stop(2)
         self._wait_for_nodes_down([2], cluster)
 
-        try:
+        with pytest.raises(Unavailable):
             self._query(session, keyspace, use_prepared=use_prepared)
-            self.fail()
-        except Unavailable:
-            pass
 
         self.coordinator_stats.reset_counts()
         start(2)
@@ -717,11 +710,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         force_stop(2)
         self._wait_for_nodes_down([2])
 
-        try:
+        with pytest.raises(NoHostAvailable):
             self._query(session, keyspace)
-            self.fail()
-        except NoHostAvailable:
-            pass
 
     def test_black_list_with_host_filter_policy(self):
         """

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+import pytest
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -58,11 +59,9 @@ class SingleInterfaceTest(unittest.TestCase):
             assert endpoint.address == host.broadcast_rpc_address
             assert endpoint.port == host.broadcast_rpc_port
 
-            if host.broadcast_rpc_port in broadcast_rpc_ports:
-                self.fail("Duplicate broadcast_rpc_port")
+            assert host.broadcast_rpc_port not in broadcast_rpc_ports, "Duplicate broadcast_rpc_port"
             broadcast_rpc_ports.append(host.broadcast_rpc_port)
-            if host.broadcast_port in broadcast_ports:
-                self.fail("Duplicate broadcast_port")
+            assert host.broadcast_port not in broadcast_ports, "Duplicate broadcast_port"
             broadcast_ports.append(host.broadcast_port)
 
         for _ in range(1, 100):

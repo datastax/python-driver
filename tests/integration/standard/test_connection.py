@@ -22,6 +22,7 @@ import threading
 from threading import Thread, Event
 import time
 from unittest import SkipTest
+import pytest
 
 from cassandra import ConsistencyLevel, OperationTimedOut, DependencyException
 from cassandra.cluster import NoHostAvailable, ConnectionShutdown, ExecutionProfile, EXEC_PROFILE_DEFAULT
@@ -179,7 +180,7 @@ class HeartbeatTest(unittest.TestCase):
             if connections:
                 return connections
             time.sleep(.1)
-        self.fail("No new connections found")
+        pytest.fail("No new connections found")
 
     def wait_for_no_connections(self, host, cluster):
         retry = 0
@@ -189,7 +190,7 @@ class HeartbeatTest(unittest.TestCase):
             if not connections:
                 return
             time.sleep(.5)
-        self.fail("Connections never cleared")
+        pytest.fail("Connections never cleared")
 
 
 class ConnectionTests(object):

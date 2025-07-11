@@ -135,16 +135,14 @@ class SchemaParsersTests(unittest.TestCase):
             p._query_all()
 
             for q in conn.queries:
-                if "USING TIMEOUT" in q.query:
-                    self.fail(f"<{schemaClass.__name__}> query `{q.query}` contains `USING TIMEOUT`, while should not")
+                assert "USING TIMEOUT" not in q.query, f"<{schemaClass.__name__}> query `{q.query}` contains `USING TIMEOUT`, while should not"
 
             conn = FakeConnection()
             p = schemaClass(conn, 2.0, 1000, datetime.timedelta(seconds=2))
             p._query_all()
 
             for q in conn.queries:
-                if "USING TIMEOUT 2000ms" not in q.query:
-                    self.fail(f"{schemaClass.__name__} query `{q.query}` does not contain `USING TIMEOUT 2000ms`")
+                assert "USING TIMEOUT 2000ms" in q.query, f"{schemaClass.__name__} query `{q.query}` does not contain `USING TIMEOUT 2000ms`"
 
 
 def get_all_schema_parser_classes(cl):
