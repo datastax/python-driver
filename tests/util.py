@@ -16,6 +16,8 @@ import time
 from functools import wraps
 import re
 import unittest
+import difflib
+import pytest
 
 
 def wait_until(condition, delay, max_attempts):
@@ -97,3 +99,12 @@ def assertCountEqual(a, b):
 
 def assertEqual(a, b):
     assert a == b
+
+def assert_startswith_diff(text, prefix):
+    if not text.startswith(prefix):
+        prefix_lines = prefix.split('\n')
+        diff_string = '\n'.join(difflib.unified_diff(prefix_lines,
+                                                        text.split('\n')[:len(prefix_lines)],
+                                                        'EXPECTED', 'RECEIVED',
+                                                        lineterm=''))
+        pytest.fail(diff_string)
