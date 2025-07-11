@@ -14,6 +14,7 @@
 
 import logging
 import time
+import pytest
 
 from collections import defaultdict
 from packaging.version import Version
@@ -48,10 +49,10 @@ class CoordinatorStats():
         ip = '127.0.0.%d' % node
         return self.coordinator_counts[ip]
 
-    def assert_query_count_equals(self, testcase, node, expected):
+    def assert_query_count_equals(self, node, expected):
         ip = '127.0.0.%d' % node
         if self.get_query_count(node) != expected:
-            testcase.fail('Expected %d queries to %s, but got %d. Query counts: %s' % (
+            pytest.fail('Expected %d queries to %s, but got %d. Query counts: %s' % (
                 expected, ip, self.coordinator_counts[ip], dict(self.coordinator_counts)))
 
 

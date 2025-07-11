@@ -101,9 +101,9 @@ class ConsistencyTests(unittest.TestCase):
                 self._query(session, keyspace, 1, cl)
                 for i in range(3):
                     if i == expected_reader:
-                        self.coordinator_stats.assert_query_count_equals(self, i, 1)
+                        self.coordinator_stats.assert_query_count_equals(i, 1)
                     else:
-                        self.coordinator_stats.assert_query_count_equals(self, i, 0)
+                        self.coordinator_stats.assert_query_count_equals(i, 0)
             except Exception as e:
                 self._cl_failure(cl, e)
 
@@ -136,9 +136,9 @@ class ConsistencyTests(unittest.TestCase):
         create_schema(cluster, session, keyspace, replication_factor=rf)
         self._insert(session, keyspace, count=1)
         self._query(session, keyspace, count=1)
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 1)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 1)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         try:
             force_stop(2)
@@ -188,9 +188,9 @@ class ConsistencyTests(unittest.TestCase):
         create_schema(cluster, session, keyspace, replication_factor=3)
         self._insert(session, keyspace, count=1)
         self._query(session, keyspace, count=1)
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 1)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 1)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         self.coordinator_stats.reset_counts()
 
@@ -211,9 +211,9 @@ class ConsistencyTests(unittest.TestCase):
         create_schema(cluster, session, keyspace, replication_factor=rf)
         self._insert(session, keyspace, 1)
         self._query(session, keyspace, 1)
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 1)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 1)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         try:
             force_stop(2)
@@ -268,13 +268,13 @@ class ConsistencyTests(unittest.TestCase):
         self._query(session, keyspace, count=12)
 
         if roundrobin:
-            self.coordinator_stats.assert_query_count_equals(self, 1, 4)
-            self.coordinator_stats.assert_query_count_equals(self, 2, 4)
-            self.coordinator_stats.assert_query_count_equals(self, 3, 4)
+            self.coordinator_stats.assert_query_count_equals(1, 4)
+            self.coordinator_stats.assert_query_count_equals(2, 4)
+            self.coordinator_stats.assert_query_count_equals(3, 4)
         else:
-            self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-            self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-            self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+            self.coordinator_stats.assert_query_count_equals(1, 0)
+            self.coordinator_stats.assert_query_count_equals(2, 12)
+            self.coordinator_stats.assert_query_count_equals(3, 0)
 
         try:
             self.coordinator_stats.reset_counts()
@@ -288,13 +288,13 @@ class ConsistencyTests(unittest.TestCase):
                 self.coordinator_stats.reset_counts()
                 self._query(session, keyspace, 12, consistency_level=cl)
                 if roundrobin:
-                    self.coordinator_stats.assert_query_count_equals(self, 1, 6)
-                    self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-                    self.coordinator_stats.assert_query_count_equals(self, 3, 6)
+                    self.coordinator_stats.assert_query_count_equals(1, 6)
+                    self.coordinator_stats.assert_query_count_equals(2, 0)
+                    self.coordinator_stats.assert_query_count_equals(3, 6)
                 else:
-                    self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-                    self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-                    self.coordinator_stats.assert_query_count_equals(self, 3, 12)
+                    self.coordinator_stats.assert_query_count_equals(1, 0)
+                    self.coordinator_stats.assert_query_count_equals(2, 0)
+                    self.coordinator_stats.assert_query_count_equals(3, 12)
         finally:
             start(2)
             wait_for_up(cluster, 2)

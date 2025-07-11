@@ -200,9 +200,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 4)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 4)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 4)
+        self.coordinator_stats.assert_query_count_equals(1, 4)
+        self.coordinator_stats.assert_query_count_equals(2, 4)
+        self.coordinator_stats.assert_query_count_equals(3, 4)
 
         force_stop(3)
         self._wait_for_nodes_down([3], cluster)
@@ -210,9 +210,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 6)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 6)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 6)
+        self.coordinator_stats.assert_query_count_equals(2, 6)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         decommission(1)
         start(3)
@@ -222,9 +222,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 6)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 6)
+        self.coordinator_stats.assert_query_count_equals(3, 6)
 
     def test_roundrobin_two_dcs(self):
         use_multidc([2, 2])
@@ -237,10 +237,10 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 3)
+        self.coordinator_stats.assert_query_count_equals(1, 3)
+        self.coordinator_stats.assert_query_count_equals(2, 3)
+        self.coordinator_stats.assert_query_count_equals(3, 3)
+        self.coordinator_stats.assert_query_count_equals(4, 3)
 
         force_stop(1)
         bootstrap(5, 'dc3')
@@ -253,11 +253,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 5, 3)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 3)
+        self.coordinator_stats.assert_query_count_equals(3, 3)
+        self.coordinator_stats.assert_query_count_equals(4, 3)
+        self.coordinator_stats.assert_query_count_equals(5, 3)
 
     def test_roundrobin_two_dcs_2(self):
         use_multidc([2, 2])
@@ -270,10 +270,10 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 3)
+        self.coordinator_stats.assert_query_count_equals(1, 3)
+        self.coordinator_stats.assert_query_count_equals(2, 3)
+        self.coordinator_stats.assert_query_count_equals(3, 3)
+        self.coordinator_stats.assert_query_count_equals(4, 3)
 
         force_stop(1)
         bootstrap(5, 'dc1')
@@ -286,11 +286,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 3)
-        self.coordinator_stats.assert_query_count_equals(self, 5, 3)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 3)
+        self.coordinator_stats.assert_query_count_equals(3, 3)
+        self.coordinator_stats.assert_query_count_equals(4, 3)
+        self.coordinator_stats.assert_query_count_equals(5, 3)
 
     def test_dc_aware_roundrobin_two_dcs(self):
         use_multidc([3, 2])
@@ -303,11 +303,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 4)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 4)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 4)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 4)
+        self.coordinator_stats.assert_query_count_equals(2, 4)
+        self.coordinator_stats.assert_query_count_equals(3, 4)
+        self.coordinator_stats.assert_query_count_equals(4, 0)
+        self.coordinator_stats.assert_query_count_equals(5, 0)
 
     def test_dc_aware_roundrobin_two_dcs_2(self):
         use_multidc([3, 2])
@@ -320,11 +320,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 6)
-        self.coordinator_stats.assert_query_count_equals(self, 5, 6)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
+        self.coordinator_stats.assert_query_count_equals(4, 6)
+        self.coordinator_stats.assert_query_count_equals(5, 6)
 
     def test_dc_aware_roundrobin_one_remote_host(self):
         use_multidc([2, 2])
@@ -337,10 +337,10 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 6)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 6)
+        self.coordinator_stats.assert_query_count_equals(4, 6)
 
         self.coordinator_stats.reset_counts()
         bootstrap(5, 'dc1')
@@ -348,11 +348,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 6)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 6)
-        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 6)
+        self.coordinator_stats.assert_query_count_equals(4, 6)
+        self.coordinator_stats.assert_query_count_equals(5, 0)
 
         self.coordinator_stats.reset_counts()
         decommission(3)
@@ -361,8 +361,8 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
+        self.coordinator_stats.assert_query_count_equals(4, 0)
         responses = set()
         for node in [1, 2, 5]:
             responses.add(self.coordinator_stats.get_query_count(node))
@@ -374,9 +374,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
+        self.coordinator_stats.assert_query_count_equals(4, 0)
+        self.coordinator_stats.assert_query_count_equals(5, 0)
         responses = set()
         for node in [1, 2]:
             responses.add(self.coordinator_stats.get_query_count(node))
@@ -388,11 +388,11 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 4, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 5, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 12)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
+        self.coordinator_stats.assert_query_count_equals(4, 0)
+        self.coordinator_stats.assert_query_count_equals(5, 0)
 
         self.coordinator_stats.reset_counts()
         force_stop(2)
@@ -421,16 +421,16 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace, use_prepared=use_prepared)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 12)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         self.coordinator_stats.reset_counts()
         self._query(session, keyspace, use_prepared=use_prepared)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 12)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         self.coordinator_stats.reset_counts()
         force_stop(2)
@@ -450,9 +450,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace, use_prepared=use_prepared)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 12)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         self.coordinator_stats.reset_counts()
         stop(2)
@@ -477,7 +477,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
             self.coordinator_stats.get_query_count(3)
         ])
         assert results == set([0, 12])
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
 
     def test_token_aware_composite_key(self):
         use_singledc()
@@ -522,9 +522,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 12)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         self.coordinator_stats.reset_counts()
         stop(2)
@@ -532,9 +532,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 12)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 12)
 
     def test_token_aware_with_local_table(self):
         use_singledc()
@@ -570,9 +570,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 12)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 12)
 
     def test_token_aware_with_shuffle_rf3(self):
         """
@@ -597,7 +597,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
         query_count_two = self.coordinator_stats.get_query_count(2)
         query_count_three = self.coordinator_stats.get_query_count(3)
         assert query_count_two + query_count_three == 12
@@ -608,9 +608,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
 
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 12)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
+        self.coordinator_stats.assert_query_count_equals(3, 12)
 
     @greaterthanorequalcass40
     def test_token_aware_with_transient_replication(self):
@@ -704,9 +704,9 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         self._insert(session, keyspace)
         self._query(session, keyspace)
 
-        self.coordinator_stats.assert_query_count_equals(self, 1, 0)
-        self.coordinator_stats.assert_query_count_equals(self, 2, 12)
-        self.coordinator_stats.assert_query_count_equals(self, 3, 0)
+        self.coordinator_stats.assert_query_count_equals(1, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 12)
+        self.coordinator_stats.assert_query_count_equals(3, 0)
 
         # white list policy should not allow reconnecting to ignored hosts
         force_stop(3)
@@ -764,7 +764,7 @@ class LoadBalancingPolicyTests(unittest.TestCase):
         assert first_node_count + third_node_count == 12
         assert first_node_count == 8 or first_node_count == 4
 
-        self.coordinator_stats.assert_query_count_equals(self, 2, 0)
+        self.coordinator_stats.assert_query_count_equals(2, 0)
 
         # policy should not allow reconnecting to ignored host
         force_stop(2)
