@@ -28,6 +28,7 @@ from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ProtocolHandler)
 
 from tests.util import wait_until, assertRegex
+import pytest
 
 
 class ConnectionTest(unittest.TestCase):
@@ -241,7 +242,8 @@ class ConnectionTest(unittest.TestCase):
         Ensure the following methods throw NIE's. If not, come back and test them.
         """
         c = self.make_connection()
-        self.assertRaises(NotImplementedError, c.close)
+        with pytest.raises(NotImplementedError):
+            c.close()
 
     def test_set_keyspace_blocking(self):
         c = self.make_connection()

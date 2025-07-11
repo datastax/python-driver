@@ -24,6 +24,7 @@ from tests.integration.simulacron.utils import prime_query, start_and_prime_sing
 from cassandra import (WriteTimeout, WriteType,
                        ConsistencyLevel, UnresolvableContactPoints)
 from cassandra.cluster import Cluster, ControlConnection
+import pytest
 
 
 PROTOCOL_VERSION = min(4, PROTOCOL_VERSION)
@@ -48,9 +49,9 @@ class ClusterTests(SimulacronCluster):
         }
         prime_query(query_to_prime_simple, then=then, rows=None, column_types=None)
 
-        with self.assertRaises(WriteTimeout) as assert_raised_context:
+        with pytest.raises(WriteTimeout) as assert_raised_context:
             self.session.execute(query_to_prime_simple)
-        wt = assert_raised_context.exception
+        wt = assert_raised_context.value
         assert wt.write_type == WriteType.name_to_value[write_type]
         assert wt.consistency == ConsistencyLevel.name_to_value[consistency]
         assert wt.received_responses == received_responses
@@ -77,7 +78,7 @@ class ClusterDNSResolutionTests(SimulacronCluster):
                                compression=False)
 
     def test_connection_with_only_unresolvable_contact_points(self):
-        with self.assertRaises(UnresolvableContactPoints):
+        with pytest.raises(UnresolvableContactPoints):
             self.cluster = Cluster(['dns.invalid'],
                                    protocol_version=PROTOCOL_VERSION,
                                    compression=False)

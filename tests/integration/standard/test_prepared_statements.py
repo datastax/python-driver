@@ -27,6 +27,7 @@ from tests.integration import (get_server_versions, greaterthanorequalcass40,
     BasicSharedKeyspaceUnitTestCase)
 
 import logging
+import pytest
 
 
 LOG = logging.getLogger(__name__)
@@ -133,12 +134,14 @@ class PreparedStatementTests(unittest.TestCase):
         statement_to_prepare = """INSERT INTO test3rf.test (v) VALUES  (?)"""
         # logic needed work with changes in CASSANDRA-6237
         if self.cass_version[0] >= (3, 0, 0):
-            self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
+            with pytest.raises(InvalidRequest):
+                session.prepare(statement_to_prepare)
         else:
             prepared = session.prepare(statement_to_prepare)
             assert isinstance(prepared, PreparedStatement)
             bound = prepared.bind((1,))
-            self.assertRaises(InvalidRequest, session.execute, bound)
+            with pytest.raises(InvalidRequest):
+                session.execute(bound)
 
     def test_missing_primary_key_dicts(self):
         """
@@ -152,12 +155,14 @@ class PreparedStatementTests(unittest.TestCase):
         statement_to_prepare = """ INSERT INTO test3rf.test (v) VALUES  (?)"""
         # logic needed work with changes in CASSANDRA-6237
         if self.cass_version[0] >= (3, 0, 0):
-            self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
+            with pytest.raises(InvalidRequest):
+                session.prepare(statement_to_prepare)
         else:
             prepared = session.prepare(statement_to_prepare)
             assert isinstance(prepared, PreparedStatement)
             bound = prepared.bind({'v': 1})
-            self.assertRaises(InvalidRequest, session.execute, bound)
+            with pytest.raises(InvalidRequest):
+                session.execute(bound)
 
     def test_too_many_bind_values(self):
         """
@@ -169,11 +174,13 @@ class PreparedStatementTests(unittest.TestCase):
         statement_to_prepare = """ INSERT INTO test3rf.test (v) VALUES  (?)"""
          # logic needed work with changes in CASSANDRA-6237
         if self.cass_version[0] >= (2, 2, 8):
-            self.assertRaises(InvalidRequest, session.prepare, statement_to_prepare)
+            with pytest.raises(InvalidRequest):
+                session.prepare(statement_to_prepare)
         else:
             prepared = session.prepare(statement_to_prepare)
             assert isinstance(prepared, PreparedStatement)
-            self.assertRaises(ValueError, prepared.bind, (1, 2))
+            with pytest.raises(ValueError):
+                prepared.bind((1, 2))
 
     def test_imprecise_bind_values_dicts(self):
         """
@@ -194,7 +201,8 @@ class PreparedStatementTests(unittest.TestCase):
         # right number, but one does not belong
         if PROTOCOL_VERSION < 4:
             # pre v4, the driver bails with key error when 'v' is found missing
-            self.assertRaises(KeyError, prepared.bind, {'k': 1, 'v2': 3})
+            with pytest.raises(KeyError):
+                prepared.bind({'k': 1, 'v2': 3})
         else:
             # post v4, the driver uses UNSET_VALUE for 'v' and 'v2' is ignored
             prepared.bind({'k': 1, 'v2': 3})
@@ -202,10 +210,12 @@ class PreparedStatementTests(unittest.TestCase):
         # also catch too few variables with dicts
         assert isinstance(prepared, PreparedStatement)
         if PROTOCOL_VERSION < 4:
-            self.assertRaises(KeyError, prepared.bind, {})
+            with pytest.raises(KeyError):
+                prepared.bind({})
         else:
             # post v4, the driver attempts to use UNSET_VALUE for unspecified keys
-            self.assertRaises(ValueError, prepared.bind, {})
+            with pytest.raises(ValueError):
+                prepared.bind({})
 
     def test_none_values(self):
         """
@@ -274,7 +284,8 @@ class PreparedStatementTests(unittest.TestCase):
             results = self.session.execute(select, (0,))
             assert results.one() == expected
 
-        self.assertRaises(ValueError, self.session.execute, select, (UNSET_VALUE, 0, 0))
+        with pytest.raises(ValueError):
+            self.session.execute(select, (UNSET_VALUE, 0, 0))
 
     def test_no_meta(self):
 
@@ -392,7 +403,7 @@ class PreparedStatementTests(unittest.TestCase):
         prepared = self.session.prepare("SELECT * FROM test3rf.error_test WHERE k=?")
         self.session.execute("DROP TABLE test3rf.error_test")
 
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             self.session.execute(prepared, [0])
 
     @unittest.skipIf((CASSANDRA_VERSION >= Version('3.11.12') and CASSANDRA_VERSION < Version('4.0')) or \
@@ -410,9 +421,9 @@ class PreparedStatementTests(unittest.TestCase):
         self.session.execute("DROP TABLE {}.foo".format(keyspace))
         self.session.execute("CREATE TABLE {}.foo(k int PRIMARY KEY)".format(keyspace))
         self.session.execute("USE {}".format(keyspace))
-        with self.assertRaises(DriverException) as e:
+        with pytest.raises(DriverException) as e:
             self.session.execute(prepared, [0])
-        assert "ID mismatch" in str(e.exception)
+        assert "ID mismatch" in str(e.value)
 
 
 @greaterthanorequalcass40
@@ -546,7 +557,7 @@ class PreparedStatementInvalidationTest(BasicSharedKeyspaceUnitTestCase):
         prepared_statement = self.session.prepare(
             "SELECT a, b, d FROM {} WHERE a = ?".format(self.table_name))
         self.session.execute("ALTER TABLE {} DROP d".format(self.table_name))
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             self.session.execute(prepared_statement.bind((1, )))
 
     def test_id_is_not_updated_conditional_v4(self):

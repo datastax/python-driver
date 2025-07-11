@@ -22,6 +22,7 @@ from cassandra.cqlengine.management import sync_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+import pytest
 
 
 class TestTimestampModel(Model):
@@ -135,12 +136,12 @@ class DeleteWithTimestampTest(BaseTimestampTest):
 
         tmp.timestamp(timedelta(seconds=5)).delete()
 
-        with self.assertRaises(TestTimestampModel.DoesNotExist):
+        with pytest.raises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
 
         tmp = TestTimestampModel.create(id=uid, count=1)
 
-        with self.assertRaises(TestTimestampModel.DoesNotExist):
+        with pytest.raises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
 
         # calling .timestamp sets the TS on the model
@@ -166,12 +167,12 @@ class DeleteWithTimestampTest(BaseTimestampTest):
 
         TestTimestampModel.objects(id=uid).timestamp(timedelta(seconds=5)).delete()
 
-        with self.assertRaises(TestTimestampModel.DoesNotExist):
+        with pytest.raises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
 
         tmp = TestTimestampModel.create(id=uid, count=1)
 
-        with self.assertRaises(TestTimestampModel.DoesNotExist):
+        with pytest.raises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
 
     def test_blind_delete_with_datetime(self):
@@ -187,12 +188,12 @@ class DeleteWithTimestampTest(BaseTimestampTest):
 
         TestTimestampModel.objects(id=uid).timestamp(plus_five_seconds).delete()
 
-        with self.assertRaises(TestTimestampModel.DoesNotExist):
+        with pytest.raises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
 
         tmp = TestTimestampModel.create(id=uid, count=1)
 
-        with self.assertRaises(TestTimestampModel.DoesNotExist):
+        with pytest.raises(TestTimestampModel.DoesNotExist):
             TestTimestampModel.get(id=uid)
 
     def test_delete_in_the_past(self):

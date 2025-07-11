@@ -32,6 +32,7 @@ from cassandra.policies import RetryPolicy, ExponentialBackoffRetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
 from tests.util import assertEqual, assertIsInstance
+import pytest
 
 
 class ResponseFutureTests(unittest.TestCase):
@@ -93,7 +94,8 @@ class ResponseFutureTests(unittest.TestCase):
         rf = self.make_response_future(session)
         rf.send_request()
         rf._set_result(None, None, None, object())
-        self.assertRaises(ConnectionException, rf.result)
+        with pytest.raises(ConnectionException):
+            rf.result()
 
     def test_set_keyspace_result(self):
         session = self.make_session()
@@ -160,7 +162,8 @@ class ResponseFutureTests(unittest.TestCase):
 
         # Simulate ResponseFuture timing out
         rf._on_timeout()
-        self.assertRaisesRegex(OperationTimedOut, "Connection defunct by heartbeat", rf.result)
+        with pytest.raises(OperationTimedOut, match="Connection defunct by heartbeat"):
+            rf.result()
 
     def test_read_timeout_error_message(self):
         session = self.make_session()
@@ -174,7 +177,8 @@ class ResponseFutureTests(unittest.TestCase):
                                                            "received_responses":1, "consistency": 1})
         rf._set_result(None, None, None, result)
 
-        self.assertRaises(Exception, rf.result)
+        with pytest.raises(Exception):
+            rf.result()
 
     def test_write_timeout_error_message(self):
         session = self.make_session()
@@ -187,7 +191,8 @@ class ResponseFutureTests(unittest.TestCase):
         result = Mock(spec=WriteTimeoutErrorMessage, info={"write_type": 1, "required_responses":2,
                                                            "received_responses":1, "consistency": 1})
         rf._set_result(None, None, None, result)
-        self.assertRaises(Exception, rf.result)
+        with pytest.raises(Exception):
+            rf.result()
 
     def test_unavailable_error_message(self):
         session = self.make_session()
@@ -202,7 +207,8 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=UnavailableErrorMessage, info={"required_replicas":2, "alive_replicas": 1, "consistency": 1})
         rf._set_result(None, None, None, result)
-        self.assertRaises(Exception, rf.result)
+        with pytest.raises(Exception):
+            rf.result()
 
     def test_request_error_with_prepare_message(self):
         session = self.make_session()
@@ -345,7 +351,8 @@ class ResponseFutureTests(unittest.TestCase):
         rf.session.cluster.scheduler.schedule.assert_called_with(ANY, rf._retry_task, False, host)
         rf._retry_task(False, host)
 
-        self.assertRaises(NoHostAvailable, rf.result)
+        with pytest.raises(NoHostAvailable):
+            rf.result()
 
     def test_exponential_retry_policy_fail(self):
         session = self.make_session()
@@ -377,7 +384,8 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf = ResponseFuture(session, Mock(), Mock(), 1)
         rf.send_request()
-        self.assertRaises(NoHostAvailable, rf.result)
+        with pytest.raises(NoHostAvailable):
+            rf.result()
 
     def test_first_pool_shutdown(self):
         session = self.make_basic_session()
@@ -464,7 +472,8 @@ class ResponseFutureTests(unittest.TestCase):
         result.to_exception.return_value = Exception()
 
         rf._set_result(None, None, None, result)
-        self.assertRaises(Exception, rf.result)
+        with pytest.raises(Exception):
+            rf.result()
 
         # this should get called immediately now that the error is set
         rf.add_errback(assertIsInstance, Exception)
@@ -522,7 +531,8 @@ class ResponseFutureTests(unittest.TestCase):
         result.to_exception.return_value = expected_exception
         rf._set_result(None, None, None, result)
         rf._event.set()
-        self.assertRaises(Exception, rf.result)
+        with pytest.raises(Exception):
+            rf.result()
 
         callback.assert_called_once_with(expected_exception, arg, **kwargs)
         callback2.assert_called_once_with(expected_exception, arg2, **kwargs2)
@@ -545,7 +555,8 @@ class ResponseFutureTests(unittest.TestCase):
                       info={"required_replicas":2, "alive_replicas": 1, "consistency": 1})
         result.to_exception.return_value = Exception()
         rf._set_result(None, None, None, result)
-        self.assertRaises(Exception, rf.result)
+        with pytest.raises(Exception):
+            rf.result()
 
         # test callback
         rf = ResponseFuture(session, message, query, 1)
@@ -607,7 +618,8 @@ class ResponseFutureTests(unittest.TestCase):
 
         result = Mock(spec=PreparedQueryNotFound, info='a' * 16)
         rf._set_result(None, None, None, result)
-        self.assertRaises(ValueError, rf.result)
+        with pytest.raises(ValueError):
+            rf.result()
 
     def test_repeat_orig_query_after_succesful_reprepare(self):
         query_id = b'abc123'  # Just a random binary string so we don't hit id mismatch exception
@@ -651,7 +663,8 @@ class ResponseFutureTests(unittest.TestCase):
 
         rf._on_timeout()
         pool.return_connection.assert_called_once_with(connection, stream_was_orphaned=True)
-        self.assertRaisesRegex(OperationTimedOut, "Client request timeout", rf.result)
+        with pytest.raises(OperationTimedOut, match="Client request timeout"):
+            rf.result()
 
         assert len(connection.request_ids) == 0, \
             "Request IDs should be empty but it's not: {}".format(connection.request_ids)

@@ -29,6 +29,7 @@ from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query.test_queryset import TestModel
 from cassandra.cqlengine.usertype import UserType
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
+import pytest
 
 
 INCLUDE_REPAIR = (not CASSANDRA_VERSION >= Version('4-a')) and SCYLLA_VERSION is None  # This should cover DSE 6.0+
@@ -261,7 +262,8 @@ class TablePropertiesTests(BaseCassEngTestCase):
         option = 'no way will this ever be an option'
         try:
             ModelWithTableProperties.__options__[option] = 'what was I thinking?'
-            self.assertRaisesRegex(KeyError, "Invalid table option.*%s.*" % option, sync_table, ModelWithTableProperties)
+            with pytest.raises(KeyError, match="Invalid table option.*%s.*" % option):
+                sync_table(ModelWithTableProperties)
         finally:
             ModelWithTableProperties.__options__.pop(option, None)
 
@@ -297,9 +299,12 @@ class SyncTableTests(BaseCassEngTestCase):
         @test_category object_mapper
         """
         sync_table(PrimaryKeysOnlyModel)
-        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysModelChanged)
-        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysAddedClusteringKey)
-        self.assertRaises(CQLEngineException, sync_table, PrimaryKeysRemovedPk)
+        with pytest.raises(CQLEngineException):
+            sync_table(PrimaryKeysModelChanged)
+        with pytest.raises(CQLEngineException):
+            sync_table(PrimaryKeysAddedClusteringKey)
+        with pytest.raises(CQLEngineException):
+            sync_table(PrimaryKeysRemovedPk)
 
 
 class IndexModel(Model):
@@ -453,7 +458,7 @@ class NonModelFailureTest(BaseCassEngTestCase):
         pass
 
     def test_failure(self):
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             sync_table(self.FakeModel)
 
 

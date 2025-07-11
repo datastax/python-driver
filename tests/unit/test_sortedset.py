@@ -194,20 +194,22 @@ class SortedSetTest(unittest.TestCase):
     def test_remove(self):
         ss = sortedset([2, 1])
         assert len(ss) == 2
-        self.assertRaises(KeyError, ss.remove, 3)
+        with pytest.raises(KeyError):
+            ss.remove(3)
         assert len(ss) == 2
         ss.remove(1)
         assert len(ss) == 1
         ss.remove(2)
         assert not ss
-        self.assertRaises(KeyError, ss.remove, 2)
+        with pytest.raises(KeyError):
+            ss.remove(2)
         assert not ss
 
     def test_getitem(self):
         ss = sortedset(range(3))
         for i in range(len(ss)):
             assert ss[i] == i
-        with self.assertRaises(IndexError):
+        with pytest.raises(IndexError):
             ss[len(ss)]
 
     def test_delitem(self):
@@ -216,7 +218,7 @@ class SortedSetTest(unittest.TestCase):
         for i in range(len(ss)):
             assertListEqual(list(ss), expected[i:])
             del ss[0]
-        with self.assertRaises(IndexError):
+        with pytest.raises(IndexError):
             ss[0]
 
     def test_delslice(self):
@@ -230,7 +232,7 @@ class SortedSetTest(unittest.TestCase):
         assertListEqual(list(ss), [1])
         del ss[:]
         assert not ss
-        with self.assertRaises(IndexError):
+        with pytest.raises(IndexError):
             del ss[0]
 
     def test_reversed(self):

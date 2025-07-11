@@ -19,6 +19,7 @@ from cassandra.query import (SimpleStatement, BatchStatement, BatchType)
 
 from tests.integration import (use_singledc, PROTOCOL_VERSION, local, TestCluster,
                               requires_custom_payload)
+import pytest
 
 
 def setup_module():
@@ -148,7 +149,7 @@ class CustomPayloadTests(unittest.TestCase):
 
         # Add one custom payload to this is too many key value pairs and should fail
         custom_payload[str(65535)] = b'x'
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.execute_async_validate_custom_payload(statement=statement, custom_payload=custom_payload)
 
     def execute_async_validate_custom_payload(self, statement, custom_payload):

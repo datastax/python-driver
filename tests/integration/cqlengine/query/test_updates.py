@@ -23,6 +23,7 @@ from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase, TestQueryUpdateModel
 from tests.integration.cqlengine import execute_count
 from tests.integration import greaterthancass20
+import pytest
 
 
 class QueryUpdateTests(BaseCassEngTestCase):
@@ -72,17 +73,17 @@ class QueryUpdateTests(BaseCassEngTestCase):
             assert row.text == str(i)
 
         # perform update
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             TestQueryUpdateModel.objects(partition=partition, cluster=3).update(count='asdf')
 
     def test_invalid_update_kwarg(self):
         """ tests that passing in a kwarg to the update method that isn't a column will fail """
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             TestQueryUpdateModel.objects(partition=uuid4(), cluster=3).update(bacon=5000)
 
     def test_primary_key_update_failure(self):
         """ tests that attempting to update the value of a primary key will fail """
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             TestQueryUpdateModel.objects(partition=uuid4(), cluster=3).update(cluster=5000)
 
     @execute_count(8)
@@ -280,7 +281,7 @@ class QueryUpdateTests(BaseCassEngTestCase):
             cluster=cluster,
             text_map={"foo": '1', "bar": '2'}
         )
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             TestQueryUpdateModel.objects(partition=partition, cluster=cluster).update(
                 text_map__remove=["bar"]
             )

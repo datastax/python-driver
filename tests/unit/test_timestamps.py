@@ -18,6 +18,7 @@ from unittest import mock
 from cassandra import timestamps
 from tests.util import assertRegex
 from threading import Thread, Lock
+import pytest
 
 
 class _TimestampTestMixin(object):
@@ -46,7 +47,7 @@ class _TimestampTestMixin(object):
                 assert actual == expected
 
         # assert we patched timestamps.time.time correctly
-        with self.assertRaises(StopIteration):
+        with pytest.raises(StopIteration):
             tsg()
 
 

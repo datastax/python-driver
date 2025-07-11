@@ -120,7 +120,8 @@ class TypeTests(unittest.TestCase):
 
         assert str(lookup_casstype('unknown')) == str(cassandra.cqltypes.mkUnrecognizedType('unknown'))
 
-        self.assertRaises(ValueError, lookup_casstype, 'AsciiType~')
+        with pytest.raises(ValueError):
+            lookup_casstype('AsciiType~')
 
     def test_casstype_parameterized(self):
         assert LongType.cass_parameterized_type_with(()) == 'LongType'
@@ -462,50 +463,50 @@ class VectorTests(unittest.TestCase):
 
     def test_serialization_fixed_size_too_small(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
-        with self.assertRaisesRegex(ValueError, "Expected sequence of size 5 for vector of type float and dimension 5, observed sequence of length 4"):
+        with pytest.raises(ValueError, match="Expected sequence of size 5 for vector of type float and dimension 5, observed sequence of length 4"):
             ctype.serialize([1.2, 3.4, 5.6, 7.8], 0)
 
     def test_serialization_fixed_size_too_big(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
-        with self.assertRaisesRegex(ValueError, "Expected sequence of size 4 for vector of type float and dimension 4, observed sequence of length 5"):
+        with pytest.raises(ValueError, match="Expected sequence of size 4 for vector of type float and dimension 4, observed sequence of length 5"):
             ctype.serialize([1.2, 3.4, 5.6, 7.8, 9.10], 0)
 
     def test_serialization_variable_size_too_small(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
-        with self.assertRaisesRegex(ValueError, "Expected sequence of size 5 for vector of type varint and dimension 5, observed sequence of length 4"):
+        with pytest.raises(ValueError, match="Expected sequence of size 5 for vector of type varint and dimension 5, observed sequence of length 4"):
             ctype.serialize([1, 2, 3, 4], 0)
 
     def test_serialization_variable_size_too_big(self):
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
-        with self.assertRaisesRegex(ValueError, "Expected sequence of size 4 for vector of type varint and dimension 4, observed sequence of length 5"):
+        with pytest.raises(ValueError, match="Expected sequence of size 4 for vector of type varint and dimension 4, observed sequence of length 5"):
             ctype.serialize([1, 2, 3, 4, 5], 0)
 
     def test_deserialization_fixed_size_too_small(self):
         ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
         ctype_four_bytes = ctype_four.serialize([1.2, 3.4, 5.6, 7.8], 0)
         ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
-        with self.assertRaisesRegex(ValueError, "Expected vector of type float and dimension 5 to have serialized size 20; observed serialized size of 16 instead"):
+        with pytest.raises(ValueError, match="Expected vector of type float and dimension 5 to have serialized size 20; observed serialized size of 16 instead"):
             ctype_five.deserialize(ctype_four_bytes, 0)
 
     def test_deserialization_fixed_size_too_big(self):
         ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
         ctype_five_bytes = ctype_five.serialize([1.2, 3.4, 5.6, 7.8, 9.10], 0)
         ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
-        with self.assertRaisesRegex(ValueError, "Expected vector of type float and dimension 4 to have serialized size 16; observed serialized size of 20 instead"):
+        with pytest.raises(ValueError, match="Expected vector of type float and dimension 4 to have serialized size 16; observed serialized size of 20 instead"):
             ctype_four.deserialize(ctype_five_bytes, 0)
 
     def test_deserialization_variable_size_too_small(self):
         ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
         ctype_four_bytes = ctype_four.serialize([1, 2, 3, 4], 0)
         ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
-        with self.assertRaisesRegex(ValueError, "Error reading additional data during vector deserialization after successfully adding 4 elements"):
+        with pytest.raises(ValueError, match="Error reading additional data during vector deserialization after successfully adding 4 elements"):
             ctype_five.deserialize(ctype_four_bytes, 0)
 
     def test_deserialization_variable_size_too_big(self):
         ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
         ctype_five_bytes = ctype_five.serialize([1, 2, 3, 4, 5], 0)
         ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
-        with self.assertRaisesRegex(ValueError, "Additional bytes remaining after vector deserialization completed"):
+        with pytest.raises(ValueError, match="Additional bytes remaining after vector deserialization completed"):
             ctype_four.deserialize(ctype_five_bytes, 0)
 
 
@@ -560,14 +561,14 @@ class DateRangeTypeTests(unittest.TestCase):
         assert DateRangeType._decode_precision(6) == 'MILLISECOND'
 
     def test_decode_precision_error(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             DateRangeType._decode_precision(-1)
 
     def test_encode_precision(self):
         assert DateRangeType._encode_precision('SECOND') == 5
 
     def test_encode_precision_error(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             DateRangeType._encode_precision('INVALID')
 
     def test_deserialize_single_value(self):
@@ -703,12 +704,14 @@ class DateRangeTypeTests(unittest.TestCase):
         assert int8_pack(4) == serialized
 
     def test_failure_to_serialize_no_value_object(self):
-        self.assertRaises(ValueError, DateRangeType.serialize, object(), 5)
+        with pytest.raises(ValueError):
+            DateRangeType.serialize(object(), 5)
 
     def test_failure_to_serialize_no_bounds_object(self):
         class no_bounds_object(object):
             value = lower_bound = None
-        self.assertRaises(ValueError, DateRangeType.serialize, no_bounds_object, 5)
+        with pytest.raises(ValueError):
+            DateRangeType.serialize(no_bounds_object, 5)
 
     def test_serialized_value_round_trip(self):
         vals = [b'\x01\x00\x00\x01%\xe9a\xf9\xd1\x06\x00\x00\x01v\xbb>o\xff\x00',

@@ -19,6 +19,7 @@ from cassandra.cluster import ResultSet
 from cassandra.query import named_tuple_factory, dict_factory, tuple_factory
 
 from tests.util import assertListEqual
+import pytest
 
 
 class ResultSetTests(unittest.TestCase):
@@ -85,11 +86,11 @@ class ResultSetTests(unittest.TestCase):
         rs = ResultSet(Mock(has_more_pages=False), expected)
         itr = iter(rs)
         # before consuming
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             rs[0]
         list(itr)
         # after consuming
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             rs[0]
 
         assert not rs
@@ -102,14 +103,14 @@ class ResultSetTests(unittest.TestCase):
         type(response_future).has_more_pages = PropertyMock(side_effect=(True, False))
         itr = iter(rs)
         # before consuming
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             rs[0]
         for row in itr:
             # while consuming
-            with self.assertRaises(RuntimeError):
+            with pytest.raises(RuntimeError):
                 rs[0]
         # after consuming
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             rs[0]
         assert not rs
         assert not list(rs)
@@ -175,17 +176,17 @@ class ResultSetTests(unittest.TestCase):
 
     def test_was_applied(self):
         # unknown row factory raises
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             ResultSet(Mock(), []).was_applied
 
         response_future = Mock(row_factory=named_tuple_factory)
 
         # no row
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             ResultSet(response_future, []).was_applied
 
         # too many rows
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             ResultSet(response_future, [tuple(), tuple()]).was_applied
 
         # various internal row factories

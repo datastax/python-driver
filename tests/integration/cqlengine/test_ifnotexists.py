@@ -22,6 +22,7 @@ from cassandra.cqlengine.query import BatchQuery, LWTException, IfNotExistsWithC
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import PROTOCOL_VERSION
+import pytest
 
 class TestIfNotExistsModel(Model):
     __test__ = False
@@ -80,13 +81,13 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
         TestIfNotExistsModel.create(id=id, count=8, text='123456789')
 
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException):
             TestIfNotExistsModel.if_not_exists().create(id=id, count=9, text='111111111111')
 
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             TestIfNotExistsModel.objects(count=9, text='111111111111').if_not_exists().create(id=id)
 
-        assert assertion.exception.existing == {
+        assert assertion.value.existing == {
             'count': 8,
             'id': id,
             'text': '123456789',
@@ -111,10 +112,10 @@ class IfNotExistsInsertTests(BaseIfNotExistsTest):
 
         b = BatchQuery()
         TestIfNotExistsModel.batch(b).if_not_exists().create(id=id, count=9, text='111111111111')
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             b.execute()
 
-        assert assertion.exception.existing == {
+        assert assertion.value.existing == {
             'count': 8,
             'id': id,
             'text': '123456789',
@@ -198,6 +199,5 @@ class IfNotExistWithCounterTest(BaseIfNotExistsWithCounterTest):
         if_not_exists on table with counter column
         """
         id = uuid4()
-        with self.assertRaises(IfNotExistsWithCounterColumn):
+        with pytest.raises(IfNotExistsWithCounterColumn):
             TestIfNotExistsWithCounterModel.if_not_exists()
-

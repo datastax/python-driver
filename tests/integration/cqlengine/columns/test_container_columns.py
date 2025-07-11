@@ -73,7 +73,8 @@ class TestSetColumn(BaseCassEngTestCase):
         drop_table(TestSetModel)
 
     def test_add_none_fails(self):
-        self.assertRaises(ValidationError, TestSetModel.create, **{'int_set': set([None])})
+        with pytest.raises(ValidationError):
+            TestSetModel.create(int_set=set([None]))
 
     def test_empty_set_initial(self):
         """
@@ -127,7 +128,8 @@ class TestSetColumn(BaseCassEngTestCase):
         """
         Tests that attempting to use the wrong types will raise an exception
         """
-        self.assertRaises(ValidationError, TestSetModel.create, **{'int_set': set(('string', True)), 'text_set': set((1, 3.0))})
+        with pytest.raises(ValidationError):
+            TestSetModel.create(int_set=set(('string', True)), text_set=set((1, 3.0)))
 
     def test_element_count_validation(self):
         """
@@ -144,7 +146,8 @@ class TestSetColumn(BaseCassEngTestCase):
             except OperationTimedOut:
                 #This will happen if the host is remote
                 assert not CASSANDRA_IP.startswith("127.0.0.")
-        self.assertRaises(ValidationError, TestSetModel.create, **{'text_set': set(str(uuid4()) for i in range(65536))})
+        with pytest.raises(ValidationError):
+            TestSetModel.create(text_set=set(str(uuid4()) for i in range(65536)))
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -244,7 +247,8 @@ class TestListColumn(BaseCassEngTestCase):
         """
         Tests that attempting to use the wrong types will raise an exception
         """
-        self.assertRaises(ValidationError, TestListModel.create, **{'int_list': ['string', True], 'text_list': [1, 3.0]})
+        with pytest.raises(ValidationError):
+            TestListModel.create(int_list=['string', True], text_list=[1, 3.0])
 
     def test_element_count_validation(self):
         """
@@ -258,7 +262,8 @@ class TestListColumn(BaseCassEngTestCase):
                 ex_type, ex, tb = sys.exc_info()
                 log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
-        self.assertRaises(ValidationError, TestListModel.create, **{'text_list': [str(uuid4()) for _ in range(65536)]})
+        with pytest.raises(ValidationError):
+            TestListModel.create(text_list=[str(uuid4()) for _ in range(65536)])
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -332,7 +337,8 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_insert_none(self):
         pkey = uuid4()
-        self.assertRaises(ValidationError, TestListModel.create, **{'partition': pkey, 'int_list': [None]})
+        with pytest.raises(ValidationError):
+            TestListModel.create(partition=pkey, int_list=[None])
 
     def test_blind_list_updates_from_none(self):
         """ Tests that updates from None work as expected """
@@ -374,7 +380,8 @@ class TestMapColumn(BaseCassEngTestCase):
         tmp.int_map['blah'] = 1
 
     def test_add_none_as_map_key(self):
-        self.assertRaises(ValidationError, TestMapModel.create, **{'int_map': {None: uuid4()}})
+        with pytest.raises(ValidationError):
+            TestMapModel.create(int_map={None: uuid4()})
 
     def test_empty_retrieve(self):
         tmp = TestMapModel.create()
@@ -416,7 +423,8 @@ class TestMapColumn(BaseCassEngTestCase):
         """
         Tests that attempting to use the wrong types will raise an exception
         """
-        self.assertRaises(ValidationError, TestMapModel.create, **{'int_map': {'key': 2, uuid4(): 'val'}, 'text_map': {2: 5}})
+        with pytest.raises(ValidationError):
+            TestMapModel.create(int_map={'key': 2, uuid4(): 'val'}, text_map={2: 5})
 
     def test_element_count_validation(self):
         """
@@ -430,7 +438,8 @@ class TestMapColumn(BaseCassEngTestCase):
                 ex_type, ex, tb = sys.exc_info()
                 log.warning("{0}: {1} Backtrace: {2}".format(ex_type.__name__, ex, traceback.extract_tb(tb)))
                 del tb
-        self.assertRaises(ValidationError, TestMapModel.create, **{'text_map': dict((str(uuid4()), i) for i in range(65536))})
+        with pytest.raises(ValidationError):
+            TestMapModel.create(text_map=dict((str(uuid4()), i) for i in range(65536)))
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -636,9 +645,12 @@ class TestTupleColumn(BaseCassEngTestCase):
 
         @test_category object_mapper
         """
-        self.assertRaises(ValidationError, TestTupleModel.create, **{'int_tuple': ('string', True), 'text_tuple': ('test', 'test'), 'mixed_tuple': ('one', 2, 'three')})
-        self.assertRaises(ValidationError, TestTupleModel.create, **{'int_tuple': ('string', 'string'), 'text_tuple': (1, 3.0), 'mixed_tuple': ('one', 2, 'three')})
-        self.assertRaises(ValidationError, TestTupleModel.create, **{'int_tuple': ('string', 'string'), 'text_tuple': ('test', 'test'), 'mixed_tuple': (1, "two", 3)})
+        with pytest.raises(ValidationError):
+            TestTupleModel.create(int_tuple=('string', True), text_tuple=('test', 'test'), mixed_tuple=('one', 2, 'three'))
+        with pytest.raises(ValidationError):
+            TestTupleModel.create(int_tuple=('string', 'string'), text_tuple=(1, 3.0), mixed_tuple=('one', 2, 'three'))
+        with pytest.raises(ValidationError):
+            TestTupleModel.create(int_tuple=('string', 'string'), text_tuple=('test', 'test'), mixed_tuple=(1, "two", 3))
 
     def test_instantiation_with_column_class(self):
         """
@@ -854,12 +866,18 @@ class TestNestedType(BaseCassEngTestCase):
         set_tuple_bad_tuple_value = set((("text", "text"), ("text", "text"), ("text", "text")))
         set_tuple_not_set = ['This', 'is', 'not', 'a', 'set']
 
-        self.assertRaises(ValidationError, TestNestedModel.create, **{'list_list': list_list_bad_list_context})
-        self.assertRaises(ValidationError, TestNestedModel.create, **{'list_list': list_list_no_list})
-        self.assertRaises(ValidationError, TestNestedModel.create, **{'map_list': map_list_bad_value})
-        self.assertRaises(ValidationError, TestNestedModel.create, **{'map_list': map_list_bad_key})
-        self.assertRaises(ValidationError, TestNestedModel.create, **{'set_tuple': set_tuple_bad_tuple_value})
-        self.assertRaises(ValidationError, TestNestedModel.create, **{'set_tuple': set_tuple_not_set})
+        with pytest.raises(ValidationError):
+            TestNestedModel.create(list_list=list_list_bad_list_context)
+        with pytest.raises(ValidationError):
+            TestNestedModel.create(list_list=list_list_no_list)
+        with pytest.raises(ValidationError):
+            TestNestedModel.create(map_list=map_list_bad_value)
+        with pytest.raises(ValidationError):
+            TestNestedModel.create(map_list=map_list_bad_key)
+        with pytest.raises(ValidationError):
+            TestNestedModel.create(set_tuple=set_tuple_bad_tuple_value)
+        with pytest.raises(ValidationError):
+            TestNestedModel.create(set_tuple=set_tuple_not_set)
 
     def test_instantiation_with_column_class(self):
         """

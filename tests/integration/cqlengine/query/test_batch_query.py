@@ -24,6 +24,7 @@ from tests.integration.cqlengine import execute_count
 from cassandra.cluster import Session
 from cassandra.query import BatchType as cassandra_BatchType
 from cassandra.cqlengine.query import BatchType as cqlengine_BatchType
+import pytest
 
 
 class TestMultiKeyModel(Model):
@@ -70,7 +71,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         b = BatchQuery()
         inst = TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=2, count=3, text='4')
 
-        with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+        with pytest.raises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
         b.execute()
@@ -108,7 +109,7 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         b.execute()
 
-        with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+        with pytest.raises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
     @execute_count(11)
@@ -119,7 +120,7 @@ class BatchQueryTests(BaseCassEngTestCase):
                 TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=i, count=3, text='4')
 
             for i in range(5):
-                with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+                with pytest.raises(TestMultiKeyModel.DoesNotExist):
                     TestMultiKeyModel.get(partition=self.pkey, cluster=i)
 
         for i in range(5):

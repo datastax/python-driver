@@ -24,6 +24,7 @@ from tests.integration import use_singledc, get_cluster, remove_cluster, PROTOCO
 from tests.integration.util import assert_quiescent_pool_state
 
 import unittest
+import pytest
 
 log = logging.getLogger(__name__)
 
@@ -121,9 +122,8 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_wrong_pwd(self):
         cluster = self.cluster_as('cassandra', 'wrong_pass')
         try:
-            self.assertRaisesRegex(NoHostAvailable,
-                                    '.*AuthenticationFailed.',
-                                    cluster.connect)
+            with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.'):
+                cluster.connect()
             assert_quiescent_pool_state(self, cluster)
         finally:
             cluster.shutdown()
@@ -131,9 +131,8 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_wrong_username(self):
         cluster = self.cluster_as('wrong_user', 'cassandra')
         try:
-            self.assertRaisesRegex(NoHostAvailable,
-                                    '.*AuthenticationFailed.*',
-                                    cluster.connect)
+            with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.*'):
+                cluster.connect()
             assert_quiescent_pool_state(self, cluster)
         finally:
             cluster.shutdown()
@@ -141,9 +140,8 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_empty_pwd(self):
         cluster = self.cluster_as('Cassandra', '')
         try:
-            self.assertRaisesRegex(NoHostAvailable,
-                                    '.*AuthenticationFailed.*',
-                                    cluster.connect)
+            with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.*'):
+                cluster.connect()
             assert_quiescent_pool_state(self, cluster)
         finally:
             cluster.shutdown()
@@ -151,9 +149,8 @@ class AuthenticationTests(unittest.TestCase):
     def test_connect_no_auth_provider(self):
         cluster = TestCluster()
         try:
-            self.assertRaisesRegex(NoHostAvailable,
-                                    '.*AuthenticationFailed.*',
-                                    cluster.connect)
+            with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.*'):
+                cluster.connect()
             assert_quiescent_pool_state(self, cluster)
         finally:
             cluster.shutdown()
@@ -188,4 +185,5 @@ class SaslAuthenticatorTests(AuthenticationTests):
 
     def test_host_rejected(self):
         sasl_kwargs = {'host': 'something'}
-        self.assertRaises(ValueError, SaslAuthProvider, **sasl_kwargs)
+        with pytest.raises(ValueError):
+            SaslAuthProvider(**sasl_kwargs)

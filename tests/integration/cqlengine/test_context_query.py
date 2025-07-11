@@ -17,6 +17,7 @@ from cassandra.cqlengine.management import drop_keyspace, sync_table, create_key
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import ContextQuery
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+import pytest
 
 
 class TestModel(Model):
@@ -154,22 +155,22 @@ class ContextQueryTests(BaseCassEngTestCase):
         @test_category query
         """
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             with ContextQuery(keyspace='ks2'):
                 pass
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             with ContextQuery(42) as tm:
                 pass
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             with ContextQuery(TestModel, 42):
                 pass
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             with ContextQuery(TestModel, unknown_param=42):
                 pass
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             with ContextQuery(TestModel, keyspace='ks2', unknown_param=42):
                 pass

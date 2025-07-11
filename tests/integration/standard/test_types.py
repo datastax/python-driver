@@ -43,6 +43,7 @@ from tests.integration import use_singledc, execute_until_pass, notprotocolv1, \
     greaterthanorequalcass3_10, TestCluster, requires_composite_type, greaterthanorequalcass50
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_all_samples, get_collection_sample
+import pytest
 
 
 def setup_module():
@@ -334,11 +335,11 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         # non-string types shouldn't accept empty strings
         for col in non_string_columns:
             query = "INSERT INTO all_empty (zz, {0}) VALUES (4, %s)".format(col)
-            with self.assertRaises(InvalidRequest):
+            with pytest.raises(InvalidRequest):
                 s.execute(query, [''])
 
             insert = s.prepare("INSERT INTO all_empty (zz, {0}) VALUES (4, ?)".format(col))
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 s.execute(insert, [''])
 
         # verify that Nones can be inserted and overwrites existing data
@@ -470,7 +471,8 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         s.execute(prepared, parameters=(5, subpartial))
 
         # extra items in the tuple should result in an error
-        self.assertRaises(ValueError, s.execute, prepared, parameters=(0, (1, 2, 3, 4, 5, 6)))
+        with pytest.raises(ValueError):
+            s.execute(prepared, parameters=(0, (1, 2, 3, 4, 5, 6)))
 
         prepared = s.prepare("SELECT b FROM tuple_type WHERE a=?")
         assert complete == s.execute(prepared, (3,)).one().b
@@ -508,7 +510,8 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         for i in lengths:
             # ensure tuples of larger sizes throw an error
             created_tuple = tuple(range(0, i + 1))
-            self.assertRaises(InvalidRequest, s.execute, "INSERT INTO tuple_lengths (k, v_%s) VALUES (0, %s)", (i, created_tuple))
+            with pytest.raises(InvalidRequest):
+                s.execute("INSERT INTO tuple_lengths (k, v_%s) VALUES (0, %s)", (i, created_tuple))
 
             # ensure tuples of proper sizes are written and read correctly
             created_tuple = tuple(range(0, i))
@@ -730,9 +733,11 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
         s.execute(f'CREATE TABLE collection_nulls (k int PRIMARY KEY, {", ".join(columns)})')
 
         def raises_simple_and_prepared(exc_type, query_str, args):
-            self.assertRaises(exc_type, lambda: s.execute(query_str, args))
+            with pytest.raises(exc_type):
+                s.execute(query_str, args)
             p = s.prepare(query_str.replace('%s', '?'))
-            self.assertRaises(exc_type, lambda: s.execute(p, args))
+            with pytest.raises(exc_type):
+                s.execute(p, args)
 
         i = 0
         for simple_type in PRIMITIVE_DATATYPES_KEYS:
@@ -894,11 +899,14 @@ class TypeTests(BasicSharedKeyspaceUnitTestCase):
                 v = results.one()[1]
                 assert Duration(month_day_value, month_day_value, nanosecond_value) == v, "Error encoding value {0},{0},{1}".format(month_day_value, nanosecond_value)
 
-        self.assertRaises(ValueError, self.session.execute, prepared,
+        with pytest.raises(ValueError):
+            self.session.execute(prepared,
                           (1, Duration(0, 0, int("8FFFFFFFFFFFFFF0", 16))))
-        self.assertRaises(ValueError, self.session.execute, prepared,
+        with pytest.raises(ValueError):
+            self.session.execute(prepared,
                           (1, Duration(0, int("8FFFFFFFFFFFFFF0", 16), 0)))
-        self.assertRaises(ValueError, self.session.execute, prepared,
+        with pytest.raises(ValueError):
+            self.session.execute(prepared,
                           (1, Duration(int("8FFFFFFFFFFFFFF0", 16), 0, 0)))
 
 class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):

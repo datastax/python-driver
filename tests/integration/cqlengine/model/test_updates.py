@@ -23,6 +23,7 @@ from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 from cassandra.cqlengine.management import sync_table, drop_table
 from cassandra.cqlengine.usertype import UserType
+import pytest
 
 class TestUpdateModel(Model):
     __test__ = False
@@ -67,11 +68,11 @@ class ModelUpdateTests(BaseCassEngTestCase):
         m0.update(partition=m0.partition, cluster=m0.cluster)
 
         #Assert a ValidationError is risen if the PR changes
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             m0.update(partition=m0.partition, cluster=20)
 
         # Assert a ValidationError is risen if the columns doesn't exist
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             m0.update(invalid_column=20)
 
     def test_update_values(self):
@@ -139,13 +140,13 @@ class ModelUpdateTests(BaseCassEngTestCase):
     def test_invalid_update_kwarg(self):
         """ tests that passing in a kwarg to the update method that isn't a column will fail """
         m0 = TestUpdateModel.create(count=5, text='monkey')
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             m0.update(numbers=20)
 
     def test_primary_key_update_failure(self):
         """ tests that attempting to update the value of a primary key will fail """
         m0 = TestUpdateModel.create(count=5, text='monkey')
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             m0.update(partition=uuid4())
 
 

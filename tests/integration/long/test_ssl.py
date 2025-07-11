@@ -25,6 +25,7 @@ from OpenSSL import SSL, crypto
 from tests.integration import (
     get_cluster, remove_cluster, use_single_node, start_cluster_wait_for_up, EVENT_LOOP_MANAGER, TestCluster
 )
+import pytest
 
 if not hasattr(ssl, 'match_hostname'):
     try:
@@ -290,7 +291,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
         cluster = TestCluster(ssl_options={'ca_certs': CLIENT_CA_CERTS,
                                            'ssl_version': ssl_version})
 
-        with self.assertRaises(NoHostAvailable) as _:
+        with pytest.raises(NoHostAvailable):
             cluster.connect()
         cluster.shutdown()
 
@@ -322,7 +323,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
                          'keyfile': DRIVER_KEYFILE}
         )
 
-        with self.assertRaises(NoHostAvailable) as _:
+        with pytest.raises(NoHostAvailable):
             cluster.connect()
         cluster.shutdown()
 
@@ -333,7 +334,7 @@ class SSLConnectionAuthTests(unittest.TestCase):
                        'certfile': DRIVER_CERTFILE}
         ssl_options.update(verify_certs)
 
-        with self.assertRaises(Exception):
+        with pytest.raises(Exception):
             validate_ssl_options(ssl_options=ssl_options, hostname='localhost')
 
 
@@ -487,7 +488,7 @@ class SSLConnectionWithSSLContextTests(unittest.TestCase):
             )
             ssl_context.verify_mode = ssl.CERT_REQUIRED
             ssl_options["check_hostname"] = True
-        with self.assertRaises(Exception):
+        with pytest.raises(Exception):
             validate_ssl_options(ssl_context=ssl_context, ssl_options=ssl_options, hostname="localhost")
 
     @unittest.skipIf(USES_PYOPENSSL, "This test is for the built-in ssl.Context")

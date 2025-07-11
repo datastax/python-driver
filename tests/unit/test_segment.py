@@ -19,6 +19,7 @@ from io import BytesIO
 from cassandra import DriverException
 from cassandra.segment import Segment, CrcException
 from cassandra.connection import segment_codec_no_compression, segment_codec_lz4
+import pytest
 
 
 def to_bits(b):
@@ -71,7 +72,7 @@ class SegmentCodecTest(unittest.TestCase):
     def test_encode_header_fails_if_payload_too_big(self):
         buffer = BytesIO()
         for codec in [c for c in [segment_codec_no_compression, segment_codec_lz4] if c is not None]:
-            with self.assertRaises(DriverException):
+            with pytest.raises(DriverException):
                 codec.encode_header(buffer, len(self.large_msg), -1, False)
 
     def test_encode_uncompressed_header_not_self_contained_msg(self):
@@ -131,7 +132,7 @@ class SegmentCodecTest(unittest.TestCase):
         buffer.write(b'0')
         buffer.seek(0)
 
-        with self.assertRaises(CrcException):
+        with pytest.raises(CrcException):
             segment_codec_no_compression.decode_header(buffer)
 
     def test_decode_uncompressed_self_contained_segment(self):
@@ -186,7 +187,7 @@ class SegmentCodecTest(unittest.TestCase):
         buffer.write(b'0')
         buffer.seek(0)
         header = segment_codec_lz4.decode_header(buffer)
-        with self.assertRaises(CrcException):
+        with pytest.raises(CrcException):
             segment_codec_lz4.decode(buffer, header)
 
     @unittest.skipUnless(segment_codec_lz4, ' lz4 not installed')

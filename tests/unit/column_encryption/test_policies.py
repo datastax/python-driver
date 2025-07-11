@@ -18,6 +18,7 @@ import unittest
 from cassandra.policies import ColDesc
 from cassandra.column_encryption.policies import AES256ColumnEncryptionPolicy, \
     AES256_BLOCK_SIZE_BYTES, AES256_KEY_SIZE_BYTES
+import pytest
 
 @unittest.skip("Skip until https://github.com/scylladb/python-driver/issues/365 is sorted out")
 class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
@@ -50,10 +51,10 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         coldesc = ColDesc('ks1','table1','col1')
         policy = AES256ColumnEncryptionPolicy()
         for key_size in range(1,AES256_KEY_SIZE_BYTES - 1):
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 policy.add_column(coldesc, os.urandom(key_size), "blob")
         for key_size in range(AES256_KEY_SIZE_BYTES + 1,(2 * AES256_KEY_SIZE_BYTES) - 1):
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 policy.add_column(coldesc, os.urandom(key_size), "blob")
 
     def test_add_column_invalid_iv_size_raises(self):
@@ -64,54 +65,54 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
 
         coldesc = ColDesc('ks1','table1','col1')
         for iv_size in range(1,AES256_BLOCK_SIZE_BYTES - 1):
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 test_iv_size(iv_size)
         for iv_size in range(AES256_BLOCK_SIZE_BYTES + 1,(2 * AES256_BLOCK_SIZE_BYTES) - 1):
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 test_iv_size(iv_size)
 
         # Finally, confirm that the expected IV size has no issue
         test_iv_size(AES256_BLOCK_SIZE_BYTES)
 
     def test_add_column_null_coldesc_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             policy.add_column(None, self._random_block(), "blob")
 
     def test_add_column_null_key_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, None, "blob")
 
     def test_add_column_null_type_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_block(), None)
 
     def test_add_column_unknown_type_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_block(), "foobar")
 
     def test_encode_and_encrypt_null_coldesc_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_key(), "blob")
             policy.encode_and_encrypt(None, self._random_block())
 
     def test_encode_and_encrypt_null_obj_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_key(), "blob")
             policy.encode_and_encrypt(coldesc, None)
 
     def test_encode_and_encrypt_unknown_coldesc_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_key(), "blob")
@@ -128,7 +129,7 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         assert not policy.contains_column(ColDesc('ks2','table2','col2'))
 
     def test_encrypt_unknown_column(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy = AES256ColumnEncryptionPolicy()
             coldesc = ColDesc('ks1','table1','col1')
             policy.add_column(coldesc, self._random_key(), "blob")
@@ -139,7 +140,7 @@ class AES256ColumnEncryptionPolicyTest(unittest.TestCase):
         coldesc = ColDesc('ks1','table1','col1')
         policy.add_column(coldesc, self._random_key(), "blob")
         encrypted_bytes = policy.encrypt(coldesc, self._random_block())
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             policy.decrypt(ColDesc('ks2','table2','col2'), encrypted_bytes)
 
     def test_cache_info(self):

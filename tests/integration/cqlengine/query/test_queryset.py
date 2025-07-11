@@ -41,6 +41,7 @@ from cassandra.cqlengine.connection import get_session
 from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthancass20, greaterthancass21, \
     greaterthanorequalcass30, TestCluster, requires_collection_indexes
 from tests.integration.cqlengine import execute_count, DEFAULT_KEYSPACE
+import pytest
 
 
 class TzOffset(tzinfo):
@@ -157,21 +158,21 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         """
         Tests that using invalid or nonexistant column names for filter args raises an error
         """
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects(nonsense=5)
 
     def test_using_nonexistant_column_names_in_query_args_raises_error(self):
         """
         Tests that using invalid or nonexistant columns for query args raises an error
         """
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             TestModel.objects(TestModel.nonsense == 5)
 
     def test_using_non_query_operators_in_query_args_raises_error(self):
         """
         Tests that providing query args that are not query operator instances raises an error
         """
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects(5)
 
     def test_queryset_is_immutable(self):
@@ -240,11 +241,11 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         q = TestModel.objects.only(['attempt_id', 'description'])
         assert q._select_fields() == ['attempt_id', 'description']
 
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects.only(['nonexistent_field'])
 
         # Cannot define more than once only fields
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects.only(['description']).only(['attempt_id'])
 
         # only with defer fields
@@ -255,18 +256,18 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         # Eliminate all results confirm exception is thrown
         q = TestModel.objects.only(['description'])
         q = q.defer(['description'])
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             q._select_fields()
 
         q = TestModel.objects.filter(test_id=0).only(['test_id', 'attempt_id', 'description'])
         assert q._select_fields() == ['attempt_id', 'description']
 
         # no fields to select
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             q = TestModel.objects.only(['test_id']).defer(['test_id'])
             q._select_fields()
 
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             q = TestModel.objects.filter(test_id=0).only(['test_id'])
             q._select_fields()
 
@@ -286,7 +287,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         q = TestModel.objects.defer(['attempt_id', 'description'])
         assert q._select_fields() == ['test_id', 'expected_result', 'test_result']
 
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects.defer(['nonexistent_field'])
 
         # defer more than one
@@ -302,7 +303,7 @@ class TestQuerySetOperation(BaseCassEngTestCase):
         # Eliminate all results confirm exception is thrown
         q = TestModel.objects.defer(['description', 'attempt_id'])
         q = q.only(['description'])
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             q._select_fields()
 
         # implicit defer
@@ -523,7 +524,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         Tests that get calls that don't return a result raises a DoesNotExist error
         """
-        with self.assertRaises(TestModel.DoesNotExist):
+        with pytest.raises(TestModel.DoesNotExist):
             TestModel.objects.get(test_id=100)
 
     @execute_count(1)
@@ -531,7 +532,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         Tests that get calls that return multiple results raise a MultipleObjectsReturned error
         """
-        with self.assertRaises(TestModel.MultipleObjectsReturned):
+        with pytest.raises(TestModel.MultipleObjectsReturned):
             TestModel.objects.get(test_id=1)
 
     def test_allow_filtering_flag(self):
@@ -580,7 +581,7 @@ class TestQuerySetDistinct(BaseQuerySetUsage):
 
     @execute_count(1)
     def test_distinct_with_non_partition(self):
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             q = TestModel.objects.distinct(['description']).filter(test_id__in=[1, 2])
             len(q)
 
@@ -615,19 +616,19 @@ class TestQuerySetOrdering(BaseQuerySetUsage):
 
     def test_ordering_by_non_second_primary_keys_fail(self):
         # kwarg filtering
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects(test_id=0).order_by('test_id')
 
         # kwarg filtering
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects(TestModel.test_id == 0).order_by('test_id')
 
     def test_ordering_by_non_primary_keys_fails(self):
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects(test_id=0).order_by('description')
 
     def test_ordering_on_indexed_columns_fails(self):
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             IndexedTestModel.objects(test_id=0).order_by('attempt_id')
 
     @execute_count(8)
@@ -654,7 +655,7 @@ class TestQuerySetSlicing(BaseQuerySetUsage):
     @execute_count(1)
     def test_out_of_range_index_raises_error(self):
         q = TestModel.objects(test_id=0).order_by('attempt_id')
-        with self.assertRaises(IndexError):
+        with pytest.raises(IndexError):
             q[10]
 
     @execute_count(1)
@@ -710,7 +711,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         """
         Tests that queries that don't have an equals relation to a primary key or indexed field fail
         """
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             q = TestModel.objects(test_result=25)
             list([i for i in q])
 
@@ -718,7 +719,7 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         """
         Tests that queries that don't have non equal (>,<, etc) relation to a primary key or indexed field fail
         """
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             q = TestModel.objects(test_id__gt=0)
             list([i for i in q])
 
@@ -754,27 +755,27 @@ class TestQuerySetValidation(BaseQuerySetUsage):
         Tests that queries on an custom indexed field will work without any primary key relations specified
         """
 
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             list(CustomIndexedTestModel.objects.filter(data='test'))  # not custom indexed
 
         # It should return InvalidRequest if target an indexed columns
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(indexed='test', data='test'))
 
         # It should return InvalidRequest if target an indexed columns
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(description='test', data='test'))
 
         # equals operator, server error since there is no real index, but it passes
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(description='test'))
 
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(test_id=1, description='test'))
 
         # gte operator, server error since there is no real index, but it passes
         # this can't work with a secondary index
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             list(CustomIndexedTestModel.objects.filter(description__gte='test'))
 
         with TestCluster().connect() as session:
@@ -805,12 +806,12 @@ class TestQuerySetDelete(BaseQuerySetUsage):
 
     def test_delete_without_partition_key(self):
         """ Tests that attempting to delete a model without defining a partition key fails """
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
 
     def test_delete_without_any_where_args(self):
         """ Tests that attempting to delete a whole table without any arguments will fail """
-        with self.assertRaises(query.QueryException):
+        with pytest.raises(query.QueryException):
             TestModel.objects(attempt_id=0).delete()
 
     @greaterthanorequalcass30
@@ -1029,13 +1030,13 @@ class TestContainsOperator(BaseQuerySetUsage):
         q = IndexedCollectionsTestModel.filter(test_map__contains=13)
         assert q.count() == 0
 
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             q = IndexedCollectionsTestModel.filter(test_list_no_index__contains=1)
             assert q.count() == 0
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             q = IndexedCollectionsTestModel.filter(test_set_no_index__contains=1)
             assert q.count() == 0
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             q = IndexedCollectionsTestModel.filter(test_map_no_index__contains=1)
             assert q.count() == 0
 
@@ -1060,13 +1061,13 @@ class TestContainsOperator(BaseQuerySetUsage):
         q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map.contains_(13))
         assert q.count() == 0
 
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
             assert q.count() == 0
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
             assert q.count() == 0
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             q = IndexedCollectionsTestModel.filter(IndexedCollectionsTestModel.test_map_no_index.contains_(1))
             assert q.count() == 0
 
@@ -1157,13 +1158,13 @@ class DMLQueryTimeoutTestCase(BaseQuerySetUsage):
     def test_timeout_then_batch(self):
         b = query.BatchQuery()
         m = self.model.timeout(None)
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             m.batch(b)
 
     def test_batch_then_timeout(self):
         b = query.BatchQuery()
         m = self.model.batch(b)
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             m.timeout(0.5)
 
 
@@ -1397,9 +1398,9 @@ class TestModelQueryWithFetchSize(BaseCassEngTestCase):
         assert len(TestModelSmall.objects.fetch_size(5101)) == 5100
         assert len(TestModelSmall.objects.fetch_size(1)) == 5100
 
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             TestModelSmall.objects.fetch_size(0)
-        with self.assertRaises(QueryException):
+        with pytest.raises(QueryException):
             TestModelSmall.objects.fetch_size(-1)
 
 

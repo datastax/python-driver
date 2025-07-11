@@ -27,6 +27,7 @@ from cassandra.connection import Connection
 from cassandra.pool import HostConnection
 from cassandra.pool import Host, NoConnectionsAvailable
 from cassandra.policies import HostDistance, SimpleConvictionPolicy
+import pytest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -77,7 +78,8 @@ class _PoolTests(unittest.TestCase):
 
         # we're already at the max number of requests for this connection,
         # so we this should fail
-        self.assertRaises(NoConnectionsAvailable, pool.borrow_connection, 0)
+        with pytest.raises(NoConnectionsAvailable):
+            pool.borrow_connection(0)
 
     def test_successful_wait_for_connection(self):
         host = Mock(spec=Host, address='ip1')
@@ -126,7 +128,8 @@ class _PoolTests(unittest.TestCase):
         # we don't care about making this borrow_connection call succeed for the
         # purposes of this test, as long as it results in a new connection
         # creation being scheduled
-        self.assertRaises(NoConnectionsAvailable, pool.borrow_connection, 0)
+        with pytest.raises(NoConnectionsAvailable):
+            pool.borrow_connection(0)
         if not self.uses_single_connection:
             session.submit.assert_called_once_with(pool._create_new_connection)
 
@@ -204,9 +207,12 @@ class _PoolTests(unittest.TestCase):
         Ensure Host fails if not initialized properly
         """
 
-        self.assertRaises(ValueError, Host, None, None)
-        self.assertRaises(ValueError, Host, '127.0.0.1', None)
-        self.assertRaises(ValueError, Host, None, SimpleConvictionPolicy)
+        with pytest.raises(ValueError):
+            Host(None, None)
+        with pytest.raises(ValueError):
+            Host('127.0.0.1', None)
+        with pytest.raises(ValueError):
+            Host(None, SimpleConvictionPolicy)
 
     def test_host_equality(self):
         """

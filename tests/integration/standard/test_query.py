@@ -99,9 +99,9 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("CREATE TABLE {0}.{1} (k int PRIMARY KEY, v timestamp)".format(self.keyspace_name,self.function_table_name))
         ss = SimpleStatement("INSERT INTO {0}.{1} (k, v) VALUES (1, 1000000000000000)".format(self.keyspace_name, self.function_table_name))
         self.session.execute(ss)
-        with self.assertRaises(DriverException) as context:
+        with pytest.raises(DriverException) as context:
             self.session.execute("SELECT * FROM {0}.{1}".format(self.keyspace_name, self.function_table_name))
-        assert "Failed decoding result column" in str(context.exception)
+        assert "Failed decoding result column" in str(context.value)
 
     def test_trace_id_to_resultset(self):
 
@@ -187,7 +187,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         statement = SimpleStatement(query)
         response_future = self.session.execute_async(statement, trace=True)
         response_future.result()
-        with self.assertRaises(Unavailable):
+        with pytest.raises(Unavailable):
             response_future.get_query_trace(query_cl=ConsistencyLevel.THREE)
         # Try again with a smattering of other CL's
         assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.TWO).trace_id is not None
@@ -196,7 +196,7 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ONE).trace_id is not None
         response_future = self.session.execute_async(statement, trace=True)
         response_future.result()
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.ANY).trace_id is not None
         assert response_future.get_query_trace(max_wait=2.0, query_cl=ConsistencyLevel.QUORUM).trace_id is not None
 
@@ -233,7 +233,8 @@ class QueryTests(BasicSharedKeyspaceUnitTestCase):
         assert self._wait_for_trace_to_delete(trace.trace_id)
 
         # should raise because duration is not set
-        self.assertRaises(TraceUnavailable, trace.populate, max_wait=0.2, wait_for_complete=True)
+        with pytest.raises(TraceUnavailable):
+            trace.populate(max_wait=0.2, wait_for_complete=True)
         assert not trace.events
 
         # should get the events with wait False
@@ -743,9 +744,12 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
         batch.add("INSERT INTO test3rf.test (k, v) VALUES (8, 8)", ())
         batch.add("INSERT INTO test3rf.test (k, v) VALUES (9, 9)", ())
 
-        self.assertRaises(ValueError, batch.add, prepared.bind([]), (1))
-        self.assertRaises(ValueError, batch.add, prepared.bind([]), (1, 2))
-        self.assertRaises(ValueError, batch.add, prepared.bind([]), (1, 2, 3))
+        with pytest.raises(ValueError):
+            batch.add(prepared.bind([]), (1))
+        with pytest.raises(ValueError):
+            batch.add(prepared.bind([]), (1, 2))
+        with pytest.raises(ValueError):
+            batch.add(prepared.bind([]), (1, 2, 3))
 
         self.session.execute(batch)
         self.confirm_results()
@@ -779,11 +783,13 @@ class BatchStatementTests(BasicSharedKeyspaceUnitTestCase):
         b = BatchStatement(batch_type=BatchType.UNLOGGED, consistency_level=ConsistencyLevel.ONE)
         # max + 1 raises
         b.add_all([ss] * max_statements, [None] * max_statements)
-        self.assertRaises(ValueError, b.add, ss)
+        with pytest.raises(ValueError):
+            b.add(ss)
 
         # also would have bombed trying to encode
         b._statements_and_parameters.append((False, ss.query_string, ()))
-        self.assertRaises(NoHostAvailable, self.session.execute, b)
+        with pytest.raises(NoHostAvailable):
+            self.session.execute(b)
 
 
 class SerialConsistencyTests(unittest.TestCase):
@@ -869,8 +875,10 @@ class SerialConsistencyTests(unittest.TestCase):
 
     def test_bad_consistency_level(self):
         statement = SimpleStatement("foo")
-        self.assertRaises(ValueError, setattr, statement, 'serial_consistency_level', ConsistencyLevel.ONE)
-        self.assertRaises(ValueError, SimpleStatement, 'foo', serial_consistency_level=ConsistencyLevel.ONE)
+        with pytest.raises(ValueError):
+            setattr(statement, 'serial_consistency_level', ConsistencyLevel.ONE)
+        with pytest.raises(ValueError):
+            SimpleStatement('foo', serial_consistency_level=ConsistencyLevel.ONE)
 
 
 class LightweightTransactionTests(unittest.TestCase):
@@ -1031,7 +1039,7 @@ class LightweightTransactionTests(unittest.TestCase):
         """
         batch_statement = BatchStatement()
         results = self.session.execute(batch_statement)
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             results.was_applied
 
     @pytest.mark.xfail(reason='Skipping until PYTHON-943 is resolved')
@@ -1469,7 +1477,7 @@ class SimpleWithKeyspaceTests(QueryKeyspaceTests, unittest.TestCase):
         # set on queries with protocol version 5 or higher. Consider setting Cluster.protocol_version to 5.',),
         # <Host: 127.0.0.2 datacenter1>: ConnectionException('Host has been marked down or removed',),
         # <Host: 127.0.0.1 datacenter1>: ConnectionException('Host has been marked down or removed',)})
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             session.execute(simple_stmt)
 
     def _check_set_keyspace_in_statement(self, session):

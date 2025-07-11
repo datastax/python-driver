@@ -33,6 +33,7 @@ from tests.integration import (
     local, CASSANDRA_VERSION, TestCluster)
 
 import unittest
+import pytest
 
 log = logging.getLogger(__name__)
 
@@ -156,13 +157,13 @@ class ClientExceptionTests(unittest.TestCase):
         if expected_exception is None:
             self.execute_helper(session, statement)
         else:
-            with self.assertRaises(expected_exception) as cm:
+            with pytest.raises(expected_exception) as cm:
                 self.execute_helper(session, statement)
             if ProtocolVersion.uses_error_code_map(PROTOCOL_VERSION):
-                if isinstance(cm.exception, ReadFailure):
-                    assert list(cm.exception.error_code_map.values())[0] == 1
-                if isinstance(cm.exception, WriteFailure):
-                    assert list(cm.exception.error_code_map.values())[0] == 0
+                if isinstance(cm.value, ReadFailure):
+                    assert list(cm.value.error_code_map.values())[0] == 1
+                if isinstance(cm.value, WriteFailure):
+                    assert list(cm.value.error_code_map.values())[0] == 0
 
     def test_write_failures_from_coordinator(self):
         """
@@ -379,7 +380,7 @@ class TimeoutTimerTest(unittest.TestCase):
         # Test with default timeout (should be 10)
         start_time = time.time()
         future = self.session.execute_async(ss)
-        with self.assertRaises(OperationTimedOut):
+        with pytest.raises(OperationTimedOut):
             future.result()
         end_time = time.time()
         total_time = end_time-start_time
@@ -396,7 +397,7 @@ class TimeoutTimerTest(unittest.TestCase):
         future.add_callback(mock_callback)
         future.add_errback(mock_errorback)
 
-        with self.assertRaises(OperationTimedOut):
+        with pytest.raises(OperationTimedOut):
             future.result()
         end_time = time.time()
         total_time = end_time-start_time

@@ -15,13 +15,14 @@ import unittest
 
 from cassandra.cqlengine.operators import EqualsOperator
 from cassandra.cqlengine.statements import StatementException, WhereClause
+import pytest
 
 
 class TestWhereClause(unittest.TestCase):
 
     def test_operator_check(self):
         """ tests that creating a where statement with a non BaseWhereOperator object fails """
-        with self.assertRaises(StatementException):
+        with pytest.raises(StatementException):
             WhereClause('a', 'b', 'c')
 
     def test_where_clause_rendering(self):

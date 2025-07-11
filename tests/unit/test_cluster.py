@@ -27,6 +27,7 @@ from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, Down
 from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
 from tests.unit.utils import mock_session_pools
 from tests import connection_class
+import pytest
 
 
 log = logging.getLogger(__name__)
@@ -100,9 +101,9 @@ class ClusterTest(unittest.TestCase):
                 assert cp.port == 9999
 
     def test_invalid_contact_point_types(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Cluster(contact_points=[None], protocol_version=4, connect_timeout=1)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             Cluster(contact_points="not a sequence", protocol_version=4, connect_timeout=1)
 
     def test_port_str(self):
@@ -112,13 +113,13 @@ class ClusterTest(unittest.TestCase):
             if cp.address in ('::1', '127.0.0.1'):
                 assert cp.port == 1111
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             cluster = Cluster(contact_points=['127.0.0.1'], port='string')
 
 
     def test_port_range(self):
         for invalid_port in [0, 65536, -1]:
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 cluster = Cluster(contact_points=['127.0.0.1'], port=invalid_port)
 
 
@@ -189,9 +190,9 @@ class SessionTest(unittest.TestCase):
         assert s.default_serial_consistency_level is None
 
         # Should fail
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             s.default_serial_consistency_level = ConsistencyLevel.ANY
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             s.default_serial_consistency_level = 1001
 
         for cl in (None, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL):
@@ -290,7 +291,7 @@ class ExecutionProfileTest(unittest.TestCase):
             assert ep == session.get_execution_profile(name)
 
         # invalid ep
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             session.get_execution_profile('non-existent')
 
     def test_serial_consistency_level_validation(self):
@@ -299,9 +300,9 @@ class ExecutionProfileTest(unittest.TestCase):
         ep = ExecutionProfile(RoundRobinPolicy(), serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
 
         # should not pass
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ep = ExecutionProfile(RoundRobinPolicy(), serial_consistency_level=ConsistencyLevel.ANY)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             ep = ExecutionProfile(RoundRobinPolicy(), serial_consistency_level=42)
 
     @mock_session_pools
@@ -352,14 +353,18 @@ class ExecutionProfileTest(unittest.TestCase):
     @mock_session_pools
     def test_no_profile_with_legacy(self):
         # don't construct with both
-        self.assertRaises(ValueError, Cluster, load_balancing_policy=RoundRobinPolicy(), execution_profiles={'a': ExecutionProfile()})
-        self.assertRaises(ValueError, Cluster, default_retry_policy=DowngradingConsistencyRetryPolicy(), execution_profiles={'a': ExecutionProfile()})
-        self.assertRaises(ValueError, Cluster, load_balancing_policy=RoundRobinPolicy(),
+        with pytest.raises(ValueError):
+            Cluster(load_balancing_policy=RoundRobinPolicy(), execution_profiles={'a': ExecutionProfile()})
+        with pytest.raises(ValueError):
+            Cluster(default_retry_policy=DowngradingConsistencyRetryPolicy(), execution_profiles={'a': ExecutionProfile()})
+        with pytest.raises(ValueError):
+            Cluster(load_balancing_policy=RoundRobinPolicy(),
                           default_retry_policy=DowngradingConsistencyRetryPolicy(), execution_profiles={'a': ExecutionProfile()})
 
         # can't add after
         cluster = Cluster(load_balancing_policy=RoundRobinPolicy())
-        self.assertRaises(ValueError, cluster.add_execution_profile, 'name', ExecutionProfile())
+        with pytest.raises(ValueError):
+            cluster.add_execution_profile('name', ExecutionProfile())
 
         # session settings lock out profiles
         cluster = Cluster()
@@ -370,10 +375,12 @@ class ExecutionProfileTest(unittest.TestCase):
                             ('row_factory', tuple_factory)):
             cluster._config_mode = _ConfigMode.UNCOMMITTED
             setattr(session, attr, value)
-            self.assertRaises(ValueError, cluster.add_execution_profile, 'name' + attr, ExecutionProfile())
+            with pytest.raises(ValueError):
+                cluster.add_execution_profile('name' + attr, ExecutionProfile())
 
         # don't accept profile
-        self.assertRaises(ValueError, session.execute_async, "query", execution_profile='some name here')
+        with pytest.raises(ValueError):
+            session.execute_async("query", execution_profile='some name here')
 
     @mock_session_pools
     def test_no_legacy_with_profile(self):
@@ -385,13 +392,15 @@ class ExecutionProfileTest(unittest.TestCase):
             # don't allow legacy parameters set
             for attr, value in (('default_retry_policy', RetryPolicy()),
                                 ('load_balancing_policy', default_lbp_factory())):
-                self.assertRaises(ValueError, setattr, cluster, attr, value)
+                with pytest.raises(ValueError):
+                    setattr(cluster, attr, value)
             session = Session(cluster, hosts=[Host("127.0.0.1", SimpleConvictionPolicy)])
             for attr, value in (('default_timeout', 1),
                                 ('default_consistency_level', ConsistencyLevel.ANY),
                                 ('default_serial_consistency_level', ConsistencyLevel.SERIAL),
                                 ('row_factory', tuple_factory)):
-                self.assertRaises(ValueError, setattr, session, attr, value)
+                with pytest.raises(ValueError):
+                    setattr(session, attr, value)
 
     @mock_session_pools
     def test_profile_name_value(self):
@@ -437,23 +446,27 @@ class ExecutionProfileTest(unittest.TestCase):
                 assert getattr(all_updated, attr) != getattr(active, attr)
 
         # cannot clone nonexistent profile
-        self.assertRaises(ValueError, session.execution_profile_clone_update, 'DOES NOT EXIST', **profile_attrs)
+        with pytest.raises(ValueError):
+            session.execution_profile_clone_update('DOES NOT EXIST', **profile_attrs)
 
     def test_no_profiles_same_name(self):
         # can override default in init
         cluster = Cluster(execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(), 'one': ExecutionProfile()})
 
         # cannot update default
-        self.assertRaises(ValueError, cluster.add_execution_profile, EXEC_PROFILE_DEFAULT, ExecutionProfile())
+        with pytest.raises(ValueError):
+            cluster.add_execution_profile(EXEC_PROFILE_DEFAULT, ExecutionProfile())
 
         # cannot update named init
-        self.assertRaises(ValueError, cluster.add_execution_profile, 'one', ExecutionProfile())
+        with pytest.raises(ValueError):
+            cluster.add_execution_profile('one', ExecutionProfile())
 
         # can add new name
         cluster.add_execution_profile('two', ExecutionProfile())
 
         # cannot add a profile added dynamically
-        self.assertRaises(ValueError, cluster.add_execution_profile, 'two', ExecutionProfile())
+        with pytest.raises(ValueError):
+            cluster.add_execution_profile('two', ExecutionProfile())
 
     def test_warning_on_no_lbp_with_contact_points_legacy_mode(self):
         """

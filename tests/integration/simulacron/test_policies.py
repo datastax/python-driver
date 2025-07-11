@@ -27,6 +27,7 @@ from tests.integration.simulacron.utils import start_and_prime_singledc, prime_q
 
 from itertools import count
 from packaging.version import Version
+import pytest
 
 
 class BadRoundRobinPolicy(RoundRobinPolicy):
@@ -124,7 +125,7 @@ class SpecExecTest(unittest.TestCase):
         assert 1 == len(result.response_future.attempted_hosts)
 
         # Test timeout with spec_ex
-        with self.assertRaises(OperationTimedOut):
+        with pytest.raises(OperationTimedOut):
             self.session.execute(statement, execution_profile='spec_ep_rr', timeout=.5)
 
         prepared_query_to_prime = "SELECT * FROM test3rf.test where k = ?"
@@ -306,7 +307,7 @@ class RetryPolicyTests(unittest.TestCase):
         then["write_type"] = "CDC"
         prime_query(query_to_prime_cdc, rows=None, column_types=None, then=then)
 
-        with self.assertRaises(WriteTimeout):
+        with pytest.raises(WriteTimeout):
             self.session.execute(query_to_prime_simple)
 
         #CDC should be ignored
@@ -438,7 +439,7 @@ class RetryPolicyTests(unittest.TestCase):
             prime_query(query_to_prime, then=prime_error, rows=None, column_types=None)
             rf = self.session.execute_async(query_to_prime)
 
-            with self.assertRaises(exc):
+            with pytest.raises(exc):
                 rf.result()
 
             assert len(rf.attempted_hosts) == 1  # no retry
@@ -455,7 +456,7 @@ class RetryPolicyTests(unittest.TestCase):
             prime_query(query_to_prime, then=e, rows=None, column_types=None)
             rf = self.session.execute_async(query_to_prime)
 
-            with self.assertRaises(NoHostAvailable):
+            with pytest.raises(NoHostAvailable):
                 rf.result()
 
             assert len(rf.attempted_hosts) == 3  # all 3 nodes failed

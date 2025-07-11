@@ -48,16 +48,24 @@ class LoadBalancingPolicyTest(unittest.TestCase):
         host = Host(DefaultEndPoint("ip1"), SimpleConvictionPolicy)
         host.set_location_info("dc1", "rack1")
 
-        self.assertRaises(NotImplementedError, policy.distance, host)
-        self.assertRaises(NotImplementedError, policy.populate, None, host)
-        self.assertRaises(NotImplementedError, policy.make_query_plan)
-        self.assertRaises(NotImplementedError, policy.on_up, host)
-        self.assertRaises(NotImplementedError, policy.on_down, host)
-        self.assertRaises(NotImplementedError, policy.on_add, host)
-        self.assertRaises(NotImplementedError, policy.on_remove, host)
+        with pytest.raises(NotImplementedError):
+            policy.distance(host)
+        with pytest.raises(NotImplementedError):
+            policy.populate(None, host)
+        with pytest.raises(NotImplementedError):
+            policy.make_query_plan()
+        with pytest.raises(NotImplementedError):
+            policy.on_up(host)
+        with pytest.raises(NotImplementedError):
+            policy.on_down(host)
+        with pytest.raises(NotImplementedError):
+            policy.on_add(host)
+        with pytest.raises(NotImplementedError):
+            policy.on_remove(host)
 
     def test_instance_check(self):
-        self.assertRaises(TypeError, Cluster, load_balancing_policy=RoundRobinPolicy)
+        with pytest.raises(TypeError):
+            Cluster(load_balancing_policy=RoundRobinPolicy)
 
 
 class RoundRobinPolicyTest(unittest.TestCase):
@@ -857,8 +865,10 @@ class ConvictionPolicyTest(unittest.TestCase):
         """
 
         conviction_policy = ConvictionPolicy(1)
-        self.assertRaises(NotImplementedError, conviction_policy.add_failure, 1)
-        self.assertRaises(NotImplementedError, conviction_policy.reset)
+        with pytest.raises(NotImplementedError):
+            conviction_policy.add_failure(1)
+        with pytest.raises(NotImplementedError):
+            conviction_policy.reset()
 
 
 class SimpleConvictionPolicyTest(unittest.TestCase):
@@ -879,7 +889,8 @@ class ReconnectionPolicyTest(unittest.TestCase):
         """
 
         policy = ReconnectionPolicy()
-        self.assertRaises(NotImplementedError, policy.new_schedule)
+        with pytest.raises(NotImplementedError):
+            policy.new_schedule()
 
 
 class ConstantReconnectionPolicyTest(unittest.TestCase):
@@ -889,7 +900,8 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
         Test initialization values
         """
 
-        self.assertRaises(ValueError, ConstantReconnectionPolicy, -1, 0)
+        with pytest.raises(ValueError):
+            ConstantReconnectionPolicy(-1, 0)
 
     def test_schedule(self):
         """
@@ -930,10 +942,14 @@ class ExponentialReconnectionPolicyTest(unittest.TestCase):
         assert min <= value <= max
 
     def test_bad_vals(self):
-        self.assertRaises(ValueError, ExponentialReconnectionPolicy, -1, 0)
-        self.assertRaises(ValueError, ExponentialReconnectionPolicy, 0, -1)
-        self.assertRaises(ValueError, ExponentialReconnectionPolicy, 9000, 1)
-        self.assertRaises(ValueError, ExponentialReconnectionPolicy, 1, 2, -1)
+        with pytest.raises(ValueError):
+            ExponentialReconnectionPolicy(-1, 0)
+        with pytest.raises(ValueError):
+            ExponentialReconnectionPolicy(0, -1)
+        with pytest.raises(ValueError):
+            ExponentialReconnectionPolicy(9000, 1)
+        with pytest.raises(ValueError):
+            ExponentialReconnectionPolicy(1, 2, -1)
 
     def test_schedule_no_max(self):
         base_delay = 2.0
@@ -1376,7 +1392,7 @@ class HostFilterPolicyInitTest(unittest.TestCase):
             expected_message_regex = "can't set attribute"
         hfp = HostFilterPolicy(child_policy=Mock(name='child_policy'),
                                predicate=Mock(name='predicate'))
-        with self.assertRaisesRegex(AttributeError, expected_message_regex):
+        with pytest.raises(AttributeError, match=expected_message_regex):
             hfp.predicate = object()
 
 

@@ -57,7 +57,7 @@ class BatchQueryTests(BaseCassEngTestCase):
         b = BatchQuery()
         TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=2, count=3, text='4')
 
-        with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+        with pytest.raises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
         b.execute()
@@ -93,7 +93,7 @@ class BatchQueryTests(BaseCassEngTestCase):
 
         b.execute()
 
-        with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+        with pytest.raises(TestMultiKeyModel.DoesNotExist):
             TestMultiKeyModel.get(partition=self.pkey, cluster=2)
 
     def test_context_manager(self):
@@ -103,7 +103,7 @@ class BatchQueryTests(BaseCassEngTestCase):
                 TestMultiKeyModel.batch(b).create(partition=self.pkey, cluster=i, count=3, text='4')
 
             for i in range(5):
-                with self.assertRaises(TestMultiKeyModel.DoesNotExist):
+                with pytest.raises(TestMultiKeyModel.DoesNotExist):
                     TestMultiKeyModel.get(partition=self.pkey, cluster=i)
 
         for i in range(5):
@@ -185,7 +185,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
         class SomeError(Exception):
             pass
 
-        with self.assertRaises(SomeError):
+        with pytest.raises(SomeError):
             with BatchQuery() as batch:
                 batch.add_callback(my_callback)
                 # this error bubbling up through context manager
@@ -197,7 +197,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
 
         # but if execute ran, even with an error bubbling through
         # the callbacks also would have fired
-        with self.assertRaises(SomeError):
+        with pytest.raises(SomeError):
             with BatchQuery(execute_on_exception=True) as batch:
                 batch.add_callback(my_callback)
                 raise SomeError

@@ -28,6 +28,7 @@ from cassandra.concurrent import execute_concurrent, execute_concurrent_with_arg
 from cassandra.pool import Host
 from cassandra.policies import SimpleConvictionPolicy
 from tests.unit.utils import mock_session_pools
+import pytest
 
 
 class MockResponseResponseFuture():
@@ -248,7 +249,8 @@ class ConcurrencyTest((unittest.TestCase)):
         """
         max_recursion = sys.getrecursionlimit()
         s = Session(Cluster(), [Host("127.0.0.1", SimpleConvictionPolicy)])
-        self.assertRaises(TypeError, execute_concurrent_with_args, s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=True)
+        with pytest.raises(TypeError):
+            execute_concurrent_with_args(s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=True)
 
         results = execute_concurrent_with_args(s, "doesn't matter", [('param',)] * max_recursion, raise_on_first_error=False)  # previously
         assert len(results) == max_recursion

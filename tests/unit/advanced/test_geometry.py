@@ -20,6 +20,7 @@ from cassandra.cqltypes import lookup_casstype
 from cassandra.protocol import ProtocolVersion
 from cassandra.cqltypes import PointType, LineStringType, PolygonType, WKBGeometryType
 from cassandra.util import Point, LineString, Polygon, _LinearRing, Distance, _HAS_GEOMET
+import pytest
 
 wkb_be = 0
 wkb_le = 1
@@ -132,10 +133,10 @@ class WKTTest(unittest.TestCase):
 
         # Test bad line strings
         bls = "LINESTRIN (1.0 2.0, 3.0 4.0, 5.0 6.0)"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             blo = LineString.from_wkt(bls)
         bls = "LINESTRING (1.0 2.0 3.0 4.0 5.0"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             blo = LineString.from_wkt(bls)
 
         # Test with NAN
@@ -163,10 +164,10 @@ class WKTTest(unittest.TestCase):
         # Test bad distance strings
 
         bds = "DISTANCE ((1.0 2.0))"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             bdo = Distance.from_wkt(bds)
         bps = "DISTANCE ((1.0 2.0 3.0 4.0 5.0)"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             bdo = Distance.from_wkt(bds)
 
         # NAN isn't supported, truncating not supported
@@ -188,10 +189,10 @@ class WKTTest(unittest.TestCase):
 
         # Test bad point strings
         bps = "POIN (1.0 2.0)"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             bpo = Point.from_wkt(bps)
         bps = "POINT (1.0 2.0 3.0 4.0 5.0"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             bpo = Point.from_wkt(bps)
 
         # Points get truncated automatically
@@ -235,10 +236,10 @@ class WKTTest(unittest.TestCase):
 
         # Test bad polygon strings
         bps = "POLYGONE ((30 10, 40 40, 20 40, 10 20, 30 10))"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             bpo = Polygon.from_wkt(bps)
         bps = "POLYGON (30 10, 40 40, 20 40, 10 20, 30 10)"
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             bpo = Polygon.from_wkt(bps)
 
         # Polygons get truncated automatically

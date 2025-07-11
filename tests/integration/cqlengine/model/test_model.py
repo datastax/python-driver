@@ -22,6 +22,7 @@ from cassandra.cqlengine.models import Model, ModelDefinitionException
 from uuid import uuid1
 from tests.integration import pypy
 from tests.integration.cqlengine.base import TestQueryUpdateModel
+import pytest
 
 class TestModel(unittest.TestCase):
     """ Tests the non-io functionality of models """
@@ -121,7 +122,8 @@ class TestModel(unittest.TestCase):
         # neither set should raise CQLEngineException before failing or formatting an invalid name
         del TestModel.__keyspace__
         with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
-            self.assertRaises(CQLEngineException, TestModel.column_family_name)
+            with pytest.raises(CQLEngineException):
+                TestModel.column_family_name()
             # .. but we can still get the bare CF name
             assert TestModel.column_family_name(include_keyspace=False) == "test_model"
 
@@ -148,7 +150,8 @@ class TestModel(unittest.TestCase):
 
         del TestModel.__keyspace__
         with patch('cassandra.cqlengine.models.DEFAULT_KEYSPACE', None):
-            self.assertRaises(CQLEngineException, TestModel.column_family_name)
+            with pytest.raises(CQLEngineException):
+                TestModel.column_family_name()
             assert TestModel.column_family_name(include_keyspace=False) == '"TestModel"'
 
 
@@ -157,7 +160,7 @@ class BuiltInAttributeConflictTest(unittest.TestCase):
 
     def test_model_with_attribute_name_conflict(self):
         """should raise exception when model defines column that conflicts with built-in attribute"""
-        with self.assertRaises(ModelDefinitionException):
+        with pytest.raises(ModelDefinitionException):
             class IllegalTimestampColumnModel(Model):
 
                 my_primary_key = columns.Integer(primary_key=True)
@@ -165,7 +168,7 @@ class BuiltInAttributeConflictTest(unittest.TestCase):
 
     def test_model_with_method_name_conflict(self):
         """should raise exception when model defines column that conflicts with built-in method"""
-        with self.assertRaises(ModelDefinitionException):
+        with pytest.raises(ModelDefinitionException):
             class IllegalFilterColumnModel(Model):
 
                 my_primary_key = columns.Integer(primary_key=True)

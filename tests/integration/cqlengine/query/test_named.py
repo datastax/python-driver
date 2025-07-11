@@ -28,6 +28,7 @@ from tests.integration.cqlengine.query.test_queryset import BaseQuerySetUsage
 
 
 from tests.integration import BasicSharedKeyspaceUnitTestCase, greaterthanorequalcass30, requires_collection_indexes
+import pytest
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -265,7 +266,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         Tests that get calls that don't return a result raises a DoesNotExist error
         """
-        with self.assertRaises(self.table.DoesNotExist):
+        with pytest.raises(self.table.DoesNotExist):
             self.table.objects.get(test_id=100)
 
     @execute_count(1)
@@ -273,7 +274,7 @@ class TestQuerySetCountSelectionAndIteration(BaseQuerySetUsage):
         """
         Tests that get calls that return multiple results raise a MultipleObjectsReturned error
         """
-        with self.assertRaises(self.table.MultipleObjectsReturned):
+        with pytest.raises(self.table.MultipleObjectsReturned):
             self.table.objects.get(test_id=1)
 
 

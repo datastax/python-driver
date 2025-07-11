@@ -25,6 +25,7 @@ from cassandra.query import dict_factory, tuple_factory, SimpleStatement
 from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 
 import unittest
+import pytest
 
 log = logging.getLogger(__name__)
 
@@ -175,7 +176,8 @@ class ClusterTests(unittest.TestCase):
             for i in range(num_statements):
                 result = next(results)
                 assert (True, [(i,)]) == result
-            self.assertRaises(StopIteration, next, results)
+            with pytest.raises(StopIteration):
+                next(results)
 
     def test_execute_concurrent_paged_result(self):
         if PROTOCOL_VERSION < 2:
@@ -259,9 +261,8 @@ class ClusterTests(unittest.TestCase):
         # we'll get an error back from the server
         parameters[57] = ('efefef', 'awefawefawef')
 
-        self.assertRaises(
-            InvalidRequest,
-            execute_concurrent, self.session, list(zip(statements, parameters)), raise_on_first_error=True)
+        with pytest.raises(InvalidRequest):
+            execute_concurrent(self.session, list(zip(statements, parameters)), raise_on_first_error=True)
 
     def test_first_failure_client_side(self):
         statement = SimpleStatement(
@@ -273,9 +274,8 @@ class ClusterTests(unittest.TestCase):
         # the driver will raise an error when binding the params
         parameters[57] = 1
 
-        self.assertRaises(
-            TypeError,
-            execute_concurrent, self.session, list(zip(statements, parameters)), raise_on_first_error=True)
+        with pytest.raises(TypeError):
+            execute_concurrent(self.session, list(zip(statements, parameters)), raise_on_first_error=True)
 
     def test_no_raise_on_first_failure(self):
         statement = SimpleStatement(

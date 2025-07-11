@@ -17,6 +17,7 @@ from tests.integration import use_singledc, get_cluster, remove_cluster, local, 
 from tests.util import wait_until, wait_until_not_raised
 
 import unittest
+import pytest
 
 
 def setup_module():
@@ -44,7 +45,7 @@ class CustomClusterTests(unittest.TestCase):
         All hosts should be marked as up and we should be able to execute queries on it.
         """
         cluster = TestCluster()
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             cluster.connect()  # should fail on port 9042
 
         cluster = TestCluster(port=9046)

@@ -19,6 +19,7 @@ from cassandra.policies import RoundRobinPolicy, WhiteListRoundRobinPolicy
 from tests.integration import requiressimulacron, libevtest
 from tests.integration.simulacron import SimulacronBase, PROTOCOL_VERSION
 from tests.integration.simulacron.utils import ResumeReads, PauseReads, prime_request, start_and_prime_singledc
+import pytest
 
 
 @requiressimulacron
@@ -146,9 +147,9 @@ class TCPBackpressureTests(SimulacronBase):
 
         # Now that our send buffer is completely full, verify we immediately get busy exceptions rather than timing out
         for i in range(1000):
-            with self.assertRaises(NoHostAvailable) as e:
+            with pytest.raises(NoHostAvailable) as e:
                 session.execute(query, [str(i)])
-            assert "ConnectionBusy" in str(e.exception)
+            assert "ConnectionBusy" in str(e.value)
 
     def test_node_busy(self):
         """ Verify that once TCP buffer is full, queries continue to get re-routed to other nodes """
@@ -176,4 +177,3 @@ class TCPBackpressureTests(SimulacronBase):
         # verify queries get re-routed to other nodes and queries complete successfully
         for i in range(1000):
             session.execute(query, [str(i)])
-

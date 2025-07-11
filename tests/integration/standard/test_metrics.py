@@ -29,6 +29,7 @@ from greplin import scales
 from tests.integration import BasicSharedKeyspaceUnitTestCaseRF3WM, BasicExistingKeyspaceUnitTestCase, local
 
 import pprint as pp
+import pytest
 
 
 def setup_module():
@@ -70,7 +71,7 @@ class MetricsTests(unittest.TestCase):
             # Ensure the nodes are actually down
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
             # both exceptions can happen depending on when the connection has been detected as defunct
-            with self.assertRaises((NoHostAvailable, ConnectionShutdown)):
+            with pytest.raises((NoHostAvailable, ConnectionShutdown)):
                 self.session.execute(query)
         finally:
             get_cluster().start(wait_for_binary_proto=True, wait_other_notice=True)
@@ -100,7 +101,7 @@ class MetricsTests(unittest.TestCase):
         try:
             # Test write
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
-            with self.assertRaises(WriteTimeout):
+            with pytest.raises(WriteTimeout):
                 self.session.execute(query, timeout=None)
             assert 1 == self.cluster.metrics.stats.write_timeouts
 
@@ -129,7 +130,7 @@ class MetricsTests(unittest.TestCase):
         try:
             # Test read
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
-            with self.assertRaises(ReadTimeout):
+            with pytest.raises(ReadTimeout):
                 self.session.execute(query, timeout=None)
             assert 1 == self.cluster.metrics.stats.read_timeouts
 
@@ -159,13 +160,13 @@ class MetricsTests(unittest.TestCase):
         try:
             # Test write
             query = SimpleStatement("INSERT INTO test (k, v) VALUES (2, 2)", consistency_level=ConsistencyLevel.ALL)
-            with self.assertRaises(Unavailable):
+            with pytest.raises(Unavailable):
                 self.session.execute(query)
             assert self.cluster.metrics.stats.unavailables == 1
 
             # Test write
             query = SimpleStatement("SELECT * FROM test", consistency_level=ConsistencyLevel.ALL)
-            with self.assertRaises(Unavailable):
+            with pytest.raises(Unavailable):
                 self.session.execute(query, timeout=None)
             assert self.cluster.metrics.stats.unavailables == 2
         finally:
@@ -217,7 +218,7 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         try:
             # Test write
             query = SimpleStatement("INSERT INTO {0}.{0} (k, v) VALUES (2, 2)".format(self.ks_name), consistency_level=ConsistencyLevel.ALL)
-            with self.assertRaises(WriteTimeout):
+            with pytest.raises(WriteTimeout):
                 self.session.execute(query, timeout=None)
         finally:
             get_node(1).resume()
@@ -269,7 +270,7 @@ class MetricsNamespaceTest(BasicSharedKeyspaceUnitTestCaseRF3WM):
         # Ensure duplicate metric names are not allowed
         cluster2.metrics.set_stats_name("appcluster")
         cluster2.metrics.set_stats_name("appcluster")
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             cluster3.metrics.set_stats_name("appcluster")
         cluster3.metrics.set_stats_name("devops")
 

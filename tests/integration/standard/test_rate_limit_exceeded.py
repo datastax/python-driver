@@ -5,6 +5,7 @@ from cassandra.cluster import Cluster
 from cassandra.policies import ConstantReconnectionPolicy, RoundRobinPolicy, TokenAwarePolicy
 
 from tests.integration import PROTOCOL_VERSION, use_cluster
+import pytest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,17 +32,17 @@ class TestRateLimitExceededException(unittest.TestCase):
         )
         self.session.execute(
             """
-            CREATE KEYSPACE IF NOT EXISTS ratetests 
+            CREATE KEYSPACE IF NOT EXISTS ratetests
             WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}
             """)
 
         self.session.execute("USE ratetests")
         self.session.execute(
             """
-            CREATE TABLE tbl (pk int PRIMARY KEY, v int) 
+            CREATE TABLE tbl (pk int PRIMARY KEY, v int)
             WITH per_partition_rate_limit = {'max_writes_per_second': 1}
             """)
-    
+
         prepared = self.session.prepare(
             """
             INSERT INTO tbl (pk, v) VALUES (?, ?)
@@ -53,7 +54,7 @@ class TestRateLimitExceededException(unittest.TestCase):
             for _ in range(1000):
                 self.session.execute(prepared.bind((123, 456)))
 
-        with self.assertRaises(RateLimitReached) as context:
+        with pytest.raises(RateLimitReached) as context:
             execute_write()
 
-        assert context.exception.op_type == OperationType.Write
+        assert context.value.op_type == OperationType.Write

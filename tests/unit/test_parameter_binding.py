@@ -92,16 +92,18 @@ class BoundStatementTestV3(unittest.TestCase):
 
     def test_invalid_argument_type(self):
         values = (0, 0, 0, 'string not int')
-        with pytest.raises(TypeError) as e:
+        with pytest.raises(TypeError) as exc:
             self.bound.bind(values)
+        e = exc.value
         assert 'v0' in str(e)
         assert 'Int32Type' in str(e)
         assert 'str' in str(e)
 
         values = (['1', '2'], 0, 0, 0)
 
-        with pytest.raises(TypeError) as e:
+        with pytest.raises(TypeError) as exc:
             self.bound.bind(values)
+        e = exc.value
         assert 'rk0' in str(e)
         assert 'Int32Type' in str(e)
         assert 'list' in str(e)
@@ -128,26 +130,32 @@ class BoundStatementTestV3(unittest.TestCase):
         assert 1234 == bound_statement.fetch_size
 
     def test_too_few_parameters_for_routing_key(self):
-        self.assertRaises(ValueError, self.prepared.bind, (1,))
+        with pytest.raises(ValueError):
+            self.prepared.bind((1,))
 
         bound = self.prepared.bind((1, 2))
         assert bound.keyspace == 'keyspace'
 
     def test_dict_missing_routing_key(self):
-        self.assertRaises(KeyError, self.bound.bind, {'rk0': 0, 'ck0': 0, 'v0': 0})
-        self.assertRaises(KeyError, self.bound.bind, {'rk1': 0, 'ck0': 0, 'v0': 0})
+        with pytest.raises(KeyError):
+            self.bound.bind({'rk0': 0, 'ck0': 0, 'v0': 0})
+        with pytest.raises(KeyError):
+            self.bound.bind({'rk1': 0, 'ck0': 0, 'v0': 0})
 
     def test_missing_value(self):
-        self.assertRaises(KeyError, self.bound.bind, {'rk0': 0, 'rk1': 0, 'ck0': 0})
+        with pytest.raises(KeyError):
+            self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0})
 
     def test_extra_value(self):
         self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': 0, 'should_not_be_here': 123})  # okay to have extra keys in dict
         assert self.bound.values == [b'\x00' * 4] * 4  # four encoded zeros
-        self.assertRaises(ValueError, self.bound.bind, (0, 0, 0, 0, 123))
+        with pytest.raises(ValueError):
+            self.bound.bind((0, 0, 0, 0, 123))
 
     def test_values_none(self):
         # should have values
-        self.assertRaises(ValueError, self.bound.bind, None)
+        with pytest.raises(ValueError):
+            self.bound.bind(None)
 
         # prepared statement with no values
         prepared_statement = PreparedStatement(column_metadata=[],
@@ -171,8 +179,10 @@ class BoundStatementTestV3(unittest.TestCase):
         assert self.bound.values[-1] == None
 
     def test_unset_value(self):
-        self.assertRaises(ValueError, self.bound.bind, {'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': UNSET_VALUE})
-        self.assertRaises(ValueError, self.bound.bind, (0, 0, 0, UNSET_VALUE))
+        with pytest.raises(ValueError):
+            self.bound.bind({'rk0': 0, 'rk1': 0, 'ck0': 0, 'v0': UNSET_VALUE})
+        with pytest.raises(ValueError):
+            self.bound.bind((0, 0, 0, UNSET_VALUE))
 
 
 class BoundStatementTestV4(BoundStatementTestV3):
@@ -181,8 +191,10 @@ class BoundStatementTestV4(BoundStatementTestV3):
     def test_dict_missing_routing_key(self):
         # in v4 it implicitly binds UNSET_VALUE for missing items,
         # UNSET_VALUE is ValueError for routing keys
-        self.assertRaises(ValueError, self.bound.bind, {'rk0': 0, 'ck0': 0, 'v0': 0})
-        self.assertRaises(ValueError, self.bound.bind, {'rk1': 0, 'ck0': 0, 'v0': 0})
+        with pytest.raises(ValueError):
+            self.bound.bind({'rk0': 0, 'ck0': 0, 'v0': 0})
+        with pytest.raises(ValueError):
+            self.bound.bind({'rk1': 0, 'ck0': 0, 'v0': 0})
 
     def test_missing_value(self):
         # in v4 missing values are UNSET_VALUE

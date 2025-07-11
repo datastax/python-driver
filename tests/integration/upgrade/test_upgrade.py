@@ -21,6 +21,7 @@ from cassandra.policies import ConstantSpeculativeExecutionPolicy
 from tests.integration.upgrade import UpgradeBase, UpgradeBaseAuth, UpgradePath, upgrade_paths
 
 import unittest
+import pytest
 
 
 # Previous Cassandra upgrade
@@ -143,7 +144,7 @@ class UpgradeTestsMetadata(UpgradeBase):
             # Wait for the control connection to reconnect
             time.sleep(20)
 
-            with self.assertRaises(DriverException):
+            with pytest.raises(DriverException):
                 self.cluster_driver.refresh_schema_metadata(max_schema_agreement_wait=10)
 
         self.upgrade_node(nodes[0])

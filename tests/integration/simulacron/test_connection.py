@@ -36,6 +36,7 @@ from tests.integration.simulacron.utils import (NO_THEN, PrimeOptions,
                                                 start_and_prime_singledc,
                                                 clear_queries, RejectConnections,
                                                 RejectType, AcceptConnections, PauseReads, ResumeReads)
+import pytest
 
 
 class TrackDownListener(HostStateListener):
@@ -181,7 +182,8 @@ class ConnectionTests(SimulacronBase):
         future = session.execute_async(query_to_prime, timeout=1)
         callback, errback = Mock(name='callback'), Mock(name='errback')
         future.add_callbacks(callback, errback)
-        self.assertRaises(OperationTimedOut, future.result)
+        with pytest.raises(OperationTimedOut):
+            future.result()
 
         assert_quiescent_pool_state(self, cluster)
 
@@ -261,7 +263,8 @@ class ConnectionTests(SimulacronBase):
         prime_request(PrimeOptions(then={"result": "no_result", "delay_in_ms": never}))
         prime_request(RejectConnections("unbind"))
 
-        self.assertRaisesRegex(OperationTimedOut, "Connection defunct by heartbeat", future.result)
+        with pytest.raises(OperationTimedOut, match="Connection defunct by heartbeat"):
+            future.result()
 
     def test_close_when_query(self):
         """
@@ -289,7 +292,8 @@ class ConnectionTests(SimulacronBase):
             }
 
             prime_query(query_to_prime, rows=None, column_types=None, then=then)
-            self.assertRaises(NoHostAvailable, session.execute, query_to_prime)
+            with pytest.raises(NoHostAvailable):
+                session.execute(query_to_prime)
 
     def test_retry_after_defunct(self):
         """
@@ -463,7 +467,8 @@ class ConnectionTests(SimulacronBase):
         for host in cluster.metadata.all_hosts():
             assert host in listener.hosts_marked_down
 
-        self.assertRaises(NoHostAvailable, session.execute, "SELECT * from system.local WHERE key='local'")
+        with pytest.raises(NoHostAvailable):
+            session.execute("SELECT * from system.local WHERE key='local'")
 
         clear_queries()
         prime_request(AcceptConnections())

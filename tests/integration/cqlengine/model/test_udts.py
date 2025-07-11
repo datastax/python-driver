@@ -28,6 +28,7 @@ from cassandra.util import Date, Time
 from tests.integration import PROTOCOL_VERSION
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
+import pytest
 
 
 class User(UserType):
@@ -99,7 +100,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         sync_type(DEFAULT_KEYSPACE, User)
         user = User(age=42, name="John", gender="male")
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             user.gender
 
     def test_can_insert_udts(self):
@@ -478,12 +479,12 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
         @test_category data_types:udt
         """
 
-        with self.assertRaises(UserTypeDefinitionException):
+        with pytest.raises(UserTypeDefinitionException):
             class something_silly(UserType):
                 first_col = columns.Integer()
                 second_col = columns.Text(db_field='first_col')
 
-        with self.assertRaises(UserTypeDefinitionException):
+        with pytest.raises(UserTypeDefinitionException):
             class something_silly_2(UserType):
                 first_col = columns.Integer(db_field="second_col")
                 second_col = columns.Text()
@@ -556,7 +557,7 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         user = UserValidate(age=1, name="Robert")
         item = UserModelValidate(id=1, info=user)
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             item.save()
 
     def test_udt_validate_with_default(self):
@@ -584,5 +585,5 @@ class UserDefinedTypeTests(BaseCassEngTestCase):
 
         user = UserValidateDefault(age=1)
         item = UserModelValidateDefault(id=1, info=user)
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             item.save()

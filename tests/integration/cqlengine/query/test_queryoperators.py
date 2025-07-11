@@ -25,6 +25,7 @@ from cassandra.cqlengine.statements import WhereClause
 from tests.integration.cqlengine import DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine import execute_count
+import pytest
 
 
 class TestQuerySetOperation(BaseCassEngTestCase):
@@ -124,15 +125,18 @@ class TestTokenFunction(BaseCassEngTestCase):
         str(q._select_query())
 
         # The 'pk__token' virtual column may only be compared to a Token
-        self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=10)
+        with pytest.raises(query.QueryException):
+            TestModel.objects.filter(pk__token__gt=10)
 
         # A Token may only be compared to the `pk__token' virtual column
         func = functions.Token('a', 'b')
-        self.assertRaises(query.QueryException, TestModel.objects.filter, p1__gt=func)
+        with pytest.raises(query.QueryException):
+            TestModel.objects.filter(p1__gt=func)
 
         # The # of arguments to Token must match the # of partition keys
         func = functions.Token('a')
-        self.assertRaises(query.QueryException, TestModel.objects.filter, pk__token__gt=func)
+        with pytest.raises(query.QueryException):
+            TestModel.objects.filter(pk__token__gt=func)
 
     @execute_count(7)
     def test_named_table_pk_token_function(self):

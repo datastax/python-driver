@@ -28,6 +28,7 @@ from tests.integration.standard.utils import create_table_with_all_types, get_al
 
 import uuid
 from unittest import mock
+import pytest
 
 
 def setup_module():
@@ -145,9 +146,9 @@ class CustomProtocolHandlerTest(unittest.TestCase):
                             continuous_paging_options=continuous_paging_options)
 
         # This should raise NoHostAvailable because continuous paging is not supported under ProtocolVersion.DSE_V1
-        with self.assertRaises(NoHostAvailable) as context:
+        with pytest.raises(NoHostAvailable) as context:
             future.result()
-        assert "Continuous paging may only be used with protocol version ProtocolVersion.DSE_V1 or higher" in str(context.exception)
+        assert "Continuous paging may only be used with protocol version ProtocolVersion.DSE_V1 or higher" in str(context.value)
 
         cluster.shutdown()
 

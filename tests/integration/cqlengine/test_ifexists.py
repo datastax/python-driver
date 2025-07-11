@@ -22,6 +22,7 @@ from cassandra.cqlengine.query import BatchQuery, BatchType, LWTException, IfExi
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import PROTOCOL_VERSION
+import pytest
 
 
 class TestIfExistsModel(Model):
@@ -104,16 +105,16 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         assert m.text == 'changed_again'
 
         m = TestIfExistsModel(id=uuid4(), count=44)  # do not exists
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             m.if_exists().update()
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
 
         # queryset update
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             TestIfExistsModel.objects(id=uuid4()).if_exists().update(count=8)
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_update_if_exists_success(self):
@@ -135,12 +136,12 @@ class IfExistsUpdateTests(BaseIfExistsTest):
             m.text = '111111111'
             m.batch(b).if_exists().update()
 
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             with BatchQuery() as b:
                 m = TestIfExistsModel(id=uuid4(), count=42)  # Doesn't exist
                 m.batch(b).if_exists().update()
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
 
         q = TestIfExistsModel.objects(id=id)
         assert len(q) == 1
@@ -162,14 +163,14 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         """
 
         m = TestIfExistsModel2.create(id=1, count=8, text='123456789')
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             with BatchQuery() as b:
                 m.text = '111111112'
                 m.batch(b).if_exists().update()  # Does exist
                 n = TestIfExistsModel2(id=1, count=10, text="Failure")  # Doesn't exist
                 n.batch(b).if_exists().update()
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_delete_if_exists(self):
@@ -191,16 +192,16 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         assert len(q) == 0
 
         m = TestIfExistsModel(id=uuid4(), count=44)  # do not exists
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             m.if_exists().delete()
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
 
         # queryset delete
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             TestIfExistsModel.objects(id=uuid4()).if_exists().delete()
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_delete_if_exists_success(self):
@@ -224,12 +225,12 @@ class IfExistsUpdateTests(BaseIfExistsTest):
         q = TestIfExistsModel.objects(id=id)
         assert len(q) == 0
 
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             with BatchQuery() as b:
                 m = TestIfExistsModel(id=uuid4(), count=42)  # Doesn't exist
                 m.batch(b).if_exists().delete()
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
 
     @unittest.skipUnless(PROTOCOL_VERSION >= 2, "only runs against the cql3 protocol v2.0")
     def test_batch_delete_mixed(self):
@@ -245,13 +246,13 @@ class IfExistsUpdateTests(BaseIfExistsTest):
 
         m = TestIfExistsModel2.create(id=3, count=8, text='123456789')
 
-        with self.assertRaises(LWTException) as assertion:
+        with pytest.raises(LWTException) as assertion:
             with BatchQuery() as b:
                 m.batch(b).if_exists().delete()  # Does exist
                 n = TestIfExistsModel2(id=3, count=42, text='1111111')  # Doesn't exist
                 n.batch(b).if_exists().delete()
 
-        assert assertion.exception.existing.get('[applied]') == False
+        assert assertion.value.existing.get('[applied]') == False
         q = TestIfExistsModel2.objects(id=3, count=8)
         assert len(q) == 1
 
@@ -298,6 +299,5 @@ class IfExistWithCounterTest(BaseIfExistsWithCounterTest):
         @test_category object_mapper
         """
         id = uuid4()
-        with self.assertRaises(IfExistsWithCounterColumn):
+        with pytest.raises(IfExistsWithCounterColumn):
             TestIfExistsWithCounterModel.if_exists()
-

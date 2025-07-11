@@ -1255,13 +1255,15 @@ CREATE TABLE export_udts.users (
         ddl = '''
             CREATE KEYSPACE %s
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}'''
-        self.assertRaises(AlreadyExists, session.execute, ddl % ksname)
+        with pytest.raises(AlreadyExists):
+            session.execute(ddl % ksname)
 
         ddl = '''
             CREATE TABLE %s.%s (
                 k int PRIMARY KEY,
                 v int )'''
-        self.assertRaises(AlreadyExists, session.execute, ddl % (ksname, cfname))
+        with pytest.raises(AlreadyExists):
+            session.execute(ddl % (ksname, cfname))
         cluster.shutdown()
 
     @local

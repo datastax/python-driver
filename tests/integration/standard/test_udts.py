@@ -25,6 +25,7 @@ from tests.integration import use_singledc, execute_until_pass, \
     BasicSegregatedKeyspaceUnitTestCase, greaterthancass20, lessthancass30, greaterthanorequalcass36, TestCluster
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, PRIMITIVE_DATATYPES_KEYS, \
     COLLECTION_TYPES, get_sample, get_collection_sample
+import pytest
 
 nested_collection_udt = namedtuple('nested_collection_udt', ['m', 't', 'l', 's'])
 nested_collection_udt_nested = namedtuple('nested_collection_udt_nested', ['m', 't', 'l', 's', 'u'])
@@ -482,13 +483,13 @@ class UDTTests(BasicSegregatedKeyspaceUnitTestCase):
         s = c.connect(self.keyspace_name, wait_for_all_pools=True)
         User = namedtuple('user', ('age', 'name'))
 
-        with self.assertRaises(UserTypeDoesNotExist):
+        with pytest.raises(UserTypeDoesNotExist):
             c.register_user_type("some_bad_keyspace", "user", User)
 
-        with self.assertRaises(UserTypeDoesNotExist):
+        with pytest.raises(UserTypeDoesNotExist):
             c.register_user_type("system", "user", User)
 
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             s.execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<user>)")
 
         c.shutdown()

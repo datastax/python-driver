@@ -33,6 +33,7 @@ from cassandra import util
 
 from tests.integration import PROTOCOL_VERSION, CASSANDRA_VERSION, greaterthanorequalcass30, greaterthanorequalcass3_11
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+import pytest
 
 
 class TestDatetime(BaseCassEngTestCase):
@@ -90,7 +91,7 @@ class TestDatetime(BaseCassEngTestCase):
 
     def test_datetime_invalid(self):
         dt_value= 'INVALID'
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.DatetimeTest.objects.create(test_id=4, created_at=dt_value)
 
     def test_datetime_timestamp(self):
@@ -185,7 +186,7 @@ class TestVarInt(BaseCassEngTestCase):
         int2 = self.VarIntTest.objects(test_id=0).first()
         assert int1.bignum == int2.bignum
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             self.VarIntTest.objects.create(test_id=0, bignum="not_a_number")
 
 
@@ -541,22 +542,22 @@ class TestAscii(BaseCassEngTestCase):
         Ascii(min_length=5).validate('kevin')
         Ascii(min_length=5).validate('kevintastic')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(min_length=1).validate('')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(min_length=1).validate(None)
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(min_length=6).validate('')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(min_length=6).validate(None)
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(min_length=6).validate('kevin')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Ascii(min_length=-1)
 
     def test_max_length(self):
@@ -573,13 +574,13 @@ class TestAscii(BaseCassEngTestCase):
         Ascii(max_length=5).validate('b')
         Ascii(max_length=5).validate('blake')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(max_length=0).validate('b')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(max_length=5).validate('blaketastic')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Ascii(max_length=-1)
 
     def test_length_range(self):
@@ -588,10 +589,10 @@ class TestAscii(BaseCassEngTestCase):
         Ascii(min_length=10, max_length=10)
         Ascii(min_length=10, max_length=11)
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Ascii(min_length=10, max_length=9)
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Ascii(min_length=1, max_length=0)
 
     def test_type_checking(self):
@@ -599,19 +600,19 @@ class TestAscii(BaseCassEngTestCase):
         Ascii().validate(u'unicode')
         Ascii().validate(bytearray('bytearray', encoding='ascii'))
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii().validate(5)
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii().validate(True)
 
         Ascii().validate("!#$%&\'()*+,-./")
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii().validate('Beyonc' + chr(233))
 
         if sys.version_info < (3, 1):
-            with self.assertRaises(ValidationError):
+            with pytest.raises(ValidationError):
                 Ascii().validate(u'Beyonc' + unichr(233))
 
     def test_unaltering_validation(self):
@@ -629,26 +630,26 @@ class TestAscii(BaseCassEngTestCase):
         """ Tests that validation raise on none and blank values if value required. """
         Ascii(required=True).validate('k')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(required=True).validate('')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(required=True).validate(None)
 
         # With min_length set.
         Ascii(required=True, min_length=0).validate('k')
         Ascii(required=True, min_length=1).validate('k')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(required=True, min_length=2).validate('k')
 
         # With max_length set.
         Ascii(required=True, max_length=1).validate('k')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Ascii(required=True, max_length=2).validate('kevin')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Ascii(required=True, max_length=0)
 
 
@@ -668,22 +669,22 @@ class TestText(BaseCassEngTestCase):
         Text(min_length=5).validate('blake')
         Text(min_length=5).validate('blaketastic')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(min_length=1).validate('')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(min_length=1).validate(None)
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(min_length=6).validate('')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(min_length=6).validate(None)
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(min_length=6).validate('blake')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Text(min_length=-1)
 
     def test_max_length(self):
@@ -700,13 +701,13 @@ class TestText(BaseCassEngTestCase):
         Text(max_length=5).validate('b')
         Text(max_length=5).validate('blake')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(max_length=0).validate('b')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(max_length=5).validate('blaketastic')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Text(max_length=-1)
 
     def test_length_range(self):
@@ -715,10 +716,10 @@ class TestText(BaseCassEngTestCase):
         Text(min_length=10, max_length=10)
         Text(min_length=10, max_length=11)
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Text(min_length=10, max_length=9)
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Text(min_length=1, max_length=0)
 
     def test_type_checking(self):
@@ -726,10 +727,10 @@ class TestText(BaseCassEngTestCase):
         Text().validate(u'unicode')
         Text().validate(bytearray('bytearray', encoding='ascii'))
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text().validate(5)
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text().validate(True)
 
         Text().validate("!#$%&\'()*+,-./")
@@ -752,26 +753,26 @@ class TestText(BaseCassEngTestCase):
         """ Tests that validation raise on none and blank values if value required. """
         Text(required=True).validate('b')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(required=True).validate('')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(required=True).validate(None)
 
         # With min_length set.
         Text(required=True, min_length=0).validate('b')
         Text(required=True, min_length=1).validate('b')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(required=True, min_length=2).validate('b')
 
         # With max_length set.
         Text(required=True, max_length=1).validate('b')
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             Text(required=True, max_length=2).validate('blake')
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Text(required=True, max_length=0)
 
 
@@ -781,7 +782,7 @@ class TestExtraFieldsRaiseException(BaseCassEngTestCase):
         id = UUID(primary_key=True, default=uuid4)
 
     def test_extra_field(self):
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             self.TestModel.create(bacon=5000)
 
 
@@ -834,5 +835,5 @@ class TestInet(BaseCassEngTestCase):
 
     def test_non_address_fails(self):
         # TODO: presently this only tests that the server blows it up. Is there supposed to be local validation?
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             self.InetTestModel.create(address="what is going on here?")

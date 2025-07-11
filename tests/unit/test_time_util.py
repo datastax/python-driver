@@ -20,6 +20,7 @@ import calendar
 import datetime
 import time
 import uuid
+import pytest
 
 
 class TimeUtilTest(unittest.TestCase):
@@ -77,11 +78,11 @@ class TimeUtilTest(unittest.TestCase):
         assert u1.clock_seq != u2.clock_seq
 
         # node too large
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             u = util.uuid_from_time(t, node=2 ** 48)
 
         # clock_seq too large
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             u = util.uuid_from_time(t, clock_seq=0x4000)
 
         # construct from datetime

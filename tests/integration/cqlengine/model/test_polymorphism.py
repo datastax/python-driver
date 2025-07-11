@@ -20,20 +20,21 @@ from cassandra.cqlengine import models
 from cassandra.cqlengine.connection import get_session
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from cassandra.cqlengine import management
+import pytest
 
 
 class TestInheritanceClassConstruction(BaseCassEngTestCase):
 
     def test_multiple_discriminator_value_failure(self):
         """ Tests that defining a model with more than one discriminator column fails """
-        with self.assertRaises(models.ModelDefinitionException):
+        with pytest.raises(models.ModelDefinitionException):
             class M(models.Model):
                 partition = columns.Integer(primary_key=True)
                 type1 = columns.Integer(discriminator_column=True)
                 type2 = columns.Integer(discriminator_column=True)
 
     def test_no_discriminator_column_failure(self):
-        with self.assertRaises(models.ModelDefinitionException):
+        with pytest.raises(models.ModelDefinitionException):
             class M(models.Model):
                 __discriminator_value__ = 1
 
@@ -86,7 +87,7 @@ class TestInheritanceClassConstruction(BaseCassEngTestCase):
         assert Base.column_family_name() == M1.column_family_name()
 
     def test_collection_columns_cant_be_discriminator_column(self):
-        with self.assertRaises(models.ModelDefinitionException):
+        with pytest.raises(models.ModelDefinitionException):
             class Base(models.Model):
 
                 partition = columns.Integer(primary_key=True)
@@ -124,7 +125,7 @@ class TestInheritanceModel(BaseCassEngTestCase):
         management.drop_table(Inherit2)
 
     def test_saving_base_model_fails(self):
-        with self.assertRaises(models.PolymorphicModelException):
+        with pytest.raises(models.PolymorphicModelException):
             InheritBase.create()
 
     def test_saving_subclass_saves_disc_value(self):
@@ -210,9 +211,9 @@ class TestUnindexedInheritanceQuery(BaseCassEngTestCase):
         assert len(list(UnindexedInherit2.objects(partition=p1.partition, cluster__in=[p2.cluster, p3.cluster]))) == 2
 
     def test_conflicting_type_results(self):
-        with self.assertRaises(models.PolymorphicModelException):
+        with pytest.raises(models.PolymorphicModelException):
             list(UnindexedInherit1.objects(partition=self.p1.partition))
-        with self.assertRaises(models.PolymorphicModelException):
+        with pytest.raises(models.PolymorphicModelException):
             list(UnindexedInherit2.objects(partition=self.p1.partition))
 
 

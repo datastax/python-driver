@@ -18,6 +18,7 @@ from cassandra import ConsistencyLevel, Unavailable
 from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 
 from tests.integration import use_cluster, get_cluster, get_node, TestCluster
+import pytest
 
 
 def setup_module():
@@ -58,10 +59,10 @@ class RetryPolicyTests(unittest.TestCase):
         # supported as conditional update commit consistency. ....""
 
         # after fix: cassandra.Unavailable (expected since replicas are down)
-        with self.assertRaises(Unavailable) as cm:
+        with pytest.raises(Unavailable) as cm:
             session.execute("update test_retry_policy_cas.t set data = 'staging' where id = 42 if data ='testing'")
 
-        exception = cm.exception
+        exception = cm.value
         assert exception.consistency == ConsistencyLevel.SERIAL
         assert exception.required_replicas == 2
         assert exception.alive_replicas == 1

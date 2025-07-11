@@ -26,6 +26,7 @@ from cassandra import InvalidRequest
 from tests.integration.cqlengine.base import TestQueryUpdateModel, BaseCassEngTestCase
 from tests.integration.cqlengine.operators import check_lookup
 from tests.integration import greaterthanorequalcass30
+import pytest
 
 
 class TestWhereOperators(unittest.TestCase):
@@ -96,8 +97,8 @@ class TestIsNotNull(BaseCassEngTestCase):
         self.addCleanup(drop_table, TestQueryUpdateModel)
 
         # Raises InvalidRequest instead of dse.protocol.SyntaxException
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             list(TestQueryUpdateModel.filter(IsNotNull("text")))
 
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             list(TestQueryUpdateModel.filter(IsNotNull("text"), partition=uuid4()))

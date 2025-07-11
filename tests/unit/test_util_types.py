@@ -16,6 +16,7 @@ import unittest
 import datetime
 
 from cassandra.util import Date, Time, Duration, Version, maybe_add_timeout_to_query
+import pytest
 
 
 class DateTests(unittest.TestCase):
@@ -56,8 +57,10 @@ class DateTests(unittest.TestCase):
         assert Date(max_builtin.days_from_epoch + 1).days_from_epoch == max_builtin.days_from_epoch + 1
 
     def test_invalid_init(self):
-        self.assertRaises(ValueError, Date, '-1999-10-10')
-        self.assertRaises(TypeError, Date, 1.234)
+        with pytest.raises(ValueError):
+            Date('-1999-10-10')
+        with pytest.raises(TypeError):
+            Date(1.234)
 
     def test_str(self):
         date_str = '2015-03-16'
@@ -141,10 +144,14 @@ class TimeTests(unittest.TestCase):
         assert repr(Time(1)) == 'Time(1)'
 
     def test_invalid_init(self):
-        self.assertRaises(ValueError, Time, '1999-10-10 11:11:11.1234')
-        self.assertRaises(TypeError, Time, 1.234)
-        self.assertRaises(ValueError, Time, 123456789000000)
-        self.assertRaises(TypeError, Time, datetime.datetime(2004, 12, 23, 11, 11, 1))
+        with pytest.raises(ValueError):
+            Time('1999-10-10 11:11:11.1234')
+        with pytest.raises(TypeError):
+            Time(1.234)
+        with pytest.raises(ValueError):
+            Time(123456789000000)
+        with pytest.raises(TypeError):
+            Time(datetime.datetime(2004, 12, 23, 11, 11, 1))
 
 
 class DurationTests(unittest.TestCase):
@@ -229,7 +236,7 @@ class VersionTests(unittest.TestCase):
             assert v.prerelease == expected_result[4]
 
         # not supported version formats
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             Version('test.1.0')
 
     def test_version_compare(self):

@@ -34,6 +34,7 @@ from cassandra.metadata import (Murmur3Token, MD5Token,
 from cassandra.policies import SimpleConvictionPolicy
 from cassandra.pool import Host
 from tests.util import assertCountEqual
+import pytest
 
 
 log = logging.getLogger(__name__)
@@ -54,10 +55,14 @@ class ReplicationFactorTest(unittest.TestCase):
         assert rf.transient_replicas == 1
         assert str(rf) == '3/1'
 
-        self.assertRaises(ValueError, ReplicationFactor.create, '3/')
-        self.assertRaises(ValueError, ReplicationFactor.create, 'a/1')
-        self.assertRaises(ValueError, ReplicationFactor.create, 'a')
-        self.assertRaises(ValueError, ReplicationFactor.create, '3/a')
+        with pytest.raises(ValueError):
+            ReplicationFactor.create('3/')
+        with pytest.raises(ValueError):
+            ReplicationFactor.create('a/1')
+        with pytest.raises(ValueError):
+            ReplicationFactor.create('a')
+        with pytest.raises(ValueError):
+            ReplicationFactor.create('3/a')
 
     def test_replication_factor_equality(self):
         assert ReplicationFactor.create('3/1') == ReplicationFactor.create('3/1')
@@ -99,8 +104,10 @@ class StrategiesTest(unittest.TestCase):
 
         assert rs.create('xxxxxxxx', fake_options_map) == _UnknownStrategy('xxxxxxxx', fake_options_map)
 
-        self.assertRaises(NotImplementedError, rs.make_token_replica_map, None, None)
-        self.assertRaises(NotImplementedError, rs.export_for_schema)
+        with pytest.raises(NotImplementedError):
+            rs.make_token_replica_map(None, None)
+        with pytest.raises(NotImplementedError):
+            rs.export_for_schema()
 
     def test_simple_replication_type_parsing(self):
         """ Test equality between passing numeric and string replication factor for simple strategy """

@@ -24,6 +24,7 @@ from cassandra.graph import (SimpleGraphStatement, GraphOptions, GraphProtocol, 
                        Vertex, Edge, Path, VertexProperty)
 from cassandra.datastax.graph.query import _graph_options
 from tests.util import assertRegex
+import pytest
 
 class GraphResultTests(unittest.TestCase):
 
@@ -37,22 +38,22 @@ class GraphResultTests(unittest.TestCase):
     def test_result_attr(self):
         # value is not a dict
         result = self._make_result(123)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             result.something
 
         expected = {'a': 1, 'b': 2}
         result = self._make_result(expected)
         assert result.a == 1
         assert result.b == 2
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             result.not_present
 
     def test_result_item(self):
         # value is not a dict, list
         result = self._make_result(123)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             result['something']
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             result[0]
 
         # dict key access
@@ -60,9 +61,9 @@ class GraphResultTests(unittest.TestCase):
         result = self._make_result(expected)
         assert result['a'] == 1
         assert result['b'] == 2
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             result['not_present']
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             result[0]
 
         # list index access
@@ -70,9 +71,9 @@ class GraphResultTests(unittest.TestCase):
         result = self._make_result(expected)
         assert result[0] == 0
         assert result[1] == 1
-        with self.assertRaises(IndexError):
+        with pytest.raises(IndexError):
             result[2]
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             result['something']
 
     def test_as_vertex(self):
@@ -101,14 +102,16 @@ class GraphResultTests(unittest.TestCase):
         modified_vertex_dict = vertex_dict.copy()
         modified_vertex_dict['type'] = 'notavertex'
         result = self._make_result(modified_vertex_dict)
-        self.assertRaises(TypeError, result.as_vertex)
+        with pytest.raises(TypeError):
+            result.as_vertex()
 
         # missing required properties
         for attr in required_attrs:
             modified_vertex_dict = vertex_dict.copy()
             del modified_vertex_dict[attr]
             result = self._make_result(modified_vertex_dict)
-            self.assertRaises(TypeError, result.as_vertex)
+            with pytest.raises(TypeError):
+                result.as_vertex()
 
     def test_as_edge(self):
         prop_name = 'name'
@@ -140,14 +143,16 @@ class GraphResultTests(unittest.TestCase):
         modified_edge_dict = edge_dict.copy()
         modified_edge_dict['type'] = 'notanedge'
         result = self._make_result(modified_edge_dict)
-        self.assertRaises(TypeError, result.as_edge)
+        with pytest.raises(TypeError):
+            result.as_edge()
 
         # missing required properties
         for attr in required_attrs:
             modified_edge_dict = edge_dict.copy()
             del modified_edge_dict[attr]
             result = self._make_result(modified_edge_dict)
-            self.assertRaises(TypeError, result.as_edge)
+            with pytest.raises(TypeError):
+                result.as_edge()
 
     def test_as_path(self):
         vertex_dict = {'id': object(),
@@ -180,7 +185,8 @@ class GraphResultTests(unittest.TestCase):
             modified_path_dict = path_dict.copy()
             del modified_path_dict[attr]
             result = self._make_result(modified_path_dict)
-            self.assertRaises(TypeError, result.as_path)
+            with pytest.raises(TypeError):
+                result.as_path()
 
     def test_str(self):
         for v in self._values:
@@ -388,7 +394,8 @@ class GraphStatementTests(unittest.TestCase):
 
         # but not a bogus parameter
         kwargs['bogus'] = object()
-        self.assertRaises(TypeError, SimpleGraphStatement, **kwargs)
+        with pytest.raises(TypeError):
+            SimpleGraphStatement(**kwargs)
 
 
 class GraphRowFactoryTests(unittest.TestCase):

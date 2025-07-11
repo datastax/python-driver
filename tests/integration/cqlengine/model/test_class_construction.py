@@ -20,6 +20,7 @@ from cassandra.cqlengine.models import Model, ModelException, ModelDefinitionExc
 from cassandra.cqlengine.query import ModelQuerySet, DMLQuery
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+import pytest
 
 
 class TestModelClassFunction(BaseCassEngTestCase):
@@ -91,7 +92,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         Tests that trying to create conflicting db column names will fail
         """
 
-        with self.assertRaisesRegex(ModelException, r".*more than once$"):
+        with pytest.raises(ModelException, match=r".*more than once$"):
             class BadNames(Model):
                 words = columns.Text(primary_key=True)
                 content = columns.Text(db_field='words')
@@ -111,7 +112,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
         assert [x for x in Stuff._columns.keys()] == ['id', 'words', 'content', 'numbers']
 
     def test_exception_raised_when_creating_class_without_pk(self):
-        with self.assertRaises(ModelDefinitionException):
+        with pytest.raises(ModelDefinitionException):
             class TestModel(Model):
 
                 count = columns.Integer()
@@ -191,7 +192,7 @@ class TestModelClassFunction(BaseCassEngTestCase):
 
         model = DelModel(key=4, data=5)
         del model.data
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             del model.key
 
     def test_does_not_exist_exceptions_are_not_shared_between_model(self):
@@ -339,18 +340,18 @@ class TestAbstractModelClasses(BaseCassEngTestCase):
 
     def test_attempting_to_save_abstract_model_fails(self):
         """ Attempting to save a model from an abstract model should fail """
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             AbstractModelWithFullCols.create(pkey=1, data=2)
 
     def test_attempting_to_create_abstract_table_fails(self):
         """ Attempting to create a table from an abstract model should fail """
         from cassandra.cqlengine.management import sync_table
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             sync_table(AbstractModelWithFullCols)
 
     def test_attempting_query_on_abstract_model_fails(self):
         """ Tests attempting to execute query with an abstract model fails """
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             iter(AbstractModelWithFullCols.objects(pkey=5)).next()
 
     def test_abstract_columns_are_inherited(self):
@@ -395,7 +396,7 @@ class TestCustomQuerySet(BaseCassEngTestCase):
             part = columns.UUID(primary_key=True)
             data = columns.Text()
 
-        with self.assertRaises(self.TestException):
+        with pytest.raises(self.TestException):
             CQModel.create(part=uuid4(), data='s')
 
     def test_overriding_dmlqueryset(self):
@@ -410,7 +411,7 @@ class TestCustomQuerySet(BaseCassEngTestCase):
             part = columns.UUID(primary_key=True)
             data = columns.Text()
 
-        with self.assertRaises(self.TestException):
+        with pytest.raises(self.TestException):
             CDQModel().save()
 
 

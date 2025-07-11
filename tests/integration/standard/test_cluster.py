@@ -152,7 +152,7 @@ class ClusterTests(unittest.TestCase):
         get_node(1).pause()
         cluster = TestCluster(contact_points=['127.0.0.1'], connect_timeout=1)
 
-        with self.assertRaisesRegex(NoHostAvailable, r"OperationTimedOut\('errors=Timed out creating connection \(1 seconds\)"):
+        with pytest.raises(NoHostAvailable, match=r"OperationTimedOut\('errors=Timed out creating connection \(1 seconds\)"):
             cluster.connect()
         cluster.shutdown()
 
@@ -220,13 +220,13 @@ class ClusterTests(unittest.TestCase):
 
         # Test with empty list
         self.cluster_to_shutdown = TestCluster(contact_points=[])
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             self.cluster_to_shutdown.connect()
         self.cluster_to_shutdown.shutdown()
 
         # Test with only invalid
         self.cluster_to_shutdown = TestCluster(contact_points=('1.2.3.4',))
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             self.cluster_to_shutdown.connect()
         self.cluster_to_shutdown.shutdown()
 
@@ -310,7 +310,7 @@ class ClusterTests(unittest.TestCase):
         log.debug('got upper_bound of {}'.format(upper_bound))
         if upper_bound is not None:
             cluster = TestCluster(protocol_version=upper_bound)
-            with self.assertRaises(NoHostAvailable):
+            with pytest.raises(NoHostAvailable):
                 cluster.connect()
             cluster.shutdown()
 
@@ -318,7 +318,7 @@ class ClusterTests(unittest.TestCase):
         log.debug('got lower_bound of {}'.format(lower_bound))
         if lower_bound is not None:
             cluster = TestCluster(protocol_version=lower_bound)
-            with self.assertRaises(NoHostAvailable):
+            with pytest.raises(NoHostAvailable):
                 cluster.connect()
             cluster.shutdown()
 
@@ -368,31 +368,37 @@ class ClusterTests(unittest.TestCase):
         """
         cluster = TestCluster()
         cluster.shutdown()
-        self.assertRaises(Exception, cluster.connect)
+        with pytest.raises(Exception):
+            cluster.connect()
 
     def test_auth_provider_is_callable(self):
         """
         Ensure that auth_providers are always callable
         """
-        self.assertRaises(TypeError, Cluster, auth_provider=1, protocol_version=1)
+        with pytest.raises(TypeError):
+            Cluster(auth_provider=1, protocol_version=1)
         c = TestCluster(protocol_version=1)
-        self.assertRaises(TypeError, setattr, c, 'auth_provider', 1)
+        with pytest.raises(TypeError):
+            setattr(c, 'auth_provider', 1)
 
     def test_v2_auth_provider(self):
         """
         Check for v2 auth_provider compliance
         """
         bad_auth_provider = lambda x: {'username': 'foo', 'password': 'bar'}
-        self.assertRaises(TypeError, Cluster, auth_provider=bad_auth_provider, protocol_version=2)
+        with pytest.raises(TypeError):
+            Cluster(auth_provider=bad_auth_provider, protocol_version=2)
         c = TestCluster(protocol_version=2)
-        self.assertRaises(TypeError, setattr, c, 'auth_provider', bad_auth_provider)
+        with pytest.raises(TypeError):
+            setattr(c, 'auth_provider', bad_auth_provider)
 
     def test_conviction_policy_factory_is_callable(self):
         """
         Ensure that conviction_policy_factory are always callable
         """
 
-        self.assertRaises(ValueError, Cluster, conviction_policy_factory=1)
+        with pytest.raises(ValueError):
+            Cluster(conviction_policy_factory=1)
 
     def test_connect_to_bad_hosts(self):
         """
@@ -402,7 +408,8 @@ class ClusterTests(unittest.TestCase):
 
         cluster = TestCluster(contact_points=['127.1.2.9', '127.1.2.10'],
                               protocol_version=PROTOCOL_VERSION)
-        self.assertRaises(NoHostAvailable, cluster.connect)
+        with pytest.raises(NoHostAvailable):
+            cluster.connect()
 
     def test_refresh_schema(self):
         cluster = TestCluster()
@@ -505,7 +512,8 @@ class ClusterTests(unittest.TestCase):
             # cluster agreement wait used for refresh
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            self.assertRaisesRegex(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata)
+            with pytest.raises(Exception, match=r"Schema metadata was not refreshed.*"):
+                c.refresh_schema_metadata()
             end_time = time.time()
             assert end_time - start_time >= agreement_timeout
             assert original_meta is c.metadata.keyspaces
@@ -542,8 +550,8 @@ class ClusterTests(unittest.TestCase):
             # refresh wait overrides cluster value
             original_meta = c.metadata.keyspaces
             start_time = time.time()
-            self.assertRaisesRegex(Exception, r"Schema metadata was not refreshed.*", c.refresh_schema_metadata,
-                                    max_schema_agreement_wait=agreement_timeout)
+            with pytest.raises(Exception, match=r"Schema metadata was not refreshed.*"):
+                c.refresh_schema_metadata(max_schema_agreement_wait=agreement_timeout)
             end_time = time.time()
             assert end_time - start_time >= agreement_timeout
             assert original_meta is c.metadata.keyspaces
@@ -876,7 +884,7 @@ class ClusterTests(unittest.TestCase):
             assert queried_hosts == expected_hosts
             tuple_row = rs.one()
             assert isinstance(tuple_row, tuple)
-            with self.assertRaises(AttributeError):
+            with pytest.raises(AttributeError):
                 tuple_row.release_version
 
             # make sure original profile is not impacted
@@ -985,7 +993,7 @@ class ClusterTests(unittest.TestCase):
         exec_profiles = {'rr1': rr1, 'rr2': rr2}
         with TestCluster(execution_profiles=exec_profiles) as cluster:
             session = cluster.connect()
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 session.execute(query, execution_profile='rr3')
 
     @local
@@ -1059,8 +1067,8 @@ class ClusterTests(unittest.TestCase):
 
                 start = time.time()
                 try:
-                    self.assertRaises(cassandra.OperationTimedOut, cluster.add_execution_profile,
-                                      'profile_{0}'.format(i),
+                    with pytest.raises(cassandra.OperationTimedOut):
+                        cluster.add_execution_profile('profile_{0}'.format(i),
                                       node2, pool_wait_timeout=sys.float_info.min)
                     break
                 except AssertionError:
@@ -1117,7 +1125,7 @@ class ClusterTests(unittest.TestCase):
             for _ in range(max_retry_count):
                 start = time.time()
                 try:
-                    with self.assertRaises(cassandra.OperationTimedOut):
+                    with pytest.raises(cassandra.OperationTimedOut):
                         session.execute(query, execution_profile=tmp_profile)
                     break
                 except:
@@ -1488,7 +1496,7 @@ class BetaProtocolTest(unittest.TestCase):
 
         cluster = TestCluster(protocol_version=cassandra.ProtocolVersion.V6, allow_beta_protocol_version=False)
         try:
-            with self.assertRaises(NoHostAvailable):
+            with pytest.raises(NoHostAvailable):
                 cluster.connect()
         except Exception as e:
             pytest.fail("Unexpected error encountered {0}".format(e.message))

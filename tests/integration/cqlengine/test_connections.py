@@ -23,6 +23,7 @@ from tests.integration.cqlengine import setup_connection, DEFAULT_KEYSPACE
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration.cqlengine.query import test_queryset
 from tests.integration import local, CASSANDRA_IP, TestCluster
+import pytest
 
 
 class TestModel(Model):
@@ -98,7 +99,7 @@ class ContextQueryConnectionTests(BaseCassEngTestCase):
 
         # ContextQuery connection should have priority over default one
         with ContextQuery(TestModel, connection='fake_cluster') as tm:
-            with self.assertRaises(NoHostAvailable):
+            with pytest.raises(NoHostAvailable):
                 tm.objects.create(partition=1, cluster=1)
 
         # Explicit connection should have priority over ContextQuery one
@@ -110,7 +111,7 @@ class ContextQueryConnectionTests(BaseCassEngTestCase):
 
         # No model connection and an invalid default connection
         with ContextQuery(TestModel) as tm:
-            with self.assertRaises(NoHostAvailable):
+            with pytest.raises(NoHostAvailable):
                 tm.objects.create(partition=1, cluster=1)
 
     def test_context_connection_with_keyspace(self):
@@ -126,7 +127,7 @@ class ContextQueryConnectionTests(BaseCassEngTestCase):
 
         # ks2 doesn't exist
         with ContextQuery(TestModel, connection='cluster', keyspace='ks2') as tm:
-            with self.assertRaises(InvalidRequest):
+            with pytest.raises(InvalidRequest):
                 tm.objects.create(partition=1, cluster=1)
 
 
@@ -166,7 +167,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         """
 
         # No connection (default is fake)
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             create_keyspace_simple(self.keyspaces[0], 1)
 
         # Explicit connections
@@ -190,7 +191,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
             create_keyspace_simple(ks, 1, connections=self.conns)
 
         # No connection (default is fake)
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             sync_table(TestModel)
 
         # Explicit connections
@@ -205,7 +206,7 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         TestModel.__connection__ = None
 
         # No connection (default is fake)
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             drop_table(TestModel)
 
         # Model connection
@@ -259,15 +260,15 @@ class ManagementConnectionTests(BaseCassEngTestCase):
         """
         cluster = TestCluster()
         session = cluster.connect()
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             conn.register_connection("bad_coonection1", session=session, consistency="not_null")
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             conn.register_connection("bad_coonection2", session=session, lazy_connect="not_null")
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             conn.register_connection("bad_coonection3", session=session, retry_connect="not_null")
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             conn.register_connection("bad_coonection4", session=session, cluster_options="not_null")
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             conn.register_connection("bad_coonection5", hosts="not_null", session=session)
         cluster.shutdown()
 
@@ -318,7 +319,7 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
         """
 
         # No connection with a QuerySet (default is a fake one)
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             with BatchQuery() as b:
                 TestModel.objects.batch(b).create(partition=1, cluster=1)
 
@@ -332,7 +333,7 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
             obj.__connection__ = None
 
         # No connection with a model (default is a fake one)
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             with BatchQuery() as b:
                 obj.count = 2
                 obj.batch(b).save()
@@ -357,7 +358,7 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
         TestModel.__connection__ = 'cluster'
         AnotherTestModel.__connection__ = 'cluster2'
 
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             with BatchQuery() as b:
                 TestModel.objects.batch(b).create(partition=1, cluster=1)
                 AnotherTestModel.objects.batch(b).create(partition=1, cluster=1)
@@ -380,7 +381,7 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
             obj1.count = 4
             obj2.count = 4
 
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             with BatchQuery() as b:
                 obj1.batch(b).save()
                 obj2.batch(b).save()
@@ -396,11 +397,11 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
         @test_category object_mapper
         """
 
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             with BatchQuery(connection='cluster') as b:
                 TestModel.batch(b).using(connection='test').save()
 
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             with BatchQuery(connection='cluster') as b:
                 TestModel.using(connection='test').batch(b).save()
 
@@ -408,11 +409,11 @@ class BatchQueryConnectionTests(BaseCassEngTestCase):
             obj1 = tm.objects.get(partition=1, cluster=1)
             obj1.__connection__ = None
 
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             with BatchQuery(connection='cluster') as b:
                 obj1.using(connection='test').batch(b).save()
 
-        with self.assertRaises(CQLEngineException):
+        with pytest.raises(CQLEngineException):
             with BatchQuery(connection='cluster') as b:
                 obj1.batch(b).using(connection='test').save()
 
@@ -470,14 +471,14 @@ class UsingDescriptorTests(BaseCassEngTestCase):
             tm.objects.using(keyspace='ks2').create(partition=1, cluster=1)
             tm.objects.using(keyspace='ks2').create(partition=2, cluster=2)
 
-            with self.assertRaises(TestModel.DoesNotExist):
+            with pytest.raises(TestModel.DoesNotExist):
                 tm.objects.get(partition=1, cluster=1)  # default keyspace ks1
             obj1 = tm.objects.using(keyspace='ks2').get(partition=1, cluster=1)
 
             obj1.count = 2
             obj1.save()
 
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             TestModel.objects.using(keyspace='ks2').get(partition=1, cluster=1)
 
         obj2 = TestModel.objects.using(connection='cluster', keyspace='ks2').get(partition=1, cluster=1)
@@ -489,7 +490,7 @@ class UsingDescriptorTests(BaseCassEngTestCase):
         assert obj3.count == 5
 
         TestModel.objects(partition=2, cluster=2).using(connection='cluster', keyspace='ks2').delete()
-        with self.assertRaises(TestModel.DoesNotExist):
+        with pytest.raises(TestModel.DoesNotExist):
             TestModel.objects.using(connection='cluster', keyspace='ks2').get(partition=2, cluster=2)
 
     def test_connection(self):
@@ -505,7 +506,7 @@ class UsingDescriptorTests(BaseCassEngTestCase):
         self._reset_data()
 
         # Model class
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             TestModel.objects.create(partition=1, cluster=1)
 
         TestModel.objects.using(connection='cluster').create(partition=1, cluster=1)
@@ -518,7 +519,7 @@ class UsingDescriptorTests(BaseCassEngTestCase):
         assert obj1.count == 5
 
         obj1.using(connection='cluster').delete()
-        with self.assertRaises(TestModel.DoesNotExist):
+        with pytest.raises(TestModel.DoesNotExist):
             TestModel.objects.using(connection='cluster').get(partition=1, cluster=1)
 
 

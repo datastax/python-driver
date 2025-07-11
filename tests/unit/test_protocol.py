@@ -26,6 +26,7 @@ from cassandra.protocol import (
 from cassandra.query import BatchType
 from cassandra.marshal import uint32_unpack
 from cassandra.cluster import ContinuousPagingOptions
+import pytest
 
 
 class MessageTest(unittest.TestCase):
@@ -109,7 +110,8 @@ class MessageTest(unittest.TestCase):
         io = Mock()
         for version in [version for version in ProtocolVersion.SUPPORTED_VERSIONS
                         if not ProtocolVersion.has_continuous_paging_support(version)]:
-            self.assertRaises(UnsupportedOperation, message.send_body, io, version)
+            with pytest.raises(UnsupportedOperation):
+                message.send_body(io, version)
 
         io.reset_mock()
         message.send_body(io, ProtocolVersion.DSE_V1)
@@ -161,7 +163,7 @@ class MessageTest(unittest.TestCase):
                     (b'ks',),
                 ])
             else:
-                with self.assertRaises(UnsupportedOperation):
+                with pytest.raises(UnsupportedOperation):
                     message.send_body(io, version)
             io.reset_mock()
 
@@ -169,7 +171,7 @@ class MessageTest(unittest.TestCase):
         keyspace_message = QueryMessage('a', consistency_level=3, keyspace='ks')
         io = Mock(name='io')
 
-        with self.assertRaisesRegex(UnsupportedOperation, 'Keyspaces.*set'):
+        with pytest.raises(UnsupportedOperation, match='Keyspaces.*set'):
             keyspace_message.send_body(io, protocol_version=4)
         io.assert_not_called()
 

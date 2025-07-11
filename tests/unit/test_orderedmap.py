@@ -17,6 +17,7 @@ import unittest
 from cassandra.util import OrderedMap, OrderedMapSerializedKey
 from cassandra.cqltypes import EMPTY, UTF8Type, lookup_casstype
 from tests.util import assertListEqual
+import pytest
 
 class OrderedMapTest(unittest.TestCase):
     def test_init(self):
@@ -34,7 +35,7 @@ class OrderedMapTest(unittest.TestCase):
         assert d['key1'] == 'v1'
         assert d['key2'] == 'v2'
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             OrderedMap('too', 'many', 'args')
 
     def test_contains(self):
@@ -107,7 +108,7 @@ class OrderedMapTest(unittest.TestCase):
         for v, k in enumerate(keys):
             assert om[k] == v
 
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             om['notthere']
 
     def test_iter(self):
@@ -118,7 +119,8 @@ class OrderedMapTest(unittest.TestCase):
 
         itr = iter(om)
         assert sum([1 for _ in itr]) == len(keys)
-        self.assertRaises(StopIteration, next, itr)
+        with pytest.raises(StopIteration):
+            next(itr)
 
         assert list(iter(om)) == keys
         assert list(om.items()) == items
@@ -145,19 +147,22 @@ class OrderedMapTest(unittest.TestCase):
         item = (1, 2)
         om = OrderedMap((item,))
         assert om.popitem() == item
-        self.assertRaises(KeyError, om.popitem)
+        with pytest.raises(KeyError):
+            om.popitem()
 
     def test_delitem(self):
         om = OrderedMap({1: 1, 2: 2})
 
-        self.assertRaises(KeyError, om.__delitem__, 3)
+        with pytest.raises(KeyError):
+            om.__delitem__(3)
 
         del om[1]
         assert om == {2: 2}
         del om[2]
         assert not om
 
-        self.assertRaises(KeyError, om.__delitem__, 1)
+        with pytest.raises(KeyError):
+            om.__delitem__(1)
 
 
 class OrderedMapSerializedKeyTest(unittest.TestCase):
