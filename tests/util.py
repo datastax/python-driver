@@ -94,3 +94,6 @@ def assertSetEqual(a, b):
 
 def assertCountEqual(a, b):
     unittest_test_case.assertCountEqual(a, b)
+
+def assertEqual(a, b):
+    assert a == b

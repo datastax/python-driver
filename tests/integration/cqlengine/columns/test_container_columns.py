@@ -30,6 +30,7 @@ from tests.integration import CASSANDRA_IP
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 from tests.integration import greaterthancass20, CASSANDRA_VERSION
+import pytest
 
 log = logging.getLogger(__name__)
 
@@ -408,8 +409,8 @@ class TestMapColumn(BaseCassEngTestCase):
         assert m2.int_map[1] == k1
         assert m2.int_map[2] == k2
 
-        self.assertAlmostEqual(get_total_seconds(now - m2.text_map['now']), 0, 2)
-        self.assertAlmostEqual(get_total_seconds(then - m2.text_map['then']), 0, 2)
+        assert get_total_seconds(now - m2.text_map['now']) == pytest.approx(0, abs=1e-2)
+        assert get_total_seconds(then - m2.text_map['then']) == pytest.approx(0, abs=1e-2)
 
     def test_type_validation(self):
         """
@@ -974,5 +975,3 @@ class TestNestedType(BaseCassEngTestCase):
         assert [] == tmp.list_list
         assert {} == tmp.map_list
         assert set() == tmp.set_tuple
-
-

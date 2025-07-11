@@ -15,6 +15,7 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
 from cassandra.cqlengine.functions import get_total_seconds
+import pytest
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
 
@@ -70,6 +71,5 @@ class TestDateTimeQueries(BaseCassEngTestCase):
         obj = DateTimeQueryTestModel.create(user=pk, day=now, data='energy cheese')
         load = DateTimeQueryTestModel.get(user=pk)
 
-        self.assertAlmostEqual(get_total_seconds(now - load.day), 0, 2)
+        assert get_total_seconds(now - load.day) == pytest.approx(0, abs=1e-2)
         obj.delete()
-

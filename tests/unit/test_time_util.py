@@ -41,11 +41,11 @@ class TimeUtilTest(unittest.TestCase):
         u = uuid.uuid1(node, 0)
 
         t = util.unix_time_from_uuid1(u)
-        self.assertAlmostEqual(now, t, 2)
+        assert now == pytest.approx(t, abs=1e-2)
 
         dt = util.datetime_from_uuid1(u)
         t = calendar.timegm(dt.timetuple()) + dt.microsecond / 1e6
-        self.assertAlmostEqual(now, t, 2)
+        assert now == pytest.approx(t, abs=1e-2)
 
     def test_uuid_from_time(self):
         t = time.time()
@@ -54,15 +54,15 @@ class TimeUtilTest(unittest.TestCase):
         u = util.uuid_from_time(t, node, seq)
         # using AlmostEqual because time precision is different for
         # some platforms
-        self.assertAlmostEqual(util.unix_time_from_uuid1(u), t, 4)
+        assert util.unix_time_from_uuid1(u) == pytest.approx(t, abs=1e-4)
         assert u.node == node
         assert u.clock_seq == seq
 
         # random node
         u1 = util.uuid_from_time(t, clock_seq=seq)
         u2 = util.uuid_from_time(t, clock_seq=seq)
-        self.assertAlmostEqual(util.unix_time_from_uuid1(u1), t, 4)
-        self.assertAlmostEqual(util.unix_time_from_uuid1(u2), t, 4)
+        assert util.unix_time_from_uuid1(u1) == pytest.approx(t, abs=1e-4)
+        assert util.unix_time_from_uuid1(u2) == pytest.approx(t, abs=1e-4)
         assert u.clock_seq == seq
         # not impossible, but we shouldn't get the same value twice
         assert u1.node != u2.node
@@ -70,8 +70,8 @@ class TimeUtilTest(unittest.TestCase):
         # random seq
         u1 = util.uuid_from_time(t, node=node)
         u2 = util.uuid_from_time(t, node=node)
-        self.assertAlmostEqual(util.unix_time_from_uuid1(u1), t, 4)
-        self.assertAlmostEqual(util.unix_time_from_uuid1(u2), t, 4)
+        assert util.unix_time_from_uuid1(u1) == pytest.approx(t, abs=1e-4)
+        assert util.unix_time_from_uuid1(u2) == pytest.approx(t, abs=1e-4)
         assert u.node == node
         # not impossible, but we shouldn't get the same value twice
         assert u1.clock_seq != u2.clock_seq
@@ -87,7 +87,7 @@ class TimeUtilTest(unittest.TestCase):
         # construct from datetime
         dt = util.datetime_from_timestamp(t)
         u = util.uuid_from_time(dt, node, seq)
-        self.assertAlmostEqual(util.unix_time_from_uuid1(u), t, 4)
+        assert util.unix_time_from_uuid1(u) == pytest.approx(t, abs=1e-4)
         assert u.node == node
         assert u.clock_seq == seq
 

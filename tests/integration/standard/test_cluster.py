@@ -1064,7 +1064,7 @@ class ClusterTests(unittest.TestCase):
                     break
                 except AssertionError:
                     end = time.time()
-                    self.assertAlmostEqual(start, end, 1)
+                    assert start == pytest.approx(end, abs=1e-1)
         else:
             raise Exception("add_execution_profile didn't timeout after {0} retries".format(max_retry_count))
 
@@ -1123,7 +1123,7 @@ class ClusterTests(unittest.TestCase):
                     import traceback
                     traceback.print_exc()
                     end = time.time()
-                    self.assertAlmostEqual(start, end, 1)
+                    assert start == pytest.approx(end, abs=1e-1)
             else:
                 raise Exception("session.execute didn't time out in {0} tries".format(max_retry_count))
 

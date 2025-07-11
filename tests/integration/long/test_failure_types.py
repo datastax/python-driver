@@ -32,7 +32,6 @@ from tests.integration import (
     get_node, start_cluster_wait_for_up, requiresmallclockgranularity,
     local, CASSANDRA_VERSION, TestCluster)
 
-
 import unittest
 
 log = logging.getLogger(__name__)
@@ -386,7 +385,7 @@ class TimeoutTimerTest(unittest.TestCase):
         total_time = end_time-start_time
         expected_time = self.cluster.profile_manager.default.request_timeout
         # check timeout and ensure it's within a reasonable range
-        self.assertAlmostEqual(expected_time, total_time, delta=.05)
+        assert expected_time == pytest.approx(total_time, abs=.05)
 
         # Test with user defined timeout (Should be 1)
         expected_time = 1
@@ -402,6 +401,6 @@ class TimeoutTimerTest(unittest.TestCase):
         end_time = time.time()
         total_time = end_time-start_time
         # check timeout and ensure it's within a reasonable range
-        self.assertAlmostEqual(expected_time, total_time, delta=.05)
+        assert expected_time == pytest.approx(total_time, abs=.05)
         assert mock_errorback.called
         assert not mock_callback.called

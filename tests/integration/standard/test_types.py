@@ -36,6 +36,7 @@ from cassandra.cqltypes import Int32Type, EMPTY
 from cassandra.query import dict_factory, ordered_dict_factory
 from cassandra.util import sortedset, Duration, OrderedMap
 from tests.unit.cython.utils import cythontest
+from tests.util import assertEqual
 
 from tests.integration import use_singledc, execute_until_pass, notprotocolv1, \
     BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, \
@@ -1043,7 +1044,7 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("varint", partial(random.randint, 0, 2 ** 63), self.assertEqual)
 
     def test_round_trip_floating_point(self):
-        _almost_equal_test_fn = partial(self.assertAlmostEqual, places=5)
+        _almost_equal_test_fn = partial(pytest.approx, abs=1e-5)
         def _random_decimal():
             return Decimal(random.uniform(0.0, 100.0))
 
@@ -1061,7 +1062,7 @@ class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
         self._round_trip_test("text", _random_string, self.assertEqual)
 
     def test_round_trip_date_and_time(self):
-        _almost_equal_test_fn = partial(self.assertAlmostEqual, delta=timedelta(seconds=1))
+        _almost_equal_test_fn = partial(pytest.approx, abs=timedelta(seconds=1))
         def _random_datetime():
             return datetime.today() - timedelta(hours=random.randint(0,18), days=random.randint(1,1000))
         def _random_date():

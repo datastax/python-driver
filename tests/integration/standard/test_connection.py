@@ -396,7 +396,7 @@ class ConnectionTests(object):
                 conn.close()
             except Exception as e:
                 end = time.time()
-                self.assertAlmostEqual(start, end, 1)
+                assert start == pytest.approx(end, abs=1e-1)
                 exception_thrown = True
                 break
         assert exception_thrown

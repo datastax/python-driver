@@ -45,6 +45,7 @@ from cassandra.util import (
     datetime_from_timestamp
 )
 from tests.unit.util import check_sequence_consistency
+import pytest
 
 
 class TypeTests(unittest.TestCase):
@@ -319,7 +320,7 @@ class VectorTests(unittest.TestCase):
 
     def _round_trip_compare_fn(self, first, second):
         if isinstance(first, float):
-            self.assertAlmostEqual(first, second, places=5)
+            assert first == pytest.approx(second, rel=1e-5)
         elif isinstance(first, list):
             assert len(first) == len(second)
             for (felem, selem) in zip(first, second):

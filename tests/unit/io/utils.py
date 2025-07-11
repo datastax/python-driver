@@ -36,6 +36,7 @@ import os
 from socket import error as socket_error
 import ssl
 import time
+import pytest
 
 
 log = logging.getLogger(__name__)
@@ -128,7 +129,7 @@ def submit_and_wait_for_completion(unit_test, create_timer, start, end, incremen
 
     # ensure they are all called back in a timely fashion
     for callback in completed_callbacks:
-        unit_test.assertAlmostEqual(callback.expected_wait, callback.get_wait_time(), delta=.15)
+        assert callback.expected_wait == pytest.approx(callback.get_wait_time(), abs=.15)
 
 
 def noop_if_monkey_patched(f):

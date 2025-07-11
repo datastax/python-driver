@@ -28,6 +28,7 @@ from tests.integration import use_singledc, PROTOCOL_VERSION, TestCluster
 from tests.integration.long.utils import create_schema
 
 import unittest
+import pytest
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +116,7 @@ class LargeDataTests(unittest.TestCase):
 
         # Verify
         for i, row in enumerate(results):
-            self.assertAlmostEqual(row['i'], i, delta=3)
+            assert row['i'] == pytest.approx(i, abs=3)
 
         session.cluster.shutdown()
 
