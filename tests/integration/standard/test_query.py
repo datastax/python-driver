@@ -973,7 +973,7 @@ class LightweightTransactionTests(unittest.TestCase):
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 1, 10);",
                                      "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 2, 10);"], [None] * 3)
             result = self.session.execute(batch_statement)
-            #self.assertTrue(result.was_applied)
+            #assert result.was_applied
 
             # Should fail since (0, 0, 10) have already been written
             # The non conditional insert shouldn't be written as well

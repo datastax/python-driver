@@ -230,7 +230,7 @@ class WKTTest(unittest.TestCase):
         long_poly_obj = Polygon.from_wkt(long_poly_string)
         assert len(long_poly_obj.exterior.coords) == 10000
         #for expected, recieved in zip(self._construct_line_string_expected_cords(10000), long_poly_obj.exterior.coords):
-        #    self.assertEqual(expected, recieved)
+        #    assert expected == recieved
         assert long_poly_obj.exterior.coords == self._construct_line_string_expected_cords(10000)
 
         # Test bad polygon strings
