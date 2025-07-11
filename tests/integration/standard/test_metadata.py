@@ -1117,14 +1117,6 @@ class TestCodeCoverage(unittest.TestCase):
             assert isinstance(keyspace_metadata.as_cql_query(), str)
         cluster.shutdown()
 
-    def assert_equal_diff(self, received, expected):
-        if received != expected:
-            diff_string = '\n'.join(difflib.unified_diff(expected.split('\n'),
-                                                         received.split('\n'),
-                                                         'EXPECTED', 'RECEIVED',
-                                                         lineterm=''))
-            self.fail(diff_string)
-
     @greaterthancass20
     def test_export_keyspace_schema_udts(self):
         """

@@ -40,13 +40,3 @@ class BaseCassEngTestCase(unittest.TestCase):
 
     def setUp(self):
         self.session = get_session()
-
-    def assertHasAttr(self, obj, attr):
-        assert hasattr(obj, attr), "{0} doesn't have attribute: {1}".format(obj, attr)
-
-    def assertNotHasAttr(self, obj, attr):
-        assert not hasattr(obj, attr), "{0} shouldn't have the attribute: {1}".format(obj, attr)
-
-    if sys.version_info > (3, 0):
-        def assertItemsEqual(self, first, second, msg=None):
-            return self.assertCountEqual(first, second, msg)
