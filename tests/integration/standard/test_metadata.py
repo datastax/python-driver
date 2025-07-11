@@ -39,7 +39,7 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                BasicExistingKeyspaceUnitTestCase, drop_keyspace_shutdown_cluster, CASSANDRA_VERSION,
                                greaterthanorequalcass30, lessthancass30, local,
                                get_supported_protocol_versions, greaterthancass20,
-                               greaterthancass21, assert_startswith, greaterthanorequalcass40,
+                               greaterthancass21, greaterthanorequalcass40,
                                lessthancass40,
                                TestCluster, requires_java_udf, requires_composite_type,
                                requires_collection_indexes, SCYLLA_VERSION, xfail_scylla, xfail_scylla_version_lt,
@@ -105,7 +105,7 @@ class HostMetaDataTests(BasicExistingKeyspaceUnitTestCase):
         @test_category metadata
         """
         for host in self.cluster.metadata.all_hosts():
-            assert_startswith(host.release_version, CASSANDRA_VERSION.base_version)
+            assert host.release_version.startswith(CASSANDRA_VERSION.base_version)
 
 
 

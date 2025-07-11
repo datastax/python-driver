@@ -944,13 +944,6 @@ class BasicExistingSegregatedKeyspaceUnitTestCase(BasicKeyspaceUnitTestCase):
         self.cluster.shutdown()
 
 
-def assert_startswith(s, prefix):
-    if not s.startswith(prefix):
-        raise AssertionError(
-            '{} does not start with {}'.format(repr(s), repr(prefix))
-        )
-
-
 class TestCluster(object):
     __test__ = False
 
