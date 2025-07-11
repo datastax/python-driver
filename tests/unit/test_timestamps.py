@@ -16,6 +16,7 @@ import unittest
 from unittest import mock
 
 from cassandra import timestamps
+from tests.util import assertRegex
 from threading import Thread, Lock
 
 
@@ -104,7 +105,7 @@ class TestTimestampGeneratorLogging(unittest.TestCase):
         last_warn_args, last_warn_kwargs = call
         assert len(last_warn_args) == 1
         assert len(last_warn_kwargs) == 0
-        self.assertRegex(last_warn_args[0], pattern)
+        assertRegex(last_warn_args[0], pattern)
 
     def test_basic_log_content(self):
         """

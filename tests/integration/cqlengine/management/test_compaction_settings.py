@@ -20,6 +20,7 @@ from cassandra.cqlengine.management import drop_table, sync_table, _get_table_me
 from cassandra.cqlengine.models import Model
 
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.util import assertRegex
 
 
 class LeveledCompactionTestTable(Model):
@@ -82,7 +83,7 @@ class AlterTableTest(BaseCassEngTestCase):
 
         table_meta = _get_table_metadata(tmp)
 
-        self.assertRegex(table_meta.export_as_string(), '.*SizeTieredCompactionStrategy.*')
+        assertRegex(table_meta.export_as_string(), '.*SizeTieredCompactionStrategy.*')
 
     def test_alter_options(self):
 
@@ -96,11 +97,11 @@ class AlterTableTest(BaseCassEngTestCase):
         drop_table(AlterTable)
         sync_table(AlterTable)
         table_meta = _get_table_metadata(AlterTable)
-        self.assertRegex(table_meta.export_as_string(), ".*'sstable_size_in_mb': '64'.*")
+        assertRegex(table_meta.export_as_string(), ".*'sstable_size_in_mb': '64'.*")
         AlterTable.__options__['compaction']['sstable_size_in_mb'] = '128'
         sync_table(AlterTable)
         table_meta = _get_table_metadata(AlterTable)
-        self.assertRegex(table_meta.export_as_string(), ".*'sstable_size_in_mb': '128'.*")
+        assertRegex(table_meta.export_as_string(), ".*'sstable_size_in_mb': '128'.*")
 
 
 class OptionsTest(BaseCassEngTestCase):
@@ -124,7 +125,7 @@ class OptionsTest(BaseCassEngTestCase):
                         attr = "'%s': '%s'" % (subname, subvalue.split('.')[-1])
                         found_at = cql.find(attr, start)
                     else:
-                        
+
                         assert found_at > start
                         assert found_at < end
 

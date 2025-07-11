@@ -27,7 +27,7 @@ from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ProtocolHandler)
 
-from tests.util import wait_until
+from tests.util import wait_until, assertRegex
 
 
 class ConnectionTest(unittest.TestCase):
@@ -383,7 +383,7 @@ class ConnectionHeartbeatTest(unittest.TestCase):
         connection.defunct.assert_has_calls([call(ANY)] * get_holders.call_count)
         exc = connection.defunct.call_args_list[0][0][0]
         assert isinstance(exc, ConnectionException)
-        self.assertRegex(exc.args[0], r'^Received unexpected response to OptionsMessage.*')
+        assertRegex(exc.args[0], r'^Received unexpected response to OptionsMessage.*')
         holder.return_connection.assert_has_calls(
             [call(connection)] * get_holders.call_count)
 

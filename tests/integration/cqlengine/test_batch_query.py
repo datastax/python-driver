@@ -20,6 +20,7 @@ from cassandra.cqlengine.management import drop_table, sync_table
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.query import BatchQuery
 from tests.integration.cqlengine.base import BaseCassEngTestCase
+from tests.util import assertRegex
 
 from unittest.mock import patch
 
@@ -225,7 +226,7 @@ class BatchQueryCallbacksTests(BaseCassEngTestCase):
                 batch.execute()
             batch.execute()
         assert len(w) == 2  # package filter setup to warn always
-        self.assertRegex(str(w[0].message), r"^Batch.*multiple.*")
+        assertRegex(str(w[0].message), r"^Batch.*multiple.*")
 
     def test_disable_multiple_callback_warning(self):
         """

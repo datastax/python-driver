@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
- 
+
 import time
 from functools import wraps
+import re
 
 
 def wait_until(condition, delay, max_attempts):
@@ -72,3 +73,6 @@ def late(seconds=1):
             func(*args, **kwargs)
         return wrapper
     return decorator
+
+def assertRegex(text: str, pattern: str):
+    assert re.search(pattern, text)

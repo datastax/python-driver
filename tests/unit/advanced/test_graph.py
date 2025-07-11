@@ -23,7 +23,7 @@ from cassandra.graph import (SimpleGraphStatement, GraphOptions, GraphProtocol, 
                        graph_result_row_factory, single_object_row_factory,
                        Vertex, Edge, Path, VertexProperty)
 from cassandra.datastax.graph.query import _graph_options
-
+from tests.util import assertRegex
 
 class GraphResultTests(unittest.TestCase):
 
@@ -257,7 +257,7 @@ class GraphOptionTests(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             GraphOptions(unknown_param=42)
         assert len(w) == 1
-        self.assertRegex(str(w[0].message), r"^Unknown keyword.*GraphOptions.*")
+        assertRegex(str(w[0].message), r"^Unknown keyword.*GraphOptions.*")
 
     def test_update(self):
         opts = GraphOptions(**self.api_params)
