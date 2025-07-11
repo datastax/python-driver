@@ -14,23 +14,23 @@
 
 from cassandra.bytesio cimport BytesIOReader
 
-def test_read1(assert_equal, assert_raises):
+def test_read1(assert_raises):
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
-    assert_equal(reader.read(2)[:2], b'ab')
-    assert_equal(reader.read(2)[:2], b'cd')
-    assert_equal(reader.read(0)[:0], b'')
-    assert_equal(reader.read(2)[:2], b'ef')
+    assert reader.read(2)[:2] == b'ab'
+    assert reader.read(2)[:2] == b'cd'
+    assert reader.read(0)[:0] == b''
+    assert reader.read(2)[:2] == b'ef'
 
-def test_read2(assert_equal, assert_raises):
+def test_read2(assert_raises):
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
     reader.read(5)
     reader.read(1)
 
-def test_read3(assert_equal, assert_raises):
+def test_read3(assert_raises):
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
     reader.read(6)
 
-def test_read_eof(assert_equal, assert_raises):
+def test_read_eof(assert_raises):
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
     reader.read(5)
     # cannot convert reader.read to an object, do it manually
