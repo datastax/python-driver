@@ -23,4 +23,4 @@ class UtilsTest(unittest.TestCase):
 
     @cythontest
     def test_datetime_from_timestamp(self):
-        utils_testhelper.test_datetime_from_timestamp(self.assertEqual)
+        utils_testhelper.test_datetime_from_timestamp()
