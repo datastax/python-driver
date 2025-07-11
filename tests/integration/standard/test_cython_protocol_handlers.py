@@ -47,14 +47,14 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         """
         Test Cython-based parser that returns a list of tuples
         """
-        verify_iterator_data(self.assertEqual, get_data(ProtocolHandler))
+        verify_iterator_data(get_data(ProtocolHandler))
 
     @cythontest
     def test_cython_lazy_parser(self):
         """
         Test Cython-based parser that returns an iterator of tuples
         """
-        verify_iterator_data(self.assertEqual, get_data(LazyProtocolHandler))
+        verify_iterator_data(get_data(LazyProtocolHandler))
 
     @numpytest
     def test_cython_lazy_results_paged(self):
@@ -74,7 +74,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
         results = session.execute("SELECT * FROM test_table")
 
         assert results.has_more_pages
-        assert verify_iterator_data(self.assertEqual, results) == self.N_ITEMS  # make sure we see all rows
+        assert verify_iterator_data(results) == self.N_ITEMS  # make sure we see all rows
 
         cluster.shutdown()
 
@@ -146,7 +146,7 @@ class CythonProtocolHandlerTest(unittest.TestCase):
             arr = page[colname]
             self.match_dtype(datatype, arr.dtype)
 
-        return verify_iterator_data(self.assertEqual, arrays_to_list_of_tuples(page, colnames))
+        return verify_iterator_data(arrays_to_list_of_tuples(page, colnames))
 
     def match_dtype(self, datatype, dtype):
         """Match a string cqltype (e.g. 'int' or 'blob') with a numpy dtype"""
@@ -192,7 +192,7 @@ def get_data(protocol_handler):
     return results
 
 
-def verify_iterator_data(assertEqual, results):
+def verify_iterator_data(results):
     """
     Check the result of get_data() when this is a list or
     iterator of tuples
@@ -200,10 +200,9 @@ def verify_iterator_data(assertEqual, results):
     count = 0
     for count, result in enumerate(results, 1):
         params = get_all_primitive_params(result[0])
-        assertEqual(len(params), len(result),
-                    msg="Not the right number of columns?")
+        assert len(params) == len(result), "Not the right number of columns?"
         for expected, actual in zip(params, result):
-            assertEqual(actual, expected)
+            assert actual == expected
     return count
 
 
