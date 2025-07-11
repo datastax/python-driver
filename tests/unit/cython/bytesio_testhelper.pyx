@@ -13,32 +13,27 @@
 # limitations under the License.
 
 from cassandra.bytesio cimport BytesIOReader
+import pytest
 
-def test_read1(assert_raises):
+def test_read1():
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
     assert reader.read(2)[:2] == b'ab'
     assert reader.read(2)[:2] == b'cd'
     assert reader.read(0)[:0] == b''
     assert reader.read(2)[:2] == b'ef'
 
-def test_read2(assert_raises):
+def test_read2():
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
     reader.read(5)
     reader.read(1)
 
-def test_read3(assert_raises):
+def test_read3():
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
     reader.read(6)
 
-def test_read_eof(assert_raises):
+def test_read_eof():
     cdef BytesIOReader reader = BytesIOReader(b'abcdef')
     reader.read(5)
-    # cannot convert reader.read to an object, do it manually
-    # assert_raises(EOFError, reader.read, 2)
-    try:
+    with pytest.raises(EOFError):
         reader.read(2)
-    except EOFError:
-        pass
-    else:
-        raise Exception("Expected an EOFError")
     reader.read(1) # see that we can still read this

@@ -23,10 +23,10 @@ class BytesIOTest(unittest.TestCase):
 
     @cythontest
     def test_reading(self):
-        bytesio_testhelper.test_read1(self.assertRaises)
-        bytesio_testhelper.test_read2(self.assertRaises)
-        bytesio_testhelper.test_read3(self.assertRaises)
+        bytesio_testhelper.test_read1()
+        bytesio_testhelper.test_read2()
+        bytesio_testhelper.test_read3()
 
     @cythontest
     def test_reading_error(self):
-        bytesio_testhelper.test_read_eof(self.assertRaises)
+        bytesio_testhelper.test_read_eof()
