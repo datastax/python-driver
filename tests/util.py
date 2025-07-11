@@ -108,3 +108,6 @@ def assert_startswith_diff(text, prefix):
                                                         'EXPECTED', 'RECEIVED',
                                                         lineterm=''))
         pytest.fail(diff_string)
+
+def assertIsInstance(a, b):
+    assert isinstance(a, b)

@@ -31,6 +31,7 @@ from cassandra.protocol import (ReadTimeoutErrorMessage, WriteTimeoutErrorMessag
 from cassandra.policies import RetryPolicy, ExponentialBackoffRetryPolicy
 from cassandra.pool import NoConnectionsAvailable
 from cassandra.query import SimpleStatement
+from tests.util import assertEqual, assertIsInstance
 
 
 class ResponseFutureTests(unittest.TestCase):
@@ -442,7 +443,7 @@ class ResponseFutureTests(unittest.TestCase):
         callback.assert_called_once_with([expected_result], arg, **kwargs)
 
         # this should get called immediately now that the result is set
-        rf.add_callback(self.assertEqual, [expected_result])
+        rf.add_callback(assertEqual, [expected_result])
 
     def test_errback(self):
         session = self.make_session()
@@ -457,7 +458,7 @@ class ResponseFutureTests(unittest.TestCase):
         rf._query_retries = 1
         rf.send_request()
 
-        rf.add_errback(self.assertIsInstance, Exception)
+        rf.add_errback(assertIsInstance, Exception)
 
         result = Mock(spec=UnavailableErrorMessage, info={"required_replicas":2, "alive_replicas": 1, "consistency": 1})
         result.to_exception.return_value = Exception()
@@ -466,7 +467,7 @@ class ResponseFutureTests(unittest.TestCase):
         self.assertRaises(Exception, rf.result)
 
         # this should get called immediately now that the error is set
-        rf.add_errback(self.assertIsInstance, Exception)
+        rf.add_errback(assertIsInstance, Exception)
 
     def test_multiple_callbacks(self):
         session = self.make_session()
@@ -537,8 +538,8 @@ class ResponseFutureTests(unittest.TestCase):
         rf.send_request()
 
         rf.add_callbacks(
-            callback=self.assertEqual, callback_args=([{'col': 'val'}],),
-            errback=self.assertIsInstance, errback_args=(Exception,))
+            callback=assertEqual, callback_args=([{'col': 'val'}],),
+            errback=assertIsInstance, errback_args=(Exception,))
 
         result = Mock(spec=UnavailableErrorMessage,
                       info={"required_replicas":2, "alive_replicas": 1, "consistency": 1})
@@ -556,7 +557,7 @@ class ResponseFutureTests(unittest.TestCase):
         kwargs = {'one': 1, 'two': 2}
         rf.add_callbacks(
             callback=callback, callback_args=(arg,), callback_kwargs=kwargs,
-            errback=self.assertIsInstance, errback_args=(Exception,))
+            errback=assertIsInstance, errback_args=(Exception,))
 
         rf._set_result(None, None, None, self.make_mock_response(expected_result[0], expected_result[1]))
         assert rf.result()[0] == expected_result
