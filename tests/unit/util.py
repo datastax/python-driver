@@ -11,20 +11,20 @@
 # limitations under the License.
 
 
-def check_sequence_consistency(unit_test, ordered_sequence, equal=False):
+def check_sequence_consistency(ordered_sequence, equal=False):
     for i, el in enumerate(ordered_sequence):
         for previous in ordered_sequence[:i]:
-            _check_order_consistency(unit_test, previous, el, equal)
+            _check_order_consistency(previous, el, equal)
         for posterior in ordered_sequence[i + 1:]:
-            _check_order_consistency(unit_test, el, posterior, equal)
+            _check_order_consistency(el, posterior, equal)
 
 
-def _check_order_consistency(unit_test, smaller, bigger, equal=False):
-    unit_test.assertLessEqual(smaller, bigger)
-    unit_test.assertGreaterEqual(bigger, smaller)
+def _check_order_consistency(smaller, bigger, equal=False):
+    assert smaller <= bigger
+    assert bigger >= smaller
     if equal:
-        unit_test.assertEqual(smaller, bigger)
+        assert smaller == bigger
     else:
-        unit_test.assertNotEqual(smaller, bigger)
-        unit_test.assertLess(smaller, bigger)
-        unit_test.assertGreater(bigger, smaller)
+        assert smaller != bigger
+        assert smaller < bigger
+        assert bigger > smaller

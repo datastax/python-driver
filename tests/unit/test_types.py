@@ -1004,9 +1004,9 @@ class TestOrdering(unittest.TestCase):
         hosts_equal = [Host(addr, SimpleConvictionPolicy) for addr in
                        ("127.0.0.1", "127.0.0.1")]
         hosts_equal_conviction = [Host("127.0.0.1", SimpleConvictionPolicy), Host("127.0.0.1", ConvictionPolicy)]
-        check_sequence_consistency(self, hosts)
-        check_sequence_consistency(self, hosts_equal, equal=True)
-        check_sequence_consistency(self, hosts_equal_conviction, equal=True)
+        check_sequence_consistency(hosts)
+        check_sequence_consistency(hosts_equal, equal=True)
+        check_sequence_consistency(hosts_equal_conviction, equal=True)
 
     def test_date_order(self):
         """
@@ -1020,8 +1020,8 @@ class TestOrdering(unittest.TestCase):
         """
         dates_from_string = [Date("2017-01-01"), Date("2017-01-05"), Date("2017-01-09"), Date("2017-01-13")]
         dates_from_string_equal = [Date("2017-01-01"), Date("2017-01-01")]
-        check_sequence_consistency(self, dates_from_string)
-        check_sequence_consistency(self, dates_from_string_equal, equal=True)
+        check_sequence_consistency(dates_from_string)
+        check_sequence_consistency(dates_from_string_equal, equal=True)
 
         date_format = "%Y-%m-%d"
 
@@ -1031,15 +1031,15 @@ class TestOrdering(unittest.TestCase):
             for dtstr in ("2017-01-02", "2017-01-06", "2017-01-10", "2017-01-14")
         ]
         dates_from_value_equal = [Date(1), Date(1)]
-        check_sequence_consistency(self, dates_from_value)
-        check_sequence_consistency(self, dates_from_value_equal, equal=True)
+        check_sequence_consistency(dates_from_value)
+        check_sequence_consistency(dates_from_value_equal, equal=True)
 
         dates_from_datetime = [Date(datetime.datetime.strptime(dtstr, date_format))
                                for dtstr in ("2017-01-03", "2017-01-07", "2017-01-11", "2017-01-15")]
         dates_from_datetime_equal = [Date(datetime.datetime.strptime("2017-01-01", date_format)),
                                Date(datetime.datetime.strptime("2017-01-01", date_format))]
-        check_sequence_consistency(self, dates_from_datetime)
-        check_sequence_consistency(self, dates_from_datetime_equal, equal=True)
+        check_sequence_consistency(dates_from_datetime)
+        check_sequence_consistency(dates_from_datetime_equal, equal=True)
 
         dates_from_date = [
             Date(datetime.datetime.strptime(dtstr, date_format).date()) for dtstr in
@@ -1048,10 +1048,10 @@ class TestOrdering(unittest.TestCase):
         dates_from_date_equal = [datetime.datetime.strptime(dtstr, date_format) for dtstr in
                                  ("2017-01-09", "2017-01-9")]
 
-        check_sequence_consistency(self, dates_from_date)
-        check_sequence_consistency(self, dates_from_date_equal, equal=True)
+        check_sequence_consistency(dates_from_date)
+        check_sequence_consistency(dates_from_date_equal, equal=True)
 
-        check_sequence_consistency(self, self._shuffle_lists(dates_from_string, dates_from_value,
+        check_sequence_consistency(self._shuffle_lists(dates_from_string, dates_from_value,
                                                              dates_from_datetime, dates_from_date))
 
     def test_timer_order(self):
@@ -1066,23 +1066,23 @@ class TestOrdering(unittest.TestCase):
         """
         time_from_int = [Time(1000), Time(4000), Time(7000), Time(10000)]
         time_from_int_equal = [Time(1), Time(1)]
-        check_sequence_consistency(self, time_from_int)
-        check_sequence_consistency(self, time_from_int_equal, equal=True)
+        check_sequence_consistency(time_from_int)
+        check_sequence_consistency(time_from_int_equal, equal=True)
 
         time_from_datetime = [Time(datetime.time(hour=0, minute=0, second=0, microsecond=us))
                               for us in (2, 5, 8, 11)]
         time_from_datetime_equal = [Time(datetime.time(hour=0, minute=0, second=0, microsecond=us))
                                     for us in (1, 1)]
-        check_sequence_consistency(self, time_from_datetime)
-        check_sequence_consistency(self, time_from_datetime_equal, equal=True)
+        check_sequence_consistency(time_from_datetime)
+        check_sequence_consistency(time_from_datetime_equal, equal=True)
 
         time_from_string = [Time("00:00:00.000003000"), Time("00:00:00.000006000"),
                             Time("00:00:00.000009000"), Time("00:00:00.000012000")]
         time_from_string_equal = [Time("00:00:00.000004000"), Time("00:00:00.000004000")]
-        check_sequence_consistency(self, time_from_string)
-        check_sequence_consistency(self, time_from_string_equal, equal=True)
+        check_sequence_consistency(time_from_string)
+        check_sequence_consistency(time_from_string_equal, equal=True)
 
-        check_sequence_consistency(self, self._shuffle_lists(time_from_int, time_from_datetime, time_from_string))
+        check_sequence_consistency(self._shuffle_lists(time_from_int, time_from_datetime, time_from_string))
 
     def test_token_order(self):
         """
@@ -1096,5 +1096,5 @@ class TestOrdering(unittest.TestCase):
         """
         tokens = [Token(1), Token(2), Token(3), Token(4)]
         tokens_equal = [Token(1), Token(1)]
-        check_sequence_consistency(self, tokens)
-        check_sequence_consistency(self, tokens_equal, equal=True)
+        check_sequence_consistency(tokens)
+        check_sequence_consistency(tokens_equal, equal=True)
