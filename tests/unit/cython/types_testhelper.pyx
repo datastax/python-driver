@@ -28,7 +28,7 @@ from cassandra.buffer cimport Buffer
 from cassandra.deserializers cimport from_binary, Deserializer
 
 
-def test_datetype(assert_equal):
+def test_datetype():
 
     cdef Deserializer des = find_deserializer(DateType)
 
@@ -52,27 +52,27 @@ def test_datetype(assert_equal):
     # deserialize
     # epoc
     expected = 0
-    assert_equal(deserialize(expected), datetime.datetime.fromtimestamp(expected, tz=datetime.timezone.utc).replace(tzinfo=None))
+    assert deserialize(expected) == datetime.datetime.fromtimestamp(expected, tz=datetime.timezone.utc).replace(tzinfo=None)
 
     # beyond 32b
     expected = 2 ** 33
-    assert_equal(deserialize(expected), datetime.datetime(2242, 3, 16, 12, 56, 32))
+    assert deserialize(expected) == datetime.datetime(2242, 3, 16, 12, 56, 32)
 
     # less than epoc (PYTHON-119)
     expected = -770172256
-    assert_equal(deserialize(expected), datetime.datetime(1945, 8, 5, 23, 15, 44))
+    assert deserialize(expected) == datetime.datetime(1945, 8, 5, 23, 15, 44)
 
     # work around rounding difference among Python versions (PYTHON-230)
     # This wont pass with the cython extension until we fix the microseconds alignment with CPython
     #expected = 1424817268.274
-    #assert_equal(deserialize(expected), datetime.datetime(2015, 2, 24, 22, 34, 28, 274000))
+    #assert deserialize(expected) == datetime.datetime(2015, 2, 24, 22, 34, 28, 274000)
 
     # Large date overflow (PYTHON-452)
     expected = 2177403010.123
-    assert_equal(deserialize(expected), datetime.datetime(2038, 12, 31, 10, 10, 10, 123000))
+    assert deserialize(expected) == datetime.datetime(2038, 12, 31, 10, 10, 10, 123000)
 
 
-def test_date_side_by_side(assert_equal):
+def test_date_side_by_side():
     # Test pure python and cython date deserialization side-by-side
     # This is meant to detect inconsistent rounding or conversion (PYTHON-480 for example)
     # The test covers the full range of time deserializable in Python. It bounds through
@@ -91,7 +91,7 @@ def test_date_side_by_side(assert_equal):
         buf.size = bior.size
         cython_deserialized = from_binary(cython_deserializer, &buf, 0)
         python_deserialized = DateType.deserialize(blob, 0)
-        assert_equal(cython_deserialized, python_deserialized)
+        assert cython_deserialized == python_deserialized
 
     # min -> 0
     x = int(calendar.timegm(datetime.datetime(1, 1, 1).utctimetuple()) * 1000)

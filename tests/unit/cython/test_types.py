@@ -22,8 +22,8 @@ class TypesTest(unittest.TestCase):
 
     @cythontest
     def test_datetype(self):
-        types_testhelper.test_datetype(self.assertEqual)
+        types_testhelper.test_datetype()
 
     @cythontest
     def test_date_side_by_side(self):
-        types_testhelper.test_date_side_by_side(self.assertEqual)
+        types_testhelper.test_date_side_by_side()
