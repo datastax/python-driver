@@ -41,9 +41,6 @@ Contents
 :doc:`security`
     An overview of the security features of the driver
 
-:doc:`upgrading`
-    A guide to upgrading versions of the driver
-
 :doc:`user-defined-types`
     Working with Scylla's user-defined types (UDT)
 
@@ -66,7 +63,6 @@ Contents
    installation
    getting-started
    scylla-specific
-   upgrading
    execution-profiles
    performance
    query-paging
