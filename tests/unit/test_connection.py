@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import unittest
 from io import BytesIO
 import time
@@ -21,7 +22,7 @@ from cassandra import OperationTimedOut
 from cassandra.cluster import Cluster
 from cassandra.connection import (Connection, HEADER_DIRECTION_TO_CLIENT, ProtocolError,
                                   locally_supported_compressions, ConnectionHeartbeat, _Frame, Timer, TimerManager,
-                                  ConnectionException, DefaultEndPoint)
+                                  ConnectionException, DefaultEndPoint, ShardAwarePortGenerator)
 from cassandra.marshal import uint8_pack, uint32_pack, int32_pack
 from cassandra.protocol import (write_stringmultimap, write_int, write_string,
                                 SupportedMessage, ProtocolHandler)
@@ -478,3 +479,43 @@ class DefaultEndPointTest(unittest.TestCase):
             DefaultEndPoint('10.0.0.1', 3232).resolve(),
             ('10.0.0.1', 3232)
         )
+
+
+class TestShardawarePortGenerator(unittest.TestCase):
+    @patch('random.randrange')
+    def test_generate_ports_basic(self, mock_randrange):
+        mock_randrange.return_value = 10005
+        gen = ShardAwarePortGenerator(10000, 10020)
+        ports = list(itertools.islice(gen.generate(shard_id=1, total_shards=3), 5))
+
+        # Starting from aligned 10005 + shard_id (1), step by 3
+        self.assertEqual(ports, [10006, 10009, 10012, 10015, 10018])
+
+    @patch('random.randrange')
+    def test_wraps_around_to_start(self, mock_randrange):
+        mock_randrange.return_value = 10008
+        gen = ShardAwarePortGenerator(10000, 10020)
+        ports = list(itertools.islice(gen.generate(shard_id=2, total_shards=4), 5))
+
+        # Expected wrap-around from start_port after end_port is exceeded
+        self.assertEqual(ports, [10010, 10014, 10018, 10002, 10006])
+
+    @patch('random.randrange')
+    def test_all_ports_have_correct_modulo(self, mock_randrange):
+        mock_randrange.return_value = 10012
+        total_shards = 5
+        shard_id = 3
+        gen = ShardAwarePortGenerator(10000, 10020)
+
+        for port in gen.generate(shard_id=shard_id, total_shards=total_shards):
+            self.assertEqual(port % total_shards, shard_id)
+
+    @patch('random.randrange')
+    def test_generate_is_repeatable_with_same_mock(self, mock_randrange):
+        mock_randrange.return_value = 10010
+        gen = ShardAwarePortGenerator(10000, 10020)
+
+        first_run = list(itertools.islice(gen.generate(0, 2), 5))
+        second_run = list(itertools.islice(gen.generate(0, 2), 5))
+
+        self.assertEqual(first_run, second_run)

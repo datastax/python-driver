@@ -667,15 +667,21 @@ class _ConnectionIOBuffer(object):
             self.reset_io_buffer()
 
 
-class ShardawarePortGenerator:
-    @classmethod
-    def generate(cls, shard_id, total_shards):
-        start = random.randrange(DEFAULT_LOCAL_PORT_LOW, DEFAULT_LOCAL_PORT_HIGH)
-        available_ports = itertools.chain(range(start, DEFAULT_LOCAL_PORT_HIGH), range(DEFAULT_LOCAL_PORT_LOW, start))
+class ShardAwarePortGenerator:
+    def __init__(self, start_port: int, end_port: int):
+        self.start_port = start_port
+        self.end_port = end_port
+
+    def generate(self, shard_id: int, total_shards: int):
+        start = random.randrange(self.start_port, self.end_port)
+        available_ports = itertools.chain(range(start, self.end_port), range(self.start_port, start))
 
         for port in available_ports:
             if port % total_shards == shard_id:
                 yield port
+
+
+DefaultShardAwarePortGenerator = ShardAwarePortGenerator(DEFAULT_LOCAL_PORT_LOW, DEFAULT_LOCAL_PORT_HIGH)
 
 
 class Connection(object):
@@ -928,7 +934,7 @@ class Connection(object):
 
     def _initiate_connection(self, sockaddr):
         if self.features.shard_id is not None:
-            for port in ShardawarePortGenerator.generate(self.features.shard_id, self.total_shards):
+            for port in DefaultShardAwarePortGenerator.generate(self.features.shard_id, self.total_shards):
                 try:
                     self._socket.bind(('', port))
                     break
