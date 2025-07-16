@@ -672,13 +672,21 @@ class ShardAwarePortGenerator:
         self.start_port = start_port
         self.end_port = end_port
 
+    @staticmethod
+    def _align(value: int, total_shards: int):
+        shift = value % total_shards
+        if shift == 0:
+            return value
+        return value + total_shards - shift
+
     def generate(self, shard_id: int, total_shards: int):
-        start = random.randrange(self.start_port, self.end_port)
-        available_ports = itertools.chain(range(start, self.end_port), range(self.start_port, start))
+        start = self._align(random.randrange(self.start_port, self.end_port), total_shards) + shard_id
+        beginning = self._align(self.start_port, total_shards) + shard_id
+        available_ports = itertools.chain(range(start, self.end_port, total_shards),
+                                          range(beginning, start, total_shards))
 
         for port in available_ports:
-            if port % total_shards == shard_id:
-                yield port
+            yield port
 
 
 DefaultShardAwarePortGenerator = ShardAwarePortGenerator(DEFAULT_LOCAL_PORT_LOW, DEFAULT_LOCAL_PORT_HIGH)
