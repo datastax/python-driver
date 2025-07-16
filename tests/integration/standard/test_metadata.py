@@ -1536,18 +1536,18 @@ class FunctionTest(unittest.TestCase):
         def __enter__(self):
             tc = self.test_case
             expected_meta = self.meta_class(**self.function_kwargs)
-            tc.assertNotIn(expected_meta.signature, self.element_meta)
+            assert expected_meta.signature not in self.element_meta
             tc.session.execute(expected_meta.as_cql_query())
-            tc.assertIn(expected_meta.signature, self.element_meta)
+            assert expected_meta.signature in self.element_meta
 
             generated_meta = self.element_meta[expected_meta.signature]
-            self.test_case.assertEqual(generated_meta.as_cql_query(), expected_meta.as_cql_query())
+            assert generated_meta.as_cql_query() == expected_meta.as_cql_query()
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             tc = self.test_case
             tc.session.execute("DROP %s %s.%s" % (self.meta_class.__name__, tc.keyspace_name, self.signature))
-            tc.assertNotIn(self.signature, self.element_meta)
+            assert self.signature not in self.element_meta
 
         @property
         def signature(self):
