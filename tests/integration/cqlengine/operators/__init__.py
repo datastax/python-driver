@@ -15,6 +15,6 @@
 from cassandra.cqlengine.operators import BaseWhereOperator
 
 
-def check_lookup(test_case, symbol, expected):
+def check_lookup(symbol, expected):
     op = BaseWhereOperator.get_operator(symbol)
-    test_case.assertEqual(op, expected)
+    assert op == expected

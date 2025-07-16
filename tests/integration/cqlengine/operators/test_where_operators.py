@@ -33,15 +33,15 @@ class TestWhereOperators(unittest.TestCase):
     def test_symbol_lookup(self):
         """ tests where symbols are looked up properly """
 
-        check_lookup(self, 'EQ', EqualsOperator)
-        check_lookup(self, 'NE', NotEqualsOperator)
-        check_lookup(self, 'IN', InOperator)
-        check_lookup(self, 'GT', GreaterThanOperator)
-        check_lookup(self, 'GTE', GreaterThanOrEqualOperator)
-        check_lookup(self, 'LT', LessThanOperator)
-        check_lookup(self, 'LTE', LessThanOrEqualOperator)
-        check_lookup(self, 'CONTAINS', ContainsOperator)
-        check_lookup(self, 'LIKE', LikeOperator)
+        check_lookup('EQ', EqualsOperator)
+        check_lookup('NE', NotEqualsOperator)
+        check_lookup('IN', InOperator)
+        check_lookup('GT', GreaterThanOperator)
+        check_lookup('GTE', GreaterThanOrEqualOperator)
+        check_lookup('LT', LessThanOperator)
+        check_lookup('LTE', LessThanOrEqualOperator)
+        check_lookup('CONTAINS', ContainsOperator)
+        check_lookup('LIKE', LikeOperator)
 
     def test_operator_rendering(self):
         """ tests symbols are rendered properly """
@@ -68,7 +68,7 @@ class TestIsNotNull(BaseCassEngTestCase):
         @test_category cqlengine
         """
 
-        check_lookup(self, 'IS NOT NULL', IsNotNullOperator)
+        check_lookup('IS NOT NULL', IsNotNullOperator)
 
         # The * is not expanded because there are no referred fields
         assert str(TestQueryUpdateModel.filter(IsNotNull("text")).limit(2)) == 'SELECT * FROM cqlengine_test.test_query_update_model WHERE "text" IS NOT NULL LIMIT 2'
