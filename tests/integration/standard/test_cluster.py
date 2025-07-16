@@ -781,7 +781,7 @@ class ClusterTests(unittest.TestCase):
 
         cluster._idle_heartbeat.stop()
         cluster._idle_heartbeat.join()
-        assert_quiescent_pool_state(self, cluster)
+        assert_quiescent_pool_state(cluster)
 
         cluster.shutdown()
 
@@ -829,7 +829,7 @@ class ClusterTests(unittest.TestCase):
         cluster.refresh_schema_metadata()
         cluster.refresh_schema_metadata(max_schema_agreement_wait=0)
 
-        assert_quiescent_pool_state(self, cluster)
+        assert_quiescent_pool_state(cluster)
 
         cluster.shutdown()
 

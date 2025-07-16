@@ -185,7 +185,7 @@ class ConnectionTests(SimulacronBase):
         with pytest.raises(OperationTimedOut):
             future.result()
 
-        assert_quiescent_pool_state(self, cluster)
+        assert_quiescent_pool_state(cluster)
 
         time.sleep(server_delay + 1)
         # PYTHON-630 -- only the errback should be called
@@ -358,11 +358,11 @@ class ConnectionTests(SimulacronBase):
 
         # Might take some time to close the previous connections and reconnect
         time.sleep(10)
-        assert_quiescent_pool_state(self, cluster)
+        assert_quiescent_pool_state(cluster)
         clear_queries()
 
         time.sleep(10)
-        assert_quiescent_pool_state(self, cluster)
+        assert_quiescent_pool_state(cluster)
 
     def test_idle_connection_is_not_closed(self):
         """
@@ -425,7 +425,7 @@ class ConnectionTests(SimulacronBase):
             assert isinstance(f._final_exception, OperationTimedOut)
 
         assert listener.hosts_marked_down == []
-        assert_quiescent_pool_state(self, cluster)
+        assert_quiescent_pool_state(cluster)
 
     def test_can_shutdown_connection_subclass(self):
         start_and_prime_singledc()

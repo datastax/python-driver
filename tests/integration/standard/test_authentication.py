@@ -107,7 +107,7 @@ class AuthenticationTests(unittest.TestCase):
             session = cluster.connect(wait_for_all_pools=True)
             try:
                 assert session.execute("SELECT release_version FROM system.local WHERE key='local'")
-                assert_quiescent_pool_state(self, cluster, wait=1)
+                assert_quiescent_pool_state(cluster, wait=1)
                 for pool in session.get_pools():
                     connection, _ = pool.borrow_connection(timeout=0)
                     assert connection.authenticator.server_authenticator_class == 'org.apache.cassandra.auth.PasswordAuthenticator'
@@ -116,7 +116,7 @@ class AuthenticationTests(unittest.TestCase):
                 cluster.shutdown()
         finally:
             root_session.execute('DROP USER %s', user)
-            assert_quiescent_pool_state(self, root_session.cluster, wait=1)
+            assert_quiescent_pool_state(root_session.cluster, wait=1)
             root_session.cluster.shutdown()
 
     def test_connect_wrong_pwd(self):
@@ -124,7 +124,7 @@ class AuthenticationTests(unittest.TestCase):
         try:
             with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.'):
                 cluster.connect()
-            assert_quiescent_pool_state(self, cluster)
+            assert_quiescent_pool_state(cluster)
         finally:
             cluster.shutdown()
 
@@ -133,7 +133,7 @@ class AuthenticationTests(unittest.TestCase):
         try:
             with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.*'):
                 cluster.connect()
-            assert_quiescent_pool_state(self, cluster)
+            assert_quiescent_pool_state(cluster)
         finally:
             cluster.shutdown()
 
@@ -142,7 +142,7 @@ class AuthenticationTests(unittest.TestCase):
         try:
             with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.*'):
                 cluster.connect()
-            assert_quiescent_pool_state(self, cluster)
+            assert_quiescent_pool_state(cluster)
         finally:
             cluster.shutdown()
 
@@ -151,7 +151,7 @@ class AuthenticationTests(unittest.TestCase):
         try:
             with pytest.raises(NoHostAvailable, match='.*AuthenticationFailed.*'):
                 cluster.connect()
-            assert_quiescent_pool_state(self, cluster)
+            assert_quiescent_pool_state(cluster)
         finally:
             cluster.shutdown()
 
