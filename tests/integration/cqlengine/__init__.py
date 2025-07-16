@@ -77,12 +77,7 @@ def execute_count(expected):
             # DeMonkey Patch our code
             cassandra.cqlengine.connection.execute = original_function
             # Check to see if we have a pre-existing test case to work from.
-            if args:
-                test_case = args[0]
-            else:
-                test_case = unittest.TestCase("__init__")
-            # Check to see if the count is what you expect
-            test_case.assertEqual(count.get_counter(), expected, msg="Expected number of cassandra.cqlengine.connection.execute calls ({0}) doesn't match actual number invoked ({1})".format(expected, count.get_counter()))
+            assert count.get_counter() == expected, "Expected number of cassandra.cqlengine.connection.execute calls ({0}) doesn't match actual number invoked ({1})".format(expected, count.get_counter())
             return to_return
         # Name of the wrapped function must match the original or unittest will error out.
         wrapped_function.__name__ = fn.__name__
@@ -94,5 +89,3 @@ def execute_count(expected):
             return wrapped_function
 
     return innerCounter
-
-
