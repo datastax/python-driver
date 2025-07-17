@@ -68,6 +68,6 @@ jobs:
     - name: Test with pytest
       run: |
         export EVENT_LOOP_MANAGER=${{ matrix.event_loop_manager }}
-        export SCYLLA_VERSION='release:6.2'
+        export SCYLLA_VERSION='release:2025.2'
         export PROTOCOL_VERSION=4
         uv run pytest tests/integration/standard/ tests/integration/cqlengine/
