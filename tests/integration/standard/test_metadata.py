@@ -2126,7 +2126,8 @@ class MaterializedViewMetadataTestSimple(BasicSharedKeyspaceUnitTestCase):
         self.session.execute("CREATE TABLE {0}.{1} (pk int PRIMARY KEY, c int)".format(self.keyspace_name, self.function_table_name))
         self.session.execute(
             "CREATE MATERIALIZED VIEW {0}.mv1 AS SELECT pk, c FROM {0}.{1} "
-            "WHERE pk IS NOT NULL AND c IS NOT NULL PRIMARY KEY (pk, c)".format(
+            "WHERE pk IS NOT NULL AND c IS NOT NULL PRIMARY KEY (pk, c) "
+            "WITH compaction = {{ 'class' : 'SizeTieredCompactionStrategy' }}".format(
                 self.keyspace_name, self.function_table_name)
         )
 
