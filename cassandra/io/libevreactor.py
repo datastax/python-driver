@@ -194,7 +194,8 @@ class LibevLoop(object):
                 self._new_conns = set()
 
             for conn in to_start:
-                conn._read_watcher.start()
+                if conn._read_watcher:
+                    conn._read_watcher.start()
 
             changed = True
 
