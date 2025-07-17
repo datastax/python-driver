@@ -908,13 +908,13 @@ class ConstantReconnectionPolicyTest(unittest.TestCase):
         Test ConstantReconnectionPolicy schedule
         """
 
-        delay = 2
+        configured_delay = 2
         max_attempts = 100
-        policy = ConstantReconnectionPolicy(delay=delay, max_attempts=max_attempts)
+        policy = ConstantReconnectionPolicy(delay=configured_delay, max_attempts=max_attempts)
         schedule = list(policy.new_schedule())
         assert len(schedule) == max_attempts
         for i, delay in enumerate(schedule):
-            assert delay == delay
+            assert delay == configured_delay
 
     def test_schedule_negative_max_attempts(self):
         """
