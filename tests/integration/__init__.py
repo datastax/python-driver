@@ -14,6 +14,7 @@
 
 import re
 import os
+from typing import Callable
 from cassandra.cluster import Cluster
 
 from tests import connection_class, EVENT_LOOP_MANAGER
@@ -258,6 +259,13 @@ def local_decorator_creator():
 
     return _id_and_mark
 
+def xfail_scylla_version(filter: Callable[[Version], bool], reason: str, *args, **kwargs):
+    if SCYLLA_VERSION is None:
+        return pytest.mark.skipif(False, reason="It is just a NoOP Decor, should not skip anything")
+    current_version = Version(get_scylla_version(SCYLLA_VERSION))
+
+    return pytest.mark.xfail(filter(current_version), reason=reason, *args, **kwargs)
+
 local = local_decorator_creator()
 notprotocolv1 = unittest.skipUnless(PROTOCOL_VERSION > 1, 'Protocol v1 not supported')
 greaterthanprotocolv3 = unittest.skipUnless(PROTOCOL_VERSION >= 4, 'Protocol versions less than 4 are not supported')
@@ -297,7 +305,7 @@ pypy = unittest.skipUnless(platform.python_implementation() == "PyPy", "Test is 
 requiresmallclockgranularity = unittest.skipIf("Windows" in platform.system() or "asyncore" in EVENT_LOOP_MANAGER,
                                                "This test is not suitible for environments with large clock granularity")
 requiressimulacron = unittest.skipIf(SIMULACRON_JAR is None or CASSANDRA_VERSION < Version("2.1"), "Simulacron jar hasn't been specified or C* version is 2.0")
-
+requirescompactstorage = xfail_scylla_version(lambda v: v >= Version('2025.1.0'), reason="ScyllaDB deprecated compact storage", raises=InvalidRequest)
 libevtest = unittest.skipUnless(EVENT_LOOP_MANAGER=="libev", "Test timing designed for libev loop")
 
 def wait_for_node_socket(node, timeout):
@@ -702,7 +710,6 @@ def xfail_scylla_version_lt(reason, oss_scylla_version, ent_scylla_version, *arg
                                  reason=reason, *args, **kwargs)
 
     return pytest.mark.xfail(current_version < Version(oss_scylla_version), reason=reason, *args, **kwargs)
-
 
 class UpDownWaiter(object):
 

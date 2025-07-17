@@ -42,7 +42,8 @@ from tests.integration import (get_cluster, use_singledc, PROTOCOL_VERSION, exec
                                greaterthancass21, assert_startswith, greaterthanorequalcass40,
                                lessthancass40,
                                TestCluster, requires_java_udf, requires_composite_type,
-                               requires_collection_indexes, SCYLLA_VERSION, xfail_scylla, xfail_scylla_version_lt)
+                               requires_collection_indexes, SCYLLA_VERSION, xfail_scylla, xfail_scylla_version_lt,
+                               requirescompactstorage)
 
 from tests.util import wait_until
 
@@ -428,6 +429,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     @lessthancass40
+    @requirescompactstorage
     def test_compact_storage(self):
         create_statement = self.make_create_statement(["a"], [], ["b"])
         create_statement += " WITH COMPACT STORAGE"
@@ -437,6 +439,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     @lessthancass40
+    @requirescompactstorage
     def test_dense_compact_storage(self):
         create_statement = self.make_create_statement(["a"], ["b"], ["c"])
         create_statement += " WITH COMPACT STORAGE"
@@ -456,6 +459,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     @lessthancass40
+    @requirescompactstorage
     def test_counter_with_compact_storage(self):
         """ PYTHON-1100 """
         create_statement = (
@@ -468,6 +472,7 @@ class SchemaMetadataTests(BasicSegregatedKeyspaceUnitTestCase):
         self.check_create_statement(tablemeta, create_statement)
 
     @lessthancass40
+    @requirescompactstorage
     def test_counter_with_dense_compact_storage(self):
         create_statement = (
             "CREATE TABLE {keyspace}.{table} ("
