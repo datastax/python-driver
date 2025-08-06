@@ -64,6 +64,7 @@ locally_supported_compressions = OrderedDict()
 try:
     import lz4
 except ImportError:
+    log.debug("lz4 package could not be imported. LZ4 Compression will not be available")
     pass
 else:
     # The compress and decompress functions we need were moved from the lz4 to
@@ -102,6 +103,7 @@ else:
 try:
     import snappy
 except ImportError:
+    log.debug("snappy package could not be imported. Snappy Compression will not be available")
     pass
 else:
     # work around apparently buggy snappy decompress
@@ -1408,7 +1410,7 @@ class Connection(object):
             overlap = (set(locally_supported_compressions.keys()) &
                        set(remote_supported_compressions))
             if len(overlap) == 0:
-                log.debug("No available compression types supported on both ends."
+                log.error("No available compression types supported on both ends."
                           " locally supported: %r. remotely supported: %r",
                           locally_supported_compressions.keys(),
                           remote_supported_compressions)
