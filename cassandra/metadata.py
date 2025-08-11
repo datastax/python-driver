@@ -569,10 +569,11 @@ class SimpleStrategy(ReplicationStrategy):
 
     def make_token_replica_map(self, token_to_host_owner, ring):
         replica_map = {}
-        for i in range(len(ring)):
+        ring_len = len(ring)
+        for i in range(ring_len):
             j, hosts = 0, list()
-            while len(hosts) < self.replication_factor and j < len(ring):
-                token = ring[(i + j) % len(ring)]
+            while len(hosts) < self.replication_factor and j < ring_len:
+                token = ring[(i + j) % ring_len]
                 host = token_to_host_owner[token]
                 if host not in hosts:
                     hosts.append(host)
