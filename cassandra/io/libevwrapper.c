@@ -583,7 +583,6 @@ static PyMethodDef module_methods[] = {
 PyDoc_STRVAR(module_doc,
 "libev wrapper methods");
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "libevwrapper",
@@ -600,13 +599,6 @@ static struct PyModuleDef moduledef = {
 
 PyObject *
 PyInit_libevwrapper(void)
-
-# else
-# define INITERROR return
-
-void
-initlibevwrapper(void)
-#endif
 {
     PyObject *module = NULL;
 
@@ -629,11 +621,7 @@ initlibevwrapper(void)
     if (PyType_Ready(&libevwrapper_TimerType) < 0)
         INITERROR;
 
-# if PY_MAJOR_VERSION >= 3
     module = PyModule_Create(&moduledef);
-# else
-    module = Py_InitModule3("libevwrapper", module_methods, module_doc);
-# endif
 
     if (module == NULL)
         INITERROR;
@@ -669,7 +657,5 @@ initlibevwrapper(void)
         PyEval_InitThreads();
     }
 
-#if PY_MAJOR_VERSION >= 3
     return module;
-#endif
 }
