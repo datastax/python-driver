@@ -1252,6 +1252,17 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
 
         self.assertEqual(policy.distance(host), HostDistance.LOCAL)
 
+    def test_hosts_with_hostname_and_port(self):
+        hosts = ['localhost']
+        policy = WhiteListRoundRobinPolicy(hosts)
+        host = Host(DefaultEndPoint("127.0.0.1", 1000), SimpleConvictionPolicy)
+        policy.populate(None, [host])
+
+        qplan = list(policy.make_query_plan())
+        self.assertEqual(sorted(qplan), [host])
+
+        self.assertEqual(policy.distance(host), HostDistance.LOCAL)
+
 
 class AddressTranslatorTest(unittest.TestCase):
 
