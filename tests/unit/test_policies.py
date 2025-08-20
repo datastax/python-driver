@@ -24,7 +24,7 @@ from threading import Thread
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
-from cassandra.connection import DefaultEndPoint
+from cassandra.endpoint import DefaultEndPoint
 from cassandra.metadata import Metadata
 from cassandra.policies import (RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,

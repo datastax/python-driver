@@ -18,7 +18,7 @@ from cassandra.cluster import ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.policies import HostFilterPolicy, RoundRobinPolicy,  SimpleConvictionPolicy, \
     WhiteListRoundRobinPolicy
 from cassandra.pool import Host
-from cassandra.connection import DefaultEndPoint
+from cassandra.endpoint import DefaultEndPoint
 
 from tests.integration import local, use_singledc, TestCluster
 
