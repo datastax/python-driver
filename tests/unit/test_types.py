@@ -997,3 +997,38 @@ class TestOrdering(unittest.TestCase):
         tokens_equal = [Token(1), Token(1)]
         check_sequence_consistency(self, tokens)
         check_sequence_consistency(self, tokens_equal, equal=True)
+
+    def test_timeuuid_comparison(self):
+        """
+        Test TimeUUID is compared just as Cassandra does
+        If first compares the timestamps,
+        then the last 64 bits interpreted as a signed int
+
+        @jira_ticket PYTHON-1358
+        @expected_result The TimeUUID from 2023-06-19 23:49:56.990000+0000
+        should be smaller than the one from 2023-06-19 23:49:59.961000+0000
+
+        @test_category data_types
+        """
+        time1 = datetime.datetime(2023, 6, 19, 23, 49, 56, 990000)
+        time2 = datetime.datetime(2023, 6, 19, 23, 49, 59, 961000)
+        timeuuid1 = util.uuid_from_time(time1)
+        timeuuid2 = util.uuid_from_time(time2)
+        self.assertTrue(timeuuid1 < timeuuid2)
+        
+    def test_timeuuid_with_same_time(self):
+        """
+        Test TimeUUID is compared just as Cassandra does
+        If first compares the timestamps,
+        then the last 64 bits interpreted as a signed int
+
+        @jira_ticket PYTHON-1358
+        @expected_result The min TimeUUID should be smaller than 
+        the max TimeUUID with the same timestamp
+
+        @test_category data_types
+        """
+        timestamp = 1693776594
+        min_timeuuid = util.min_uuid_from_time(timestamp)
+        max_timeuuid = util.max_uuid_from_time(timestamp)
+        self.assertTrue(min_timeuuid < max_timeuuid)
