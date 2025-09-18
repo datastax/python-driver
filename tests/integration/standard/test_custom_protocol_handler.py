@@ -73,7 +73,7 @@ class CustomProtocolHandlerTest(unittest.TestCase):
         uuid_type = result[0][0]
         self.assertEqual(type(uuid_type), uuid.UUID)
 
-        # use our custom protocol handlder
+        # use our custom protocol handler
         session.client_protocol_handler = CustomTestRawRowType
         result_set = session.execute("SELECT schema_version FROM system.local")
         raw_value = result_set[0][0]
@@ -271,7 +271,7 @@ class CustomResultMessageRaw(ResultMessage):
 
 class CustomTestRawRowType(ProtocolHandler):
     """
-    This is the a custom protocol handler that will substitute the the
+    This is a custom protocol handler that will substitute the
     customResultMesageRowRaw Result message for our own implementation
     """
     my_opcodes = ProtocolHandler.message_types_by_opcode.copy()
@@ -281,7 +281,7 @@ class CustomTestRawRowType(ProtocolHandler):
 
 class CustomResultMessageTracked(ResultMessage):
     """
-    This is a custom Result Message that is use to track what primitive types
+    This is a custom Result Message that is used to track what primitive types
     have been processed when it receives results
     """
     my_type_codes = ResultMessage.type_codes.copy()
@@ -305,7 +305,7 @@ class CustomResultMessageTracked(ResultMessage):
 
 class CustomProtocolHandlerResultMessageTracked(ProtocolHandler):
     """
-    This is the a custom protocol handler that will substitute the the
+    This is a custom protocol handler that will substitute the
     CustomTestRawRowTypeTracked Result message for our own implementation
     """
     my_opcodes = ProtocolHandler.message_types_by_opcode.copy()

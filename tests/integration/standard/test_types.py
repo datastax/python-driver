@@ -14,9 +14,17 @@
 
 import unittest
 
-from datetime import datetime
 import ipaddress
 import math
+import random
+import string
+import socket
+import uuid
+
+from datetime import datetime, date, time, timedelta
+from decimal import Decimal
+from functools import partial
+
 from packaging.version import Version
 
 import cassandra
@@ -31,7 +39,7 @@ from tests.unit.cython.utils import cythontest
 
 from tests.integration import use_singledc, execute_until_pass, notprotocolv1, \
     BasicSharedKeyspaceUnitTestCase, greaterthancass21, lessthancass30, greaterthanorequaldse51, \
-    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster
+    DSE_VERSION, greaterthanorequalcass3_10, requiredse, TestCluster, greaterthanorequalcass50
 from tests.integration.datatype_utils import update_datatypes, PRIMITIVE_DATATYPES, COLLECTION_TYPES, PRIMITIVE_DATATYPES_KEYS, \
     get_sample, get_all_samples, get_collection_sample
 
@@ -1291,3 +1299,180 @@ class TypeTestsProtocol(BasicSharedKeyspaceUnitTestCase):
 
         finally:
             session.cluster.shutdown()
+
+@greaterthanorequalcass50
+class TypeTestsVector(BasicSharedKeyspaceUnitTestCase):
+
+    def _get_first_j(self, rs):
+        rows = rs.all()
+        self.assertEqual(len(rows), 1)
+        return rows[0].j
+
+    def _get_row_simple(self, idx, table_name):
+        rs = self.session.execute("select j from {0}.{1} where i = {2}".format(self.keyspace_name, table_name, idx))
+        return self._get_first_j(rs)
+
+    def _get_row_prepared(self, idx, table_name):
+        cql = "select j from {0}.{1} where i = ?".format(self.keyspace_name, table_name)
+        ps = self.session.prepare(cql)
+        rs = self.session.execute(ps, [idx])
+        return self._get_first_j(rs)
+
+    def _round_trip_test(self, subtype, subtype_fn, test_fn, use_positional_parameters=True):
+
+        table_name = subtype.replace("<","A").replace(">", "B").replace(",", "C") + "isH"
+
+        def random_subtype_vector():
+            return [subtype_fn() for _ in range(3)]
+
+        ddl = """CREATE TABLE {0}.{1} (
+                    i int PRIMARY KEY,
+                    j vector<{2}, 3>)""".format(self.keyspace_name, table_name, subtype)
+        self.session.execute(ddl)
+
+        if use_positional_parameters:
+            cql = "insert into {0}.{1} (i,j) values (%s,%s)".format(self.keyspace_name, table_name)
+            expected1 = random_subtype_vector()
+            data1 = {1:random_subtype_vector(), 2:expected1, 3:random_subtype_vector()}
+            for k,v in data1.items():
+                # Attempt a set of inserts using the driver's support for positional params
+                self.session.execute(cql, (k,v))
+
+        cql = "insert into {0}.{1} (i,j) values (?,?)".format(self.keyspace_name, table_name)
+        expected2 = random_subtype_vector()
+        ps = self.session.prepare(cql)
+        data2 = {4:random_subtype_vector(), 5:expected2, 6:random_subtype_vector()}
+        for k,v in data2.items():
+            # Add some additional rows via prepared statements
+            self.session.execute(ps, [k,v])
+
+        # Use prepared queries to gather data from the rows we added via simple queries and vice versa
+        if use_positional_parameters:
+            observed1 = self._get_row_prepared(2, table_name)
+            for idx in range(0, 3):
+                test_fn(observed1[idx], expected1[idx])
+
+        observed2 = self._get_row_simple(5, table_name)
+        for idx in range(0, 3):
+            test_fn(observed2[idx], expected2[idx])
+
+    def test_round_trip_integers(self):
+        self._round_trip_test("int", partial(random.randint, 0, 2 ** 31), self.assertEqual)
+        self._round_trip_test("bigint", partial(random.randint, 0, 2 ** 63), self.assertEqual)
+        self._round_trip_test("smallint", partial(random.randint, 0, 2 ** 15), self.assertEqual)
+        self._round_trip_test("tinyint", partial(random.randint, 0, (2 ** 7) - 1), self.assertEqual)
+        self._round_trip_test("varint", partial(random.randint, 0, 2 ** 63), self.assertEqual)
+
+    def test_round_trip_floating_point(self):
+        _almost_equal_test_fn = partial(self.assertAlmostEqual, places=5)
+        def _random_decimal():
+            return Decimal(random.uniform(0.0, 100.0))
+
+        # Max value here isn't really connected to max value for floating point nums in IEEE 754... it's used here
+        # mainly as a convenient benchmark
+        self._round_trip_test("float", partial(random.uniform, 0.0, 100.0), _almost_equal_test_fn)
+        self._round_trip_test("double", partial(random.uniform, 0.0, 100.0), _almost_equal_test_fn)
+        self._round_trip_test("decimal", _random_decimal, _almost_equal_test_fn)
+
+    def test_round_trip_text(self):
+        def _random_string():
+            return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(24))
+
+        self._round_trip_test("ascii", _random_string, self.assertEqual)
+        self._round_trip_test("text", _random_string, self.assertEqual)
+
+    def test_round_trip_date_and_time(self):
+        _almost_equal_test_fn = partial(self.assertAlmostEqual, delta=timedelta(seconds=1))
+        def _random_datetime():
+            return datetime.today() - timedelta(hours=random.randint(0,18), days=random.randint(1,1000))
+        def _random_date():
+            return _random_datetime().date()
+        def _random_time():
+            return _random_datetime().time()
+
+        self._round_trip_test("date", _random_date, self.assertEqual)
+        self._round_trip_test("time", _random_time, self.assertEqual)
+        self._round_trip_test("timestamp", _random_datetime, _almost_equal_test_fn)
+
+    def test_round_trip_uuid(self):
+        self._round_trip_test("uuid", uuid.uuid1, self.assertEqual)
+        self._round_trip_test("timeuuid", uuid.uuid1, self.assertEqual)
+
+    def test_round_trip_miscellany(self):
+        def _random_bytes():
+            return random.getrandbits(32).to_bytes(4,'big')
+        def _random_boolean():
+            return random.choice([True, False])
+        def _random_duration():
+            return Duration(random.randint(0,11), random.randint(0,11), random.randint(0,10000))
+        def _random_inet():
+            return socket.inet_ntoa(_random_bytes())
+
+        self._round_trip_test("boolean", _random_boolean, self.assertEqual)
+        self._round_trip_test("duration", _random_duration, self.assertEqual)
+        self._round_trip_test("inet", _random_inet, self.assertEqual)
+        self._round_trip_test("blob", _random_bytes, self.assertEqual)
+
+    def test_round_trip_collections(self):
+        def _random_seq():
+            return [random.randint(0,100000) for _ in range(8)]
+        def _random_set():
+            return set(_random_seq())
+        def _random_map():
+            return {k:v for (k,v) in zip(_random_seq(), _random_seq())}
+
+        # Goal here is to test collections of both fixed and variable size subtypes
+        self._round_trip_test("list<int>", _random_seq, self.assertEqual)
+        self._round_trip_test("list<varint>", _random_seq, self.assertEqual)
+        self._round_trip_test("set<int>", _random_set, self.assertEqual)
+        self._round_trip_test("set<varint>", _random_set, self.assertEqual)
+        self._round_trip_test("map<int,int>", _random_map, self.assertEqual)
+        self._round_trip_test("map<int,varint>", _random_map, self.assertEqual)
+        self._round_trip_test("map<varint,int>", _random_map, self.assertEqual)
+        self._round_trip_test("map<varint,varint>", _random_map, self.assertEqual)
+
+    def test_round_trip_vector_of_vectors(self):
+        def _random_vector():
+            return [random.randint(0,100000) for _ in range(2)]
+
+        self._round_trip_test("vector<int,2>", _random_vector, self.assertEqual)
+        self._round_trip_test("vector<varint,2>", _random_vector, self.assertEqual)
+
+    def test_round_trip_tuples(self):
+        def _random_tuple():
+            return (random.randint(0,100000),random.randint(0,100000))
+
+        # Unfortunately we can't use positional parameters when inserting tuples because the driver will try to encode
+        # them as lists before sending them to the server... and that confuses the parsing logic.
+        self._round_trip_test("tuple<int,int>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+        self._round_trip_test("tuple<int,varint>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+        self._round_trip_test("tuple<varint,int>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+        self._round_trip_test("tuple<varint,varint>", _random_tuple, self.assertEqual, use_positional_parameters=False)
+
+    def test_round_trip_udts(self):
+        def _udt_equal_test_fn(udt1, udt2):
+            self.assertEqual(udt1.a, udt2.a)
+            self.assertEqual(udt1.b, udt2.b)
+
+        self.session.execute("create type {}.fixed_type (a int, b int)".format(self.keyspace_name))
+        self.session.execute("create type {}.mixed_type_one (a int, b varint)".format(self.keyspace_name))
+        self.session.execute("create type {}.mixed_type_two (a varint, b int)".format(self.keyspace_name))
+        self.session.execute("create type {}.var_type (a varint, b varint)".format(self.keyspace_name))
+
+        class GeneralUDT:
+            def __init__(self, a, b):
+                self.a = a
+                self.b = b
+
+        self.cluster.register_user_type(self.keyspace_name,'fixed_type', GeneralUDT)
+        self.cluster.register_user_type(self.keyspace_name,'mixed_type_one', GeneralUDT)
+        self.cluster.register_user_type(self.keyspace_name,'mixed_type_two', GeneralUDT)
+        self.cluster.register_user_type(self.keyspace_name,'var_type', GeneralUDT)
+
+        def _random_udt():
+            return GeneralUDT(random.randint(0,100000),random.randint(0,100000))
+
+        self._round_trip_test("fixed_type", _random_udt, _udt_equal_test_fn)
+        self._round_trip_test("mixed_type_one", _random_udt, _udt_equal_test_fn)
+        self._round_trip_test("mixed_type_two", _random_udt, _udt_equal_test_fn)
+        self._round_trip_test("var_type", _random_udt, _udt_equal_test_fn)

@@ -15,6 +15,7 @@ Matrix Types:
   Full: All server versions, python runtimes tested with and without Cython.
   Cassandra: All cassandra server versions.
   Dse: All dse server versions.
+  Hcd: All hcd server versions.
   Smoke: CI-friendly configurations. Currently-supported Python version + modern Cassandra/DSE instances.
          We also avoid cython since it's tested as part of the nightlies
 
@@ -30,9 +31,10 @@ import com.datastax.jenkins.drivers.python.Slack
 
 slack = new Slack()
 
-DEFAULT_CASSANDRA = ['3.0', '3.11', '4.0', '4.1', '5.0-beta1']
-DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30']
-DEFAULT_RUNTIME = ['3.8.16', '3.9.16', '3.10.11', '3.11.3', '3.12.0']
+DEFAULT_CASSANDRA = ['3.11', '4.0', '4.1', '5.0']
+DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30', 'dse-6.9.0']
+DEFAULT_HCD = ['hcd-1.0.0']
+DEFAULT_RUNTIME = ['3.9.23', '3.10.18', '3.11.13', '3.12.11', '3.13.5']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
@@ -51,7 +53,7 @@ matrices = [
     "CYTHON": DEFAULT_CYTHON
   ],
   "SMOKE": [
-    "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(1),
+    "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(2) + DEFAULT_HCD.takeRight(1),
     "RUNTIME": DEFAULT_RUNTIME.take(1) + DEFAULT_RUNTIME.takeRight(1),
     "CYTHON": ["True"]
   ]
@@ -226,6 +228,19 @@ CCM_BRANCH=${DSE_FIXED_VERSION}
 DSE_BRANCH=${DSE_FIXED_VERSION}
 ENVIRONMENT_EOF
       '''
+  } else if (env.CASSANDRA_VERSION.split('-')[0] == 'hcd') {
+    env.HCD_FIXED_VERSION = env.CASSANDRA_VERSION.split('-')[1]
+    sh label: 'Update environment for DataStax Enterprise', script: '''#!/bin/bash -le
+        cat >> ${HOME}/environment.txt << ENVIRONMENT_EOF
+CCM_CASSANDRA_VERSION=${HCD_FIXED_VERSION} # maintain for backwards compatibility
+CCM_VERSION=${HCD_FIXED_VERSION}
+CCM_SERVER_TYPE=hcd
+HCD_VERSION=${HCD_FIXED_VERSION}
+CCM_IS_HCD=true
+CCM_BRANCH=${HCD_FIXED_VERSION}
+HCD_BRANCH=${HCD_FIXED_VERSION}
+ENVIRONMENT_EOF
+      '''
   }
 
   sh label: 'Display Python and environment information', script: '''#!/bin/bash -le
@@ -276,13 +291,13 @@ def executeStandardTests() {
     jabba use 1.8
 
     SIMULACRON_JAR="${HOME}/simulacron.jar"
-    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_results.xml tests/integration/simulacron/ || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_results.xml tests/integration/simulacron/ || true
 
     # Run backpressure tests separately to avoid memory issue
-    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_1_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_paused_connections || true
-    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_2_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_queued_requests_timeout || true
-    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_3_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_cluster_busy || true
-    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_4_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_node_busy || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_1_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_paused_connections || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_2_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_queued_requests_timeout || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_3_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_cluster_busy || true
+    SIMULACRON_JAR=${SIMULACRON_JAR} EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=test_backpressure.py --junit-xml=simulacron_backpressure_4_results.xml tests/integration/simulacron/test_backpressure.py:TCPBackpressureTests.test_node_busy || true
   '''
 
   sh label: 'Execute CQL engine integration tests', script: '''#!/bin/bash -lex
@@ -294,7 +309,7 @@ def executeStandardTests() {
     . ${JABBA_SHELL}
     jabba use 1.8
 
-    EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=cqle_results.xml tests/integration/cqlengine/ || true
+    EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=cqle_results.xml tests/integration/cqlengine/ || true
   '''
 
   sh label: 'Execute Apache CassandraⓇ integration tests', script: '''#!/bin/bash -lex
@@ -306,7 +321,7 @@ def executeStandardTests() {
     . ${JABBA_SHELL}
     jabba use 1.8
 
-    EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=standard_results.xml tests/integration/standard/ || true
+    EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=standard_results.xml tests/integration/standard/ || true
   '''
 
   if (env.CASSANDRA_VERSION.split('-')[0] == 'dse' && env.CASSANDRA_VERSION.split('-')[1] != '4.8') {
@@ -323,7 +338,7 @@ def executeStandardTests() {
         . ${JABBA_SHELL}
         jabba use 1.8
 
-        EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} DSE_VERSION=${DSE_VERSION} ADS_HOME="${HOME}/" VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=dse_results.xml tests/integration/advanced/ || true
+        EVENT_LOOP=${EVENT_LOOP} CASSANDRA_DIR=${CCM_INSTALL_DIR} DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} ADS_HOME="${HOME}/" VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=dse_results.xml tests/integration/advanced/ || true
       '''
     }
   }
@@ -350,7 +365,7 @@ def executeStandardTests() {
       . ${JABBA_SHELL}
       jabba use 1.8
 
-      EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=tests/integration/long/upgrade --junit-xml=long_results.xml tests/integration/long/ || true
+      EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --ignore=tests/integration/long/upgrade --junit-xml=long_results.xml tests/integration/long/ || true
     '''
   }
 }
@@ -389,7 +404,7 @@ def executeEventLoopTests() {
       "tests/integration/simulacron/test_endpoint.py"
       "tests/integration/long/test_ssl.py"
     )
-    EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=standard_results.xml ${EVENT_LOOP_TESTS[@]} || true
+    EVENT_LOOP=${EVENT_LOOP} CCM_ARGS="${CCM_ARGS}" DSE_VERSION=${DSE_VERSION} HCD_VERSION=${HCD_VERSION} CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=standard_results.xml ${EVENT_LOOP_TESTS[@]} || true
   '''
 }
 
@@ -496,7 +511,7 @@ pipeline {
                       </table>''')
     choice(
       name: 'MATRIX',
-      choices: ['DEFAULT', 'SMOKE', 'FULL', 'CASSANDRA', 'DSE'],
+      choices: ['DEFAULT', 'SMOKE', 'FULL', 'CASSANDRA', 'DSE', 'HCD'],
       description: '''<p>The matrix for the build.</p>
                       <table style="width:100%">
                         <col width="25%">
@@ -525,6 +540,10 @@ pipeline {
                           <td><strong>DSE</strong></td>
                           <td>All dse server versions.</td>
                         </tr>
+                        <tr>
+                          <td><strong>HCD</strong></td>
+                          <td>All hcd server versions.</td>
+                        </tr>
                       </table>''')
     choice(
       name: 'PYTHON_VERSION',
@@ -532,7 +551,7 @@ pipeline {
       description: 'Python runtime version. Default to the build context.')
     choice(
       name: 'SERVER_VERSION',
-      choices: ['DEFAULT'] + DEFAULT_CASSANDRA + DEFAULT_DSE,
+      choices: ['DEFAULT'] + DEFAULT_CASSANDRA + DEFAULT_DSE + DEFAULT_HCD,
       description: '''Apache CassandraⓇ and DataStax Enterprise server version to use for adhoc <b>BUILD-AND-EXECUTE-TESTS</b> <strong>ONLY!</strong>
                       <table style="width:100%">
                         <col width="15%">
@@ -558,8 +577,8 @@ pipeline {
                           <td>Apache CassandraⓇ v4.0.x</td>
                         </tr>
                         <tr>
-                          <td><strong>5.0-beta1</strong></td>
-                          <td>Apache CassandraⓇ v5.0-beta1</td>
+                          <td><strong>5.0</strong></td>
+                          <td>Apache CassandraⓇ v5.0.x</td>
                         </tr>
                         <tr>
                           <td><strong>dse-5.1.35</strong></td>
@@ -567,7 +586,15 @@ pipeline {
                         </tr>
                         <tr>
                           <td><strong>dse-6.8.30</strong></td>
-                          <td>DataStax Enterprise v6.8.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
+                          <td>DataStax Enterprise v6.8.x</td>
+                        </tr>
+                        <tr>
+                          <td><strong>dse-6.9.0</strong></td>
+                          <td>DataStax Enterprise v6.9.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
+                        </tr>
+                        <tr>
+                          <td><strong>hcd-1.0.0</strong></td>
+                          <td>DataStax HCD v1.0.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
                         </tr>
                       </table>''')
     choice(
@@ -647,13 +674,13 @@ pipeline {
   triggers {
     parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? """
       # Every weeknight (Monday - Friday) around 4:00 AM
-      # These schedules will run with and without Cython enabled for Python 3.8.16 and 3.12.0
-      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.8.16 3.12.0;CI_SCHEDULE_SERVER_VERSION=3.11 4.0 5.0-beta1 dse-5.1.35 dse-6.8.30
+      # These schedules will run with and without Cython enabled for Python 3.9.23 and 3.13.5
+      H 4 * * 1-5 %CI_SCHEDULE=WEEKNIGHTS;EVENT_LOOP=LIBEV;CI_SCHEDULE_PYTHON_VERSION=3.9.23 3.13.5;CI_SCHEDULE_SERVER_VERSION=3.11 4.0 5.0 dse-5.1.35 dse-6.8.30 dse-6.9.0 hcd-1.0.0
     """ : "")
   }
 
   environment {
-    OS_VERSION = 'ubuntu/bionic64/python-driver'
+    OS_VERSION = 'ubuntu/focal64/python-driver'
     CCM_ENVIRONMENT_SHELL = '/usr/local/bin/ccm_environment.sh'
     CCM_MAX_HEAP_SIZE = '1536M'
     JABBA_SHELL = '/usr/lib/jabba/jabba.sh'

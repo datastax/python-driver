@@ -20,7 +20,7 @@ import uuid
 from binascii import unhexlify
 
 import cassandra
-from cassandra import util, VectorDeserializationFailure
+from cassandra import util
 from cassandra.cqltypes import (
     CassandraType, DateRangeType, DateType, DecimalType,
     EmptyValue, LongType, SetType, UTF8Type,
@@ -196,6 +196,16 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(3, ctype.vector_size)
         self.assertEqual(FloatType, ctype.subtype)
 
+    def test_parse_casstype_vector_of_vectors(self):
+        inner_type = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)"
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
+        self.assertTrue(issubclass(ctype, VectorType))
+        self.assertEqual(3, ctype.vector_size)
+        sub_ctype = ctype.subtype
+        self.assertTrue(issubclass(sub_ctype, VectorType))
+        self.assertEqual(4, sub_ctype.vector_size)
+        self.assertEqual(FloatType, sub_ctype.subtype)
+
     def test_empty_value(self):
         self.assertEqual(str(EmptyValue()), 'EMPTY')
 
@@ -309,8 +319,44 @@ class TypeTests(unittest.TestCase):
         self.assertEqual(cql_quote('test'), "'test'")
         self.assertEqual(cql_quote(0), '0')
 
-    def test_vector_round_trip_types_with_serialized_size(self):
-        # Test all the types which specify a serialized size... see PYTHON-1371 for details
+
+class VectorTests(unittest.TestCase):
+    def _normalize_set(self, val):
+        if isinstance(val, set) or isinstance(val, util.SortedSet):
+            return frozenset([self._normalize_set(v) for v in val])
+        return val
+
+    def _round_trip_compare_fn(self, first, second):
+        if isinstance(first, float):
+            self.assertAlmostEqual(first, second, places=5)
+        elif isinstance(first, list):
+            self.assertEqual(len(first), len(second))
+            for (felem, selem) in zip(first, second):
+                self._round_trip_compare_fn(felem, selem)
+        elif isinstance(first, set) or isinstance(first, frozenset):
+            self.assertEqual(len(first), len(second))
+            first_norm = self._normalize_set(first)
+            second_norm = self._normalize_set(second)
+            self.assertEqual(first_norm, second_norm)
+        elif isinstance(first, dict):
+            for ((fk,fv), (sk,sv)) in zip(first.items(), second.items()):
+                self._round_trip_compare_fn(fk, sk)
+                self._round_trip_compare_fn(fv, sv)
+        else:
+            self.assertEqual(first,second)
+
+    def _round_trip_test(self, data, ctype_str):
+        ctype = parse_casstype_args(ctype_str)
+        data_bytes = ctype.serialize(data, 0)
+        serialized_size = ctype.subtype.serial_size()
+        if serialized_size:
+            self.assertEqual(serialized_size * len(data), len(data_bytes))
+        result = ctype.deserialize(data_bytes, 0)
+        self.assertEqual(len(data), len(result))
+        for idx in range(0,len(data)):
+            self._round_trip_compare_fn(data[idx], result[idx])
+
+    def test_round_trip_basic_types_with_fixed_serialized_size(self):
         self._round_trip_test([True, False, False, True], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.BooleanType, 4)")
         self._round_trip_test([3.4, 2.9, 41.6, 12.0], \
@@ -325,55 +371,151 @@ class TypeTests(unittest.TestCase):
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.TimeUUIDType, 4)")
         self._round_trip_test([3, 2, 41, 12], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ShortType, 4)")
+
+    def test_round_trip_basic_types_without_fixed_serialized_size(self):
+        # Varints
+        self._round_trip_test([3, 2, 41, 12], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        # ASCII text
+        self._round_trip_test(["abc", "def", "ghi", "jkl"], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.AsciiType, 4)")
+        # UTF8 text
+        self._round_trip_test(["abc", "def", "ghi", "jkl"], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.UTF8Type, 4)")
+        # Time is something of a weird one.  By rights, it should be a fixed size type but C* code marks it as variable
+        # size.  We're forced to follow the C* code base (since that's who'll be providing the data we're parsing) so
+        # we match what they're doing.
         self._round_trip_test([datetime.time(1,1,1), datetime.time(2,2,2), datetime.time(3,3,3)], \
             "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.TimeType, 3)")
+        # Duration (contains varints)
+        self._round_trip_test([util.Duration(1,1,1), util.Duration(2,2,2), util.Duration(3,3,3)], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.DurationType, 3)")
 
-    def test_vector_round_trip_types_without_serialized_size(self):
-        # Test all the types which do not specify a serialized size... see PYTHON-1371 for details
-        # Varints
-        with self.assertRaises(VectorDeserializationFailure):
-            self._round_trip_test([3, 2, 41, 12], \
-                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
-        # ASCII text
-        with self.assertRaises(VectorDeserializationFailure):
-            self._round_trip_test(["abc", "def", "ghi", "jkl"], \
-                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.AsciiType, 4)")
-        # UTF8 text
-        with self.assertRaises(VectorDeserializationFailure):
-            self._round_trip_test(["abc", "def", "ghi", "jkl"], \
-                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.UTF8Type, 4)")
-        # Duration (containts varints)
-        with self.assertRaises(VectorDeserializationFailure):
-            self._round_trip_test([util.Duration(1,1,1), util.Duration(2,2,2), util.Duration(3,3,3)], \
-                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.DurationType, 3)")
-        # List (of otherwise serializable type)
-        with self.assertRaises(VectorDeserializationFailure):
-            self._round_trip_test([[3.4], [2.9], [41.6], [12.0]], \
-                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ListType(org.apache.cassandra.db.marshal.FloatType), 4)")
-        # Set (of otherwise serializable type)
-        with self.assertRaises(VectorDeserializationFailure):
-            self._round_trip_test([set([3.4]), set([2.9]), set([41.6]), set([12.0])], \
-                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.SetType(org.apache.cassandra.db.marshal.FloatType), 4)")
-        # Map (of otherwise serializable types)
-        with self.assertRaises(VectorDeserializationFailure):
-            self._round_trip_test([{1:3.4}, {2:2.9}, {3:41.6}, {4:12.0}], \
+    def test_round_trip_collection_types(self):
+        # List (subtype of fixed size)
+        self._round_trip_test([[1, 2, 3, 4], [5, 6], [7, 8, 9, 10], [11, 12]], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ListType \
+                (org.apache.cassandra.db.marshal.Int32Type), 4)")
+        # Set (subtype of fixed size)
+        self._round_trip_test([set([1, 2, 3, 4]), set([5, 6]), set([7, 8, 9, 10]), set([11, 12])], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.SetType \
+                (org.apache.cassandra.db.marshal.Int32Type), 4)")
+        # Map (subtype of fixed size)
+        self._round_trip_test([{1:1.2}, {2:3.4}, {3:5.6}, {4:7.8}], \
                 "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.MapType \
                     (org.apache.cassandra.db.marshal.Int32Type,org.apache.cassandra.db.marshal.FloatType), 4)")
+        # List (subtype without fixed size)
+        self._round_trip_test([["one","two"], ["three","four"], ["five","six"], ["seven","eight"]], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ListType \
+                (org.apache.cassandra.db.marshal.AsciiType), 4)")
+        # Set (subtype without fixed size)
+        self._round_trip_test([set(["one","two"]), set(["three","four"]), set(["five","six"]), set(["seven","eight"])], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.SetType \
+                (org.apache.cassandra.db.marshal.AsciiType), 4)")
+        # Map (subtype without fixed size)
+        self._round_trip_test([{1:"one"}, {2:"two"}, {3:"three"}, {4:"four"}], \
+                "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.MapType \
+                    (org.apache.cassandra.db.marshal.IntegerType,org.apache.cassandra.db.marshal.AsciiType), 4)")
+        # List of lists (subtype without fixed size)
+        data = [[["one","two"],["three"]], [["four"],["five"]], [["six","seven","eight"]], [["nine"]]]
+        ctype = "org.apache.cassandra.db.marshal.VectorType\
+                    (org.apache.cassandra.db.marshal.ListType\
+                        (org.apache.cassandra.db.marshal.ListType\
+                            (org.apache.cassandra.db.marshal.AsciiType)), 4)"
+        self._round_trip_test(data, ctype)
+        # Set of sets (subtype without fixed size)
+        data = [set([frozenset(["one","two"]),frozenset(["three"])]),\
+                set([frozenset(["four"]),frozenset(["five"])]),\
+                set([frozenset(["six","seven","eight"])]),
+                set([frozenset(["nine"])])]
+        ctype = "org.apache.cassandra.db.marshal.VectorType\
+                    (org.apache.cassandra.db.marshal.SetType\
+                        (org.apache.cassandra.db.marshal.SetType\
+                            (org.apache.cassandra.db.marshal.AsciiType)), 4)"
+        self._round_trip_test(data, ctype)
+        # Map of maps (subtype without fixed size)
+        data = [{100:{1:"one",2:"two",3:"three"}},\
+                {200:{4:"four",5:"five"}},\
+                {300:{}},\
+                {400:{6:"six"}}]
+        ctype = "org.apache.cassandra.db.marshal.VectorType\
+                    (org.apache.cassandra.db.marshal.MapType\
+                        (org.apache.cassandra.db.marshal.Int32Type,\
+                        org.apache.cassandra.db.marshal.MapType \
+                            (org.apache.cassandra.db.marshal.IntegerType,org.apache.cassandra.db.marshal.AsciiType)), 4)"
+        self._round_trip_test(data, ctype)
 
-    def _round_trip_test(self, data, ctype_str):
-        ctype = parse_casstype_args(ctype_str)
-        data_bytes = ctype.serialize(data, 0)
-        serialized_size = getattr(ctype.subtype, "serial_size", None)
-        if serialized_size:
-            self.assertEqual(serialized_size * len(data), len(data_bytes))
-        result = ctype.deserialize(data_bytes, 0)
-        self.assertEqual(len(data), len(result))
-        for idx in range(0,len(data)):
-            self.assertAlmostEqual(data[idx], result[idx], places=5)
+    def test_round_trip_vector_of_vectors(self):
+        # Subytpes of subtypes with a fixed size
+        self._round_trip_test([[1.2, 3.4], [5.6, 7.8], [9.10, 11.12], [13.14, 15.16]], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.VectorType \
+                (org.apache.cassandra.db.marshal.FloatType,2), 4)")
 
-    def test_vector_cql_parameterized_type(self):
+        # Subytpes of subtypes without a fixed size
+        self._round_trip_test([["one", "two"], ["three", "four"], ["five", "six"], ["seven", "eight"]], \
+            "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.VectorType \
+                (org.apache.cassandra.db.marshal.AsciiType,2), 4)")
+
+    # parse_casstype_args() is tested above... we're explicitly concerned about cql_parameterized_type() output here
+    def test_cql_parameterized_type(self):
+        # Base vector functionality
         ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
         self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<float, 4>")
+
+        # Test vector-of-vectors
+        inner_type = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)"
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(%s, 3)" % (inner_type))
+        inner_parsed_type = "org.apache.cassandra.db.marshal.VectorType<float, 4>"
+        self.assertEqual(ctype.cql_parameterized_type(), "org.apache.cassandra.db.marshal.VectorType<%s, 3>" % (inner_parsed_type))
+
+    def test_serialization_fixed_size_too_small(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 5 for vector of type float and dimension 5, observed sequence of length 4"):
+            ctype.serialize([1.2, 3.4, 5.6, 7.8], 0)
+
+    def test_serialization_fixed_size_too_big(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 4 for vector of type float and dimension 4, observed sequence of length 5"):
+            ctype.serialize([1.2, 3.4, 5.6, 7.8, 9.10], 0)
+
+    def test_serialization_variable_size_too_small(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 5 for vector of type varint and dimension 5, observed sequence of length 4"):
+            ctype.serialize([1, 2, 3, 4], 0)
+
+    def test_serialization_variable_size_too_big(self):
+        ctype = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        with self.assertRaisesRegex(ValueError, "Expected sequence of size 4 for vector of type varint and dimension 4, observed sequence of length 5"):
+            ctype.serialize([1, 2, 3, 4, 5], 0)
+
+    def test_deserialization_fixed_size_too_small(self):
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        ctype_four_bytes = ctype_four.serialize([1.2, 3.4, 5.6, 7.8], 0)
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
+        with self.assertRaisesRegex(ValueError, "Expected vector of type float and dimension 5 to have serialized size 20; observed serialized size of 16 instead"):
+            ctype_five.deserialize(ctype_four_bytes, 0)
+
+    def test_deserialization_fixed_size_too_big(self):
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 5)")
+        ctype_five_bytes = ctype_five.serialize([1.2, 3.4, 5.6, 7.8, 9.10], 0)
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 4)")
+        with self.assertRaisesRegex(ValueError, "Expected vector of type float and dimension 4 to have serialized size 16; observed serialized size of 20 instead"):
+            ctype_four.deserialize(ctype_five_bytes, 0)
+
+    def test_deserialization_variable_size_too_small(self):
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        ctype_four_bytes = ctype_four.serialize([1, 2, 3, 4], 0)
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
+        with self.assertRaisesRegex(ValueError, "Error reading additional data during vector deserialization after successfully adding 4 elements"):
+            ctype_five.deserialize(ctype_four_bytes, 0)
+
+    def test_deserialization_variable_size_too_big(self):
+        ctype_five = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 5)")
+        ctype_five_bytes = ctype_five.serialize([1, 2, 3, 4, 5], 0)
+        ctype_four = parse_casstype_args("org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.IntegerType, 4)")
+        with self.assertRaisesRegex(ValueError, "Additional bytes remaining after vector deserialization completed"):
+            ctype_four.deserialize(ctype_five_bytes, 0)
+
 
 ZERO = datetime.timedelta(0)
 
@@ -772,7 +914,7 @@ class DateRangeDeserializationTests(unittest.TestCase):
                                                999,
                                      lambda original_value, i: original_value + i * 900 * 50 * 60 * 24)
 
-    @unittest.skip("This is currently failig, see PYTHON-912")
+    @unittest.skip("This is currently failing, see PYTHON-912")
     def test_deserialize_date_range_month(self):
         """
         Test rounding from DateRange for months
@@ -789,7 +931,7 @@ class DateRangeDeserializationTests(unittest.TestCase):
             but with the microseconds set to 999999, seconds to 59, minutes to 59, hours to 23
             and days 28, 29, 30 or 31 depending on the month.
             The way to do this is to add one month and leave the date at YEAR-MONTH-01 00:00:00 000000.
-            Then substract one millisecond.
+            Then subtract one millisecond.
             """
             dt = datetime.datetime.fromtimestamp(seconds / 1000.0, tz=utc_timezone)
             dt = dt + datetime.timedelta(days=32)
@@ -816,7 +958,7 @@ class DateRangeDeserializationTests(unittest.TestCase):
             but with the microseconds set to 999999, seconds to 59, minutes to 59, hours to 23
             days 28, 29, 30 or 31 depending on the month and months to 12.
             The way to do this is to add one year and leave the date at YEAR-01-01 00:00:00 000000.
-            Then substract one millisecond.
+            Then subtract one millisecond.
             """
             dt = datetime.datetime.fromtimestamp(seconds / 1000.0, tz=utc_timezone)
             dt = dt + datetime.timedelta(days=370)
@@ -838,14 +980,14 @@ class DateRangeDeserializationTests(unittest.TestCase):
         lower_value upper_value which are given as a value that represents seconds since the epoch.
         We want to make sure the lower_value is correctly rounded down and the upper value is correctly rounded up.
         In the case of rounding down we verify that the rounded down value
-        has the appropriate fields set to the minimum they could possible have. That is
+        has the appropriate fields set to the minimum they could possibly have. That is
         1 for months, 1 for days, 0 for hours, 0 for minutes, 0 for seconds, 0 for microseconds.
         We use the generic function truncate_date which depends on truncate_kwargs for this
 
         In the case of rounding up we verify that the rounded up value has the appropriate fields set
-        to the maximum they could possible have. This is calculated by round_up_truncated_upper_value
+        to the maximum they could possibly have. This is calculated by round_up_truncated_upper_value
         which input is the truncated value from before. It is passed as an argument as the way
-        of calculating this is is different for every precision.
+        of calculating this is different for every precision.
 
         :param truncate_kwargs: determine what values to truncate in truncate_date
         :param precision: :class:`~util.DateRangePrecision`

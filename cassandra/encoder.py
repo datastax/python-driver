@@ -21,6 +21,7 @@ import logging
 log = logging.getLogger(__name__)
 
 from binascii import hexlify
+from decimal import Decimal
 import calendar
 import datetime
 import math
@@ -59,6 +60,7 @@ class Encoder(object):
     def __init__(self):
         self.mapping = {
             float: self.cql_encode_float,
+            Decimal: self.cql_encode_decimal,
             bytearray: self.cql_encode_bytes,
             str: self.cql_encode_str,
             int: self.cql_encode_object,
@@ -217,3 +219,6 @@ class Encoder(object):
         is suitable for ``inet`` type columns.
         """
         return "'%s'" % val.compressed
+
+    def cql_encode_decimal(self, val):
+        return self.cql_encode_float(float(val))

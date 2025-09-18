@@ -256,7 +256,7 @@ def _sync_table(model, connection=None):
 
                 continue
 
-            if col.primary_key or col.primary_key:
+            if col.primary_key:
                 msg = format_log_context("Cannot add primary key '{0}' (with db_field '{1}') to existing table {2}", keyspace=ks_name, connection=connection)
                 raise CQLEngineException(msg.format(model_name, db_name, cf_name))
 
@@ -525,7 +525,7 @@ def _drop_table(model, connection=None):
 
     connection = connection or model._get_connection()
 
-    # don't try to delete non existant tables
+    # don't try to delete non existent tables
     meta = get_cluster(connection).metadata
 
     ks_name = model._get_keyspace()

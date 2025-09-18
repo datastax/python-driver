@@ -55,7 +55,7 @@ class BasicGraphQueryTest(BasicGraphUnitTestCase):
         cl_attrs = ('graph_read_consistency_level', 'graph_write_consistency_level')
 
         # Iterates over the graph options and constructs an array containing
-        # The graph_options that correlate to graoh read and write consistency levels
+        # The graph_options that correlate to graph read and write consistency levels
         graph_params = [a[2] for a in _graph_options if a[0] in cl_attrs]
 
         s = self.session
@@ -244,7 +244,7 @@ class GenericGraphQueryTest(GraphUnitTestCase):
         """
         Test to validate range queries are handled correctly.
 
-        Creates a very large line graph script and executes it. Then proceeds to to a range
+        Creates a very large line graph script and executes it. Then proceeds to a range
         limited query against it, and ensure that the results are formatted correctly and that
         the result set is properly sized.
 
@@ -331,7 +331,7 @@ class GenericGraphQueryTest(GraphUnitTestCase):
         @test_category dse graph
         """
         self.execute_graph(schema.fixtures.line(150), graphson)
-        self.execute_graph(schema.fixtures.line(300), graphson)  # This should passed since the queries are splitted
+        self.execute_graph(schema.fixtures.line(300), graphson)  # This should pass since the queries are split
         self.assertRaises(SyntaxException, self.execute_graph, schema.fixtures.line(300, single_script=True), graphson)  # this is not and too big
 
     def _test_large_result_set(self, schema, graphson):

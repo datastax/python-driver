@@ -41,8 +41,8 @@ def assert_quiescent_pool_state(test_case, cluster, wait=None):
             test_case.assertFalse(state['shutdown'])
             test_case.assertGreater(state['open_count'], 0)
             no_in_flight = all((i == 0 for i in state['in_flights']))
-            orphans_and_inflights = zip(state['orphan_requests'],state['in_flights'])
-            all_orphaned = all((len(orphans) == inflight for (orphans,inflight) in orphans_and_inflights))
+            orphans_and_inflights = zip(state['orphan_requests'], state['in_flights'])
+            all_orphaned = all((len(orphans) == inflight for (orphans, inflight) in orphans_and_inflights))
             test_case.assertTrue(no_in_flight or all_orphaned)
 
     for holder in cluster.get_connection_holders():

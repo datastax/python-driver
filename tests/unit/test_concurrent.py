@@ -24,7 +24,7 @@ import sys
 import platform
 
 from cassandra.cluster import Cluster, Session
-from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
+from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args, execute_concurrent_async
 from cassandra.pool import Host
 from cassandra.policies import SimpleConvictionPolicy
 from tests.unit.utils import mock_session_pools
@@ -40,7 +40,7 @@ class MockResponseResponseFuture():
     _col_names = None
     _col_types = None
 
-    # a list pending callbacks, these will be prioritized in reverse or normal orderd
+    # a list pending callbacks, these will be prioritized in reverse or normal order
     pending_callbacks = PriorityQueue()
 
     def __init__(self, reverse):
@@ -179,7 +179,7 @@ class ConcurrencyTest((unittest.TestCase)):
         This utility method will execute submit various statements for execution using the ConcurrentExecutorListResults,
         then invoke a separate thread to execute the callback associated with the futures registered
         for those statements. The parameters will toggle various timing, and ordering changes.
-        Finally it will validate that the results were returned in the order they were submitted
+        Finally, it will validate that the results were returned in the order they were submitted
         :param reverse: Execute the callbacks in the opposite order that they were submitted
         :param slowdown: Cause intermittent queries to perform slowly
         """
@@ -203,7 +203,7 @@ class ConcurrencyTest((unittest.TestCase)):
         This utility method will execute submit various statements for execution using the ConcurrentExecutorGenResults,
         then invoke a separate thread to execute the callback associated with the futures registered
         for those statements. The parameters will toggle various timing, and ordering changes.
-        Finally it will validate that the results were returned in the order they were submitted
+        Finally, it will validate that the results were returned in the order they were submitted
         :param reverse: Execute the callbacks in the opposite order that they were submitted
         :param slowdown: Cause intermittent queries to perform slowly
         """
@@ -232,12 +232,64 @@ class ConcurrencyTest((unittest.TestCase)):
             self.assertTrue(success)
             current_time_added = list(result)[0]
 
-            #Windows clock granularity makes this equal most of the times
+            # Windows clock granularity makes this equal most of the time
             if "Windows" in platform.system():
                 self.assertLessEqual(last_time_added, current_time_added)
             else:
                 self.assertLess(last_time_added, current_time_added)
             last_time_added = current_time_added
+
+    def insert_and_validate_list_async(self, reverse, slowdown):
+        """
+        This utility method will execute submit various statements for execution using execute_concurrent_async,
+        then invoke a separate thread to execute the callback associated with the futures registered
+        for those statements. The parameters will toggle various timing, and ordering changes.
+        Finally it will validate that the results were returned in the order they were submitted
+        :param reverse: Execute the callbacks in the opposite order that they were submitted
+        :param slowdown: Cause intermittent queries to perform slowly
+        """
+        our_handler = MockResponseResponseFuture(reverse=reverse)
+        mock_session = Mock()
+        statements_and_params = zip(cycle(["INSERT INTO test3rf.test (k, v) VALUES (%s, 0)"]),
+                                    [(i, ) for i in range(100)])
+        mock_session.execute_async.return_value = our_handler
+
+        t = TimedCallableInvoker(our_handler, slowdown=slowdown)
+        t.start()
+        try:
+            future = execute_concurrent_async(mock_session, statements_and_params)
+            results = future.result()
+            self.validate_result_ordering(results)
+        finally:
+            t.stop()
+
+    def test_results_ordering_async_forward(self):
+        """
+        This tests the ordering of our execute_concurrent_async function
+        when queries complete in the order they were executed.
+        """
+        self.insert_and_validate_list_async(False, False)
+
+    def test_results_ordering_async_reverse(self):
+        """
+        This tests the ordering of our execute_concurrent_async function
+        when queries complete in the reverse order they were executed.
+        """
+        self.insert_and_validate_list_async(True, False)
+
+    def test_results_ordering_async_forward_slowdown(self):
+        """
+        This tests the ordering of our execute_concurrent_async function
+        when queries complete in the order they were executed, with slow queries mixed in.
+        """
+        self.insert_and_validate_list_async(False, True)
+
+    def test_results_ordering_async_reverse_slowdown(self):
+        """
+        This tests the ordering of our execute_concurrent_async function
+        when queries complete in the reverse order they were executed, with slow queries mixed in.
+        """
+        self.insert_and_validate_list_async(True, True)
 
     @mock_session_pools
     def test_recursion_limited(self):

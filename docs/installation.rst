@@ -3,7 +3,7 @@ Installation
 
 Supported Platforms
 -------------------
-Python 3.8 through 3.12 are supported.  Both CPython (the standard Python
+Python 3.9 through 3.13 are supported.  Both CPython (the standard Python
 implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
 
 Linux, OSX, and Windows are supported.
@@ -26,7 +26,7 @@ To check if the installation was successful, you can run::
 
     python -c 'import cassandra; print(cassandra.__version__)'
 
-It should print something like "3.29.1".
+It should print something like "3.29.2".
 
 .. _installation-datastax-graph:
 
@@ -238,8 +238,10 @@ through `Homebrew <http://brew.sh/>`_. For example, on Mac OS X::
 
     $ brew install libev
 
-The libev extension is not built for Windows (the build process is complex, and the Windows implementation uses
-select anyway).
+The libev extension can now be built for Windows as of Python driver version 3.29.2.  You can
+install libev using any Windows package manager.  For example, to install using `vcpkg <https://vcpkg.io>`_::
+
+    $ vcpkg install libev
 
 If successful, you should be able to build and install the extension
 (just using ``setup.py build`` or ``setup.py install``) and then use

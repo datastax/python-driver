@@ -2,10 +2,6 @@ title: DataStax Python Driver
 summary: DataStax Python Driver for Apache Cassandra®
 output: docs/_build/
 swiftype_drivers: pythondrivers
-checks:
-  external_links:
-    exclude:
-    - 'http://aka.ms/vcpython27'
 sections:
   - title: N/A
     prefix: /
@@ -23,7 +19,7 @@ sections:
       CASS_DRIVER_NO_CYTHON=1 python setup.py build_ext --inplace --force
 versions:
   - name: '3.29'
-    ref: 1a947f84
+    ref: 434b1f52
   - name: '3.28'
     ref: 4325afb6
   - name: '3.27'

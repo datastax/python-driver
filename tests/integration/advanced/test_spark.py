@@ -30,7 +30,7 @@ def setup_module():
 @requiredse
 class SparkLBTests(BasicGraphUnitTestCase):
     """
-    Test to validate that analtics query can run in a multi-node enviroment. Also check to to ensure
+    Test to validate that analytics query can run in a multi-node environment. Also check to ensure
     that the master spark node is correctly targeted when OLAP queries are run
 
     @since 3.20
@@ -42,7 +42,7 @@ class SparkLBTests(BasicGraphUnitTestCase):
         self.session.execute_graph(ClassicGraphFixtures.classic())
         spark_master = find_spark_master(self.session)
 
-        # Run multipltle times to ensure we don't round robin
+        # Run multiple times to ensure we don't round-robin
         for i in range(3):
             to_run = SimpleGraphStatement("g.V().count()")
             rs = self.session.execute_graph(to_run, execution_profile=EXEC_PROFILE_GRAPH_ANALYTICS_DEFAULT)
