@@ -29,7 +29,7 @@ except ImportError:
         "The C extension needed to use libev was not found.  This "
         "probably means that you didn't have the required build dependencies "
         "when installing the driver.  See "
-        "http://datastax.github.io/python-driver/installation.html#c-extensions "
+        "https://docs.datastax.com/en/developer/python-driver/latest/installation/index.html#c-extensions "
         "for instructions on installing build dependencies and building "
         "the C extension.")
 
