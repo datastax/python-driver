@@ -4,7 +4,7 @@
 .. |version| image:: https://badge.fury.io/py/cassandra-driver.svg
     :target: https://badge.fury.io/py/cassandra-driver
 .. |pyversion| image:: https://img.shields.io/pypi/pyversions/cassandra-driver.svg
-.. |travis| image:: https://travis-ci.com/datastax/python-driver.svg?branch=master
+.. |travis| image:: https://api.travis-ci.com/datastax/python-driver.svg?branch=master
     :target: https://travis-ci.com/github/datastax/python-driver
 
 |license| |version| |pyversion|
