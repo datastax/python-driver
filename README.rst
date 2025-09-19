@@ -7,8 +7,8 @@
 .. |travis| image:: https://api.travis-ci.com/datastax/python-driver.svg?branch=master
     :target: https://travis-ci.com/github/datastax/python-driver
 
-|license| |version| |pyversion|
-|travis|
+| |license| |version| |pyversion|
+| |travis|
 
 DataStax Driver for Apache Cassandra
 ====================================
