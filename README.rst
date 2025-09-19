@@ -10,7 +10,7 @@
 DataStax Driver for Apache Cassandra
 ====================================
 
-.. image:: https://travis-ci.com/datastax/python-driver.png?branch=master
+.. image:: https://travis-ci.com/datastax/python-driver.svg?branch=master
    :target: https://travis-ci.com/github/datastax/python-driver
 
 A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (2.1+) and
@@ -79,9 +79,8 @@ If you would like to contribute, please feel free to open a pull request.
 
 Getting Help
 ------------
-Your best options for getting help with the driver are the
-`mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_
-and the `DataStax Community <https://community.datastax.com>`_.
+Your best options for getting help with the driver is the
+`mailing list <https://groups.google.com/a/lists.datastax.com/forum/#!forum/python-driver-user>`_.
 
 License
 -------
