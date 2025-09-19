@@ -22,13 +22,13 @@ The driver supports Python 3.9 through 3.13.
 
 Features
 --------
-* `Synchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster/index.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster.html#cassandra.cluster.Session.execute_async>`_ APIs
+* `Synchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster/index.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster/index.html#cassandra.cluster.Session.execute_async>`_ APIs
 * `Simple, Prepared, and Batch statements <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/query/index.html#cassandra.query.Statement>`_
 * Asynchronous IO, parallel execution, request pipelining
 * `Connection pooling <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster/index.html#cassandra.cluster.Cluster.get_core_connections_per_host>`_
 * Automatic node discovery
 * `Automatic reconnection <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies/index.html#reconnecting-to-dead-hosts>`_
-* Configurable `load balancing <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies/index.html#load-balancing>`_ and `retry policies <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies.html#retrying-failed-operations>`_
+* Configurable `load balancing <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies/index.html#load-balancing>`_ and `retry policies <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies/index.html#retrying-failed-operations>`_
 * `Concurrent execution utilities <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/concurrent/index.html>`_
 * `Object mapper <https://docs.datastax.com/en/developer/python-driver/latest/object_mapper/>`_
 * `Connecting to DataStax Astra database (cloud) <https://docs.datastax.com/en/developer/python-driver/latest/cloud/>`_
@@ -43,7 +43,7 @@ Installation through pip is recommended::
     $ pip install cassandra-driver
 
 For more complete installation instructions, see the
-`installation guide <https://docs.datastax.com/en/developer/python-driver/latest/installation.html>`_.
+`installation guide <https://docs.datastax.com/en/developer/python-driver/latest/installation/index.html>`_.
 
 Documentation
 -------------
@@ -51,16 +51,16 @@ The documentation can be found online `here <https://docs.datastax.com/en/develo
 
 A couple of links for getting up to speed:
 
-* `Installation <https://docs.datastax.com/en/developer/python-driver/latest/installation.html>`_
-* `Getting started guide <https://docs.datastax.com/en/developer/python-driver/latest/getting_started.html>`_
+* `Installation <https://docs.datastax.com/en/developer/python-driver/latest/installation/index.html>`_
+* `Getting started guide <https://docs.datastax.com/en/developer/python-driver/latest/getting_started/index.html>`_
 * `API docs <https://docs.datastax.com/en/developer/python-driver/latest/api/index.html>`_
-* `Performance tips <https://docs.datastax.com/en/developer/python-driver/latest/performance.html>`_
+* `Performance tips <https://docs.datastax.com/en/developer/python-driver/latest/performance/index.html>`_
 
 Object Mapper
 -------------
 cqlengine (originally developed by Blake Eggleston and Jon Haddad, with contributions from the
 community) is now maintained as an integral part of this package. Refer to
-`documentation here <https://docs.datastax.com/en/developer/python-driver/latest/object_mapper.html>`_.
+`documentation here <https://docs.datastax.com/en/developer/python-driver/latest/object_mapper/index.html>`_.
 
 Contributing
 ------------
