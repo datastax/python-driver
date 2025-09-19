@@ -22,15 +22,15 @@ The driver supports Python 3.9 through 3.13.
 
 Features
 --------
-* `Synchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster.html#cassandra.cluster.Session.execute_async>`_ APIs
-* `Simple, Prepared, and Batch statements <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/query.html#cassandra.query.Statement>`_
+* `Synchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster/index.html#cassandra.cluster.Session.execute>`_ and `Asynchronous <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster.html#cassandra.cluster.Session.execute_async>`_ APIs
+* `Simple, Prepared, and Batch statements <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/query/index.html#cassandra.query.Statement>`_
 * Asynchronous IO, parallel execution, request pipelining
-* `Connection pooling <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster.html#cassandra.cluster.Cluster.get_core_connections_per_host>`_
+* `Connection pooling <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/cluster/index.html#cassandra.cluster.Cluster.get_core_connections_per_host>`_
 * Automatic node discovery
-* `Automatic reconnection <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies.html#reconnecting-to-dead-hosts>`_
-* Configurable `load balancing <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies.html#load-balancing>`_ and `retry policies <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies.html#retrying-failed-operations>`_
-* `Concurrent execution utilities <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/concurrent.html>`_
-* `Object mapper <https://docs.datastax.com/en/developer/python-driver/latest/object_mapper.html>`_
+* `Automatic reconnection <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies/index.html#reconnecting-to-dead-hosts>`_
+* Configurable `load balancing <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies/index.html#load-balancing>`_ and `retry policies <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/policies.html#retrying-failed-operations>`_
+* `Concurrent execution utilities <https://docs.datastax.com/en/developer/python-driver/latest/api/cassandra/concurrent/index.html>`_
+* `Object mapper <https://docs.datastax.com/en/developer/python-driver/latest/object_mapper/>`_
 * `Connecting to DataStax Astra database (cloud) <https://docs.datastax.com/en/developer/python-driver/latest/cloud/>`_
 * DSE Graph execution API
 * DSE Geometric type serialization
