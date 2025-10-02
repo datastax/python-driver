@@ -9,8 +9,8 @@
 
 |license| |version| |pyversion| |travis|
 
-DataStax Driver for Apache Cassandra
-====================================
+Apache Cassandra Python Driver
+==============================
 
 A modern, `feature-rich <https://github.com/datastax/python-driver#features>`_ and highly-tunable Python client library for Apache Cassandra (2.1+) and
 DataStax Enterprise (4.7+) using exclusively Cassandra's binary protocol and Cassandra Query Language v3.
@@ -83,7 +83,7 @@ Your best options for getting help with the driver is the
 
 License
 -------
-Copyright DataStax, Inc.
+Copyright 2013 The Apache Software Foundation
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
