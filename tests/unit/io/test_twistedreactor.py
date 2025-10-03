@@ -15,7 +15,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from cassandra.connection import DefaultEndPoint
+from cassandra.endpoint import DefaultEndPoint
 
 try:
     from twisted.test import proto_helpers
