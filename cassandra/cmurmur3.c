@@ -14,12 +14,6 @@
 #include <Python.h>
 #include <stdio.h>
 
-#if PY_VERSION_HEX < 0x02050000
-typedef int Py_ssize_t;
-#define PY_SSIZE_T_MAX INT_MAX
-#define PY_SSIZE_T_MIN INT_MIN
-#endif
-
 #ifdef PYPY_VERSION
 #define COMPILING_IN_PYPY 1
 #define COMPILING_IN_CPYTHON 0
@@ -216,8 +210,6 @@ static PyMethodDef cmurmur3_methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
-#if PY_MAJOR_VERSION >= 3
-
 static int cmurmur3_traverse(PyObject *m, visitproc visit, void *arg) {
     Py_VISIT(GETSTATE(m)->error);
     return 0;
@@ -245,18 +237,8 @@ static struct PyModuleDef moduledef = {
 PyObject *
 PyInit_cmurmur3(void)
 
-#else
-#define INITERROR return
-
-void
-initcmurmur3(void)
-#endif
 {
-#if PY_MAJOR_VERSION >= 3
     PyObject *module = PyModule_Create(&moduledef);
-#else
-    PyObject *module = Py_InitModule("cmurmur3", cmurmur3_methods);
-#endif
     struct module_state *st = NULL;
 
     if (module == NULL)
@@ -269,7 +251,5 @@ initcmurmur3(void)
         INITERROR;
     }
 
-#if PY_MAJOR_VERSION >= 3
     return module;
-#endif
 }
