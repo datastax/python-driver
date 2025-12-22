@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-
+import importlib.metadata
 
 class NullHandler(logging.Handler):
 
@@ -24,9 +24,7 @@ class NullHandler(logging.Handler):
 
 logging.getLogger('cassandra').addHandler(NullHandler())
 
-__version_info__ = (3, 29, 3)
-__version__ = '.'.join(map(str, __version_info__))
-
+__version__ = importlib.metadata.version('cassandra-driver')
 
 class ConsistencyLevel(object):
     """

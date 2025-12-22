@@ -1,0 +1,56 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools", "Cython>=3.0", "tomli"]
+
+[project]
+name = "cassandra-driver"
+description = "Apache Cassandra Python Driver"
+version = "3.30.0"
+dependencies = ['geomet>=1.1']
+readme = "README.rst"
+authors = [{name = "DataStax"}]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">= 3.10"
+keywords = ["cassandra","cql","orm","dse","graph"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+[project.optional-dependencies]
+graph = ["gremlinpython==3.4.6"]
+cle = ["cryptography>=42.0"]
+test = ["pytest", "PyYAML", "pytz"]
+
+[project.urls]
+homepage = "https://github.com/apache/cassandra-python-driver/"
+documentation = "https://docs.datastax.com/en/developer/python-driver/latest/"
+source = "https://github.com/apache/cassandra-python-driver/"
+issues = "https://issues.apache.org/jira/issues/?jql=project%20%3D%20CASSPYTHON%20ORDER%20BY%20key%20DESC"
+changelog = "https://github.com/apache/cassandra-python-driver/blob/trunk/CHANGELOG.rst"
+
+[tool.setuptools.packages.find]
+include = ['cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
+'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
+'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud',
+"cassandra.column_encryption"]
+
+[tool.cassandra-driver]
+build-murmur3-extension = true
+build-libev-extension = true
+build-cython-extensions = true
+libev-includes = []
+libev-libs = []
+build-concurrency = 0
