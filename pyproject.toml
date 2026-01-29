@@ -35,6 +35,10 @@ graph = ['gremlinpython==3.7.4']
 cle = ['cryptography>=35.0']
 compress-lz4 = ['lz4']
 compress-snappy = ['python-snappy']
+auth-kerberos = [
+    'kerberos; platform_system != "Windows"',
+    'winkerberos; platform_system == "Windows"',
+]
 
 [dependency-groups]
 dev = [
@@ -51,6 +55,8 @@ dev = [
     "futurist",
     "asynctest",
     "pyyaml",
+    "numpy",
+    "objgraph",
     "ccm @ git+https://git@github.com/scylladb/scylla-ccm.git@master",
 ]
 
