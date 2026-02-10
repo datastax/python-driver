@@ -34,7 +34,7 @@ slack = new Slack()
 DEFAULT_CASSANDRA = ['3.11', '4.0', '4.1', '5.0']
 DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30', 'dse-6.9.0']
 DEFAULT_HCD = ['hcd-1.0.0']
-DEFAULT_RUNTIME = ['3.9.23', '3.10.18', '3.11.13', '3.12.11', '3.13.5']
+DEFAULT_RUNTIME = ['3.10.18', '3.11.13', '3.12.11', '3.13.5']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
@@ -119,7 +119,7 @@ def getBuildContext() {
 
 def buildAndTest(context) {
   initializeEnvironment()
-  installDriverAndCompileExtensions()
+  installDriver()
 
   try {
       executeTests()
@@ -165,15 +165,18 @@ def getMatrixBuilds(buildContext) {
 
 def initializeEnvironment() {
   sh label: 'Initialize the environment', script: '''#!/bin/bash -lex
-    pyenv global ${PYTHON_VERSION}
-    sudo apt-get install socat
-    pip install --upgrade pip
-    pip install -U setuptools
 
-    # install a version of pyyaml<6.0 compatible with ccm-3.1.5 as of Aug 2023
+    # One of the integration tests relies on socat so let's install that here
+    sudo apt-get install -y socat moreutils
+
+    pyenv shell ${PYTHON_VERSION}
+    python -m venv jenkins-venv
+    . ./jenkins-venv/bin/activate
+    pip install --upgrade pip setuptools wheel
+
+    # Install a version of pyyaml<6.0 compatible with ccm-3.1.5 as of Aug 2023
     # this works around the python-3.10+ compatibility problem as described in DSP-23524
-    pip install wheel
-    pip install "Cython<3.0" "pyyaml<6.0" --no-build-isolation
+    pip install "pyyaml<6.0" --no-build-isolation
     pip install ${HOME}/ccm
   '''
 
@@ -182,32 +185,25 @@ def initializeEnvironment() {
     if (env.PYTHON_VERSION =~ /3\.12\.\d+/) {
       echo "Cannot install DSE dependencies for Python 3.12.x; installing Apache CassandraⓇ requirements only.  See PYTHON-1368 for more detail."
       sh label: 'Install Apache CassandraⓇ requirements', script: '''#!/bin/bash -lex
+        . ./jenkins-venv/bin/activate
         pip install -r test-requirements.txt
       '''
     }
     else {
       sh label: 'Install DataStax Enterprise requirements', script: '''#!/bin/bash -lex
+        . ./jenkins-venv/bin/activate
         pip install -r test-datastax-requirements.txt
       '''
     }
   } else {
     sh label: 'Install Apache CassandraⓇ requirements', script: '''#!/bin/bash -lex
+      . ./jenkins-venv/bin/activate
       pip install -r test-requirements.txt
     '''
 
     sh label: 'Uninstall the geomet dependency since it is not required for Cassandra', script: '''#!/bin/bash -lex
+      . ./jenkins-venv/bin/activate
       pip uninstall -y geomet
-    '''
-  }
-
-  sh label: 'Install unit test modules', script: '''#!/bin/bash -lex
-    pip install --no-deps nose-ignore-docstring nose-exclude
-    pip install service_identity
-  '''
-
-  if (env.CYTHON_ENABLED  == 'True') {
-    sh label: 'Install cython modules', script: '''#!/bin/bash -lex
-      pip install cython numpy
     '''
   }
 
@@ -244,6 +240,8 @@ ENVIRONMENT_EOF
   }
 
   sh label: 'Display Python and environment information', script: '''#!/bin/bash -le
+    . ./jenkins-venv/bin/activate
+
     # Load CCM environment variables
     set -o allexport
     . ${HOME}/environment.txt
@@ -251,27 +249,46 @@ ENVIRONMENT_EOF
 
     python --version
     pip --version
-    pip freeze
     printenv | sort
   '''
 }
 
-def installDriverAndCompileExtensions() {
-  if (env.CYTHON_ENABLED  == 'True') {
-    sh label: 'Install the driver and compile with C extensions with Cython', script: '''#!/bin/bash -lex
-      python setup.py build_ext --inplace
-    '''
-  } else {
-    sh label: 'Install the driver and compile with C extensions without Cython', script: '''#!/bin/bash -lex
-      python setup.py build_ext --inplace --no-cython
-    '''
-  }
+def installDriver() {
+  sh label: 'Install the driver and compile with C extensions with Cython', script: '''#!/bin/bash -lex
+    # Update libev includes and libs to point to the right spot for this install
+    pyenv shell ${PYTHON_VERSION}
+    python -m venv libev-venv
+    . ./libev-venv/bin/activate
+    pip install toml
+    python fix-jenkinsfile-libev.py ./pyproject.toml "/usr/include" "/usr/lib/x86_64-linux-gnu" | sponge ./pyproject.toml
+    deactivate
+
+    ls /usr/include/ev.h
+    ls /usr/lib/x86_64-linux-gnu/libev*
+
+    # Now that we've made relevant mods to our local pyproject.toml we're ready to build the driver
+    . ./jenkins-venv/bin/activate
+
+    # Load CCM environment variables
+    set -o allexport
+    . ${HOME}/environment.txt
+    set +o allexport
+
+    cat ./pyproject.toml
+    pip install --verbose --editable .
+
+    # After install display a list of packages in the venv for auditing
+    pip list
+  '''
 }
+
 
 def executeStandardTests() {
 
   try {
     sh label: 'Execute unit tests', script: '''#!/bin/bash -lex
+      . ./jenkins-venv/bin/activate
+
       # Load CCM environment variables
       set -o allexport
       . ${HOME}/environment.txt
@@ -289,6 +306,8 @@ def executeStandardTests() {
 
   try {
     sh label: 'Execute Simulacron integration tests', script: '''#!/bin/bash -lex
+      . ./jenkins-venv/bin/activate
+
       # Load CCM environment variables
       set -o allexport
       . ${HOME}/environment.txt
@@ -314,6 +333,8 @@ def executeStandardTests() {
 
   try {
     sh label: 'Execute CQL engine integration tests', script: '''#!/bin/bash -lex
+      . ./jenkins-venv/bin/activate
+
       # Load CCM environment variables
       set -o allexport
       . ${HOME}/environment.txt
@@ -330,6 +351,8 @@ def executeStandardTests() {
 
   try {
     sh label: 'Execute Apache CassandraⓇ integration tests', script: '''#!/bin/bash -lex
+      . ./jenkins-venv/bin/activate
+
       # Load CCM environment variables
       set -o allexport
       . ${HOME}/environment.txt
@@ -351,6 +374,8 @@ def executeStandardTests() {
     else {
       try {
         sh label: 'Execute DataStax Enterprise integration tests', script: '''#!/bin/bash -lex
+          . ./jenkins-venv/bin/activate
+
           # Load CCM environment variable
           set -o allexport
           . ${HOME}/environment.txt
@@ -369,6 +394,8 @@ def executeStandardTests() {
 
   try {
     sh label: 'Execute DataStax Astra integration tests', script: '''#!/bin/bash -lex
+      . ./jenkins-venv/bin/activate
+
       # Load CCM environment variable
       set -o allexport
       . ${HOME}/environment.txt
@@ -386,6 +413,8 @@ def executeStandardTests() {
   if (env.PROFILE == 'FULL') {
     try {
       sh label: 'Execute long running integration tests', script: '''#!/bin/bash -lex
+        . ./jenkins-venv/bin/activate
+
         # Load CCM environment variable
         set -o allexport
         . ${HOME}/environment.txt
@@ -404,6 +433,8 @@ def executeStandardTests() {
 
 def executeDseSmokeTests() {
   sh label: 'Execute profile DataStax Enterprise smoke test integration tests', script: '''#!/bin/bash -lex
+    . ./jenkins-venv/bin/activate
+
     # Load CCM environment variable
     set -o allexport
     . ${HOME}/environment.txt
@@ -418,6 +449,8 @@ def executeDseSmokeTests() {
 
 def executeEventLoopTests() {
   sh label: 'Execute profile event loop manager integration tests', script: '''#!/bin/bash -lex
+    . ./jenkins-venv/bin/activate
+
     # Load CCM environment variable
     set -o allexport
     . ${HOME}/environment.txt
