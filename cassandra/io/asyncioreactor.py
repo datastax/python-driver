@@ -173,7 +173,7 @@ class AsyncioConnection(Connection):
 
     async def _push_msg(self, chunks):
         # This lock ensures all chunks of a message are sequential in the Queue
-        with await self._write_queue_lock:
+        async with self._write_queue_lock:
             for chunk in chunks:
                 self._write_queue.put_nowait(chunk)
 
