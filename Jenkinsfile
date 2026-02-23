@@ -34,7 +34,7 @@ slack = new Slack()
 DEFAULT_CASSANDRA = ['3.11', '4.0', '4.1', '5.0']
 DEFAULT_DSE = ['dse-5.1.35', 'dse-6.8.30', 'dse-6.9.0']
 DEFAULT_HCD = ['hcd-1.0.0']
-DEFAULT_RUNTIME = ['3.10.18', '3.11.13', '3.12.11', '3.13.5']
+DEFAULT_RUNTIME = ['3.10.19', '3.11.14', '3.12.12', '3.13.12', '3.14.3']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
@@ -745,7 +745,7 @@ pipeline {
   }
 
   environment {
-    OS_VERSION = 'ubuntu/focal64/python-driver'
+    OS_VERSION = 'ubuntu/jammy64/python-driver'
     CCM_ENVIRONMENT_SHELL = '/usr/local/bin/ccm_environment.sh'
     CCM_MAX_HEAP_SIZE = '1536M'
     JABBA_SHELL = '/usr/lib/jabba/jabba.sh'
