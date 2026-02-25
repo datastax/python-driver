@@ -3290,7 +3290,7 @@ def get_schema_parser(connection, server_version, dse_version, timeout):
         elif v >= Version('6.0.0'):
             return SchemaParserDSE60(connection, timeout)
 
-    if version >= Version('4-a'):
+    if version >= Version('4.0-alpha'):
         return SchemaParserV4(connection, timeout)
     elif version >= Version('3.0.0'):
         return SchemaParserV3(connection, timeout)

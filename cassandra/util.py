@@ -1692,57 +1692,56 @@ class DateRange(object):
             self.lower_bound, self.upper_bound, self.value
         )
 
+VERSION_REGEX = re.compile("^(\\d+)\\.(\\d+)(\\.\\d+)?(\\.\\d+)?([~\\-]\\w[.\\w]*(?:-\\w[.\\w]*)*)?(\\+[.\\w]+)?$")
 
 @total_ordering
 class Version(object):
     """
-    Internal minimalist class to compare versions.
-    A valid version is: <int>.<int>.<int>.<int or str>.
+    Representation of a Cassandra version.  Mostly follows the implementation of the same logic in the Java driver;
+    see https://github.com/apache/cassandra-java-driver/blob/4.19.2/core/src/main/java/com/datastax/oss/driver/api/core/Version.java.
 
-    TODO: when python2 support is removed, use packaging.version.
+    Cassandra versions are assumed to correspond to major.minor.patch with an optional additional numeric build field as well as a
+    string prerelease field.
     """
-
-    _version = None
-    major = None
-    minor = 0
-    patch = 0
-    build = 0
-    prerelease = 0
 
     def __init__(self, version):
         self._version = version
-        if '-' in version:
-            version_without_prerelease, self.prerelease = version.split('-', 1)
-        else:
-            version_without_prerelease = version
-        parts = list(reversed(version_without_prerelease.split('.')))
-        if len(parts) > 4:
-            prerelease_string = "-{}".format(self.prerelease) if self.prerelease else ""
-            log.warning("Unrecognized version: {}. Only 4 components plus prerelease are supported. "
-                        "Assuming version as {}{}".format(version, '.'.join(parts[:-5:-1]), prerelease_string))
+
+        match = VERSION_REGEX.match(version)
+        if not match:
+            raise ValueError("Version string {0} did not match expected format".format(version))
+
+        self.major = int(match[1])
+        self.minor = int(match[2])
 
         try:
-            self.major = int(parts.pop())
-        except ValueError as e:
-            raise ValueError(
-                "Couldn't parse version {}. Version should start with a number".format(version))\
-                .with_traceback(e.__traceback__)
-        try:
-            self.minor = int(parts.pop()) if parts else 0
-            self.patch = int(parts.pop()) if parts else 0
+            self.patch = self._cleanup_int(match[3])
+        except:
+            self.patch = 0
 
-            if parts:  # we have a build version
-                build = parts.pop()
-                try:
-                    self.build = int(build)
-                except ValueError:
-                    self.build = build
-        except ValueError:
-            assumed_version = "{}.{}.{}.{}-{}".format(self.major, self.minor, self.patch, self.build, self.prerelease)
-            log.warning("Unrecognized version {}. Assuming version as {}".format(version, assumed_version))
+        try:
+            self.build = self._cleanup_int(match[4])
+        except:
+            self.build = 0
+
+        try:
+            self.prerelease = self._cleanup_str(match[5])
+        except:
+            self.prerelease = ""
+
+        # This is used in a few places below so let's just build it now
+        self._tuple = (self.major, self.minor, self.patch, self.build, self.prerelease)
+
+    # Trim off the leading '.' characters and convert the discovered value to an integer
+    def _cleanup_int(self, instr):
+        return int(instr[1:]) if instr else 0
+
+    # Trim off the leading '.' or '~' characters and just return the string directly
+    def _cleanup_str(self, instr):
+        return instr[1:] if instr else ""
 
     def __hash__(self):
-        return self._version
+        return hash(self._tuple)
 
     def __repr__(self):
         version_string = "Version({0}, {1}, {2}".format(self.major, self.minor, self.patch)
@@ -1757,48 +1756,27 @@ class Version(object):
     def __str__(self):
         return self._version
 
-    @staticmethod
-    def _compare_version_part(version, other_version, cmp):
-        if not (isinstance(version, int) and
-                isinstance(other_version, int)):
-            version = str(version)
-            other_version = str(other_version)
-
-        return cmp(version, other_version)
-
+    # Methods below leverage left-to-right positional comparison of tuples
     def __eq__(self, other):
         if not isinstance(other, Version):
             return NotImplemented
 
-        return (self.major == other.major and
-                self.minor == other.minor and
-                self.patch == other.patch and
-                self._compare_version_part(self.build, other.build, lambda s, o: s == o) and
-                self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s == o)
-                )
+        return self._tuple == other._tuple
 
     def __gt__(self, other):
         if not isinstance(other, Version):
             return NotImplemented
 
-        is_major_ge = self.major >= other.major
-        is_minor_ge = self.minor >= other.minor
-        is_patch_ge = self.patch >= other.patch
-        is_build_gt = self._compare_version_part(self.build, other.build, lambda s, o: s > o)
-        is_build_ge = self._compare_version_part(self.build, other.build, lambda s, o: s >= o)
-
-        # By definition, a prerelease comes BEFORE the actual release, so if a version
-        # doesn't have a prerelease, it's automatically greater than anything that does
-        if self.prerelease and not other.prerelease:
-            is_prerelease_gt = False
+        # We start by comparing the first four fields directly
+        self_tuple = self._tuple[:4]
+        other_tuple = (other.major, other.minor, other.patch, other.build)
+        if self_tuple != other_tuple:
+            return self_tuple > other_tuple
+        # If we're still around we have to check prereleases... prereleases always come before
+        # the corresponding version
+        elif self.prerelease and not other.prerelease:
+            return False
         elif other.prerelease and not self.prerelease:
-            is_prerelease_gt = True
+            return True
         else:
-            is_prerelease_gt = self._compare_version_part(self.prerelease, other.prerelease, lambda s, o: s > o) \
-
-        return (self.major > other.major or
-                (is_major_ge and self.minor > other.minor) or
-                (is_major_ge and is_minor_ge and self.patch > other.patch) or
-                (is_major_ge and is_minor_ge and is_patch_ge and is_build_gt) or
-                (is_major_ge and is_minor_ge and is_patch_ge and is_build_ge and is_prerelease_gt)
-                )
+            return self.prerelease > other.prerelease

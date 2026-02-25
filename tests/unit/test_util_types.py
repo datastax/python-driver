@@ -209,18 +209,13 @@ class VersionTests(unittest.TestCase):
 
     def test_version_parsing(self):
         versions = [
-            ('2.0.0', (2, 0, 0, 0, 0)),
-            ('3.1.0', (3, 1, 0, 0, 0)),
-            ('2.4.54', (2, 4, 54, 0, 0)),
-            ('3.1.1.12', (3, 1, 1, 12, 0)),
-            ('3.55.1.build12', (3, 55, 1, 'build12', 0)),
-            ('3.55.1.20190429-TEST', (3, 55, 1, 20190429, 'TEST')),
-            ('4.0-SNAPSHOT', (4, 0, 0, 0, 'SNAPSHOT')),
-            ('1.0.5.4.3', (1, 0, 5, 4, 0)),
-            ('1-SNAPSHOT', (1, 0, 0, 0, 'SNAPSHOT')),
-            ('4.0.1.2.3.4.5-ABC-123-SNAP-TEST.blah', (4, 0, 1, 2, 'ABC-123-SNAP-TEST.blah')),
-            ('2.1.hello', (2, 1, 0, 0, 0)),
-            ('2.test.1', (2, 0, 0, 0, 0)),
+            # Test cases here adapted from the Java driver cases 
+            # (https://github.com/apache/cassandra-java-driver/blob/4.19.2/core/src/test/java/com/datastax/oss/driver/api/core/VersionTest.java)
+            ('1.2.19', (1, 2, 19, 0, "")),
+            ('1.2', (1, 2, 0, 0, "")),
+            ('1.2-beta1-SNAPSHOT', (1, 2, 0, 0, 'beta1-SNAPSHOT')),
+            ('1.2~beta1-SNAPSHOT', (1, 2, 0, 0, 'beta1-SNAPSHOT')),
+            ('1.2.19.2-SNAPSHOT', (1, 2, 19, 2, 'SNAPSHOT')),
         ]
 
         for str_version, expected_result in versions:
@@ -232,9 +227,17 @@ class VersionTests(unittest.TestCase):
             self.assertEqual(v.build, expected_result[3])
             self.assertEqual(v.prerelease, expected_result[4])
 
-        # not supported version formats
-        with self.assertRaises(ValueError):
-            Version('test.1.0')
+        # Note that a few of these formats used to be supported when this class was based on the Python versioning scheme.
+        # This has been updated to more directly correspond to the Cassandra versioning scheme.  See CASSPYTHON-10 for more
+        # detail.
+        unsupported_versions = [
+            "test.1.0",
+            '2.test.1'
+        ]
+
+        for v in unsupported_versions:
+            with self.assertRaises(ValueError):
+                Version(v)
 
     def test_version_compare(self):
         # just tests a bunch of versions
@@ -251,41 +254,53 @@ class VersionTests(unittest.TestCase):
 
         # patch wins
         self.assertTrue(Version('2.3.1') > Version('2.3.0'))
-        self.assertTrue(Version('2.3.1') > Version('2.3.0.4post0'))
+        self.assertTrue(Version('2.3.1') > Version('2.3.0-4post0'))
         self.assertTrue(Version('2.3.1') > Version('2.3.0.44'))
 
         # various
         self.assertTrue(Version('2.3.0.1') > Version('2.3.0.0'))
         self.assertTrue(Version('2.3.0.680') > Version('2.3.0.670'))
         self.assertTrue(Version('2.3.0.681') > Version('2.3.0.680'))
-        self.assertTrue(Version('2.3.0.1build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
-        self.assertTrue(Version('2.3.0.build0') > Version('2.3.0.1'))  # 4th part fallback to str cmp
-        self.assertTrue(Version('2.3.0') < Version('2.3.0.build'))
 
-        self.assertTrue(Version('4-a') <= Version('4.0.0'))
-        self.assertTrue(Version('4-a') <= Version('4.0-alpha1'))
-        self.assertTrue(Version('4-a') <= Version('4.0-beta1'))
-        self.assertTrue(Version('4.0.0') >= Version('4.0.0'))
-        self.assertTrue(Version('4.0.0.421') >= Version('4.0.0'))
-        self.assertTrue(Version('4.0.1') >= Version('4.0.0'))
+        # If builds are equal then a prerelease always comes before
+        self.assertTrue(Version('2.3.0.1-SNAPSHOT') < Version('2.3.0.1'))
+
+        # If both have prereleases we fall back to a string compare
+        self.assertTrue(Version('2.3.0.1-SNAPSHOT') < Version('2.3.0.1-ZNAPSHOT'))
+
         self.assertTrue(Version('2.3.0') == Version('2.3.0'))
         self.assertTrue(Version('2.3.32') == Version('2.3.32'))
         self.assertTrue(Version('2.3.32') == Version('2.3.32.0'))
-        self.assertTrue(Version('2.3.0.build') == Version('2.3.0.build'))
+        self.assertTrue(Version('2.3.0-SNAPSHOT') == Version('2.3.0-SNAPSHOT'))
 
-        self.assertTrue(Version('4') == Version('4.0.0'))
         self.assertTrue(Version('4.0') == Version('4.0.0.0'))
         self.assertTrue(Version('4.0') > Version('3.9.3'))
 
-        self.assertTrue(Version('4.0') > Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0-SNAPSHOT') == Version('4.0.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0.build5-SNAPSHOT') == Version('4.0.0.build5-SNAPSHOT'))
-        self.assertTrue(Version('4.1-SNAPSHOT') > Version('4.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))
-        self.assertTrue(Version('4.0.0.build6-SNAPSHOT') > Version('4.0.0.build5-SNAPSHOT'))
-        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0-SNAPSHOT1'))
-        self.assertTrue(Version('4.0-SNAPSHOT2') > Version('4.0.0-SNAPSHOT1'))
 
-        self.assertTrue(Version('4.0.0-alpha1-SNAPSHOT') > Version('4.0.0-SNAPSHOT'))
+        equal_tuples = [
+            (Version('4.0-SNAPSHOT'), Version('4.0-SNAPSHOT')),
+            (Version('4.0.0-SNAPSHOT'), Version('4.0-SNAPSHOT')),
+            (Version('4.0.0-SNAPSHOT'), Version('4.0.0-SNAPSHOT')),
+            (Version('4.0.0.5-SNAPSHOT'), Version('4.0.0.5-SNAPSHOT'))
+        ]
+        for (a,b) in equal_tuples:
+            self.assertEqual(a, b)
+            self.assertEqual(hash(a), hash(b))
+
+        left_greater_tuples = [
+            (Version('4.0'), Version('4.0-SNAPSHOT')),
+            (Version('4.1-SNAPSHOT'), Version('4.0-SNAPSHOT')),
+            (Version('4.0.1-SNAPSHOT'), Version('4.0.0-SNAPSHOT')),
+            (Version('4.0.0.6-SNAPSHOT'), Version('4.0.0.5-SNAPSHOT')),
+            (Version('4.0-SNAPSHOT2'), Version('4.0-SNAPSHOT1')),
+            (Version('4.0-SNAPSHOT2'), Version('4.0.0-SNAPSHOT1')),
+            (Version('4.0.0-alpha1-SNAPSHOT'), Version('4.0.0-SNAPSHOT'))
+        ]
+        for (a,b) in left_greater_tuples:
+            self.assertGreater(a, b)
+
+        # Test the version limit for v4 schema parsing in cassandra.metadata to make sure
+        # all 4.0.x Cassandra servers are covered
+        self.assertTrue(Version('4.0-alpha') <= Version('4.0.0'))
+        self.assertTrue(Version('4.0-alpha') <= Version('4.0-alpha1'))
+        self.assertTrue(Version('4.0-alpha') <= Version('4.0-beta1'))
