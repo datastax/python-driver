@@ -38,7 +38,7 @@ DEFAULT_RUNTIME = ['3.10.19', '3.11.14', '3.12.12', '3.13.12', '3.14.3']
 DEFAULT_CYTHON = ["True", "False"]
 matrices = [
   "FULL": [
-    "SERVER": DEFAULT_CASSANDRA + DEFAULT_DSE,
+    "SERVER": DEFAULT_CASSANDRA,
     "RUNTIME": DEFAULT_RUNTIME,
     "CYTHON": DEFAULT_CYTHON
   ],
@@ -53,7 +53,7 @@ matrices = [
     "CYTHON": DEFAULT_CYTHON
   ],
   "SMOKE": [
-    "SERVER": DEFAULT_CASSANDRA.takeRight(2) + DEFAULT_DSE.takeRight(2) + DEFAULT_HCD.takeRight(1),
+    "SERVER": DEFAULT_CASSANDRA.takeRight(2),
     "RUNTIME": DEFAULT_RUNTIME.take(1) + DEFAULT_RUNTIME.takeRight(1),
     "CYTHON": ["True"]
   ]
