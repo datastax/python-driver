@@ -11,21 +11,6 @@ from threading import Lock, Thread, get_ident
 log = logging.getLogger(__name__)
 
 
-# This module uses ``yield from`` and ``@asyncio.coroutine`` over ``await`` and
-# ``async def`` for pre-Python-3.5 compatibility, so keep in mind that the
-# managed coroutines are generator-based, not native coroutines. See PEP 492:
-# https://www.python.org/dev/peps/pep-0492/#coroutine-objects
-
-
-try:
-    asyncio.run_coroutine_threadsafe
-except AttributeError:
-    raise ImportError(
-        'Cannot use asyncioreactor without access to '
-        'asyncio.run_coroutine_threadsafe (added in 3.4.6 and 3.5.1)'
-    )
-
-
 class AsyncioTimer(object):
     """
     An ``asyncioreactor``-specific Timer. Similar to :class:`.connection.Timer,
@@ -67,11 +52,12 @@ class AsyncioTimer(object):
 
 class AsyncioConnection(Connection):
     """
-    An experimental implementation of :class:`.Connection` that uses the
-    ``asyncio`` module in the Python standard library for its event loop.
+    An implementation of :class:`.Connection` that uses the ``asyncio``
+    module in the Python standard library for its event loop.
 
-    Note that it requires ``asyncio`` features that were only introduced in the
-    3.4 line in 3.4.6, and in the 3.5 line in 3.5.1.
+    This is the preferred connection class on Python 3.12+ where the
+    ``asyncore`` module has been removed. It is also used as a fallback
+    when the libev C extension is not available.
     """
 
     _loop = None
@@ -109,7 +95,6 @@ class AsyncioConnection(Connection):
                 cls._loop = None
             if cls._loop is None:
                 cls._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(cls._loop)
 
             if not cls._loop_thread:
                 # daemonize so the loop will be shut down on interpreter
@@ -173,7 +158,7 @@ class AsyncioConnection(Connection):
 
     async def _push_msg(self, chunks):
         # This lock ensures all chunks of a message are sequential in the Queue
-        with await self._write_queue_lock:
+        async with self._write_queue_lock:
             for chunk in chunks:
                 self._write_queue.put_nowait(chunk)
 

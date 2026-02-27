@@ -1,16 +1,15 @@
 AsyncioConnection, ASYNCIO_AVAILABLE = None, False
 try:
     from cassandra.io.asyncioreactor import AsyncioConnection
-    import asynctest
     ASYNCIO_AVAILABLE = True
 except (ImportError, SyntaxError):
     AsyncioConnection = None
     ASYNCIO_AVAILABLE = False
 
 from tests import is_monkey_patched, connection_class
-from tests.unit.io.utils import TimerCallback, TimerTestMixin
+from tests.unit.io.utils import TimerCallback, TimerTestMixin, submit_and_wait_for_completion
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import unittest
 import time
@@ -56,7 +55,7 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
         socket_patcher.start()
 
         old_selector = AsyncioConnection._loop._selector
-        AsyncioConnection._loop._selector = asynctest.TestSelector()
+        AsyncioConnection._loop._selector = MagicMock()
 
         def reset_selector():
             AsyncioConnection._loop._selector = old_selector
@@ -64,6 +63,31 @@ class AsyncioTimerTests(TimerTestMixin, unittest.TestCase):
         self.addCleanup(reset_selector)
 
         super(AsyncioTimerTests, self).setUp()
+
+    def test_multi_timer_validation(self):
+        """
+        Override with a wider tolerance for asyncio's thread-based scheduling,
+        which has inherently more jitter than libev's native event loop.
+        """
+        from tests.unit.io.utils import get_timeout
+        pending_callbacks = []
+        completed_callbacks = []
+
+        for gross_time in range(0, 100, 1):
+            timeout = get_timeout(gross_time, 0, 100, 100, False)
+            callback = TimerCallback(timeout)
+            self.create_timer(timeout, callback.invoke)
+            pending_callbacks.append(callback)
+
+        while len(pending_callbacks) != 0:
+            for callback in pending_callbacks:
+                if callback.was_invoked():
+                    pending_callbacks.remove(callback)
+                    completed_callbacks.append(callback)
+            time.sleep(.1)
+
+        for callback in completed_callbacks:
+            self.assertAlmostEqual(callback.expected_wait, callback.get_wait_time(), delta=.25)
 
     def test_timer_cancellation(self):
         # Various lists for tracking callback stage
