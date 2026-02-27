@@ -251,7 +251,12 @@ ENVIRONMENT_EOF
     pip --version
     printenv | sort
   '''
+
+  sh label: 'See what files are available', script: '''#!/bin/bash -le
+    curl http://repo-public.aws.dsinternal.org/tar/enterprise/
+  '''
 }
+
 
 def installDriver() {
   sh label: 'Install the driver and compile with C extensions with Cython', script: '''#!/bin/bash -lex
