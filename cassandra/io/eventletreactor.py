@@ -24,6 +24,7 @@ from greenlet import GreenletExit
 import logging
 from threading import Event
 import time
+from deprecated import deprecated
 
 from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
 try:
@@ -45,6 +46,7 @@ def _check_pyopenssl():
         )
 
 
+@deprecated(version="3.30.0", reason="The eventlet event loop is deprecated and will be removed in 3.31.0.  See CASSPYTHON-12.")
 class EventletConnection(Connection):
     """
     An implementation of :class:`.Connection` that utilizes ``eventlet``.

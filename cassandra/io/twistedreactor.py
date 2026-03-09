@@ -18,6 +18,7 @@ Module that implements an event loop based on twisted
 ( https://twistedmatrix.com ).
 """
 import atexit
+from deprecated import deprecated
 import logging
 import time
 from functools import partial
@@ -180,7 +181,7 @@ class _SSLCreator(object):
             connection.set_tlsext_host_name(self.ssl_options['server_hostname'].encode('ascii'))
         return connection
 
-
+@deprecated(version="3.30.0", reason="The Twisted event loop is deprecated and will be removed in 3.31.0.  See CASSPYTHON-12.")
 class TwistedConnection(Connection):
     """
     An implementation of :class:`.Connection` that utilizes the

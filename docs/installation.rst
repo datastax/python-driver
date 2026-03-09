@@ -217,10 +217,16 @@ dependencies, then use install-option::
 
 Supported Event Loops
 ^^^^^^^^^^^^^^^^^^^^^
-For Python versions before 3.12 the driver uses the ``asyncore`` module for its default
-event loop.  Other event loops such as ``libev``, ``gevent`` and ``eventlet`` are also
-available via Python modules or C extensions.  Python 3.12 has removed ``asyncore`` entirely
-so for this platform one of these other event loops must be used.
+The ``asyncore`` and ``libev`` event loops are proven production-grade event loops.  Python 3.12 removed
+asyncore from the runtime but this event loop can still be used in newer versions of Python via the
+`pyasyncore <https://pypi.org/project/pyasyncore/>`_ package.
+
+The ``asyncio`` event loop is generally functional but still somewhat experimental and not recommended
+for production systems.  We anticipate significant improvements to this event loop (including hopefully
+making this event loop the default going forward) in 3.31.0.
+
+The ``gevent``, ``eventlet`` and ``Twisted`` event loops have been deprecated in 3.30.0 and will be removed
+completely in 3.31.0.
 
 libev support
 ^^^^^^^^^^^^^

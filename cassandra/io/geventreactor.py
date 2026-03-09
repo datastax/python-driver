@@ -19,16 +19,15 @@ from gevent.queue import Queue
 from gevent import socket
 import gevent.ssl
 
+from deprecated import deprecated
 import logging
 import time
 
-
 from cassandra.connection import Connection, ConnectionShutdown, Timer, TimerManager
-
 
 log = logging.getLogger(__name__)
 
-
+@deprecated(version="3.30.0", reason="The gevent event loop is deprecated and will be removed in 3.31.0.  See CASSPYTHON-12.")
 class GeventConnection(Connection):
     """
     An implementation of :class:`.Connection` that utilizes ``gevent``.
