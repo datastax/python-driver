@@ -31,8 +31,9 @@ except ImportError:
 import threading
 import ssl
 import time
+from importlib import reload
+
 import eventlet
-from imp import reload
 
 def eventlet_un_patch_all():
     """
@@ -47,4 +48,3 @@ def eventlet_un_patch_all():
 def restore_saved_module(module):
     reload(module)
     del eventlet.patcher.already_patched[module.__name__]
-

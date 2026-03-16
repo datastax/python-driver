@@ -743,10 +743,10 @@ class ClusterTests(unittest.TestCase):
             with TestCluster(auth_provider=auth_provider) as cluster:
                 session = cluster.connect()
                 self.assertIsNotNone(session.execute("SELECT * from system.local"))
+                expected_connections = len(cluster.metadata.all_hosts()) + 1
 
-            # Three conenctions to nodes plus the control connection
             auth_warning = mock_handler.get_message_count('warning', "An authentication challenge was not sent")
-            self.assertGreaterEqual(auth_warning, 4)
+            self.assertGreaterEqual(auth_warning, expected_connections)
             self.assertEqual(
                 auth_warning,
                 mock_handler.get_message_count("debug", "Got ReadyMessage on new connection")
@@ -996,7 +996,8 @@ class ClusterTests(unittest.TestCase):
         exec_profiles = {'rr1': rr1}
         with TestCluster(execution_profiles=exec_profiles) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
-            self.assertGreater(len(cluster.metadata.all_hosts()), 1, "We only have one host connected at this point")
+            if len(cluster.metadata.all_hosts()) <= 1:
+                raise unittest.SkipTest("This test requires multiple connected hosts")
 
             rr1_clone = session.execution_profile_clone_update('rr1', row_factory=tuple_factory)
             cluster.add_execution_profile("rr1_clone", rr1_clone)
@@ -1158,6 +1159,8 @@ class ClusterTests(unittest.TestCase):
         )
         with TestCluster(execution_profiles={EXEC_PROFILE_DEFAULT: tap_profile}) as cluster:
             session = cluster.connect(wait_for_all_pools=True)
+            if len(cluster.metadata.all_hosts()) <= 1:
+                raise unittest.SkipTest("This test requires multiple connected hosts")
             session.execute('''
                     CREATE TABLE test1rf.table_with_big_key (
                         k1 int,

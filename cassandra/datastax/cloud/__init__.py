@@ -20,11 +20,12 @@ import json
 import sys
 import tempfile
 import shutil
+import ssl
 from urllib.request import urlopen
 
 _HAS_SSL = True
 try:
-    from ssl import SSLContext, PROTOCOL_TLS, CERT_REQUIRED
+    from ssl import SSLContext, CERT_REQUIRED
 except:
     _HAS_SSL = False
 
@@ -171,9 +172,12 @@ def parse_metadata_info(config, http_data):
 
 
 def _ssl_context_from_cert(ca_cert_location, cert_location, key_location):
-    ssl_context = SSLContext(PROTOCOL_TLS)
+    protocol = getattr(ssl, "PROTOCOL_TLS_CLIENT", ssl.PROTOCOL_TLS)
+    ssl_context = SSLContext(protocol)
     ssl_context.load_verify_locations(ca_cert_location)
     ssl_context.verify_mode = CERT_REQUIRED
+    if hasattr(ssl_context, "check_hostname"):
+        ssl_context.check_hostname = True
     ssl_context.load_cert_chain(certfile=cert_location, keyfile=key_location)
 
     return ssl_context
@@ -186,7 +190,8 @@ def _pyopenssl_context_from_cert(ca_cert_location, cert_location, key_location):
         raise ImportError(
             "PyOpenSSL must be installed to connect to Astra with the Eventlet or Twisted event loops")\
             .with_traceback(e.__traceback__)
-    ssl_context = SSL.Context(SSL.TLSv1_METHOD)
+    ssl_method = getattr(SSL, "TLS_METHOD", SSL.TLSv1_METHOD)
+    ssl_context = SSL.Context(ssl_method)
     ssl_context.set_verify(SSL.VERIFY_PEER, callback=lambda _1, _2, _3, _4, ok: ok)
     ssl_context.use_certificate_file(cert_location)
     ssl_context.use_privatekey_file(key_location)

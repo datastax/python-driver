@@ -150,7 +150,8 @@ class _SSLCreator(object):
         if ssl_context:
             self.context = ssl_context
         else:
-            self.context = SSL.Context(SSL.TLSv1_METHOD)
+            ssl_method = getattr(SSL, "TLS_METHOD", SSL.TLSv1_METHOD)
+            self.context = SSL.Context(ssl_method)
             if "certfile" in self.ssl_options:
                 self.context.use_certificate_file(self.ssl_options["certfile"])
             if "keyfile" in self.ssl_options:

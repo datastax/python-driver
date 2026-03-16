@@ -70,6 +70,12 @@ driver_project_data = pyproject_data["tool"]["cassandra-driver"]
 def key_or_false(k):
     return driver_project_data[k] if k in driver_project_data else False
 
+def has_libev_headers(include_dirs):
+    for include_dir in include_dirs:
+        if os.path.exists(os.path.join(include_dir, 'ev.h')):
+            return True
+    return False
+
 try_murmur3 = key_or_false("build-murmur3-extension") and is_supported
 try_libev = key_or_false("build-libev-extension") and is_supported
 try_cython = key_or_false("build-cython-extensions") and is_supported and not is_pypy
@@ -88,13 +94,16 @@ if try_libev:
     if is_macos:
         libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
         libev_libs.extend(['/opt/homebrew/lib'])
-    libev_ext = Extension('cassandra.io.libevwrapper',
-                          sources=['cassandra/io/libevwrapper.c'],
-                          include_dirs=libev_includes,
-                          libraries=['ev'],
-                          library_dirs=libev_libs)
-    sys.stderr.write("Appending libev extension %s\n" % libev_ext)
-    exts.append(libev_ext)
+    if has_libev_headers(libev_includes):
+        libev_ext = Extension('cassandra.io.libevwrapper',
+                              sources=['cassandra/io/libevwrapper.c'],
+                              include_dirs=libev_includes,
+                              libraries=['ev'],
+                              library_dirs=libev_libs)
+        sys.stderr.write("Appending libev extension %s\n" % libev_ext)
+        exts.append(libev_ext)
+    else:
+        sys.stderr.write("Skipping libev extension because ev.h was not found in configured include directories.\n")
 
 if try_cython:
     sys.stderr.write("Trying Cython builds in order to append Cython extensions\n")

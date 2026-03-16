@@ -149,6 +149,13 @@ def _try_libev_import():
     except DependencyException as e:
         return (None, e)
 
+def _try_asyncio_import():
+    try:
+        from cassandra.io.asyncioreactor import AsyncioConnection
+        return (AsyncioConnection, None)
+    except ImportError as e:
+        return (None, e)
+
 def _try_asyncore_import():
     try:
         from cassandra.io.asyncorereactor import AsyncoreConnection
@@ -168,7 +175,7 @@ def _connection_reduce_fn(val,import_fn):
 
 log = logging.getLogger(__name__)
 
-conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncore_import)
+conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncio_import, _try_asyncore_import)
 (conn_class, excs) = reduce(_connection_reduce_fn, conn_fns, (None,[]))
 if not conn_class:
     raise DependencyException("Unable to load a default connection class", excs)
@@ -883,18 +890,20 @@ class Cluster(object):
     * :class:`cassandra.io.twistedreactor.TwistedConnection`
     * EXPERIMENTAL: :class:`cassandra.io.asyncioreactor.AsyncioConnection`
 
-    By default, ``AsyncoreConnection`` will be used, which uses
-    the ``asyncore`` module in the Python standard library.
+    By default, ``LibevConnection`` will be used when available.
 
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
+
+    If ``libev`` is not available, ``AsyncioConnection`` will be used when available.
 
     If ``gevent`` or ``eventlet`` monkey-patching is detected, the corresponding
     connection class will be used automatically.
 
+    ``AsyncoreConnection`` is still available on Python versions where the
+    ``asyncore`` module exists.
+
     ``AsyncioConnection``, which uses the ``asyncio`` module in the Python
-    standard library, is also available, but currently experimental. Note that
-    it requires ``asyncio`` features that were only introduced in the 3.4 line
-    in 3.4.6, and in the 3.5 line in 3.5.1.
+    standard library, is also available, but currently experimental.
     """
 
     control_connection_timeout = 2.0

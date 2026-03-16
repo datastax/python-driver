@@ -100,12 +100,12 @@ else:
         connection_class = LibevConnection
     except DependencyException as e:
         log.debug('Could not import LibevConnection, '
-                  'using connection_class=None; '
+                  'falling back to AsyncioConnection; '
                   'failed with error:\n {}'.format(
                       repr(e)
                   ))
-        log.debug("Will attempt to set connection class at cluster initialization")
-        connection_class = None
+        from cassandra.io.asyncioreactor import AsyncioConnection
+        connection_class = AsyncioConnection
 
 
 def is_windows():

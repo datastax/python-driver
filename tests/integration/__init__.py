@@ -41,13 +41,23 @@ from cassandra.protocol import ConfigurationException
 from cassandra import ProtocolVersion
 
 try:
-    from ccmlib.dse_cluster import DseCluster
-    from ccmlib.hcd_cluster import HcdCluster
     from ccmlib.cluster import Cluster as CCMCluster
     from ccmlib.cluster_factory import ClusterFactory as CCMClusterFactory
     from ccmlib import common
-except ImportError as e:
+except ImportError:
+    CCMCluster = None
     CCMClusterFactory = None
+    common = None
+
+try:
+    from ccmlib.dse_cluster import DseCluster
+except ImportError:
+    DseCluster = None
+
+try:
+    from ccmlib.hcd_cluster import HcdCluster
+except ImportError:
+    HcdCluster = None
 
 log = logging.getLogger(__name__)
 

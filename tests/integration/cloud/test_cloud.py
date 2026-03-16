@@ -18,9 +18,10 @@ from cassandra.cqlengine.management import sync_table, create_keyspace_simple
 from cassandra.cqlengine.models import Model
 from cassandra.cqlengine import columns
 
+import ssl
 import unittest
 
-from ssl import SSLContext, PROTOCOL_TLS
+from ssl import SSLContext
 
 from cassandra import DriverException, ConsistencyLevel, InvalidRequest
 from cassandra.cluster import NoHostAvailable, ExecutionProfile, Cluster, _execution_profile_to_string
@@ -33,6 +34,8 @@ from unittest.mock import patch
 from tests.integration import requirescloudproxy
 from tests.util import wait_until_not_raised
 from tests.integration.cloud import CloudProxyCluster, CLOUD_PROXY_SERVER
+
+SSL_CLIENT_PROTOCOL = getattr(ssl, "PROTOCOL_TLS_CLIENT", ssl.PROTOCOL_TLS)
 
 DISALLOWED_CONSISTENCIES = [
     ConsistencyLevel.ANY,
@@ -88,7 +91,7 @@ class CloudTests(CloudProxyCluster):
 
     def test_error_overriding_ssl_context(self):
         with self.assertRaises(ValueError) as cm:
-            self.connect(self.creds, ssl_context=SSLContext(PROTOCOL_TLS))
+            self.connect(self.creds, ssl_context=SSLContext(SSL_CLIENT_PROTOCOL))
 
         self.assertIn('cannot be specified with a cloud configuration', str(cm.exception))
 
