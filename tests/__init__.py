@@ -100,7 +100,7 @@ else:
         connection_class = LibevConnection
     except DependencyException as e:
         log.debug('Could not import LibevConnection, '
-                  'falling back to AsyncioConnection; '
+                  'using connection_class=None; '
                   'failed with error:\n {}'.format(
                       repr(e)
                   ))
