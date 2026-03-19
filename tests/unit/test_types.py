@@ -965,8 +965,10 @@ class DateRangeDeserializationTests(unittest.TestCase):
             dt = datetime.datetime.fromtimestamp(seconds / 1000.0, tz=utc_timezone)
             dt = dt + datetime.timedelta(days=370)
             dt = dt.replace(day=1) - datetime.timedelta(microseconds=1)
-            delta = dt - self.epoch
-            return delta.days * 24 * 60 * 60 * 1000 + delta.seconds * 1000 + dt.microsecond // 1000
+            diff = time.mktime(dt.timetuple()) - time.mktime(self.epoch.timetuple())
+            return diff * 1000 + 999
+            # This doesn't work for big values because it loses precision
+            #return int((dt - self.epoch).total_seconds() * 1000)
         self._deserialize_date_range({"month": 1, "day": 1, "hour": 0, "minute": 0, "second": 0, "microsecond": 0},
                                      DateRangePrecision.YEAR,
                                      get_upper_bound,

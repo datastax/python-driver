@@ -104,8 +104,8 @@ else:
                   'failed with error:\n {}'.format(
                       repr(e)
                   ))
-        from cassandra.io.asyncioreactor import AsyncioConnection
-        connection_class = AsyncioConnection
+        log.debug("Will attempt to set connection class at cluster initialization")
+        connection_class = None
 
 
 def is_windows():
