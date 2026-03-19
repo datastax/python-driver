@@ -70,12 +70,6 @@ driver_project_data = pyproject_data["tool"]["cassandra-driver"]
 def key_or_false(k):
     return driver_project_data[k] if k in driver_project_data else False
 
-def has_libev_headers(include_dirs):
-    for include_dir in include_dirs:
-        if os.path.exists(os.path.join(include_dir, 'ev.h')):
-            return True
-    return False
-
 try_murmur3 = key_or_false("build-murmur3-extension") and is_supported
 try_libev = key_or_false("build-libev-extension") and is_supported
 try_cython = key_or_false("build-cython-extensions") and is_supported and not is_pypy
