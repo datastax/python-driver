@@ -1,3 +1,26 @@
+3.30.0
+======
+March 23, 2026
+
+Features
+--------
+* Introduce pyproject.toml to explicitly declare build dependencies (CASSPYTHON-7)
+* Add Python 3.14 to CI, remove Python 3.9 (CASSPYTHON-4)
+* Mark eventlet, gevent and Twisted event loops as deprecated (CASSPYTHON-12)
+
+Bug Fixes
+---------
+* Do not set timeout to None when calling execute_async in execute_concurrent (PYTHON-1354)
+* No C extension .so files in published binary Python whl packages of 3.29.3 (CASSPYTHON-3)
+* Win32 wheels do not include compiled libev modules (CASSPYTHON-5)
+
+Others
+------
+* Remove obsolete __future__ import absolute_import (PR 1263)
+* Remove ez_setup for compatibility with setuptools v82 (PR 1268)
+* Replace usage of with await lock (PR 1270)
+* Update cassandra.util.Version to better support Cassandra version strings (CASSPYTHON-10)
+
 3.29.3
 ======
 October 20, 2025

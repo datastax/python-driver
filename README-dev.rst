@@ -75,7 +75,7 @@ Running Integration Tests
 -------------------------
 In order to run integration tests, you must specify a version to run using the ``CASSANDRA_VERSION`` or ``DSE_VERSION`` environment variable::
 
-    CASSANDRA_VERSION=2.0.9 pytest tests/integration/standard
+    CASSANDRA_VERSION=4.0.1 pytest tests/integration/standard
 
 Or you can specify a cassandra directory (to test unreleased versions)::
 
@@ -85,7 +85,7 @@ Specifying the usage of an already running Cassandra cluster
 ------------------------------------------------------------
 The test will start the appropriate Cassandra clusters when necessary  but if you don't want this to happen because a Cassandra cluster is already running the flag ``USE_CASS_EXTERNAL`` can be used, for example::
 
-    USE_CASS_EXTERNAL=1 CASSANDRA_VERSION=2.0.9 pytest tests/integration/standard
+    USE_CASS_EXTERNAL=1 CASSANDRA_VERSION=4.0.1 pytest tests/integration/standard
 
 Specify a Protocol Version for Tests
 ------------------------------------
@@ -96,7 +96,7 @@ it with the ``PROTOCOL_VERSION`` environment variable::
 
 Testing Multiple Python Versions
 --------------------------------
-Use tox to test all of Python 3.9 through 3.13 and pypy::
+Use tox to test all of Python 3.10 through 3.14 and pypy::
 
     tox
 
@@ -106,7 +106,7 @@ Running the Benchmarks
 ======================
 There needs to be a version of cassandra running locally so before running the benchmarks, if ccm is installed:
 	
-	ccm create benchmark_cluster -v 3.0.1 -n 1 -s
+	ccm create benchmark_cluster -v 4.0.1 -n 1 -s
 
 To run the benchmarks, pick one of the files under the ``benchmarks/`` dir and run it::
 
