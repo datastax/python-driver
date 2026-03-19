@@ -94,16 +94,13 @@ if try_libev:
     if is_macos:
         libev_includes.extend(['/opt/homebrew/include', os.path.expanduser('~/homebrew/include')])
         libev_libs.extend(['/opt/homebrew/lib'])
-    if has_libev_headers(libev_includes):
-        libev_ext = Extension('cassandra.io.libevwrapper',
-                              sources=['cassandra/io/libevwrapper.c'],
-                              include_dirs=libev_includes,
-                              libraries=['ev'],
-                              library_dirs=libev_libs)
-        sys.stderr.write("Appending libev extension %s\n" % libev_ext)
-        exts.append(libev_ext)
-    else:
-        sys.stderr.write("Skipping libev extension because ev.h was not found in configured include directories.\n")
+    libev_ext = Extension('cassandra.io.libevwrapper',
+                          sources=['cassandra/io/libevwrapper.c'],
+                          include_dirs=libev_includes,
+                          libraries=['ev'],
+                          library_dirs=libev_libs)
+    sys.stderr.write("Appending libev extension %s\n" % libev_ext)
+    exts.append(libev_ext)
 
 if try_cython:
     sys.stderr.write("Trying Cython builds in order to append Cython extensions\n")
