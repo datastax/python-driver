@@ -20,6 +20,7 @@ Others
 * Remove ez_setup for compatibility with setuptools v82 (PR 1268)
 * Replace usage of with await lock (PR 1270)
 * Update cassandra.util.Version to better support Cassandra version strings (CASSPYTHON-10)
+* Update DRIVER_NAME after donation to ASF (CASSPYTHON-17)
 
 3.29.3
 ======
