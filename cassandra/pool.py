@@ -459,6 +459,13 @@ class HostConnection(object):
             with self._stream_available_condition:
                 self._stream_available_condition.notify()
 
+        if connection.is_draining:
+            with connection.lock:
+                if connection.in_flight == 0:
+                    log.debug("Graceful drain complete for %s. Closing connection.", self.host)
+                    connection.close()
+            return
+
         if connection.is_defunct or connection.is_closed:
             if connection.signaled_error and not self.shutdown_on_error:
                 return
@@ -776,6 +783,14 @@ class HostConnectionPool(object):
             if not stream_was_orphaned:
                 connection.in_flight -= 1
             in_flight = connection.in_flight
+
+        if connection.is_draining and connection.in_flight == 0:
+            with self._lock:
+                if connection in self._connections:
+                    self._connections.remove(connection)
+                    self.open_count -= 1
+            connection.close()
+            return
 
         if connection.is_defunct or connection.is_closed:
             if not connection.signaled_error:

@@ -3718,7 +3718,8 @@ class ControlConnection(object):
             connection.register_watchers({
                 "TOPOLOGY_CHANGE": partial(_watch_callback, self_weakref, '_handle_topology_change'),
                 "STATUS_CHANGE": partial(_watch_callback, self_weakref, '_handle_status_change'),
-                "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change')
+                "SCHEMA_CHANGE": partial(_watch_callback, self_weakref, '_handle_schema_change'),
+                "GRACEFUL_DISCONNECT": partial(_watch_callback, self_weakref, '_handle_graceful_disconnect')
             }, register_timeout=self._timeout)
 
             sel_peers = self._get_peers_query(self.PeersQueryType.PEERS, connection)
@@ -3747,6 +3748,15 @@ class ControlConnection(object):
             raise
 
         return connection
+
+    def _handle_graceful_disconnect(self, event):
+        if self._connection is None:
+            return
+        host = self._cluster.metadata.get_host(self._connection.endpoint)
+        print("host found:", host)
+        if host:
+            print(self)
+            self._cluster.on_down(host, is_host_addition=False)
 
     def reconnect(self):
         if self._is_shutdown:

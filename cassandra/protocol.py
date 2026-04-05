@@ -986,7 +986,8 @@ class BatchMessage(_MessageType):
 known_event_types = frozenset((
     'TOPOLOGY_CHANGE',
     'STATUS_CHANGE',
-    'SCHEMA_CHANGE'
+    'SCHEMA_CHANGE',
+    'GRACEFUL_DISCONNECT'
 ))
 
 
@@ -1055,6 +1056,13 @@ class EventMessage(_MessageType):
             else:
                 event = {'target_type': SchemaTargetType.KEYSPACE, 'change_type': change_type, 'keyspace': keyspace}
         return event
+
+    @classmethod
+    def recv_graceful_disconnect(cls, f, protocol_version):
+        """
+        Graceful disconnect events contain no extra arguments.
+        """
+        return {}
 
 
 class ReviseRequestMessage(_MessageType):

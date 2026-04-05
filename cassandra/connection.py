@@ -674,6 +674,9 @@ class Connection(object):
 
     CALLBACK_ERR_THREAD_THRESHOLD = 100
 
+    supports_graceful_disconnect = False
+    is_draining = False
+
     in_buffer_size = 4096
     out_buffer_size = 4096
 
@@ -1061,6 +1064,8 @@ class Connection(object):
             return self.highest_request_id
 
     def handle_pushed(self, response):
+        if response.event_type == 'GRACEFUL_DISCONNECT':
+            self._handle_graceful_disconnect()
         log.debug("Message pushed from server: %r", response)
         for cb in self._push_watchers.get(response.event_type, []):
             try:
@@ -1068,9 +1073,20 @@ class Connection(object):
             except Exception:
                 log.exception("Pushed event handler errored, ignoring:")
 
+    def _handle_graceful_disconnect(self):
+        log.info("Received GRACEFUL_DISCONNECT from %s. Draining connection...", self.endpoint)
+        self.is_draining = True
+        self._socket_writable = False
+
+        with self.lock:
+            if self.in_flight == 0:
+                self.close()
+
     def send_msg(self, msg, request_id, cb, encoder=ProtocolHandler.encode_message, decoder=ProtocolHandler.decode_message, result_metadata=None):
         if self.is_defunct:
             raise ConnectionShutdown("Connection to %s is defunct" % self.endpoint)
+        if self.is_draining:
+            raise ConnectionShutdown("Connection to %s is draining" % self.endpoint)
         elif self.is_closed:
             raise ConnectionShutdown("Connection to %s is closed" % self.endpoint)
         elif not self._socket_writable:
@@ -1397,6 +1413,7 @@ class Connection(object):
                         locally_supported_compressions[compression_type]
 
         self._send_startup_message(compression_type, no_compact=self.no_compact)
+        self.supports_graceful_disconnect = options_response.options.get('GRACEFUL_DISCONNECT') == ['true']
 
     @defunct_on_error
     def _send_startup_message(self, compression=None, no_compact=False):
