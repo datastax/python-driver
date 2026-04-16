@@ -4,9 +4,51 @@ Upgrading
 .. toctree::
    :maxdepth: 1
 
+Upgrading to 3.30.0
+-------------------
+Version 3.30.0 of the Python driver is the first release since the driver's donation
+to the Apache Software Foundation (ASF).
+
+Supported Python Versions
+^^^^^^^^^^^^^^^^^^^^^^^^^
+An individual version of the Python driver aims to officially support all Python runtimes
+that are not end-of-life (EOL) at the time of that version's release.  For 3.30.0 this policy
+entails support for Python 3.10 through Python 3.14.  The driver will likely continue to work
+reasonably well on older Python runtimes but only these versions are officially supported.
+
+Conversion to pyproject.toml
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+With this release we are moving away from the install and configuration process based on
+setup.py and towards the use of pyproject.toml.  As a result of this change (and in keeping
+with the typical use of pyproject.toml) configuration of a driver build is now declarative.  All
+build options should be specified in pyproject.toml and overrides via command-line flags or
+environment variables are no longer supported.  Please consult
+`CASSPYTHON-7 <https://issues.apache.org/jira/browse/CASSPYTHON-7>`_ for additional details.
+
+Event Loop Deprecation
+^^^^^^^^^^^^^^^^^^^^^^
+With this release the eventlet, gevent and Twisted event loops are considered deprecated.  Use
+of these event loops in this version will generate a warning to this effect.  We are planning on
+removing these event loops in their entirety in the next minor release.  Please consult
+`CASSPYTHON-12 <https://issues.apache.org/jira/browse/CASSPYTHON-12>`_ for additional details.
+
+Removal of Win32 Wheels
+^^^^^^^^^^^^^^^^^^^^^^^
+As of this release we will no longer be offering wheels for Win32 platforms.  Wheels for other
+Windows platforms will continue to be deployed to PyPI.  Please consult
+`CASSPYTHON-5 <https://issues.apache.org/jira/browse/CASSPYTHON-5>`_ for additional details.
+
+Change to DRIVER_NAME in STARTUP Messages
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The DRIVER_NAME property in STARTUP messages has been changed in this release to allow
+administrators to clearly distinguish between uses of the previous DataStax Python drivers
+and this driver.  Any monitoring/management applications which were monitoring driver usage
+based on this string should be aware of this change and update accordingly.  Please consult
+`CASSPYTHON-17 <https://issues.apache.org/jira/browse/CASSPYTHON-17>`_ for additional details.
+
+
 Upgrading from dse-driver
 -------------------------
-
 Since 3.21.0, cassandra-driver fully supports DataStax products. dse-driver and
 dse-graph users should now migrate to cassandra-driver to benefit from latest bug fixes
 and new features. The upgrade to this new unified driver version is straightforward
