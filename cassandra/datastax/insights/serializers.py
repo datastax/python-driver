@@ -37,6 +37,7 @@ def initialize_registry(insights_registry):
         DCAwareRoundRobinPolicy,
         TokenAwarePolicy,
         WhiteListRoundRobinPolicy,
+        DynamicWhiteListRoundRobinPolicy,
         HostFilterPolicy,
         ConstantReconnectionPolicy,
         ExponentialReconnectionPolicy,
@@ -78,6 +79,13 @@ def initialize_registry(insights_registry):
         return {'type': policy.__class__.__name__,
                 'namespace': namespace(policy.__class__),
                 'options': {'allowed_hosts': policy._allowed_hosts}
+                }
+
+    @insights_registry.register_serializer_for(DynamicWhiteListRoundRobinPolicy)
+    def dynamic_whitelist_round_robin_policy_insights_serializer(policy):
+        return {'type': policy.__class__.__name__,
+                'namespace': namespace(policy.__class__),
+                'options': {'allowed_host_ids': tuple(policy._allowed_host_ids)}
                 }
 
     @insights_registry.register_serializer_for(HostFilterPolicy)

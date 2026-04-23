@@ -21,7 +21,7 @@ from cassandra.shard_info import _ShardingInfo
 
 import unittest
 from threading import Thread, Event, Lock
-from unittest.mock import Mock, NonCallableMagicMock, MagicMock
+from unittest.mock import Mock, NonCallableMagicMock, MagicMock, patch
 
 from cassandra.cluster import Session, ShardAwareOptions
 from cassandra.connection import Connection
@@ -42,6 +42,8 @@ class _PoolTests(unittest.TestCase):
 
     def make_session(self):
         session = NonCallableMagicMock(spec=Session, keyspace='foobarkeyspace', _trash=[])
+        session._signal_connection_failure.return_value = False
+        session.is_shard_aware_disabled.return_value = False
         return session
 
     def test_borrow_and_return(self):
@@ -143,8 +145,7 @@ class _PoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
-        session.cluster.signal_connection_failure.return_value = False
-        host.signal_connection_failure.return_value = False
+        session._signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # the connection should be closed a new creation scheduled
@@ -165,19 +166,14 @@ class _PoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_defunct = True
-        session.cluster.signal_connection_failure.return_value = True
-        host.signal_connection_failure.return_value = True
+        session._signal_connection_failure.return_value = True
         pool.return_connection(conn)
 
-        # the connection should be closed a new creation scheduled
+        # the connection should be closed and the pool should delegate down
+        # handling back to the session.
         assert conn.close.call_args
-        if self.PoolImpl is HostConnection:
-            # on shard aware implementation we use submit function regardless
-            assert host.signal_connection_failure.call_args
-            assert session.submit.called
-        else:
-            assert not session.submit.called
-            assert session.cluster.signal_connection_failure.call_args
+        session._signal_connection_failure.assert_called_once_with(host, conn.last_error)
+        session._handle_pool_down.assert_called_once_with(host, is_host_addition=False)
         assert pool.is_shutdown
 
     def test_return_closed_connection(self):
@@ -192,8 +188,7 @@ class _PoolTests(unittest.TestCase):
 
         pool.borrow_connection(timeout=0.01)
         conn.is_closed = True
-        session.cluster.signal_connection_failure.return_value = False
-        host.signal_connection_failure.return_value = False
+        session._signal_connection_failure.return_value = False
         pool.return_connection(conn)
 
         # a new creation should be scheduled
@@ -230,6 +225,29 @@ class HostConnectionTests(_PoolTests):
     __test__ = True
     PoolImpl = HostConnection
     uses_single_connection = True
+
+    def test_session_level_shard_aware_disable_skips_fanout(self):
+        host = Mock(spec=Host, address='ip1')
+        host.sharding_info = None
+        session = self.make_session()
+        session.is_shard_aware_disabled.return_value = True
+
+        connection = HashableMock(spec=Connection, in_flight=0, is_defunct=False,
+                                  is_closed=False, max_request_id=100)
+        connection.features = ProtocolFeatures(
+            shard_id=0,
+            sharding_info=_ShardingInfo(
+                shard_id=0, shards_count=4, partitioner="",
+                sharding_algorithm="", sharding_ignore_msb=0,
+                shard_aware_port=19042, shard_aware_port_ssl=""),
+            tablets_routing_v1=False)
+        session.cluster.connection_factory.return_value = connection
+
+        with patch.object(HostConnection, "_open_connections_for_all_shards") as open_shards:
+            pool = HostConnection(host, HostDistance.LOCAL, session)
+
+        open_shards.assert_not_called()
+        assert pool.host.sharding_info is None
 
     def test_fast_shutdown(self):
         class MockSession(MagicMock):

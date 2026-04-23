@@ -15,7 +15,7 @@ import unittest
 
 import logging
 import socket
-
+from concurrent.futures import Future
 from unittest.mock import patch, Mock
 import uuid
 
@@ -23,8 +23,9 @@ from cassandra import ConsistencyLevel, DriverException, Timeout, Unavailable, R
     InvalidRequest, Unauthorized, AuthenticationFailed, OperationTimedOut, UnsupportedOperation, RequestValidationException, ConfigurationException, ProtocolVersion
 from cassandra.cluster import _Scheduler, Session, Cluster, default_lbp_factory, \
     ExecutionProfile, _ConfigMode, EXEC_PROFILE_DEFAULT
+from cassandra.connection import DefaultEndPoint, EndPoint
 from cassandra.pool import Host
-from cassandra.policies import HostDistance, RetryPolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy, SimpleConvictionPolicy
+from cassandra.policies import RetryPolicy, RoundRobinPolicy, DowngradingConsistencyRetryPolicy, SimpleConvictionPolicy
 from cassandra.query import SimpleStatement, named_tuple_factory, tuple_factory
 from tests.unit.utils import mock_session_pools
 from tests import connection_class
@@ -32,6 +33,39 @@ import pytest
 
 
 log = logging.getLogger(__name__)
+
+
+class _HostAwareProxyEndPoint(EndPoint):
+    def __init__(self, address, affinity_key, port=9042):
+        self._address = address
+        self._affinity_key = affinity_key
+        self._port = port
+
+    @property
+    def address(self):
+        return self._address
+
+    @property
+    def port(self):
+        return self._port
+
+    def resolve(self):
+        return self._address, self._port
+
+    def __eq__(self, other):
+        return isinstance(other, _HostAwareProxyEndPoint) and \
+            self.address == other.address and self.port == other.port and \
+            self._affinity_key == other._affinity_key
+
+    def __hash__(self):
+        return hash((self.address, self.port, self._affinity_key))
+
+    def __lt__(self, other):
+        if not isinstance(other, _HostAwareProxyEndPoint):
+            return NotImplemented
+        return (self.address, self.port, str(self._affinity_key)) < \
+            (other.address, other.port, str(other._affinity_key))
+
 
 class ExceptionTypeTest(unittest.TestCase):
 
@@ -171,6 +205,62 @@ class ClusterTest(unittest.TestCase):
                 assert factory.call_args.kwargs['compression'] == expected
                 assert cluster.compression == expected
 
+    def test_get_control_connection_host_falls_back_to_host_id(self):
+        cluster = Cluster(contact_points=['127.0.0.1'])
+        host = Host(DefaultEndPoint('192.168.1.10'), SimpleConvictionPolicy, host_id=uuid.uuid4())
+
+        metadata = Mock()
+        metadata.get_host.return_value = None
+        metadata.get_host_by_host_id.return_value = host
+        cluster.metadata = metadata
+
+        connection = Mock(endpoint=DefaultEndPoint('127.254.254.101', 9042))
+        cluster.control_connection = Mock(_connection=connection, _current_host_id=host.host_id)
+
+        assert cluster.get_control_connection_host() is host
+        metadata.get_host.assert_called_once_with(connection.endpoint)
+        metadata.get_host_by_host_id.assert_called_once_with(host.host_id)
+
+    def test_is_shard_aware_ignores_non_shard_aware_pools(self):
+        cluster = Cluster(contact_points=['127.0.0.1'])
+
+        shard_pool = Mock()
+        shard_pool.host = Mock(
+            endpoint=DefaultEndPoint("127.0.0.1"),
+            sharding_info=Mock(shards_count=8))
+        shard_pool._connections = {0: Mock(), 1: Mock()}
+
+        control_pool = Mock()
+        control_pool.host = Mock(
+            endpoint=DefaultEndPoint("127.254.254.101"),
+            sharding_info=None)
+        control_pool._connections = {0: Mock()}
+
+        cluster.get_all_pools = Mock(return_value=[control_pool, shard_pool])
+
+        assert cluster.is_shard_aware() is True
+
+    def test_shard_aware_stats_ignores_non_shard_aware_pools(self):
+        cluster = Cluster(contact_points=['127.0.0.1'])
+
+        shard_pool = Mock()
+        shard_pool.host = Mock(
+            endpoint=DefaultEndPoint("127.0.0.1"),
+            sharding_info=Mock(shards_count=8))
+        shard_pool._connections = {0: Mock(), 1: Mock()}
+
+        control_pool = Mock()
+        control_pool.host = Mock(
+            endpoint=DefaultEndPoint("127.254.254.101"),
+            sharding_info=None)
+        control_pool._connections = {0: Mock()}
+
+        cluster.get_all_pools = Mock(return_value=[shard_pool, control_pool])
+
+        assert cluster.shard_aware_stats() == {
+            "127.0.0.1:9042": {"shards_count": 8, "connected": 2}
+        }
+
 
 class SchedulerTest(unittest.TestCase):
     # TODO: this suite could be expanded; for now just adding a test covering a ticket
@@ -193,6 +283,16 @@ class SessionTest(unittest.TestCase):
         if connection_class is None:
             raise unittest.SkipTest('libev does not appear to be installed correctly')
         connection_class.initialize_reactor()
+
+    @staticmethod
+    def _completed_future(result):
+        future = Future()
+        future.set_result(result)
+        return future
+
+    @staticmethod
+    def _proxy_endpoint(address, affinity_key, port=9042):
+        return _HostAwareProxyEndPoint(address, affinity_key, port)
 
     # TODO: this suite could be expanded; for now just adding a test covering a PR
     @mock_session_pools
@@ -280,6 +380,144 @@ class SessionTest(unittest.TestCase):
         query = s.execute.call_args[0][0]
         assert query == 'USE simple_ks', (
             "Simple keyspace names should not be quoted, got: %r" % query)
+
+    def test_get_control_connection_host_endpoint_reuses_matching_default_endpoint(self):
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), protocol_version=4)
+        self.addCleanup(cluster.shutdown)
+
+        source_host = Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy, host_id=uuid.uuid4())
+        source_host.set_up()
+        connection_endpoint = DefaultEndPoint("127.254.254.101")
+
+        verification_connection = Mock()
+        verification_connection.wait_for_response.return_value = Mock(
+            column_names=["host_id"],
+            parsed_rows=[(source_host.host_id,)])
+
+        with patch.object(cluster, "connection_factory",
+                          return_value=verification_connection) as connection_factory:
+            endpoint = cluster._get_control_connection_host_endpoint(source_host, connection_endpoint)
+
+        assert endpoint == connection_endpoint
+        assert connection_factory.call_count == 3
+        assert verification_connection.close.call_count == 3
+
+    def test_get_control_connection_host_endpoint_prefers_host_aware_metadata_endpoint(self):
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), protocol_version=4)
+        self.addCleanup(cluster.shutdown)
+
+        host_id = uuid.uuid4()
+        source_endpoint = self._proxy_endpoint("proxy.control.example", host_id)
+        source_host = Host(source_endpoint, SimpleConvictionPolicy, host_id=host_id)
+        source_host.set_up()
+
+        endpoint = cluster._get_control_connection_host_endpoint(
+            source_host, DefaultEndPoint("127.254.254.101"))
+
+        assert endpoint == source_endpoint
+
+    def test_get_control_connection_host_endpoint_falls_back_to_metadata_for_shared_default_endpoint(self):
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), protocol_version=4)
+        self.addCleanup(cluster.shutdown)
+
+        source_host = Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy, host_id=uuid.uuid4())
+        source_host.set_up()
+        connection_endpoint = DefaultEndPoint("127.254.254.101")
+
+        verification_connection = Mock()
+        verification_connection.wait_for_response.return_value = Mock(
+            column_names=["host_id"],
+            parsed_rows=[(uuid.uuid4(),)])
+
+        with patch.object(cluster, "connection_factory",
+                          return_value=verification_connection) as connection_factory:
+            endpoint = cluster._get_control_connection_host_endpoint(source_host, connection_endpoint)
+
+        assert endpoint == source_host.endpoint
+        assert connection_factory.call_count == 1
+        assert verification_connection.close.call_count == 1
+
+    def test_analytics_master_lookup_keeps_explicit_host(self):
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), protocol_version=4)
+        self.addCleanup(cluster.shutdown)
+
+        target_host = Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy, host_id=uuid.uuid4())
+        target_host.set_up()
+
+        with patch.object(Session, "_add_or_renew_pool_for_distance",
+                          return_value=self._completed_future(True)):
+            session = Session(cluster, [target_host])
+
+        master_future = Mock()
+        master_future.result.return_value = [({'location': '127.0.0.99:8182'},)]
+
+        query_future = Mock()
+        query_future._host = target_host
+        query_future.query = SimpleStatement("g.V()")
+        query_future._load_balancer = Mock()
+        query_future.send_request = Mock()
+        query_future.query_plan = iter(())
+
+        with patch.object(session, "submit",
+                          side_effect=lambda fn, *args, **kwargs: self._completed_future(fn(*args, **kwargs))):
+            session._on_analytics_master_result(None, master_future, query_future)
+
+        assert list(query_future.query_plan) == [target_host]
+        query_future._load_balancer.make_query_plan.assert_not_called()
+        query_future.send_request.assert_called_once_with()
+
+    @mock_session_pools
+    def test_session_preserves_down_event_discounting_after_endpoint_update(self, *_):
+        class _DeterministicHashEndPoint(EndPoint):
+            def __init__(self, address, hash_value, port=9042):
+                self._address = address
+                self._hash_value = hash_value
+                self._port = port
+
+            @property
+            def address(self):
+                return self._address
+
+            @property
+            def port(self):
+                return self._port
+
+            def resolve(self):
+                return self._address, self._port
+
+            def __eq__(self, other):
+                return isinstance(other, _DeterministicHashEndPoint) and \
+                    self.address == other.address and self.port == other.port
+
+            def __hash__(self):
+                return self._hash_value
+
+            def __lt__(self, other):
+                return (self.address, self.port) < (other.address, other.port)
+
+        cluster = Cluster(load_balancing_policy=RoundRobinPolicy(), protocol_version=4)
+        self.addCleanup(cluster.shutdown)
+
+        host = Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy, host_id=uuid.uuid4())
+        host.set_up()
+
+        session = Session(cluster, [host])
+        cluster.sessions.add(session)
+
+        pool = Mock()
+        pool.get_state.return_value = {"open_count": 1}
+
+        host.endpoint = _DeterministicHashEndPoint("127.0.0.1", 1)
+        session._pools = {host: pool}
+        host.endpoint = _DeterministicHashEndPoint("127.0.0.2", 2)
+
+        cluster.on_down_potentially_blocking = Mock()
+
+        cluster.on_down(host, is_host_addition=False)
+
+        assert host.is_up is True
+        cluster.on_down_potentially_blocking.assert_not_called()
+        assert session.get_pool_state_for_host(host) == {"open_count": 1}
 
 class ProtocolVersionTests(unittest.TestCase):
 

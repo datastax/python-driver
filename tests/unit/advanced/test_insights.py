@@ -37,6 +37,7 @@ from cassandra.policies import (
     DCAwareRoundRobinPolicy,
     TokenAwarePolicy,
     WhiteListRoundRobinPolicy,
+    DynamicWhiteListRoundRobinPolicy,
     HostFilterPolicy,
     ConstantReconnectionPolicy,
     ExponentialReconnectionPolicy,
@@ -202,6 +203,13 @@ class TestConfigAsDict(unittest.TestCase):
         assert insights_registry.serialize(WhiteListRoundRobinPolicy(['127.0.0.3'])) == {'namespace': 'cassandra.policies',
          'options': {'allowed_hosts': ('127.0.0.3',)},
          'type': 'WhiteListRoundRobinPolicy'}
+
+    def test_dynamic_whitelist_round_robin_policy(self):
+        policy = DynamicWhiteListRoundRobinPolicy()
+        policy._allowed_host_ids = ("host-1",)
+        assert insights_registry.serialize(policy) == {'namespace': 'cassandra.policies',
+         'options': {'allowed_host_ids': ('host-1',)},
+         'type': 'DynamicWhiteListRoundRobinPolicy'}
 
     def test_host_filter_policy(self):
         def my_predicate(s):

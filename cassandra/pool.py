@@ -435,7 +435,7 @@ class HostConnection(object):
 
         if self._keyspace:
             first_connection.set_keyspace_blocking(self._keyspace)
-        if first_connection.features.sharding_info and not self._session.cluster.shard_aware_options.disable:
+        if first_connection.features.sharding_info and not self._session.is_shard_aware_disabled():
             self.host.sharding_info = first_connection.features.sharding_info
             self._open_connections_for_all_shards(first_connection.features.shard_id)
         self.tablets_routing_v1 = first_connection.features.tablets_routing_v1
@@ -451,7 +451,7 @@ class HostConnection(object):
             raise NoConnectionsAvailable()
 
         shard_id = None
-        if not self._session.cluster.shard_aware_options.disable and self.host.sharding_info and routing_key:
+        if not self._session.is_shard_aware_disabled() and self.host.sharding_info and routing_key:
             t = self._session.cluster.metadata.token_map.token_class.from_key(routing_key)
             
             shard_id = None
@@ -554,7 +554,7 @@ class HostConnection(object):
             if not connection.signaled_error:
                 log.debug("Defunct or closed connection (%s) returned to pool, potentially "
                           "marking host %s as down", id(connection), self.host)
-                is_down = self.host.signal_connection_failure(connection.last_error)
+                is_down = self._session._signal_connection_failure(self.host, connection.last_error)
                 connection.signaled_error = True
 
             if self.shutdown_on_error and not is_down:
@@ -562,7 +562,7 @@ class HostConnection(object):
 
             if is_down:
                 self.shutdown()
-                self._session.cluster.on_down(self.host, is_host_addition=False)
+                self._session._handle_pool_down(self.host, is_host_addition=False)
             else:
                 connection.close()
                 with self._lock:
@@ -603,7 +603,7 @@ class HostConnection(object):
             try:
                 if connection.features.shard_id in self._connections:
                     del self._connections[connection.features.shard_id]
-                if self.host.sharding_info and not self._session.cluster.shard_aware_options.disable:
+                if self.host.sharding_info and not self._session.is_shard_aware_disabled():
                     self._connecting.add(connection.features.shard_id)
                     self._session.submit(self._open_connection_to_missing_shard, connection.features.shard_id)
                 else:
@@ -678,7 +678,8 @@ class HostConnection(object):
 
     def _get_shard_aware_endpoint(self):
         if (self.advanced_shardaware_block_until and self.advanced_shardaware_block_until > time.time()) or \
-           self._session.cluster.shard_aware_options.disable_shardaware_port:
+           self._session.cluster.shard_aware_options.disable_shardaware_port or \
+           self._session.is_shard_aware_disabled():
             return None
 
         endpoint = None
@@ -920,5 +921,3 @@ class HostConnection(object):
     @property
     def _excess_connection_limit(self):
         return self.host.sharding_info.shards_count * self.max_excess_connections_per_shard_multiplier
-
-

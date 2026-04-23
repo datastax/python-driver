@@ -27,7 +27,8 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster, ControlConnection
 from cassandra.metadata import Metadata
-from cassandra.policies import (RackAwareRoundRobinPolicy, RoundRobinPolicy, WhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
+from cassandra.policies import (RackAwareRoundRobinPolicy, RoundRobinPolicy, WhiteListRoundRobinPolicy,
+                                DynamicWhiteListRoundRobinPolicy, DCAwareRoundRobinPolicy,
                                 TokenAwarePolicy, SimpleConvictionPolicy,
                                 HostDistance, ExponentialReconnectionPolicy,
                                 RetryPolicy, WriteType,
@@ -1420,6 +1421,42 @@ class WhiteListRoundRobinPolicyTest(unittest.TestCase):
         assert sorted(qplan) == [host]
 
         assert policy.distance(host) == HostDistance.LOCAL
+
+
+class DynamicWhiteListRoundRobinPolicyTest(unittest.TestCase):
+
+    def test_control_connection_host_updates_allowed_host(self):
+        hosts = [
+            Host(DefaultEndPoint("127.0.0.1"), SimpleConvictionPolicy, host_id=uuid.uuid4()),
+            Host(DefaultEndPoint("127.0.0.2"), SimpleConvictionPolicy, host_id=uuid.uuid4()),
+            Host(DefaultEndPoint("127.0.0.3"), SimpleConvictionPolicy, host_id=uuid.uuid4()),
+        ]
+        for host in hosts:
+            host.set_up()
+
+        cluster = Mock()
+        cluster.metadata.all_hosts.return_value = hosts
+
+        policy = DynamicWhiteListRoundRobinPolicy()
+        policy.populate(cluster, hosts)
+
+        assert list(policy.make_query_plan()) == []
+        assert policy.distance(hosts[0]) == HostDistance.IGNORED
+
+        policy.on_control_connection_host(hosts[1])
+
+        assert list(policy.make_query_plan()) == [hosts[1]]
+        assert policy.distance(hosts[0]) == HostDistance.IGNORED
+        assert policy.distance(hosts[1]) == HostDistance.LOCAL
+
+        policy.on_down(hosts[1])
+        assert list(policy.make_query_plan()) == []
+
+        policy.on_up(hosts[1])
+        assert list(policy.make_query_plan()) == [hosts[1]]
+
+        policy.on_control_connection_host(hosts[2])
+        assert list(policy.make_query_plan()) == [hosts[2]]
 
     def test_hosts_with_socket_hostname(self):
         hosts = [UnixSocketEndPoint('/tmp/scylla-workdir/cql.m')]

@@ -102,6 +102,7 @@ class MockCluster(object):
     down_host = None
     contact_points = []
     is_shutdown = False
+    sessions = ()
 
     def __init__(self):
         self.metadata = MockMetadata()
@@ -117,6 +118,14 @@ class MockCluster(object):
         host, _ = self.metadata.add_or_return_host(host)
         self.added_hosts.append(host)
         return host, True
+
+    def _update_host_endpoint(self, host, endpoint):
+        old_endpoint = host.endpoint
+        host.endpoint = endpoint
+        self.metadata.update_host(host, old_endpoint)
+
+    def _get_control_connection_host_endpoint(self, host, connection_endpoint):
+        return connection_endpoint
 
     def remove_host(self, host):
         pass
@@ -301,6 +310,60 @@ class ControlConnectionTest(unittest.TestCase):
         cc._time = self.time
         assert cc.wait_for_schema_agreement()
 
+    def test_on_down_reconnects_when_current_host_matches_by_host_id(self):
+        self.control_connection._connection.endpoint = DefaultEndPoint("127.254.254.101")
+        self.control_connection._current_host_id = "uuid1"
+        self.control_connection.reconnect = Mock()
+
+        self.control_connection.on_down(self.cluster.metadata.get_host_by_host_id("uuid1"))
+
+        self.control_connection.reconnect.assert_called_once_with()
+
+    def test_on_remove_reconnects_when_current_host_matches_by_host_id(self):
+        self.control_connection._connection.endpoint = DefaultEndPoint("127.254.254.101")
+        self.control_connection._current_host_id = "uuid1"
+        self.control_connection.reconnect = Mock()
+        self.control_connection.refresh_node_list_and_token_map = Mock()
+
+        self.control_connection.on_remove(self.cluster.metadata.get_host_by_host_id("uuid1"))
+
+        self.control_connection.reconnect.assert_called_once_with()
+        self.control_connection.refresh_node_list_and_token_map.assert_not_called()
+
+    def test_signal_error_marks_current_host_down_when_current_host_matches_by_host_id(self):
+        host = self.cluster.metadata.get_host_by_host_id("uuid1")
+        error = RuntimeError("defunct")
+
+        self.connection.endpoint = DefaultEndPoint("127.254.254.101")
+        self.connection.is_defunct = True
+        self.connection.last_error = error
+        self.control_connection._current_host_id = host.host_id
+        self.cluster.signal_connection_failure = Mock()
+        self.control_connection.reconnect = Mock()
+
+        self.control_connection._signal_error()
+
+        self.cluster.signal_connection_failure.assert_called_once_with(
+            host, error, is_host_addition=False)
+        self.control_connection.reconnect.assert_not_called()
+
+    def test_signal_error_reconnects_when_current_host_conviction_is_deferred(self):
+        host = self.cluster.metadata.get_host_by_host_id("uuid1")
+        error = RuntimeError("defunct")
+
+        self.connection.endpoint = DefaultEndPoint("127.254.254.101")
+        self.connection.is_defunct = True
+        self.connection.last_error = error
+        self.control_connection._current_host_id = host.host_id
+        self.cluster.signal_connection_failure = Mock(return_value=False)
+        self.control_connection.reconnect = Mock()
+
+        self.control_connection._signal_error()
+
+        self.cluster.signal_connection_failure.assert_called_once_with(
+            host, error, is_host_addition=False)
+        self.control_connection.reconnect.assert_called_once_with()
+
     def test_refresh_nodes_and_tokens(self):
         self.control_connection.refresh_node_list_and_token_map()
         meta = self.cluster.metadata
@@ -318,6 +381,20 @@ class ControlConnectionTest(unittest.TestCase):
             assert host.rack == "rack1"
 
         assert self.connection.wait_for_responses.call_count == 1
+
+    def test_refresh_nodes_and_tokens_rebinds_current_host_to_control_endpoint(self):
+        proxy_endpoint = DefaultEndPoint("127.254.254.101")
+        self.connection.endpoint = proxy_endpoint
+        self.connection.original_endpoint = proxy_endpoint
+        self.cluster.profile_manager.on_control_connection_host = Mock()
+
+        self.control_connection.refresh_node_list_and_token_map()
+
+        current_host = self.cluster.metadata.get_host_by_host_id("uuid1")
+        assert current_host.endpoint == proxy_endpoint
+        assert self.cluster.metadata.get_host(proxy_endpoint) is current_host
+        assert self.control_connection._current_host_id == "uuid1"
+        self.cluster.profile_manager.on_control_connection_host.assert_called_once_with(current_host)
 
     def test_refresh_nodes_and_tokens_with_invalid_peers(self):
         def refresh_and_validate_added_hosts():

@@ -40,8 +40,8 @@ import urllib.request
 
 from cassandra.cluster import Cluster
 from cassandra.client_routes import ClientRoutesConfig, ClientRouteProxy
-from cassandra.connection import ClientRoutesEndPoint
-from cassandra.policies import RoundRobinPolicy
+from cassandra.connection import ClientRoutesEndPoint, ConnectionException
+from cassandra.policies import DynamicWhiteListRoundRobinPolicy, RoundRobinPolicy
 from tests.integration import (
     TestCluster,
     get_cluster,
@@ -53,6 +53,28 @@ from tests.integration import (
 from tests.util import wait_until_not_raised
 
 log = logging.getLogger(__name__)
+
+
+class ProxyOnlyReachableConnection(Cluster.connection_class):
+    """
+    Simulates a private-link client that can reach only the proxy endpoint.
+
+    The CCM node addresses are reachable from the local test runner, which means
+    the existing client-routes tests cannot reproduce bugs that only appear when
+    direct node IPs are private. This connection class rejects those direct node
+    addresses while still allowing the NLB address.
+    """
+
+    @classmethod
+    def factory(cls, endpoint, timeout, host_conn=None, *args, **kwargs):
+        address, _ = endpoint.resolve()
+        if address.startswith("127.0.0."):
+            raise ConnectionException(
+                "Simulated private node address %s is unreachable from the client" % address,
+                endpoint=endpoint,
+            )
+        return super().factory(endpoint, timeout, host_conn=host_conn, *args, **kwargs)
+
 
 class TcpProxy:
     """
@@ -534,6 +556,57 @@ def teardown_module():
         os.environ.pop('SCYLLA_EXT_OPTS', None)
     else:
         os.environ['SCYLLA_EXT_OPTS'] = _saved_scylla_ext_opts
+
+
+class TestProxyConnectivityWithoutClientRoutes(unittest.TestCase):
+    """
+    Reproducer for connecting through a generic proxy when node addresses are
+    not reachable from the client.
+
+    The initial control connection can reach the cluster through the proxy, but
+    the driver later tries to open pools to the discovered node addresses
+    directly. In a proxy-only environment that makes connect/query fail.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.node_addrs = {
+            1: "127.0.0.1",
+            2: "127.0.0.2",
+            3: "127.0.0.3",
+        }
+        cls.proxy_node_id = 1
+        cls.nlb = NLBEmulator()
+        cls.nlb.start(cls.node_addrs)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.nlb.stop()
+
+    def _make_proxy_cluster(self):
+        return Cluster(
+            contact_points=[NLBEmulator.LISTEN_HOST],
+            port=self.nlb.node_port(self.proxy_node_id),
+            connection_class=ProxyOnlyReachableConnection,
+            load_balancing_policy=DynamicWhiteListRoundRobinPolicy(),
+        )
+
+    def test_dynamic_whitelist_session_succeeds_when_only_proxy_is_reachable(self):
+        cluster = self._make_proxy_cluster()
+        self.addCleanup(cluster.shutdown)
+
+        session = cluster.connect()
+        row = session.execute(
+            "SELECT release_version FROM system.local WHERE key='local'"
+        ).one()
+
+        self.assertIsNotNone(row)
+        pool_state = session.get_pool_state()
+        self.assertEqual(len(pool_state), 1)
+
+        session_host = next(iter(pool_state))
+        self.assertEqual(session_host.endpoint.address, NLBEmulator.LISTEN_HOST)
+        self.assertEqual(session_host.endpoint.port, self.nlb.node_port(self.proxy_node_id))
 
 @skip_scylla_version_lt(reason='scylladb/scylladb#26992 - system.client_routes is not yet supported',
                         scylla_version="2026.1.0")

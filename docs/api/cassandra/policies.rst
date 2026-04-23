@@ -26,6 +26,9 @@ Load Balancing
 .. autoclass:: WhiteListRoundRobinPolicy
    :members:
 
+.. autoclass:: DynamicWhiteListRoundRobinPolicy
+   :members:
+
 .. autoclass:: TokenAwarePolicy
    :members:
 

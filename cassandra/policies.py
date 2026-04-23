@@ -166,6 +166,16 @@ class LoadBalancingPolicy(HostStateListener):
         """
         pass
 
+    def on_control_connection_host(self, host):
+        """
+        Called when the control connection resolves the metadata host behind
+        the endpoint it is currently using.
+
+        Policies that maintain a dynamic host allowlist can override this to
+        update their internal view of the cluster.
+        """
+        pass
+
 
 class RoundRobinPolicy(LoadBalancingPolicy):
     """
@@ -540,6 +550,9 @@ class TokenAwarePolicy(LoadBalancingPolicy):
     def on_remove(self, *args, **kwargs):
         return self._child_policy.on_remove(*args, **kwargs)
 
+    def on_control_connection_host(self, host):
+        return self._child_policy.on_control_connection_host(host)
+
 
 class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     """
@@ -592,6 +605,58 @@ class WhiteListRoundRobinPolicy(RoundRobinPolicy):
     def on_add(self, host):
         if host.address in self._allowed_hosts_resolved:
             RoundRobinPolicy.on_add(self, host)
+
+
+class DynamicWhiteListRoundRobinPolicy(RoundRobinPolicy):
+    """
+    A :class:`.RoundRobinPolicy` variant whose allowlist is updated from the
+    control connection.
+
+    This is intended for proxy deployments where the driver can only reach the
+    host currently behind the control connection endpoint. The policy keeps
+    every other discovered node at :attr:`~.HostDistance.IGNORED` until the
+    control connection resolves a different host.
+    """
+
+    def __init__(self):
+        self._allowed_host_ids = frozenset(())
+        self._cluster = None
+        RoundRobinPolicy.__init__(self)
+
+    def _host_is_allowed(self, host):
+        return getattr(host, "host_id", None) in self._allowed_host_ids
+
+    def _refresh_live_hosts(self, hosts):
+        self._live_hosts = frozenset(
+            host for host in hosts
+            if self._host_is_allowed(host) and host.is_up is not False
+        )
+
+    def populate(self, cluster, hosts):
+        self._cluster = cluster
+        self._refresh_live_hosts(hosts)
+        if len(self._live_hosts) > 1:
+            self._position = randint(0, len(self._live_hosts) - 1)
+        else:
+            self._position = 0
+
+    def distance(self, host):
+        return HostDistance.LOCAL if self._host_is_allowed(host) else HostDistance.IGNORED
+
+    def on_up(self, host):
+        if self._host_is_allowed(host):
+            RoundRobinPolicy.on_up(self, host)
+
+    def on_add(self, host):
+        if self._host_is_allowed(host):
+            RoundRobinPolicy.on_add(self, host)
+
+    def on_control_connection_host(self, host):
+        with self._hosts_lock:
+            allowed_host_id = getattr(host, "host_id", None)
+            self._allowed_host_ids = frozenset((allowed_host_id,)) if allowed_host_id is not None else frozenset(())
+            if self._cluster is not None:
+                self._refresh_live_hosts(self._cluster.metadata.all_hosts())
 
 
 class HostFilterPolicy(LoadBalancingPolicy):
@@ -653,6 +718,9 @@ class HostFilterPolicy(LoadBalancingPolicy):
 
     def on_remove(self, host, *args, **kwargs):
         return self._child_policy.on_remove(host, *args, **kwargs)
+
+    def on_control_connection_host(self, host):
+        return self._child_policy.on_control_connection_host(host)
 
     @property
     def predicate(self):
@@ -1321,6 +1389,9 @@ class WrapperPolicy(LoadBalancingPolicy):
 
     def on_remove(self, *args, **kwargs):
         return self._child_policy.on_remove(*args, **kwargs)
+
+    def on_control_connection_host(self, host):
+        return self._child_policy.on_control_connection_host(host)
 
 
 class DefaultLoadBalancingPolicy(WrapperPolicy):
