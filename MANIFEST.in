@@ -1,3 +1,4 @@
+global-exclude *.c
 include setup.py README.rst MANIFEST.in LICENSE
 include cassandra/cmurmur3.c
 include cassandra/io/libevwrapper.c
