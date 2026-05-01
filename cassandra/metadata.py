@@ -1864,7 +1864,7 @@ class MD5Token(HashToken):
     def hash_fn(cls, key):
         if isinstance(key, str):
             key = key.encode('UTF-8')
-        return abs(varint_unpack(hashlib.md5(key,usedforsecurity=False).digest()))
+        return abs(varint_unpack(hashlib.md5(key, usedforsecurity=False).digest()))
 
 
 class BytesToken(Token):
