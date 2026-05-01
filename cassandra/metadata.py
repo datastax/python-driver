@@ -19,7 +19,6 @@ from bisect import bisect_left
 from collections import defaultdict
 from collections.abc import Mapping
 from functools import total_ordering
-import hashlib
 import json
 import logging
 import re
@@ -27,6 +26,12 @@ import sys
 from threading import RLock
 import struct
 import random
+
+md5 = None
+try:
+    from hashlib import md5
+except ImportError as e:
+    pass
 
 murmur3 = None
 try:
@@ -1827,6 +1832,8 @@ MAX_LONG = (2 ** 63) - 1
 class NoMurmur3(Exception):
     pass
 
+class NoMD5(Exception):
+    pass
 
 class HashToken(Token):
 
@@ -1862,9 +1869,11 @@ class MD5Token(HashToken):
 
     @classmethod
     def hash_fn(cls, key):
+        if md5 is None:
+            raise NoMD5()
         if isinstance(key, str):
             key = key.encode('UTF-8')
-        return abs(varint_unpack(hashlib.md5(key, usedforsecurity=False).digest()))
+        return abs(varint_unpack(md5(key).digest()))
 
 
 class BytesToken(Token):
