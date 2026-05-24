@@ -94,53 +94,9 @@ from cassandra.datastax.graph.query import _request_timeout_key, _GraphSONContex
 from cassandra.datastax import cloud as dscloud
 
 try:
-    from cassandra.io.twistedreactor import TwistedConnection
-except ImportError:
-    TwistedConnection = None
-
-try:
-    from cassandra.io.eventletreactor import EventletConnection
-# PYTHON-1364
-#
-# At the moment eventlet initialization is chucking AttributeErrors due to its dependence on pyOpenSSL
-# and some changes in Python 3.12 which have some knock-on effects there.
-except (ImportError, AttributeError):
-    EventletConnection = None
-
-try:
     from weakref import WeakSet
 except ImportError:
     from cassandra.util import WeakSet  # NOQA
-
-def _is_gevent_monkey_patched():
-    if 'gevent.monkey' not in sys.modules:
-        return False
-    import gevent.socket
-    return socket.socket is gevent.socket.socket
-
-def _try_gevent_import():
-    if _is_gevent_monkey_patched():
-        from cassandra.io.geventreactor import GeventConnection
-        return (GeventConnection,None)
-    else:
-        return (None,None)
-
-def _is_eventlet_monkey_patched():
-    if 'eventlet.patcher' not in sys.modules:
-        return False
-    try:
-        import eventlet.patcher
-        return eventlet.patcher.is_monkey_patched('socket')
-    # Another case related to PYTHON-1364
-    except AttributeError:
-        return False
-
-def _try_eventlet_import():
-    if _is_eventlet_monkey_patched():
-        from cassandra.io.eventletreactor import EventletConnection
-        return (EventletConnection,None)
-    else:
-        return (None,None)
 
 def _try_libev_import():
     try:
@@ -168,7 +124,7 @@ def _connection_reduce_fn(val,import_fn):
 
 log = logging.getLogger(__name__)
 
-conn_fns = (_try_gevent_import, _try_eventlet_import, _try_libev_import, _try_asyncore_import)
+conn_fns = (_try_libev_import, _try_asyncore_import)
 (conn_class, excs) = reduce(_connection_reduce_fn, conn_fns, (None,[]))
 if not conn_class:
     raise DependencyException("Unable to load a default connection class", excs)
@@ -878,18 +834,12 @@ class Cluster(object):
 
     * :class:`cassandra.io.asyncorereactor.AsyncoreConnection`
     * :class:`cassandra.io.libevreactor.LibevConnection`
-    * :class:`cassandra.io.eventletreactor.EventletConnection` (requires monkey-patching - see doc for details)
-    * :class:`cassandra.io.geventreactor.GeventConnection` (requires monkey-patching - see doc for details)
-    * :class:`cassandra.io.twistedreactor.TwistedConnection`
     * EXPERIMENTAL: :class:`cassandra.io.asyncioreactor.AsyncioConnection`
 
     By default, ``AsyncoreConnection`` will be used, which uses
     the ``asyncore`` module in the Python standard library.
 
     If ``libev`` is installed, ``LibevConnection`` will be used instead.
-
-    If ``gevent`` or ``eventlet`` monkey-patching is detected, the corresponding
-    connection class will be used automatically.
 
     ``AsyncioConnection``, which uses the ``asyncio`` module in the Python
     standard library, is also available, but currently experimental. Note that
@@ -1168,9 +1118,7 @@ class Cluster(object):
                 raise ValueError("contact_points, endpoint_factory, ssl_context, and ssl_options "
                                  "cannot be specified with a cloud configuration")
 
-            uses_twisted = TwistedConnection and issubclass(self.connection_class, TwistedConnection)
-            uses_eventlet = EventletConnection and issubclass(self.connection_class, EventletConnection)
-            cloud_config = dscloud.get_cloud_config(cloud, create_pyopenssl_context=uses_twisted or uses_eventlet)
+            cloud_config = dscloud.get_cloud_config(cloud)
 
             ssl_context = cloud_config.ssl_context
             ssl_options = {'check_hostname': True}

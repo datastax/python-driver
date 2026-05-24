@@ -144,11 +144,7 @@ class MonitorReporter(Thread):
         cert_validation = None
         try:
             if self._session.cluster.ssl_context:
-                if isinstance(self._session.cluster.ssl_context, ssl.SSLContext):
-                    cert_validation = self._session.cluster.ssl_context.verify_mode == ssl.CERT_REQUIRED
-                else:  # pyopenssl
-                    from OpenSSL import SSL
-                    cert_validation = self._session.cluster.ssl_context.get_verify_mode() != SSL.VERIFY_NONE
+                cert_validation = self._session.cluster.ssl_context.verify_mode == ssl.CERT_REQUIRED
             elif self._session.cluster.ssl_options:
                 cert_validation = self._session.cluster.ssl_options.get('cert_reqs') == ssl.CERT_REQUIRED
         except Exception as e:

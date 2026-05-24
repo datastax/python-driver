@@ -29,10 +29,7 @@ import ssl
 import weakref
 
 
-if 'gevent.monkey' in sys.modules:
-    from gevent.queue import Queue, Empty
-else:
-    from queue import Queue, Empty  # noqa
+from queue import Queue, Empty  # noqa
 
 from cassandra import ConsistencyLevel, AuthenticationFailed, OperationTimedOut, ProtocolVersion
 from cassandra.marshal import int32_pack
