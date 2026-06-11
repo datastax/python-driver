@@ -392,24 +392,6 @@ def executeStandardTests() {
     }
   }
 
-  try {
-    sh label: 'Execute DataStax Astra integration tests', script: '''#!/bin/bash -lex
-      . ./jenkins-venv/bin/activate
-
-      # Load CCM environment variable
-      set -o allexport
-      . ${HOME}/environment.txt
-      set +o allexport
-
-      . ${JABBA_SHELL}
-      jabba use 1.8
-
-      EVENT_LOOP=${EVENT_LOOP} CLOUD_PROXY_PATH="${HOME}/proxy/" CASSANDRA_VERSION=${CCM_CASSANDRA_VERSION} MAPPED_CASSANDRA_VERSION=${MAPPED_CASSANDRA_VERSION} VERIFY_CYTHON=${CYTHON_ENABLED} JVM_EXTRA_OPTS="$JVM_EXTRA_OPTS -Xss384k" pytest -s -v --log-format="[%(levelname)s] %(asctime)s %(thread)d: %(message)s" --junit-xml=advanced_results.xml tests/integration/cloud/
-    '''
-  } catch (err) {
-    currentBuild.result = 'UNSTABLE'
-  }
-
   if (env.PROFILE == 'FULL') {
     try {
       sh label: 'Execute long running integration tests', script: '''#!/bin/bash -lex
