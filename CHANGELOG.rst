@@ -1,3 +1,17 @@
+3.30.1
+======
+June 19, 2026
+
+Bug Fixes
+---------
+* Wheels for 3.30.0 include Cython-generated .c files (CASSPYTHON-21)
+* Mark non-security md5 usage to allow for compatibility with fips (PR 1288/1294)
+* Prevent crash at exit (PR 1287)
+
+Others
+------
+* Removed obsolete check for python version > 3.7+ (CASSPYTHON-18)
+
 3.30.0
 ======
 March 23, 2026
