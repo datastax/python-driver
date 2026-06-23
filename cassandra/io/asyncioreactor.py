@@ -1,5 +1,6 @@
 from cassandra.connection import Connection, ConnectionShutdown
 
+import atexit
 import asyncio
 import logging
 import os
@@ -11,19 +12,30 @@ from threading import Lock, Thread, get_ident
 log = logging.getLogger(__name__)
 
 
-# This module uses ``yield from`` and ``@asyncio.coroutine`` over ``await`` and
-# ``async def`` for pre-Python-3.5 compatibility, so keep in mind that the
-# managed coroutines are generator-based, not native coroutines. See PEP 492:
-# https://www.python.org/dev/peps/pep-0492/#coroutine-objects
+def _cleanup():
+    """
+    Module-level cleanup called at interpreter shutdown via atexit.
+    Stops the asyncio event loop and joins the loop thread.
+    """
+    loop = AsyncioConnection._loop
+    thread = AsyncioConnection._loop_thread
+    if loop is not None:
+        try:
+            loop.call_soon_threadsafe(loop.stop)
+        except RuntimeError:
+            # loop may already be closed post-fork or during shutdown
+            pass
+    if thread is not None:
+        thread.join(timeout=1.0)
+        if thread.is_alive():
+            log.warning(
+                "Event loop thread could not be joined, so shutdown may not be clean. "
+                "Please call Cluster.shutdown() to avoid this.")
+        else:
+            log.debug("Event loop thread was joined")
 
 
-try:
-    asyncio.run_coroutine_threadsafe
-except AttributeError:
-    raise ImportError(
-        'Cannot use asyncioreactor without access to '
-        'asyncio.run_coroutine_threadsafe (added in 3.4.6 and 3.5.1)'
-    )
+atexit.register(_cleanup)
 
 
 class AsyncioTimer(object):
@@ -67,11 +79,12 @@ class AsyncioTimer(object):
 
 class AsyncioConnection(Connection):
     """
-    An experimental implementation of :class:`.Connection` that uses the
-    ``asyncio`` module in the Python standard library for its event loop.
+    An implementation of :class:`.Connection` that uses the ``asyncio``
+    module in the Python standard library for its event loop.
 
-    Note that it requires ``asyncio`` features that were only introduced in the
-    3.4 line in 3.4.6, and in the 3.5 line in 3.5.1.
+    This is the preferred connection class on Python 3.12+ where the
+    ``asyncore`` module has been removed. It is also used as a fallback
+    when the libev C extension is not available.
     """
 
     _loop = None
@@ -106,17 +119,32 @@ class AsyncioConnection(Connection):
     def initialize_reactor(cls):
         with cls._lock:
             if cls._pid != os.getpid():
-                cls._loop = None
+                log.debug("Detected fork, clearing and reinitializing reactor state")
+                cls.handle_fork()
             if cls._loop is None:
                 cls._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(cls._loop)
 
-            if not cls._loop_thread:
+            if not cls._loop_thread or not cls._loop_thread.is_alive():
                 # daemonize so the loop will be shut down on interpreter
                 # shutdown
                 cls._loop_thread = Thread(target=cls._loop.run_forever,
                                           daemon=True, name="asyncio_thread")
                 cls._loop_thread.start()
+
+    @classmethod
+    def handle_fork(cls):
+        """
+        Called after a fork.  Cleans up any reactor state from the parent
+        process so that a fresh event loop can be started in the child.
+        """
+        if cls._loop is not None:
+            try:
+                cls._loop.call_soon_threadsafe(cls._loop.stop)
+            except RuntimeError:
+                pass
+        cls._loop = None
+        cls._loop_thread = None
+        cls._pid = os.getpid()
 
     @classmethod
     def create_timer(cls, timeout, callback):
