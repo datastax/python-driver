@@ -27,7 +27,10 @@ pversions.default = 0
 
 native_regex = /^cassandra\/(?<native_name>(io\/)?\w+?)\.cp.+?\.(so|pyd)$/
 
-expected_native_names = Set.new(File.open("expected_native.txt").readlines chomp:true)
+expected_shared_objects = %w[bytesio cluster cmurmur3 concurrent connection cqltypes cython_marshal
+cython_utils deserializers ioutils metadata numpy_parser obj_parser parsing pool protocol query
+row_parser util io/libevwrapper]
+expected_native_names = Set.new(expected_shared_objects)
 
 # Extract individual wheel files from the archive built by the Github upload-artifact task.
 # Wheel files are ZIP files so we extract each entry and perform checks on them as well.
