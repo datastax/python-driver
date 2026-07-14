@@ -28,12 +28,6 @@ from threading import RLock
 import struct
 import random
 
-murmur3 = None
-try:
-    from cassandra.murmur3 import murmur3
-except ImportError as e:
-    pass
-
 from cassandra import SignatureDescriptor, ConsistencyLevel, InvalidRequest, Unauthorized
 import cassandra.cqltypes as types
 from cassandra.encoder import Encoder
@@ -43,6 +37,12 @@ from cassandra.query import dict_factory, bind_params
 from cassandra.util import OrderedDict, Version
 from cassandra.pool import HostDistance
 from cassandra.connection import EndPoint
+
+murmur3 = None
+try:
+    from cassandra.murmur3 import murmur3
+except ImportError as e:
+    pass
 
 log = logging.getLogger(__name__)
 
@@ -384,7 +384,6 @@ class ReplicationStrategyTypeType(type):
         if not name.startswith('_'):
             _replication_strategies[name] = cls
         return cls
-
 
 
 class _ReplicationStrategy(object, metaclass=ReplicationStrategyTypeType):
@@ -798,7 +797,7 @@ class KeyspaceMetadata(object):
         if self._exc_info:
             import traceback
             ret = "/*\nWarning: Keyspace %s is incomplete because of an error processing metadata.\n" % \
-                  (self.name)
+                  self.name
             for line in traceback.format_exception(*self._exc_info):
                 ret += line
             ret += "\nApproximate structure, for reference:\n(this should not be used to reproduce this schema)\n\n%s\n*/" % cql
@@ -1864,7 +1863,7 @@ class MD5Token(HashToken):
     def hash_fn(cls, key):
         if isinstance(key, str):
             key = key.encode('UTF-8')
-        return abs(varint_unpack(md5(key,usedforsecurity=False).digest()))
+        return abs(varint_unpack(md5(key, usedforsecurity=False).digest()))
 
 
 class BytesToken(Token):
@@ -2525,7 +2524,7 @@ class SchemaParserV3(SchemaParserV22):
 
     def get_table(self, keyspaces, keyspace, table):
         cl = ConsistencyLevel.ONE
-        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % self._table_name_col, (keyspace, table), _encoder)
         cf_query = QueryMessage(query=self._SELECT_TABLES + where_clause, consistency_level=cl)
         col_query = QueryMessage(query=self._SELECT_COLUMNS + where_clause, consistency_level=cl)
         indexes_query = QueryMessage(query=self._SELECT_INDEXES + where_clause, consistency_level=cl)
@@ -2926,7 +2925,7 @@ class SchemaParserDSE68(SchemaParserDSE67):
     def get_table(self, keyspaces, keyspace, table):
         table_meta = super(SchemaParserDSE68, self).get_table(keyspaces, keyspace, table)
         cl = ConsistencyLevel.ONE
-        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % (self._table_name_col), (keyspace, table), _encoder)
+        where_clause = bind_params(" WHERE keyspace_name = %%s AND %s = %%s" % self._table_name_col, (keyspace, table), _encoder)
         vertices_query = QueryMessage(query=self._SELECT_VERTICES + where_clause, consistency_level=cl)
         edges_query = QueryMessage(query=self._SELECT_EDGES + where_clause, consistency_level=cl)
 
@@ -3319,6 +3318,7 @@ class RLACTableExtension(RegisteredTableExtension):
         return "RESTRICT ROWS ON %s.%s USING %s;" % (protect_name(table_meta.keyspace_name),
                                                      protect_name(table_meta.name),
                                                      protect_name(ext_blob.decode('utf-8')))
+
 NO_VALID_REPLICA = object()
 
 

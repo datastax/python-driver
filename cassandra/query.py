@@ -85,6 +85,7 @@ def tuple_factory(colnames, rows):
     """
     return rows
 
+
 def named_tuple_factory(colnames, rows):
     """
     Returns each row as a `namedtuple <https://docs.python.org/2/library/collections.html#collections.namedtuple>`_.
@@ -384,7 +385,7 @@ class PreparedStatement(object):
        <b>A note about <code>*</code> in prepared statements</b>
     """
 
-    column_metadata = None  #TODO: make this bind_metadata in next major
+    column_metadata = None  # TODO: make this bind_metadata in next major
     retry_policy = None
     consistency_level = None
     custom_payload = None
@@ -1058,8 +1059,8 @@ class HostTargetingStatement(object):
     it usable in a targeted LBP without modifying the user's statement.
     """
     def __init__(self, inner_statement, target_host):
-            self.__class__ = type(inner_statement.__class__.__name__,
+        self.__class__ = type(inner_statement.__class__.__name__,
                                   (self.__class__, inner_statement.__class__),
                                   {})
-            self.__dict__ = inner_statement.__dict__
-            self.target_host = target_host
+        self.__dict__ = inner_statement.__dict__
+        self.target_host = target_host

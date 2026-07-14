@@ -20,7 +20,6 @@ called on each query parameter.
 """
 
 import logging
-log = logging.getLogger(__name__)
 
 from binascii import hexlify
 from decimal import Decimal
@@ -34,6 +33,8 @@ import ipaddress
 
 from cassandra.util import (OrderedDict, OrderedMap, OrderedMapSerializedKey,
                             sortedset, Time, Date, Point, LineString, Polygon)
+
+log = logging.getLogger(__name__)
 
 
 def cql_quote(term):

@@ -647,7 +647,7 @@ class _ConnectionIOBuffer(object):
 
     @property
     def has_consumed_segment(self):
-        return self._segment_consumed;
+        return self._segment_consumed
 
     def readable_io_bytes(self):
         return self.io_buffer.tell()
@@ -721,7 +721,7 @@ class Connection(object):
     # If the number of orphaned streams reaches this threshold, this connection
     # will become marked and will be replaced with a new connection by the
     # owning pool (currently, only HostConnection supports this)
-    orphaned_threshold = 3  * max_in_flight // 4
+    orphaned_threshold = 3 * max_in_flight // 4
 
     is_defunct = False
     is_closed = False
@@ -869,7 +869,7 @@ class Connection(object):
 
         # Extract a subset of names from self.ssl_options which apply to SSLContext creation
         ssl_context_opt_names = ['ssl_version', 'cert_reqs', 'check_hostname', 'keyfile', 'certfile', 'ca_certs', 'ciphers']
-        opts = {k:self.ssl_options.get(k, None) for k in ssl_context_opt_names if k in self.ssl_options}
+        opts = {k: self.ssl_options.get(k, None) for k in ssl_context_opt_names if k in self.ssl_options}
 
         # Python >= 3.10 requires either PROTOCOL_TLS_CLIENT or PROTOCOL_TLS_SERVER, so we'll get ahead of things by always
         # being explicit
@@ -897,11 +897,11 @@ class Connection(object):
         # Extract a subset of names from self.ssl_options which apply to SSLContext.wrap_socket (or at least the parts
         # of it that don't involve building an SSLContext under the covers)
         wrap_socket_opt_names = ['server_side', 'do_handshake_on_connect', 'suppress_ragged_eofs', 'server_hostname']
-        opts = {k:self.ssl_options.get(k, None) for k in wrap_socket_opt_names if k in self.ssl_options}
+        opts = {k: self.ssl_options.get(k, None) for k in wrap_socket_opt_names if k in self.ssl_options}
 
         # PYTHON-1186: set the server_hostname only if the SSLContext has
         # check_hostname enabled, and it is not already provided by the EndPoint ssl options
-        #opts['server_hostname'] = self.endpoint.address
+        # opts['server_hostname'] = self.endpoint.address
         if (self.ssl_context.check_hostname and 'server_hostname' not in opts):
             server_hostname = self.endpoint.address
             opts['server_hostname'] = server_hostname

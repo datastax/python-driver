@@ -108,6 +108,7 @@ def _murmur3(data):
 
     return truncate_int64(h1)
 
+
 try:
     from cassandra.cmurmur3 import murmur3
 except ImportError:

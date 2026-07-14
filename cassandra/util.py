@@ -30,15 +30,13 @@ import socket
 import sys
 import time
 import uuid
+from cassandra import DriverException
 
 _HAS_GEOMET = True
 try:
     from geomet import wkt
 except:
     _HAS_GEOMET = False
-
-
-from cassandra import DriverException
 
 DATETIME_EPOC = datetime.datetime(1970, 1, 1).replace(tzinfo=None)
 UTC_DATETIME_EPOC = datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc).replace(tzinfo=None)
@@ -112,7 +110,8 @@ def min_uuid_from_time(timestamp):
 
     See :func:`uuid_from_time` for argument and return types.
     """
-    return uuid_from_time(timestamp, 0x808080808080, 0x80)  # Cassandra does byte-wise comparison; fill with min signed bytes (0x80 = -128)
+    # Pad with 0x80 (min signed byte) to ensure this UUID acts as the lower bound for the timestamp
+    return uuid_from_time(timestamp, 0x808080808080, 0x80)
 
 
 def max_uuid_from_time(timestamp):
@@ -176,6 +175,7 @@ def uuid_from_time(time_arg, node=None, clock_seq=None):
     return uuid.UUID(fields=(time_low, time_mid, time_hi_version,
                              clock_seq_hi_variant, clock_seq_low, node), version=1)
 
+
 LOWEST_TIME_UUID = uuid.UUID('00000000-0000-1000-8080-808080808080')
 """ The lowest possible TimeUUID, as sorted by Cassandra. """
 
@@ -191,7 +191,7 @@ def _addrinfo_or_none(contact_point, port):
     """
     try:
         value = socket.getaddrinfo(contact_point, port,
-                                  socket.AF_UNSPEC, socket.SOCK_STREAM)
+                                   socket.AF_UNSPEC, socket.SOCK_STREAM)
         return value
     except socket.gaierror:
         log.debug('Could not resolve hostname "{}" '
@@ -652,11 +652,12 @@ class SortedSet(object):
                 lo += 1
         return lo
 
+
 sortedset = SortedSet  # backwards-compatibility
 
 
 class OrderedMap(Mapping):
-    '''
+    """
     An ordered map that accepts non-hashable types for keys. It also maintains the
     insertion order of items, behaving as OrderedDict in that regard. These maps
     are constructed and read just as normal mapping types, except that they may
@@ -680,7 +681,7 @@ class OrderedMap(Mapping):
 
     This class derives from the (immutable) Mapping API. Objects in these maps
     are not intended be modified.
-    '''
+    """
 
     def __init__(self, *args, **kwargs):
         if len(args) > 1:
@@ -783,11 +784,11 @@ class OrderedMapSerializedKey(OrderedMap):
 
 @total_ordering
 class Time(object):
-    '''
+    """
     Idealized time, independent of day.
 
     Up to nanosecond resolution
-    '''
+    """
 
     MICRO = 1000
     MILLI = 1000 * MICRO
@@ -911,13 +912,13 @@ class Time(object):
 
 @total_ordering
 class Date(object):
-    '''
+    """
     Idealized date: year, month, day
 
     Offers wider year range than datetime.date. For Dates that cannot be represented
     as a datetime.date (because datetime.MINYEAR, datetime.MAXYEAR), this type falls back
     to printing days_from_epoch offset.
-    '''
+    """
 
     MINUTE = 60
     HOUR = 60 * MINUTE
@@ -1692,7 +1693,9 @@ class DateRange(object):
             self.lower_bound, self.upper_bound, self.value
         )
 
+
 VERSION_REGEX = re.compile("^(\\d+)\\.(\\d+)(\\.\\d+)?(\\.\\d+)?([~\\-]\\w[.\\w]*(?:-\\w[.\\w]*)*)?(\\+[.\\w]+)?$")
+
 
 @total_ordering
 class Version(object):
@@ -1700,7 +1703,7 @@ class Version(object):
     Representation of a Cassandra version.  Mostly follows the implementation of the same logic in the Java driver;
     see https://github.com/apache/cassandra-java-driver/blob/4.19.2/core/src/main/java/com/datastax/oss/driver/api/core/Version.java.
 
-    Cassandra versions are assumed to correspond to major.minor.patch with an optional additional numeric build field as well as a
+    Cassandra's versions are assumed to correspond to major.minor.patch with an optional additional numeric build field as well as a
     string prerelease field.
     """
 

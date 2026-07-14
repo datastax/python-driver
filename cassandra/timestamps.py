@@ -25,6 +25,7 @@ from threading import Lock
 
 log = logging.getLogger(__name__)
 
+
 class MonotonicTimestampGenerator(object):
     """
     An object that, when called, returns ``int(time.time() * 1e6)`` when

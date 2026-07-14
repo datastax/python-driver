@@ -571,7 +571,7 @@ class HostConnection(object):
         open_count = 1 if connection and not (connection.is_closed or connection.is_defunct) else 0
         in_flights = [connection.in_flight] if connection else []
         orphan_requests = [connection.orphaned_request_ids] if connection else []
-        return {'shutdown': self.is_shutdown, 'open_count': open_count, \
+        return {'shutdown': self.is_shutdown, 'open_count': open_count,
             'in_flights': in_flights, 'orphan_requests': orphan_requests}
 
     @property
@@ -752,7 +752,7 @@ class HostConnectionPool(object):
 
         while remaining > 0:
             # wait on our condition for the possibility that a connection
-            # is useable
+            # is usable
             self._await_available_conn(remaining)
 
             # self.shutdown() may trigger the above Condition
@@ -931,5 +931,5 @@ class HostConnectionPool(object):
     def get_state(self):
         in_flights = [c.in_flight for c in self._connections]
         orphan_requests = [c.orphaned_request_ids for c in self._connections]
-        return {'shutdown': self.is_shutdown, 'open_count': self.open_count, \
+        return {'shutdown': self.is_shutdown, 'open_count': self.open_count,
             'in_flights': in_flights, 'orphan_requests': orphan_requests}

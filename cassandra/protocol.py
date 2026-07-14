@@ -54,6 +54,7 @@ class NotSupportedError(Exception):
 class InternalError(Exception):
     pass
 
+
 ColumnMetadata = namedtuple("ColumnMetadata", ['keyspace_name', 'table_name', 'name', 'type'])
 
 HEADER_DIRECTION_TO_CLIENT = 0x80
