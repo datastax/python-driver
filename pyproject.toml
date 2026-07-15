@@ -43,7 +43,7 @@ changelog = "https://github.com/apache/cassandra-python-driver/blob/trunk/CHANGE
 
 [tool.setuptools.packages.find]
 include = ['cassandra', 'cassandra.io', 'cassandra.cqlengine', 'cassandra.graph',
-'cassandra.datastax', 'cassandra.datastax.insights', 'cassandra.datastax.graph',
+'cassandra.datastax', 'cassandra.datastax.graph',
 'cassandra.datastax.graph.fluent', 'cassandra.datastax.cloud',
 "cassandra.column_encryption"]
 

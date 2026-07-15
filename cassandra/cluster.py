@@ -31,10 +31,8 @@ import json
 import logging
 from warnings import warn
 from random import random
-import re
 import queue
 import socket
-import sys
 import time
 from threading import Lock, RLock, Thread, Event
 import uuid
@@ -82,9 +80,6 @@ from cassandra.query import (SimpleStatement, PreparedStatement, BoundStatement,
 from cassandra.marshal import int64_pack
 from cassandra.timestamps import MonotonicTimestampGenerator
 from cassandra.util import _resolve_contact_points_to_string_map, Version
-
-from cassandra.datastax.insights.reporter import MonitorReporter
-from cassandra.datastax.insights.util import version_supports_insights
 
 from cassandra.datastax.graph import (graph_object_row_factory, GraphOptions, GraphSON1Serializer,
                                       GraphProtocol, GraphSON2Serializer, GraphStatement, SimpleGraphStatement,
@@ -950,34 +945,6 @@ class Cluster(object):
     documentation for :meth:`Session.timestamp_generator`.
     """
 
-    monitor_reporting_enabled = True
-    """
-    A boolean indicating if monitor reporting, which sends gathered data to
-    Insights when running against DSE 6.8 and higher.
-    """
-
-    monitor_reporting_interval = 30
-    """
-    A boolean indicating if monitor reporting, which sends gathered data to
-    Insights when running against DSE 6.8 and higher.
-    """
-
-    client_id = None
-    """
-    A UUID that uniquely identifies this Cluster object to Insights. This will
-    be generated automatically unless the user provides one.
-    """
-
-    application_name = ''
-    """
-    A string identifying this application to Insights.
-    """
-
-    application_version = ''
-    """
-    A string identifying this application's version to Insights
-    """
-
     cloud = None
     """
     A dict of the cloud configuration. Example::
@@ -1096,11 +1063,6 @@ class Cluster(object):
                  no_compact=False,
                  ssl_context=None,
                  endpoint_factory=None,
-                 application_name=None,
-                 application_version=None,
-                 monitor_reporting_enabled=True,
-                 monitor_reporting_interval=30,
-                 client_id=None,
                  cloud=None,
                  column_encryption_policy=None):
         """
@@ -1159,8 +1121,6 @@ class Cluster(object):
             raw_contact_points.append(cp if isinstance(cp, tuple) else (cp, port))
 
         self.endpoints_resolved = [cp for cp in self.contact_points if isinstance(cp, EndPoint)]
-        self._endpoint_map_for_insights = {repr(ep): '{ip}:{port}'.format(ip=ep.address, port=ep.port)
-                                           for ep in self.endpoints_resolved}
 
         strs_resolved_map = _resolve_contact_points_to_string_map(raw_contact_points)
         self.endpoints_resolved.extend(list(chain(
@@ -1170,14 +1130,14 @@ class Cluster(object):
             ]
         )))
 
-        self._endpoint_map_for_insights.update(
-            {key: ['{ip}:{port}'.format(ip=ip, port=port) for ip, port in value]
-             for key, value in strs_resolved_map.items() if value is not None}
-        )
-
         if contact_points and (not self.endpoints_resolved):
             # only want to raise here if the user specified CPs but resolution failed
-            raise UnresolvableContactPoints(self._endpoint_map_for_insights)
+            endpoint_map = {repr(ep): '{ip}:{port}'.format(ip=ep.address, port=ep.port) for ep in self.endpoints_resolved}
+            endpoint_map.update(
+                {key: ['{ip}:{port}'.format(ip=ip, port=port) for ip, port in value]
+                 for key, value in strs_resolved_map.items() if value is not None}
+            )
+            raise UnresolvableContactPoints(endpoint_map)
 
         self.compression = compression
 
@@ -1301,8 +1261,6 @@ class Cluster(object):
         self.connect_timeout = connect_timeout
         self.prepare_on_all_hosts = prepare_on_all_hosts
         self.reprepare_on_up = reprepare_on_up
-        self.monitor_reporting_enabled = monitor_reporting_enabled
-        self.monitor_reporting_interval = monitor_reporting_interval
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -1351,13 +1309,6 @@ class Cluster(object):
             self.schema_event_refresh_window, self.topology_event_refresh_window,
             self.status_event_refresh_window,
             schema_metadata_enabled, token_metadata_enabled)
-
-        if client_id is None:
-            self.client_id = uuid.uuid4()
-        if application_name is not None:
-            self.application_name = application_name
-        if application_version is not None:
-            self.application_version = application_version
 
     def register_user_type(self, keyspace, user_type, klass):
         """
@@ -2473,8 +2424,7 @@ class Session(object):
 
     session_id = None
     """
-    A UUID that uniquely identifies this Session to Insights. This will be
-    generated automatically.
+    A UUID that uniquely identifies this Session. This will be generated automatically.
     """
 
     _lock = None
@@ -2527,22 +2477,7 @@ class Session(object):
             except AttributeError:
                 log.info("Unable to set column encryption policy for session")
 
-        if self.cluster.monitor_reporting_enabled:
-            cc_host = self.cluster.get_control_connection_host()
-            valid_insights_version = (cc_host and version_supports_insights(cc_host.dse_version))
-            if valid_insights_version:
-                self._monitor_reporter = MonitorReporter(
-                    interval_sec=self.cluster.monitor_reporting_interval,
-                    session=self,
-                )
-            else:
-                if cc_host:
-                    log.debug('Not starting MonitorReporter thread for Insights; '
-                              'not supported by server version {v} on '
-                              'ControlConnection host {c}'.format(v=cc_host.release_version, c=cc_host))
-
-        log.debug('Started Session with client_id {} and session_id {}'.format(self.cluster.client_id,
-                                                                               self.session_id))
+        log.debug('Started Session with session_id {}'.format(self.session_id))
 
     def execute(self, query, parameters=None, timeout=_NOT_SET, trace=False,
                 custom_payload=None, execution_profile=EXEC_PROFILE_DEFAULT,
