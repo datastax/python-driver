@@ -3,10 +3,10 @@ Installation
 
 Supported Platforms
 -------------------
-Python 3.10 through 3.14 are supported.  Both CPython (the standard Python
-implementation) and `PyPy <http://pypy.org>`_ are supported and tested.
+Python 3.10 through 3.14 are supported.  Linux, OSX, and Windows are supported.
 
-Linux, OSX, and Windows are supported.
+As of Python driver 4.0.0 only CPython is supported.  Prior versions also explicitly supported PyPy but we no longer
+support this runtime.  See `CASSPYTHON-14 <https://issues.apache.org/jira/browse/CASSPYTHON-14>`_ for additional information.
 
 Installation through pip
 ------------------------
@@ -18,7 +18,8 @@ the same time as the driver itself.  To install the driver*::
 
 You can use ``pip install --pre cassandra-driver`` if you need to install a beta version.
 
-***Note**: if intending to use optional extensions, install the `dependencies <#optional-non-python-dependencies>`_ first. The driver may need to be reinstalled if dependencies are added after the initial installation.
+***Note**: if intending to use optional extensions, install the `dependencies <#optional-non-python-dependencies>`_ first.
+The driver may need to be reinstalled if dependencies are added after the initial installation.
 
 Verifying your Installation
 ---------------------------

@@ -1875,9 +1875,6 @@ class BytesToken(Token):
     @classmethod
     def from_string(cls, token_string):
         """ `token_string` should be the string representation from the server. """
-        # unhexlify works fine with unicode input in everythin but pypy3, where it Raises "TypeError: 'str' does not support the buffer interface"
-        if isinstance(token_string, str):
-            token_string = token_string.encode('ascii')
         # The BOP stores a hex string
         return cls(unhexlify(token_string))
 

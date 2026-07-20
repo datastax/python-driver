@@ -16,8 +16,6 @@
 
 import unittest
 import logging
-import sys
-import socket
 import platform
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -70,4 +68,3 @@ def is_windows():
 
 
 notwindows = unittest.skipUnless(not is_windows(), "This test is not adequate for windows")
-notpypy = unittest.skipUnless(not platform.python_implementation() == 'PyPy', "This tests is not suitable for pypy")
