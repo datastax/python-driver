@@ -63,7 +63,8 @@ from cassandra.protocol import (QueryMessage, ResultMessage,
                                 BatchMessage, RESULT_KIND_PREPARED,
                                 RESULT_KIND_SET_KEYSPACE, RESULT_KIND_ROWS,
                                 RESULT_KIND_SCHEMA_CHANGE, ProtocolHandler,
-                                RESULT_KIND_VOID, ProtocolException)
+                                RESULT_KIND_VOID, ProtocolException,
+                                StartupMessage)
 from cassandra.metadata import Metadata, protect_name, murmur3, _NodeInfo
 from cassandra.policies import (TokenAwarePolicy, DCAwareRoundRobinPolicy, SimpleConvictionPolicy,
                                 ExponentialReconnectionPolicy, HostDistance,
@@ -972,6 +973,21 @@ class Cluster(object):
     used for columns in this cluster.
     """
 
+    extra_startup_options: dict[str, str] | None = None
+    """
+    A dict of extra options sent in the STARTUP message when a connection is established.
+
+    This is useful for sending custom startup options that are not supported by the driver.
+    For example, per `CASSANDRA-16378 <https://issues.apache.org/jira/browse/CASSANDRA-16378>`_,
+    custom application level options are exposed in client metrics::
+
+        Cluster(extra_startup_options={'APPLICATION_NAME': 'my-app'})
+
+    Options managed by the driver, such as ``CQL_VERSION``, ``COMPRESSION``, ``NO_COMPACT``,
+    ``DRIVER_NAME`` and ``DRIVER_VERSION``, always take precedence. Extra options that collide
+    with them are ignored.
+    """
+
     @property
     def schema_metadata_enabled(self):
         """
@@ -1069,7 +1085,8 @@ class Cluster(object):
                  ssl_context=None,
                  endpoint_factory=None,
                  cloud=None,
-                 column_encryption_policy=None):
+                 column_encryption_policy=None,
+                 extra_startup_options=None):
         """
         ``executor_threads`` defines the number of threads in a pool for handling asynchronous tasks such as
         establishing connection pools or refreshing metadata.
@@ -1266,6 +1283,13 @@ class Cluster(object):
         self.connect_timeout = connect_timeout
         self.prepare_on_all_hosts = prepare_on_all_hosts
         self.reprepare_on_up = reprepare_on_up
+        self.extra_startup_options = dict(extra_startup_options) if extra_startup_options else {}
+        driver_managed_options = self.extra_startup_options.keys() & StartupMessage.KNOWN_OPTION_KEYS
+        if driver_managed_options:
+            log.warning("Ignoring extra startup option(s) %s: they are managed by the driver "
+                        "and cannot be overridden", ', '.join(sorted(driver_managed_options)))
+            for key in driver_managed_options:
+                del self.extra_startup_options[key]
 
         self._listeners = set()
         self._listener_lock = Lock()
@@ -1556,6 +1580,7 @@ class Cluster(object):
         kwargs_dict.setdefault('user_type_map', self._user_types)
         kwargs_dict.setdefault('allow_beta_protocol_version', self.allow_beta_protocol_version)
         kwargs_dict.setdefault('no_compact', self.no_compact)
+        kwargs_dict.setdefault('extra_startup_options', self.extra_startup_options)
 
         return kwargs_dict
 
